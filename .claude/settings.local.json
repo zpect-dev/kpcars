@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite:*)",
+      "Bash(xargs -0 grep -l \"className\")",
+      "Bash(composer show:*)",
+      "Bash(composer require:*)"
+    ]
+  }
+}

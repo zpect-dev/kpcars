@@ -1,0 +1,296 @@
+
+   PASS  Tests\Unit\ExampleTest
+  ✓ that true is true                                                                                            0.03s  
+
+   FAIL  Tests\Feature\Auth\AuthenticationTest
+  ✓ login screen can be rendered                                                                                 0.51s  
+  ⨯ users can authenticate using the login screen                                                                0.11s  
+  ⨯ users with two factor enabled are redirected to two factor challenge                                         0.03s  
+  ⨯ users can not authenticate with invalid password                                                             0.03s  
+  ⨯ users can logout                                                                                             0.03s  
+  ⨯ users are rate limited                                                                                       0.03s  
+
+   FAIL  Tests\Feature\Auth\PasswordConfirmationTest
+  ⨯ confirm password screen can be rendered                                                                      0.04s  
+  ✓ password confirmation requires authentication                                                                0.04s  
+
+   FAIL  Tests\Feature\Auth\TwoFactorChallengeTest
+  ✓ two factor challenge redirects to login when not authenticated                                               0.04s  
+  ⨯ two factor challenge can be rendered                                                                         0.03s  
+
+   FAIL  Tests\Feature\DashboardTest
+  ✓ guests are redirected to the login page                                                                      0.04s  
+  ⨯ authenticated users can visit the dashboard                                                                  0.04s  
+
+   PASS  Tests\Feature\ExampleTest
+  ✓ returns a successful response                                                                                0.09s  
+
+   PASS  Tests\Feature\ProcessStockMovementActionTest
+  ✓ it ingresa stock correctamente sin patente                                                                   0.22s  
+  ✓ it egresa stock correctamente indicando patente                                                              0.03s  
+  ✓ it falla al procesar un egreso si no se indica la patente                                                    0.03s  
+  ✓ it falla al procesar un egreso si no hay stock suficiente                                                    0.04s  
+
+   FAIL  Tests\Feature\Settings\SecurityTest
+  ⨯ security page is displayed                                                                                   0.03s  
+  ⨯ security page requires password confirmation when enabled                                                    0.03s  
+  ⨯ security page does not require password confirmation when disabled                                           0.03s  
+  ⨯ security page renders without two factor when feature is disabled                                            0.03s  
+  ⨯ password can be updated                                                                                      0.03s  
+  ⨯ correct password must be provided to update password                                                         0.03s  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\AuthenticationTest > users can authenticate using the login screen       QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Jayde Cruickshank, 54006092, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, FtqkwmT7f2, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\AuthenticationTest > users with two factor enabled are redirected to t…  QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Hardy Bernier, 88604220, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, Z8H01ccxoi, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\AuthenticationTest > users can not authenticate with invalid password    QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Lavon Rice, 93775143, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, 16PTkai9Ly, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\AuthenticationTest > users can logout                                    QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Enola Botsford, 83510908, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, 9wvjlq1HH1, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\AuthenticationTest > users are rate limited                              QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Candelario Gulgowski DVM, 20664304, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, eaEYZrOtAS, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\PasswordConfirmationTest > confirm password screen can be rendered       QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Immanuel Keeling, 08236922, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, YIDfTpUQff, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Auth\TwoFactorChallengeTest > two factor challenge can be rendered            QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Nicholas Kassulke, 01362126, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, yNejwx0uZv, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\DashboardTest > authenticated users can visit the dashboard                   QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Ariane Gislason, 38785312, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, m5kyeqeMW3, ?, ?, ?, 2026-04-09 18:29:10, 2026-04-09 18:29:10))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > security page is displayed                            QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Lowell Jenkins DDS, 37227709, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, nu8PU9WUXm, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > security page requires password confirmation when e…  QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Dr. Clotilde Huels I, 81871429, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, cfyPOuhT3s, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > security page does not require password confirmatio…  QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Brant Willms, 32572676, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, 49OED6jM4M, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > security page renders without two factor when featu…  QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Gregory Koss, 70444710, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, 58EwqXebwV, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > password can be updated                               QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Dr. Javier Balistreri I, 74527421, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, fFRPVUVUlV, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Settings\SecurityTest > correct password must be provided to update passwor…  QueryException   
+  SQLSTATE[HY000]: General error: 1 no such table: users (Connection: sqlite, Database: :memory:, SQL: insert into "users" ("name", "dni", "inactivo", "password", "remember_token", "two_factor_secret", "two_factor_recovery_codes", "two_factor_confirmed_at", "updated_at", "created_at") values (Miss Stacy Macejkovic V, 32102456, 0, $2y$04$sloANnqOaqh9omtH/fbXv.oM1bgq49iYsKvpibMODL5g7HfXsok72, iTR2THAmQv, ?, ?, ?, 2026-04-09 18:29:11, 2026-04-09 18:29:11))
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+    577▕             if ($this->pretending()) {
+    578▕                 return true;
+    579▕             }
+    580▕ 
+  ➜ 581▕             $statement = $this->getPdo()->prepare($query);
+    582▕ 
+    583▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    584▕ 
+    585▕             $this->recordsHaveBeenModified();
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:581
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+
+  Tests:    14 failed, 10 passed (22 assertions)
+  Duration: 1.94s
+
