@@ -3,7 +3,7 @@ import {
     ArrowLeft,
     ChevronLeft,
     ChevronRight,
-    RotateCcw,
+    X,
     ArrowDownCircle,
     ArrowUpCircle,
     FileDown,
@@ -197,6 +197,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
         setApplicantQuery('');
     }
 
+    const hasActiveFilters =
+        Boolean(selectedArticleId) || Boolean(selectedPlate) || Boolean(applicantQuery);
+
     return (
         <>
             <Head title="Historial Transacciones" />
@@ -237,9 +240,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
 
                 {/* Panel de Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="grid items-end gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 sm:gap-4">
+                    <div className="flex flex-wrap items-end gap-3">
                         {/* Filtro Artículo */}
-                        <div className="grid gap-2">
+                        <div className="grid min-w-[140px] flex-1 gap-2">
                             <Label htmlFor="article">Artículo</Label>
                             <div className="relative">
                                 <Input
@@ -288,7 +291,7 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                         </div>
 
                         {/* Filtro Patente */}
-                        <div className="grid gap-2">
+                        <div className="grid min-w-[140px] flex-1 gap-2">
                             <Label htmlFor="plate">Patente</Label>
                             <div className="relative">
                                 <Input
@@ -340,7 +343,7 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                         </div>
 
                         {/* Filtro Solicitante */}
-                        <div className="grid gap-2">
+                        <div className="grid min-w-[140px] flex-1 gap-2">
                             <Label htmlFor="applicant">Solicitante</Label>
                             <Input
                                 id="applicant"
@@ -350,15 +353,21 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                             />
                         </div>
 
-                        <div className="grid gap-2">
-                            <Button
-                                variant="outline"
+                        <div className="ml-auto flex items-end">
+                            <button
+                                type="button"
                                 onClick={clearFilters}
-                                className="w-full"
+                                disabled={!hasActiveFilters}
+                                title="Limpiar filtros"
+                                className={cn(
+                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                    hasActiveFilters
+                                        ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
+                                        : 'border-border/40 text-muted-foreground/30 cursor-not-allowed',
+                                )}
                             >
-                                <RotateCcw className="mr-2 h-4 w-4" />
-                                Limpiar Filtros
-                            </Button>
+                                <X className="h-4 w-4" />
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -366,16 +375,16 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                 {/* Table */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase text-muted-foreground">
                                 <tr>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Fecha</th>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Artículo</th>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Cantidad</th>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Patente</th>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Descripción</th>
-                                    <th scope="col" className="px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Solicitante</th>
-                                    <th scope="col" className="px-3 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">Usuario</th>
+                                    <th scope="col" className="w-[13%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Fecha</th>
+                                    <th scope="col" className="w-[22%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Artículo</th>
+                                    <th scope="col" className="w-[10%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Cantidad</th>
+                                    <th scope="col" className="w-[10%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Patente</th>
+                                    <th scope="col" className="w-[22%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Descripción</th>
+                                    <th scope="col" className="w-[13%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Solicitante</th>
+                                    <th scope="col" className="w-[10%] px-3 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">Usuario</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">

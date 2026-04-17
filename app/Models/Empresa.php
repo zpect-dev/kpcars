@@ -11,8 +11,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['nombre'])]
 class Empresa extends Model
 {
+    protected $table = 'empresas';
+
     /**
-     * Get all of the vehiculos for the Empresa.
+     * Get all of the vehicles for the Empresa.
      */
     public function vehiculos(): HasMany
     {

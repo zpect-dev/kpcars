@@ -140,4 +140,14 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    input[type="date"] {
+        position: relative;
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        position: absolute;
+        right: 12px;
+        cursor: pointer;
+    }
 }

@@ -11,8 +11,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Enums\UserRole;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'role'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,7 +31,23 @@ class User extends Authenticatable
             'password' => 'hashed',
             'inactivo' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
+            'role' => UserRole::class,
         ];
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMINISTRADOR;
+    }
+
+    public function isMechanic(): bool
+    {
+        return $this->role === UserRole::MECANICO;
+    }
+
+    public function isChofer(): bool
+    {
+        return $this->role === UserRole::CHOFER;
     }
 
     /**

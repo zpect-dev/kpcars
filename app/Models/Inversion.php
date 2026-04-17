@@ -10,8 +10,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['nombre'])]
 class Inversion extends Model
 {
+    protected $table = 'inversiones';
+
     /**
-     * Get all of the vehiculos for the Empresa.
+     * Get all of the vehicles for the Inversion.
      */
     public function vehiculos(): HasMany
     {

@@ -1,0 +1,615 @@
+import { Head, router, useForm } from '@inertiajs/react';
+import {
+    CalendarPlus,
+    CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    MoreHorizontal,
+    X,
+    XCircle,
+    Wrench,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Vehiculo } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import InputError from '@/components/input-error';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+
+type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado';
+
+interface AppointmentRow {
+    id: number;
+    service: string;
+    license_plate: string;
+    applicant: string;
+    scheduled_date: string;
+    status: AppointmentStatus;
+}
+
+interface PaginationInfo {
+    data: AppointmentRow[];
+    current_page: number;
+    last_page: number;
+    total: number;
+    prev_page_url: string | null;
+    next_page_url: string | null;
+}
+
+interface Filters {
+    from?: string;
+    to?: string;
+    status?: string;
+    plate?: string;
+}
+
+interface Props {
+    appointments: PaginationInfo;
+    filters: Filters;
+    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
+}
+
+const STATUS_STYLES: Record<AppointmentStatus, string> = {
+    agendado:
+        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    en_proceso:
+        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    completado:
+        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+};
+
+const STATUS_LABEL: Record<AppointmentStatus, string> = {
+    agendado: 'Agendado',
+    en_proceso: 'En proceso',
+    completado: 'Completado',
+};
+
+function formatDate(iso: string): string {
+    // Server sends either 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS.000Z' depending on cast.
+    const d = iso.length >= 10 ? iso.slice(0, 10) : iso;
+    const [y, m, day] = d.split('-');
+    return `${day}/${m}/${y}`;
+}
+
+function dayKey(iso: string): string {
+    return iso.length >= 10 ? iso.slice(0, 10) : iso;
+}
+
+export default function AppointmentsIndex({
+    appointments,
+    filters,
+    vehiculos,
+}: Props) {
+    const [from, setFrom] = useState(filters.from || '');
+    const [to, setTo] = useState(filters.to || '');
+    const [status, setStatus] = useState(filters.status || '');
+    const [plate, setPlate] = useState(filters.plate || '');
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const today = useRef(new Date().toISOString().slice(0, 10)).current;
+
+    const form = useForm({
+        service: '' as string,
+        license_plate: '' as string,
+        applicant: '' as string,
+        preferred_date: today,
+    });
+
+    const isMounted = useRef(false);
+
+    const patenteOptions: ComboboxOption[] = useMemo(
+        () =>
+            vehiculos.map((v) => ({
+                value: v.patente,
+                label: v.patente,
+                sub: `${v.marca} ${v.modelo}`,
+            })),
+        [vehiculos],
+    );
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        form.post('/appointments', {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset('license_plate', 'applicant', 'service');
+                setIsDialogOpen(false);
+            },
+        });
+    }
+
+    const canSubmit =
+        !form.processing &&
+        form.data.service.trim() !== '' &&
+        form.data.license_plate.trim() !== '' &&
+        form.data.applicant.trim() !== '' &&
+        form.data.preferred_date !== '';
+
+    useEffect(() => {
+        if (!isMounted.current) {
+            isMounted.current = true;
+            return;
+        }
+
+        const hasChanges =
+            from !== (filters.from || '') ||
+            to !== (filters.to || '') ||
+            status !== (filters.status || '') ||
+            plate !== (filters.plate || '');
+
+        if (!hasChanges) return;
+
+        const timeoutId = setTimeout(() => {
+            const active: Record<string, string> = {};
+            if (from) active.from = from;
+            if (to) active.to = to;
+            if (status) active.status = status;
+            if (plate) active.plate = plate;
+
+            router.get('/appointments', active, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [from, to, status, plate, filters]);
+
+    function clearFilters() {
+        setFrom('');
+        setTo('');
+        setStatus('');
+        setPlate('');
+    }
+
+    const hasActiveFilters = !!(from || to || status || plate);
+
+    function changeStatus(id: number, next: AppointmentStatus) {
+        router.patch(
+            `/appointments/${id}/status`,
+            { status: next },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    }
+
+    return (
+        <>
+            <Head title="Turnos" />
+
+            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+                {/* Header */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <div>
+                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                            Turnos Asignados
+                        </h1>
+                    </div>
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm">
+                                <CalendarPlus className="h-4 w-4" />
+                                <span className="hidden sm:inline">
+                                    Agendar Turno
+                                </span>
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Agendar Turno</DialogTitle>
+                            </DialogHeader>
+
+                            <form
+                                onSubmit={handleSubmit}
+                                className="grid gap-4 py-4"
+                            >
+                                <div className="grid gap-2">
+                                    <Label htmlFor="service">Servicio</Label>
+                                    <Input
+                                        id="service"
+                                        type="text"
+                                        placeholder="Ej. Cambio de aceite"
+                                        value={form.data.service}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'service',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError message={form.errors.service} />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="license_plate">
+                                        Patente
+                                    </Label>
+                                    <Combobox
+                                        id="license_plate"
+                                        placeholder="Buscar patente..."
+                                        options={patenteOptions}
+                                        value={form.data.license_plate}
+                                        onSelect={(o) =>
+                                            form.setData(
+                                                'license_plate',
+                                                o.value,
+                                            )
+                                        }
+                                        uppercase
+                                    />
+                                    <InputError
+                                        message={form.errors.license_plate}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="applicant">
+                                        Solicitante
+                                    </Label>
+                                    <Input
+                                        id="applicant"
+                                        type="text"
+                                        placeholder="Nombre del solicitante"
+                                        value={form.data.applicant}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'applicant',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={form.errors.applicant}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="preferred_date">
+                                        Fecha Solicitada
+                                    </Label>
+                                    <Input
+                                        id="preferred_date"
+                                        type="date"
+                                        min={today}
+                                        value={form.data.preferred_date}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'preferred_date',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={form.errors.preferred_date}
+                                    />
+                                </div>
+
+                                <div className="flex justify-end pt-2">
+                                    <Button type="submit" disabled={!canSubmit}>
+                                        {form.processing
+                                            ? 'Procesando...'
+                                            : 'Guardar Turno'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                {/* Filtros */}
+                <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+                    <div className="flex flex-wrap items-end gap-3">
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="from">Desde</Label>
+                            <Input
+                                id="from"
+                                type="date"
+                                value={from}
+                                onChange={(e) => setFrom(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="to">Hasta</Label>
+                            <Input
+                                id="to"
+                                type="date"
+                                value={to}
+                                onChange={(e) => setTo(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="status">Estado</Label>
+                            <Select
+                                value={status || 'all'}
+                                onValueChange={(v) =>
+                                    setStatus(v === 'all' ? '' : v)
+                                }
+                            >
+                                <SelectTrigger id="status" className="w-full">
+                                    <SelectValue placeholder="Todos" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todos</SelectItem>
+                                    <SelectItem value="agendado">
+                                        Agendado
+                                    </SelectItem>
+                                    <SelectItem value="en_proceso">
+                                        En proceso
+                                    </SelectItem>
+                                    <SelectItem value="completado">
+                                        Completado
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="plate">Patente</Label>
+                            <Input
+                                id="plate"
+                                type="text"
+                                placeholder="Buscar patente..."
+                                value={plate}
+                                onChange={(e) =>
+                                    setPlate(e.target.value.toUpperCase())
+                                }
+                            />
+                        </div>
+
+                        <div className="ml-auto flex items-end">
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                disabled={!hasActiveFilters}
+                                title="Limpiar filtros"
+                                className={cn(
+                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                    hasActiveFilters
+                                        ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
+                                        : 'border-border/40 text-muted-foreground/30 cursor-not-allowed',
+                                )}
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Tabla */}
+                <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                            <thead className="border-b border-border bg-muted/40 text-xs uppercase">
+                                <tr>
+                                    <th className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Fecha
+                                    </th>
+                                    <th className="w-[30%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Servicio
+                                    </th>
+                                    <th className="w-[13%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Patente
+                                    </th>
+                                    <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Solicitante
+                                    </th>
+                                    <th className="w-[13%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Estado
+                                    </th>
+                                    <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {appointments.data.length === 0 ? (
+                                    <tr>
+                                        <td
+                                            colSpan={6}
+                                            className="px-6 py-12 text-center text-muted-foreground"
+                                        >
+                                            No hay turnos que coincidan con los
+                                            filtros.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    appointments.data.map((a) => {
+                                        return (
+                                            <tr
+                                                key={a.id}
+                                                className="bg-card transition-colors hover:bg-muted/40"
+                                            >
+                                                <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground sm:px-6 sm:py-4">
+                                                    {formatDate(
+                                                        a.scheduled_date,
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                    {a.service}
+                                                </td>
+                                                <td className="px-4 py-3 font-mono whitespace-nowrap text-foreground sm:px-6 sm:py-4">
+                                                    {a.license_plate}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                    {a.applicant}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                                            STATUS_STYLES[
+                                                                a.status
+                                                            ],
+                                                        )}
+                                                    >
+                                                        {STATUS_LABEL[a.status]}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right whitespace-nowrap sm:px-6 sm:py-4">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger
+                                                            asChild
+                                                        >
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-8 w-8 p-0"
+                                                            >
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                                <span className="sr-only">
+                                                                    Acciones
+                                                                </span>
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>
+                                                                Cambiar estado
+                                                            </DropdownMenuLabel>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                disabled={
+                                                                    a.status ===
+                                                                    'agendado'
+                                                                }
+                                                                onSelect={() =>
+                                                                    changeStatus(
+                                                                        a.id,
+                                                                        'agendado',
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Clock className="h-4 w-4" />
+                                                                Marcar agendado
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={
+                                                                    a.status ===
+                                                                    'en_proceso'
+                                                                }
+                                                                onSelect={() =>
+                                                                    changeStatus(
+                                                                        a.id,
+                                                                        'en_proceso',
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Wrench className="h-4 w-4" />
+                                                                Marcar en
+                                                                proceso
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                disabled={
+                                                                    a.status ===
+                                                                    'completado'
+                                                                }
+                                                                onSelect={() =>
+                                                                    changeStatus(
+                                                                        a.id,
+                                                                        'completado',
+                                                                    )
+                                                                }
+                                                            >
+                                                                <CheckCircle2 className="h-4 w-4" />
+                                                                Marcar
+                                                                completado
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Paginación */}
+                    {appointments.last_page > 1 && (
+                        <div className="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
+                            <span className="text-xs text-muted-foreground">
+                                Página {appointments.current_page} de{' '}
+                                {appointments.last_page}
+                            </span>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!appointments.prev_page_url}
+                                    onClick={() =>
+                                        appointments.prev_page_url &&
+                                        router.get(
+                                            appointments.prev_page_url,
+                                            {},
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={!appointments.next_page_url}
+                                    onClick={() =>
+                                        appointments.next_page_url &&
+                                        router.get(
+                                            appointments.next_page_url,
+                                            {},
+                                            {
+                                                preserveState: true,
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+}
+
+AppointmentsIndex.layout = {
+    breadcrumbs: [
+        {
+            title: 'Turnos',
+            href: '/appointments',
+        },
+    ],
+};

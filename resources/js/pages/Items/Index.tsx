@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,13 +46,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     // ─── Modal Egreso (OUT) ──────────────────────────────────────────────────
     const [showMovModal, setShowMovModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<Articulo | null>(null);
-    const [showPatenteDropdown, setShowPatenteDropdown] = useState(false);
-    const [patenteSearch, setPatenteSearch] = useState('');
-    const [patenteHighlightedIndex, setPatenteHighlightedIndex] = useState(-1);
     const [movLocalErrors, setMovLocalErrors] = useState<{ cantidad?: string }>(
         {},
     );
-    const patenteRef = useRef<HTMLInputElement>(null);
 
     const movForm = useForm({
         tipo: 'OUT' as string,
@@ -61,24 +58,20 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         descripcion: '' as string,
     });
 
-    const patenteSuggestions = useMemo(() => {
-        const q = patenteSearch.toLowerCase().trim();
-        if (!q) return vehiculos;
-        return vehiculos.filter(
-            (v) =>
-                v.patente.toLowerCase().includes(q) ||
-                v.marca.toLowerCase().includes(q) ||
-                v.modelo.toLowerCase().includes(q),
-        );
-    }, [vehiculos, patenteSearch]);
+    const patenteOptions: ComboboxOption[] = useMemo(
+        () =>
+            vehiculos.map((v) => ({
+                value: v.patente,
+                label: v.patente,
+                sub: `${v.marca} ${v.modelo}`,
+            })),
+        [vehiculos],
+    );
 
     function openMovModal(item: Articulo) {
         setSelectedItem(item);
         movForm.reset();
         movForm.setData('tipo', 'OUT');
-        setShowPatenteDropdown(false);
-        setPatenteSearch('');
-        setPatenteHighlightedIndex(-1);
         setMovLocalErrors({});
         setShowMovModal(true);
     }
@@ -87,53 +80,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setShowMovModal(false);
         setSelectedItem(null);
         movForm.reset();
-        setShowPatenteDropdown(false);
-        setPatenteSearch('');
-        setPatenteHighlightedIndex(-1);
         setMovLocalErrors({});
-    }
-
-    function handlePatenteKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (!showPatenteDropdown || patenteSuggestions.length === 0) return;
-
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            setPatenteHighlightedIndex(
-                (prev) => (prev + 1) % patenteSuggestions.length,
-            );
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setPatenteHighlightedIndex((prev) =>
-                prev <= 0 ? patenteSuggestions.length - 1 : prev - 1,
-            );
-        } else if (e.key === 'Enter' && patenteHighlightedIndex >= 0) {
-            e.preventDefault();
-            const v = patenteSuggestions[patenteHighlightedIndex];
-            movForm.setData('patente', v.patente);
-            setPatenteSearch(v.patente);
-            setShowPatenteDropdown(false);
-            setPatenteHighlightedIndex(-1);
-        } else if (e.key === 'Tab') {
-            e.preventDefault();
-            const v =
-                patenteHighlightedIndex >= 0
-                    ? patenteSuggestions[patenteHighlightedIndex]
-                    : patenteSuggestions[0];
-            movForm.setData('patente', v.patente);
-            setPatenteSearch(v.patente);
-            setShowPatenteDropdown(false);
-            setPatenteHighlightedIndex(-1);
-        } else if (e.key === 'Escape') {
-            setShowPatenteDropdown(false);
-            setPatenteHighlightedIndex(-1);
-        }
-    }
-
-    function handleSelectPatente(v: (typeof vehiculos)[number]) {
-        movForm.setData('patente', v.patente);
-        setPatenteSearch(v.patente);
-        setShowPatenteDropdown(false);
-        setPatenteHighlightedIndex(-1);
     }
 
     function handleMovSubmit(e: React.FormEvent) {
@@ -322,30 +269,30 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[50%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
                                     </th>
                                     <th
                                         scope="col"
-                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Actual
                                     </th>
                                     <th
                                         scope="col"
-                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Mínimo
                                     </th>
                                     <th
                                         scope="col"
-                                        className="px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Acciones
                                     </th>
@@ -483,74 +430,16 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <Label htmlFor="patente">
                                 Patente del Vehículo
                             </Label>
-                            <div className="relative">
-                                <Input
-                                    id="patente"
-                                    ref={patenteRef}
-                                    autoComplete="off"
-                                    placeholder="Buscar patente, marca o modelo..."
-                                    value={patenteSearch}
-                                    onChange={(e) => {
-                                        setPatenteSearch(e.target.value);
-                                        movForm.setData('patente', '');
-                                        setPatenteHighlightedIndex(-1);
-                                        setShowPatenteDropdown(true);
-                                    }}
-                                    onKeyDown={handlePatenteKeyDown}
-                                    onFocus={() => setShowPatenteDropdown(true)}
-                                    onBlur={() =>
-                                        setTimeout(
-                                            () => setShowPatenteDropdown(false),
-                                            150,
-                                        )
-                                    }
-                                />
-                                {showPatenteDropdown && (
-                                    <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                                        <div className="max-h-52 overflow-y-auto">
-                                            {patenteSuggestions.length === 0 ? (
-                                                <p className="px-3 py-2 text-sm text-muted-foreground">
-                                                    Sin coincidencias
-                                                </p>
-                                            ) : (
-                                                patenteSuggestions.map(
-                                                    (v, idx) => (
-                                                        <button
-                                                            key={v.id}
-                                                            type="button"
-                                                            className={cn(
-                                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
-                                                                patenteHighlightedIndex ===
-                                                                    idx
-                                                                    ? 'bg-accent'
-                                                                    : 'hover:bg-accent/60',
-                                                            )}
-                                                            onMouseEnter={() =>
-                                                                setPatenteHighlightedIndex(
-                                                                    idx,
-                                                                )
-                                                            }
-                                                            onMouseDown={() =>
-                                                                handleSelectPatente(
-                                                                    v,
-                                                                )
-                                                            }
-                                                        >
-                                                            <span className="font-medium">
-                                                                {v.patente}
-                                                            </span>
-                                                            <span className="ml-4 shrink-0 text-xs text-muted-foreground">
-                                                                {v.marca}{' '}
-                                                                {v.modelo}
-                                                            </span>
-                                                        </button>
-                                                    ),
-                                                )
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <Combobox
+                                id="patente"
+                                placeholder="Buscar patente, marca o modelo..."
+                                options={patenteOptions}
+                                value={movForm.data.patente}
+                                onSelect={(o) =>
+                                    movForm.setData('patente', o.value)
+                                }
+                                uppercase
+                            />
                             <InputError message={movForm.errors.patente} />
                         </div>
 

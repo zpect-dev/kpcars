@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\ProcessStockMovementAction;
 use App\Models\Articulo;
-use App\Models\Empresa;
+use App\Models\Inversion;
 use App\Models\Transaccion;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -17,7 +17,7 @@ beforeEach(function () {
         'dni' => '12341234',
         'password' => bcrypt('password'),
     ]);
-    $this->empresa = Empresa::create(['nombre' => 'Test Company']);
+    $this->inversion = Inversion::create(['nombre' => 'Test Inversion']);
     
     $this->action = new ProcessStockMovementAction();
 });
@@ -50,7 +50,7 @@ it('egresa stock correctamente indicando patente', function () {
     ]);
 
     $vehiculo = Vehiculo::create([
-        'empresa_id' => $this->empresa->id,
+        'inversion_id' => $this->inversion->id,
         'patente' => 'AB123CD',
         'marca' => 'Toyota',
         'modelo' => 'Corolla',
@@ -90,7 +90,7 @@ it('falla al procesar un egreso si no hay stock suficiente', function () {
     ]);
 
     $vehiculo = Vehiculo::create([
-        'empresa_id' => $this->empresa->id,
+        'inversion_id' => $this->inversion->id,
         'patente' => 'XYZ987',
         'marca' => 'Ford',
         'modelo' => 'Focus',
