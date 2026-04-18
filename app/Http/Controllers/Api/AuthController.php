@@ -84,18 +84,28 @@ class AuthController extends Controller
      */
     public function changePassword(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
 
-        if (! Hash::check($validated['current_password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => ['La contraseña actual es incorrecta.'],
-            ]);
+        $isFirstLogin = $user->must_change_password;
+
+        $rules = [
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ];
+
+        // Only require current password on voluntary changes, not on first login
+        if (! $isFirstLogin) {
+            $rules['current_password'] = ['required', 'string'];
+        }
+
+        $validated = $request->validate($rules);
+
+        if (! $isFirstLogin) {
+            if (! Hash::check($validated['current_password'], $user->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => ['La contraseña actual es incorrecta.'],
+                ]);
+            }
         }
 
         $user->update([
