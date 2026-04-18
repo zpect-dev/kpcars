@@ -13,16 +13,17 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->create([
+        User::create([
             'name' => 'Test User',
             'dni' => '12345678',
             'password' => bcrypt('password'),
+            'role' => 'chofer',
         ]);
 
         $this->call([
             EmpresaSeeder::class,
+            InversionSeeder::class,
             VehiculoSeeder::class,
-            ServiceTypeSeeder::class,
         ]);
     }
 }

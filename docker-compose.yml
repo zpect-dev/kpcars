@@ -1,0 +1,79 @@
+networks:
+  kpcars_net:
+    driver: bridge
+    internal: false
+  proxy_network:
+    external: true
+
+volumes:
+  storage_public:
+  mysql_data:
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: kpcars_db
+    networks:
+      - kpcars_net
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - '3307:3306'
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-p${DB_PASSWORD}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: kpcars_app
+    image: kpcars_app:latest
+    networks:
+      - kpcars_net
+    env_file:
+      - .env
+    expose:
+      - '9000'
+    volumes:
+      - storage_public:/var/www/storage/app/public
+    healthcheck:
+      test: ['CMD', 'cgi-fcgi', '-bind', '-connect', '127.0.0.1:9000']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: web
+    image: kpcars_web:latest
+    container_name: kpcars_nginx
+    networks:
+      - kpcars_net
+      - proxy_network
+    expose:
+      - '80'
+    volumes:
+      - storage_public:/var/www/storage/app/public:ro
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped

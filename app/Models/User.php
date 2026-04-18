@@ -7,18 +7,20 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\UserRole;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'role'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * Get the attributes that should be cast.
@@ -30,6 +32,7 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'inactivo' => 'boolean',
+            'must_change_password' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
         ];
@@ -56,5 +59,15 @@ class User extends Authenticatable
     public function vehiculos(): HasMany
     {
         return $this->hasMany(Vehiculo::class);
+    }
+
+    /**
+     * Get the current active vehicle assignment for the User (conductor).
+     */
+    public function asignacionActiva(): HasOne
+    {
+        return $this->hasOne(Asignacion::class, 'conductor_id')
+            ->whereNull('fecha_fin')
+            ->latestOfMany('fecha_inicio');
     }
 }

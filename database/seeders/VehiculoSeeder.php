@@ -119,7 +119,7 @@ EMP_2	INV_01	AA042ZU	TOYOTA COROLLA XLI 1.8 6M/T	2016";
             if (count($cols) < 5) continue;
 
             $empresaName = $cols[0];
-            $inversionName = $cols[1];
+            $inversionName = str_replace('INV_0', 'INV_', $cols[1]); // Normalize INV_01 to INV_1
             $patente = $cols[2];
             $fullModel = $cols[3];
             $anio = $cols[4];
