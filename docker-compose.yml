@@ -1,13 +1,14 @@
 networks:
   kpcars_net:
     driver: bridge
-    internal: false
-  proxy_network:
-    external: true
 
 volumes:
   storage_public:
   mysql_data:
+  certs:
+  vhost:
+  html:
+  acme:
 
 services:
   db:
@@ -21,9 +22,19 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - '3307:3306'
+      - '127.0.0.1:3307:3306'
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-p${DB_PASSWORD}']
+      test:
+        [
+          'CMD',
+          'mysqladmin',
+          'ping',
+          '-h',
+          '127.0.0.1',
+          '-u',
+          'root',
+          '-p${DB_PASSWORD}',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -40,8 +51,6 @@ services:
       - kpcars_net
     env_file:
       - .env
-    expose:
-      - '9000'
     volumes:
       - storage_public:/var/www/storage/app/public
     healthcheck:
@@ -60,10 +69,12 @@ services:
       dockerfile: Dockerfile
       target: web
     image: kpcars_web:latest
-    container_name: kpcars_nginx
+    container_name: kpcars_nginx_internal
     networks:
       - kpcars_net
-      - proxy_network
+    environment:
+      - VIRTUAL_HOST=${APP_DOMAIN}
+      - LETSENCRYPT_HOST=${APP_DOMAIN}
     expose:
       - '80'
     volumes:
@@ -76,4 +87,39 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    restart: unless-stopped
+
+  # --- Edge reverse proxy: auto-detects containers via Docker socket ---
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nginx_proxy
+    networks:
+      - kpcars_net
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - certs:/etc/nginx/certs:ro
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    restart: unless-stopped
+
+  # --- SSL certificate manager (Let's Encrypt) ---
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx_proxy_letsencrypt
+    networks:
+      - kpcars_net
+    environment:
+      - DEFAULT_EMAIL=${LETSENCRYPT_EMAIL:-admin@example.com}
+      - NGINX_PROXY_CONTAINER=nginx_proxy
+    volumes:
+      - certs:/etc/nginx/certs
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - acme:/etc/acme.sh
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - nginx-proxy
     restart: unless-stopped
