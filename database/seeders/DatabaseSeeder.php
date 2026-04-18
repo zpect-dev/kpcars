@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             EmpresaSeeder::class,
             InversionSeeder::class,
             VehiculoSeeder::class,
+            UserSeeder::class,
         ]);
     }
 }
