@@ -269,7 +269,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed min-w-[800px] text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
@@ -333,7 +333,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 >
                                                     {item.descripcion}
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
                                                     <span
                                                         className={
                                                             lowStock
@@ -344,10 +344,10 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         {item.stock}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={item.min_stock}>
                                                     {item.min_stock}
                                                 </td>
-                                                <td className="px-4 py-3 text-right whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
@@ -607,7 +607,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="stock">
                                     {isRestock

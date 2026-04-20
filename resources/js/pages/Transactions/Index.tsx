@@ -53,10 +53,17 @@ interface Props {
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
 }
 
-export default function TransactionsIndex({ transactions, filters, items, vehiculos }: Props) {
+export default function TransactionsIndex({
+    transactions,
+    filters,
+    items,
+    vehiculos,
+}: Props) {
     // ─── Filtro: Artículo (select con dropdown) ──────────────────────────────
     const [articleSearch, setArticleSearch] = useState('');
-    const [selectedArticleId, setSelectedArticleId] = useState(filters.article || '');
+    const [selectedArticleId, setSelectedArticleId] = useState(
+        filters.article || '',
+    );
     const [showArticleDropdown, setShowArticleDropdown] = useState(false);
     const [articleHighlightedIndex, setArticleHighlightedIndex] = useState(-1);
     const articleRef = useRef<HTMLInputElement>(null);
@@ -90,16 +97,23 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setArticleHighlightedIndex((prev) => (prev + 1) % articleSuggestions.length);
+            setArticleHighlightedIndex(
+                (prev) => (prev + 1) % articleSuggestions.length,
+            );
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setArticleHighlightedIndex((prev) => (prev <= 0 ? articleSuggestions.length - 1 : prev - 1));
+            setArticleHighlightedIndex((prev) =>
+                prev <= 0 ? articleSuggestions.length - 1 : prev - 1,
+            );
         } else if (e.key === 'Enter' && articleHighlightedIndex >= 0) {
             e.preventDefault();
             handleSelectArticle(articleSuggestions[articleHighlightedIndex]);
         } else if (e.key === 'Tab' && articleSuggestions.length > 0) {
             e.preventDefault();
-            const target = articleHighlightedIndex >= 0 ? articleSuggestions[articleHighlightedIndex] : articleSuggestions[0];
+            const target =
+                articleHighlightedIndex >= 0
+                    ? articleSuggestions[articleHighlightedIndex]
+                    : articleSuggestions[0];
             handleSelectArticle(target);
         } else if (e.key === 'Escape') {
             setShowArticleDropdown(false);
@@ -125,7 +139,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
         );
     }, [vehiculos, plateSearch]);
 
-    function handleSelectPlate(v: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>) {
+    function handleSelectPlate(
+        v: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>,
+    ) {
         setPlateSearch(v.patente);
         setSelectedPlate(v.patente);
         setShowPlateDropdown(false);
@@ -137,16 +153,23 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setPlateHighlightedIndex((prev) => (prev + 1) % plateSuggestions.length);
+            setPlateHighlightedIndex(
+                (prev) => (prev + 1) % plateSuggestions.length,
+            );
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setPlateHighlightedIndex((prev) => (prev <= 0 ? plateSuggestions.length - 1 : prev - 1));
+            setPlateHighlightedIndex((prev) =>
+                prev <= 0 ? plateSuggestions.length - 1 : prev - 1,
+            );
         } else if (e.key === 'Enter' && plateHighlightedIndex >= 0) {
             e.preventDefault();
             handleSelectPlate(plateSuggestions[plateHighlightedIndex]);
         } else if (e.key === 'Tab' && plateSuggestions.length > 0) {
             e.preventDefault();
-            const target = plateHighlightedIndex >= 0 ? plateSuggestions[plateHighlightedIndex] : plateSuggestions[0];
+            const target =
+                plateHighlightedIndex >= 0
+                    ? plateSuggestions[plateHighlightedIndex]
+                    : plateSuggestions[0];
             handleSelectPlate(target);
         } else if (e.key === 'Escape') {
             setShowPlateDropdown(false);
@@ -155,7 +178,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
     }
 
     // ─── Filtro: Solicitante ─────────────────────────────────────────────────
-    const [applicantQuery, setApplicantQuery] = useState(filters.applicant || '');
+    const [applicantQuery, setApplicantQuery] = useState(
+        filters.applicant || '',
+    );
 
     // ─── Efecto de búsqueda con debounce ─────────────────────────────────────
     const isMounted = useRef(false);
@@ -198,7 +223,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
     }
 
     const hasActiveFilters =
-        Boolean(selectedArticleId) || Boolean(selectedPlate) || Boolean(applicantQuery);
+        Boolean(selectedArticleId) ||
+        Boolean(selectedPlate) ||
+        Boolean(applicantQuery);
 
     return (
         <>
@@ -225,15 +252,23 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                             size="sm"
                             onClick={() => {
                                 const params = new URLSearchParams();
-                                if (selectedArticleId) params.set('article', selectedArticleId);
-                                if (selectedPlate) params.set('plate', selectedPlate);
-                                if (applicantQuery) params.set('applicant', applicantQuery);
+                                if (selectedArticleId)
+                                    params.set('article', selectedArticleId);
+                                if (selectedPlate)
+                                    params.set('plate', selectedPlate);
+                                if (applicantQuery)
+                                    params.set('applicant', applicantQuery);
                                 const qs = params.toString();
-                                window.open('/pdf/transactions' + (qs ? '?' + qs : ''), '_blank');
+                                window.open(
+                                    '/pdf/transactions' + (qs ? '?' + qs : ''),
+                                    '_blank',
+                                );
                             }}
                         >
                             <FileDown className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
+                            <span className="hidden sm:inline">
+                                Exportar PDF
+                            </span>
                         </Button>
                     </div>
                 </div>
@@ -259,30 +294,52 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                                     }}
                                     onKeyDown={handleArticleKeyDown}
                                     onFocus={() => setShowArticleDropdown(true)}
-                                    onBlur={() => setTimeout(() => setShowArticleDropdown(false), 150)}
+                                    onBlur={() =>
+                                        setTimeout(
+                                            () => setShowArticleDropdown(false),
+                                            150,
+                                        )
+                                    }
                                 />
                                 {showArticleDropdown && (
                                     <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
                                         <div className="max-h-52 overflow-y-auto">
                                             {articleSuggestions.length === 0 ? (
-                                                <p className="px-3 py-2 text-sm text-muted-foreground">Sin coincidencias</p>
+                                                <p className="px-3 py-2 text-sm text-muted-foreground">
+                                                    Sin coincidencias
+                                                </p>
                                             ) : (
-                                                articleSuggestions.map((item, idx) => (
-                                                    <button
-                                                        key={item.id}
-                                                        type="button"
-                                                        className={cn(
-                                                            'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
-                                                            articleHighlightedIndex === idx
-                                                                ? 'bg-accent'
-                                                                : 'hover:bg-accent/60',
-                                                        )}
-                                                        onMouseEnter={() => setArticleHighlightedIndex(idx)}
-                                                        onMouseDown={() => handleSelectArticle(item)}
-                                                    >
-                                                        <span className="font-medium">{item.descripcion}</span>
-                                                    </button>
-                                                ))
+                                                articleSuggestions.map(
+                                                    (item, idx) => (
+                                                        <button
+                                                            key={item.id}
+                                                            type="button"
+                                                            className={cn(
+                                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                                                                articleHighlightedIndex ===
+                                                                    idx
+                                                                    ? 'bg-accent'
+                                                                    : 'hover:bg-accent/60',
+                                                            )}
+                                                            onMouseEnter={() =>
+                                                                setArticleHighlightedIndex(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            onMouseDown={() =>
+                                                                handleSelectArticle(
+                                                                    item,
+                                                                )
+                                                            }
+                                                        >
+                                                            <span className="font-medium">
+                                                                {
+                                                                    item.descripcion
+                                                                }
+                                                            </span>
+                                                        </button>
+                                                    ),
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -308,33 +365,54 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                                     }}
                                     onKeyDown={handlePlateKeyDown}
                                     onFocus={() => setShowPlateDropdown(true)}
-                                    onBlur={() => setTimeout(() => setShowPlateDropdown(false), 150)}
+                                    onBlur={() =>
+                                        setTimeout(
+                                            () => setShowPlateDropdown(false),
+                                            150,
+                                        )
+                                    }
                                 />
                                 {showPlateDropdown && (
                                     <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
                                         <div className="max-h-52 overflow-y-auto">
                                             {plateSuggestions.length === 0 ? (
-                                                <p className="px-3 py-2 text-sm text-muted-foreground">Sin coincidencias</p>
+                                                <p className="px-3 py-2 text-sm text-muted-foreground">
+                                                    Sin coincidencias
+                                                </p>
                                             ) : (
-                                                plateSuggestions.map((v, idx) => (
-                                                    <button
-                                                        key={v.id}
-                                                        type="button"
-                                                        className={cn(
-                                                            'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
-                                                            plateHighlightedIndex === idx
-                                                                ? 'bg-accent'
-                                                                : 'hover:bg-accent/60',
-                                                        )}
-                                                        onMouseEnter={() => setPlateHighlightedIndex(idx)}
-                                                        onMouseDown={() => handleSelectPlate(v)}
-                                                    >
-                                                        <span className="font-medium">{v.patente}</span>
-                                                        <span className="ml-4 shrink-0 text-xs text-muted-foreground">
-                                                            {v.marca} {v.modelo}
-                                                        </span>
-                                                    </button>
-                                                ))
+                                                plateSuggestions.map(
+                                                    (v, idx) => (
+                                                        <button
+                                                            key={v.id}
+                                                            type="button"
+                                                            className={cn(
+                                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                                                                plateHighlightedIndex ===
+                                                                    idx
+                                                                    ? 'bg-accent'
+                                                                    : 'hover:bg-accent/60',
+                                                            )}
+                                                            onMouseEnter={() =>
+                                                                setPlateHighlightedIndex(
+                                                                    idx,
+                                                                )
+                                                            }
+                                                            onMouseDown={() =>
+                                                                handleSelectPlate(
+                                                                    v,
+                                                                )
+                                                            }
+                                                        >
+                                                            <span className="font-medium">
+                                                                {v.patente}
+                                                            </span>
+                                                            <span className="ml-4 shrink-0 text-xs text-muted-foreground">
+                                                                {v.marca}{' '}
+                                                                {v.modelo}
+                                                            </span>
+                                                        </button>
+                                                    ),
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -349,7 +427,9 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                                 id="applicant"
                                 placeholder="Nombre..."
                                 value={applicantQuery}
-                                onChange={(e) => setApplicantQuery(e.target.value)}
+                                onChange={(e) =>
+                                    setApplicantQuery(e.target.value)
+                                }
                             />
                         </div>
 
@@ -363,7 +443,7 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                                     'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
-                                        : 'border-border/40 text-muted-foreground/30 cursor-not-allowed',
+                                        : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
@@ -375,38 +455,91 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                 {/* Table */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
-                            <thead className="border-b border-border bg-muted/40 text-xs uppercase text-muted-foreground">
+                        <table className="w-full min-w-[1000px] table-fixed text-left text-sm text-muted-foreground">
+                            <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
-                                    <th scope="col" className="w-[13%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Fecha</th>
-                                    <th scope="col" className="w-[22%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Artículo</th>
-                                    <th scope="col" className="w-[10%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Cantidad</th>
-                                    <th scope="col" className="w-[10%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Patente</th>
-                                    <th scope="col" className="w-[22%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Descripción</th>
-                                    <th scope="col" className="w-[13%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4">Solicitante</th>
-                                    <th scope="col" className="w-[10%] px-3 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">Usuario</th>
+                                    <th
+                                        scope="col"
+                                        className="w-[10%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Fecha
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[15%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Artículo
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[8%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Cant.
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[20%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Patente
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[20%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Descripción
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[12%] px-3 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Solicitante
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[10%] px-3 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Usuario
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {transactions.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-3 py-12 text-center text-muted-foreground sm:px-6">
-                                            No hay transacciones registradas o no coinciden con la búsqueda.
+                                        <td
+                                            colSpan={7}
+                                            className="px-3 py-12 text-center text-muted-foreground sm:px-6"
+                                        >
+                                            No hay transacciones registradas o
+                                            no coinciden con la búsqueda.
                                         </td>
                                     </tr>
                                 ) : (
                                     transactions.data.map((tx) => (
                                         <tr
                                             key={tx.id}
-                                            className="transition-colors bg-card hover:bg-muted/40"
+                                            className="bg-card transition-colors hover:bg-muted/40"
                                         >
-                                            <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
-                                                {new Date(tx.created_at).toLocaleString('es-AR')}
+                                            <td
+                                                className="px-3 py-3 text-xs whitespace-nowrap sm:px-6 sm:py-4"
+                                                title={new Date(
+                                                    tx.created_at,
+                                                ).toLocaleString('es-AR')}
+                                            >
+                                                {new Date(
+                                                    tx.created_at,
+                                                ).toLocaleString('es-AR')}
                                             </td>
-                                            <td className="px-3 py-3 font-medium whitespace-nowrap text-foreground sm:px-6 sm:py-4">
-                                                {tx.articulo?.descripcion || 'N/A'}
+                                            <td
+                                                className="truncate px-3 py-3 font-medium text-foreground sm:px-6 sm:py-4"
+                                                title={
+                                                    tx.articulo?.descripcion ||
+                                                    'N/A'
+                                                }
+                                            >
+                                                {tx.articulo?.descripcion ||
+                                                    'N/A'}
                                             </td>
-                                            <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td className="truncate px-3 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex items-center gap-2">
                                                     {tx.tipo === 'IN' ? (
                                                         <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
@@ -418,27 +551,42 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td className="px-3 py-3 sm:px-6 sm:py-4">
                                                 {tx.vehiculo ? (
                                                     <div className="flex flex-col">
                                                         <span className="font-medium text-foreground">
-                                                            {tx.vehiculo.patente}
+                                                            {
+                                                                tx.vehiculo
+                                                                    .patente
+                                                            }
                                                         </span>
                                                         <span className="text-xs">
-                                                            {tx.vehiculo.marca} {tx.vehiculo.modelo}
+                                                            {tx.vehiculo.marca}{' '}
+                                                            {tx.vehiculo.modelo}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-muted-foreground">-</span>
+                                                    <span className="text-muted-foreground">
+                                                        -
+                                                    </span>
                                                 )}
                                             </td>
-                                            <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td
+                                                className="truncate px-3 py-3 sm:px-6 sm:py-4"
+                                                title={tx.descripcion || '-'}
+                                            >
                                                 {tx.descripcion || '-'}
                                             </td>
-                                            <td className="px-3 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td
+                                                className="truncate px-3 py-3 sm:px-6 sm:py-4"
+                                                title={tx.solicitante || '-'}
+                                            >
                                                 {tx.solicitante || '-'}
                                             </td>
-                                            <td className="px-3 py-3 text-right whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td
+                                                className="truncate px-3 py-3 text-right sm:px-6 sm:py-4"
+                                                title={tx.user?.name || 'N/A'}
+                                            >
                                                 {tx.user?.name || 'N/A'}
                                             </td>
                                         </tr>
@@ -457,10 +605,14 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                             disabled={!transactions.prev_page_url}
                             onClick={() => {
                                 if (transactions.prev_page_url) {
-                                    router.get(transactions.prev_page_url, {}, {
-                                        preserveState: true,
-                                        preserveScroll: true,
-                                    });
+                                    router.get(
+                                        transactions.prev_page_url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
                                 }
                             }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
@@ -469,17 +621,22 @@ export default function TransactionsIndex({ transactions, filters, items, vehicu
                         </button>
 
                         <span className="text-sm text-muted-foreground tabular-nums">
-                            {transactions.current_page} / {transactions.last_page}
+                            {transactions.current_page} /{' '}
+                            {transactions.last_page}
                         </span>
 
                         <button
                             disabled={!transactions.next_page_url}
                             onClick={() => {
                                 if (transactions.next_page_url) {
-                                    router.get(transactions.next_page_url, {}, {
-                                        preserveState: true,
-                                        preserveScroll: true,
-                                    });
+                                    router.get(
+                                        transactions.next_page_url,
+                                        {},
+                                        {
+                                            preserveState: true,
+                                            preserveScroll: true,
+                                        },
+                                    );
                                 }
                             }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"

@@ -84,7 +84,7 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed min-w-[700px] text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
                                 <tr>
                                     <th className="w-[25%] px-4 py-3 font-medium sm:px-6 sm:py-4">Conductor</th>
@@ -133,10 +133,10 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                                                 <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell sm:px-6 sm:py-4">
                                                     {a.conductor?.dni ?? '—'}
                                                 </td>
-                                                <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                                                <td className="truncate px-4 py-3 sm:px-6 sm:py-4" title={formatDate(a.fecha_inicio)}>
                                                     {formatDate(a.fecha_inicio)}
                                                 </td>
-                                                <td className="hidden whitespace-nowrap px-4 py-3 text-muted-foreground md:table-cell sm:px-6 sm:py-4">
+                                                <td className="hidden truncate px-4 py-3 text-muted-foreground md:table-cell sm:px-6 sm:py-4" title={formatDate(a.fecha_fin)}>
                                                     {formatDate(a.fecha_fin)}
                                                 </td>
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">

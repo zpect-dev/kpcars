@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { useEffect } from 'react';
 import { CalendarClock, LayoutGrid, Package, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -12,15 +13,25 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as articulosIndex } from '@/routes/articulos';
-import type { NavItem, PageProps } from '@/types';
+import type { NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [];
 
 export function AppSidebar() {
-    const { auth } = usePage<PageProps>().props;
+    const { auth } = usePage<any>().props;
+    const { url } = usePage();
+    const { setOpenMobile, isMobile } = useSidebar();
+
+    // Close the mobile sidebar when the URL changes (navigation)
+    useEffect(() => {
+        if (isMobile) {
+            setOpenMobile(false);
+        }
+    }, [url, isMobile, setOpenMobile]);
 
     const mainNavItems: NavItem[] = [
         {
@@ -43,8 +54,13 @@ export function AppSidebar() {
     if (auth.user.role === 'administrador') {
         mainNavItems.push({
             title: 'Usuarios',
-            href: '/users',
+            href: '#',
             icon: Users,
+            items: [
+                { title: 'Administradores', href: '/users?role=administrador' },
+                { title: 'Mecánicos', href: '/users?role=mecanico' },
+                { title: 'Choferes', href: '/users?role=chofer' },
+            ],
         });
     }
 

@@ -52,6 +52,12 @@ class FortifyServiceProvider extends ServiceProvider
                     ]);
                 }
 
+                if ($user->isChofer()) {
+                    throw ValidationException::withMessages([
+                        Fortify::username() => __('Los choferes solo pueden acceder mediante la pagina web.'),
+                    ]);
+                }
+
                 return $user;
             }
         });

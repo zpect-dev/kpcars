@@ -447,7 +447,7 @@ export default function Dashboard({
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed min-w-[1000px] text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase text-muted-foreground">
                                 <tr>
                                     <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -486,10 +486,10 @@ export default function Dashboard({
                                             key={vehiculo.id}
                                             className="bg-card transition-colors hover:bg-muted/40"
                                         >
-                                            <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4" title={vehiculo.patente}>
                                                 {vehiculo.patente}
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex flex-col">
                                                     <span className="font-medium text-foreground">
                                                         {vehiculo.marca} {vehiculo.modelo}
@@ -499,7 +499,7 @@ export default function Dashboard({
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 font-medium sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
                                                 {vehiculo.empresa?.nombre ? (
                                                     <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
                                                         {vehiculo.empresa.nombre}
@@ -508,7 +508,7 @@ export default function Dashboard({
                                                     <span className="italic text-muted-foreground">Sin empresa</span>
                                                 )}
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 font-medium sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
                                                 {vehiculo.inversion?.nombre ? (
                                                     <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
                                                         {vehiculo.inversion.nombre}
@@ -517,12 +517,14 @@ export default function Dashboard({
                                                     <span className="italic text-muted-foreground">Sin inversión</span>
                                                 )}
                                             </td>
-                                            <td className="whitespace-nowrap px-4 py-3 sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 sm:px-6 sm:py-4" title={vehiculo.user?.name || (
+                                                    <span className="italic text-muted-foreground">No asignado</span>
+                                                )}>
                                                 {vehiculo.user?.name || (
                                                     <span className="italic text-muted-foreground">No asignado</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 text-right whitespace-nowrap sm:px-6 sm:py-4">
+                                            <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button
@@ -680,7 +682,7 @@ function VehiculoForm({
 
     return (
         <form onSubmit={onSubmit} className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor="patente">Patente</Label>
                     <Input
@@ -707,7 +709,7 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor="marca">Marca</Label>
                     <Input

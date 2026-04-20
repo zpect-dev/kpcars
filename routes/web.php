@@ -42,7 +42,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])->name('appointments.status');
 
     Route::get('users', [UserController::class, 'index'])->name('users.index');
+    Route::post('users', [UserController::class, 'store'])->name('users.store');
     Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
+    Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 });
 
 require __DIR__.'/settings.php';

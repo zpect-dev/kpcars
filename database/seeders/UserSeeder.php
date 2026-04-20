@@ -16,6 +16,7 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         $users = [
+            ['name' => 'JUAN VARGAS', 'dni' => '29960819'],
             ['name' => 'JOSE LARA', 'dni' => '19122958'],
             ['name' => 'JOAQUIN GUERRA', 'dni' => '42955589'],
             ['name' => 'FEDERICO MASCIOTRA', 'dni' => '43090499'],
@@ -81,6 +82,14 @@ class UserSeeder extends Seeder
             ['name' => 'PABLO ESCOBAR', 'dni' => '96001191'],
             ['name' => 'EMANUEL GONZÁLEZ', 'dni' => '40671289'],
             ['name' => 'DANIEL HORACIO BOYE', 'dni' => '23203264'],
+            ['name' => 'ELIONAR SANCHEZ', 'dni' => '24540789'],
+            ['name' => 'JORGE BOSSY', 'dni' => '96125271'],
+            ['name' => 'MARCELO NUÑEZ', 'dni' => '96107678'],
+            ['name' => 'FRANCISCO COTIS', 'dni' => '95676369'],
+            ['name' => 'GUSTAVO PRIETO', 'dni' => '96213602'],
+            ['name' => 'GABRIEL GUERRA', 'dni' => '96015181'],
+            ['name' => 'CARMEN GIL', 'dni' => '96256456'],
+            ['name' => 'FRANCISCO DUN', 'dni' => '19127307'],
         ];
 
         foreach ($users as $userData) {

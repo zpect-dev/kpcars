@@ -1,13 +1,9 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { dashboard, login, register } from '@/routes';
+import { dashboard, login } from '@/routes';
 import AppLogoIcon from '@/components/app-logo-icon';
 
-export default function Welcome({
-    canRegister = true,
-}: {
-    canRegister?: boolean;
-}) {
-    const { auth } = usePage().props;
+export default function Welcome() {
+    const { auth } = usePage<any>().props;
 
     return (
         <>
@@ -40,14 +36,6 @@ export default function Welcome({
                                 >
                                     Iniciar sesión
                                 </Link>
-                                {canRegister && (
-                                    <Link
-                                        href={register()}
-                                        className="inline-flex w-full items-center justify-center rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
-                                    >
-                                        Registrarse
-                                    </Link>
-                                )}
                             </>
                         )}
                     </div>

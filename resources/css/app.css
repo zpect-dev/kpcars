@@ -150,4 +150,12 @@
         right: 12px;
         cursor: pointer;
     }
+
+    table tbody tr {
+        height: 4rem; /* Altura fija para todas las filas */
+    }
+
+    table td {
+        vertical-align: middle;
+    }
 }

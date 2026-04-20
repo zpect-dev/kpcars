@@ -547,7 +547,7 @@ export default function AppointmentsIndex({
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full table-fixed min-w-[900px] text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase">
                                 <tr>
                                     <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -591,21 +591,23 @@ export default function AppointmentsIndex({
                                                 key={a.id}
                                                 className="bg-card transition-colors hover:bg-muted/40"
                                             >
-                                                <td className="px-4 py-3 font-medium whitespace-nowrap text-foreground sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 font-medium truncate text-foreground sm:px-6 sm:py-4" title={formatDate(
+                                                        a.scheduled_date,
+                                                    )}>
                                                     {formatDate(
                                                         a.scheduled_date,
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={a.service}>
                                                     {a.service}
                                                 </td>
-                                                <td className="px-4 py-3 font-mono whitespace-nowrap text-foreground sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 font-mono truncate text-foreground sm:px-6 sm:py-4" title={a.license_plate}>
                                                     {a.license_plate}
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={a.applicant}>
                                                     {a.applicant}
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
                                                     <span
                                                         className={cn(
                                                             'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -617,7 +619,7 @@ export default function AppointmentsIndex({
                                                         {TYPE_LABEL[a.type]}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
                                                     <span
                                                         className={cn(
                                                             'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -629,7 +631,7 @@ export default function AppointmentsIndex({
                                                         {STATUS_LABEL[a.status]}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-right whitespace-nowrap sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger
                                                             asChild
