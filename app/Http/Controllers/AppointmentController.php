@@ -24,10 +24,17 @@ class AppointmentController extends Controller
     {
         $filters = $request->only(['from', 'to', 'status', 'plate']);
 
+        // Default to today if no date filter is explicitly provided (or cleared)
+        if (! $request->has('from') && ! $request->has('to')) {
+            $filters['from'] = now()->toDateString();
+            $filters['to'] = now()->toDateString();
+        }
+
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->toDateString() : null;
         $to   = ! empty($filters['to'])   ? Carbon::parse($filters['to'])->toDateString()   : null;
 
-        $appointments = Appointment::when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
+        $appointments = Appointment::with('completedBy:id,name')
+            ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
             ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
@@ -63,6 +70,8 @@ class AppointmentController extends Controller
      */
     public function store(Request $request, ScheduleAppointmentAction $action): RedirectResponse
     {
+        abort_if($request->user()->isMechanic(), 403);
+        
         $validated = $request->validate([
             'service' => ['required', 'string', 'max:255'],
             'license_plate' => ['required', 'string', 'max:20'],
@@ -100,11 +109,15 @@ class AppointmentController extends Controller
     public function updateStatus(Request $request, Appointment $appointment): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['required', 'in:agendado,en_proceso,completado'],
+            'status' => ['required', 'in:agendado,en_proceso,completado,cancelado'],
         ]);
 
         $newStatus = $validated['status'];
         $oldStatus = $appointment->status;
+
+        if ($newStatus === 'cancelado') {
+            abort_if($request->user()->isMechanic(), 403, 'Los mecánicos no pueden cancelar turnos.');
+        }
 
         if ($oldStatus === $newStatus) {
             return redirect()->back();
@@ -112,7 +125,13 @@ class AppointmentController extends Controller
 
         try {
             DB::transaction(function () use ($appointment, $newStatus) {
-                $appointment->update(['status' => $newStatus]);
+                $payload = ['status' => $newStatus];
+                
+                if ($newStatus === 'completado') {
+                    $payload['completed_by'] = auth()->id();
+                }
+
+                $appointment->update($payload);
             });
         } catch (RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -122,6 +141,7 @@ class AppointmentController extends Controller
             'agendado'   => 'agendado',
             'en_proceso' => 'en proceso',
             'completado' => 'completado',
+            'cancelado'  => 'cancelado',
         ];
 
         return redirect()->back()->with(

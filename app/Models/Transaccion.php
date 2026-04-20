@@ -108,10 +108,12 @@ class Transaccion extends Model
     /**
      * Scope a query to filter transactions by creation date.
      */
-    public function scopeFilterByDate(Builder $query, ?string $date): Builder
+    /**
+     * Scope a query to filter transactions by creation date range.
+     */
+    public function scopeFilterByDate(Builder $query, ?string $from, ?string $to = null): Builder
     {
-        return $query->when($date, function (Builder $q, string $date) {
-            $q->whereDate('created_at', $date);
-        });
+        return $query->when($from, fn($q) => $q->whereDate('created_at', '>=', $from))
+                     ->when($to, fn($q) => $q->whereDate('created_at', '<=', $to));
     }
 }

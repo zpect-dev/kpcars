@@ -24,6 +24,9 @@ class UserController extends Controller
             'dni' => ['required', 'string', 'max:20', 'unique:users,dni'],
             'role' => ['required', Rule::enum(UserRole::class)],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'correo' => ['nullable', 'email', 'max:255'],
+            'telefono' => ['nullable', 'string', 'max:50'],
+            'fecha_vencimiento_licencia' => ['nullable', 'date'],
         ]);
 
         User::create([
@@ -32,6 +35,9 @@ class UserController extends Controller
             'role' => $validated['role'],
             'password' => Hash::make($validated['password']),
             'must_change_password' => true, // Opcional, pero util para cuentas nuevas
+            'correo' => $validated['correo'] ?? null,
+            'telefono' => $validated['telefono'] ?? null,
+            'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
@@ -45,16 +51,22 @@ class UserController extends Controller
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
             })
-            ->get(['id', 'name', 'dni', 'role', 'inactivo']);
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia']);
         
         $roles = collect(UserRole::cases())->map(fn($role) => [
             'value' => $role->value,
             'label' => $role->label()
         ]);
 
+        $filterRoles = collect(UserRole::cases())->map(fn($role) => [
+            'value' => $role->value,
+            'label' => $role->pluralLabel()
+        ]);
+
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
+            'filterRoles' => $filterRoles,
         ]);
     }
 

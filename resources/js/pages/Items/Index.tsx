@@ -1,4 +1,4 @@
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
     ArrowDownCircle,
     ArrowUpCircle,
@@ -32,6 +32,9 @@ interface Props {
 }
 
 export default function ItemsIndex({ items, vehiculos }: Props) {
+    const { auth } = usePage<any>().props;
+    const isMechanic = auth.user.role === 'mecanico';
+
     // ─── Buscador de artículos ───────────────────────────────────────────────
     const [itemSearch, setItemSearch] = useState('');
 
@@ -242,28 +245,30 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             onChange={(e) => setItemSearch(e.target.value)}
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open('/pdf/stock', '_blank')}
-                        >
-                            <FileDown className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.get(transactionsIndex.url())}
-                        >
-                            <History className="h-4 w-4" />
-                            <span className="hidden sm:inline">Historial</span>
-                        </Button>
-                        <Button size="sm" onClick={openCreateModal}>
-                            <ArrowDownCircle className="h-4 w-4" />
-                            <span className="hidden sm:inline">Ingreso</span>
-                        </Button>
-                    </div>
+                    {!isMechanic && (
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open('/pdf/stock', '_blank')}
+                            >
+                                <FileDown className="h-4 w-4" />
+                                <span className="hidden sm:inline">Exportar PDF</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => router.get(transactionsIndex.url())}
+                            >
+                                <History className="h-4 w-4" />
+                                <span className="hidden sm:inline">Historial</span>
+                            </Button>
+                            <Button size="sm" onClick={openCreateModal}>
+                                <ArrowDownCircle className="h-4 w-4" />
+                                <span className="hidden sm:inline">Ingreso</span>
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tabla */}
@@ -290,19 +295,21 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     >
                                         Stock Mínimo
                                     </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Acciones
-                                    </th>
+                                    {!isMechanic && (
+                                        <th
+                                            scope="col"
+                                            className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                        >
+                                            Acciones
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {filteredItems.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={4}
+                                            colSpan={isMechanic ? 3 : 4}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay artículos registrados o no
@@ -344,21 +351,23 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         {item.stock}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={item.min_stock}>
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={String(item.min_stock)}>
                                                     {item.min_stock}
                                                 </td>
-                                                <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            openMovModal(item)
-                                                        }
-                                                    >
-                                                        <ArrowUpCircle className="h-4 w-4" />
-                                                        <span className="hidden sm:inline">Salida</span>
-                                                    </Button>
-                                                </td>
+                                                {!isMechanic && (
+                                                    <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                openMovModal(item)
+                                                            }
+                                                        >
+                                                            <ArrowUpCircle className="h-4 w-4" />
+                                                            <span className="hidden sm:inline">Salida</span>
+                                                        </Button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     })

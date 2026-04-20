@@ -12,6 +12,9 @@ use App\Http\Controllers\VehiculoController;
 
 Route::get('/', function () {
     if (auth()->check()) {
+        if (auth()->user()->isMechanic()) {
+            return redirect()->route('articulos.index');
+        }
         return redirect()->route('dashboard');
     }
     return redirect()->route('login');

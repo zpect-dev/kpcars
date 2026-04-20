@@ -38,6 +38,7 @@ class ArticuloController extends Controller
      */
     public function store(Request $request, ProcessStockMovementAction $action): RedirectResponse
     {
+        abort_if($request->user()->isMechanic(), 403);
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
             'stock' => ['required', 'integer', 'min:0'],
@@ -86,6 +87,7 @@ class ArticuloController extends Controller
      */
     public function storeMovement(Request $request, Articulo $articulo, ProcessStockMovementAction $action): RedirectResponse
     {
+        abort_if($request->user()->isMechanic(), 403);
         $validated = $request->validate([
             'tipo' => ['required', 'in:IN,OUT'],
             'cantidad' => ['required', 'numeric', 'min:1'],

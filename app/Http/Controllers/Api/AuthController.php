@@ -41,11 +41,6 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($user->role !== UserRole::CHOFER) {
-            throw ValidationException::withMessages([
-                'dni' => ['Acceso no autorizado. Solo conductores pueden iniciar sesión.'],
-            ]);
-        }
 
         // Revoke previous tokens to enforce single-session
         $user->tokens()->delete();

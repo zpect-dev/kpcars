@@ -48,6 +48,8 @@ interface Props {
         article?: string;
         plate?: string;
         applicant?: string;
+        from?: string;
+        to?: string;
     };
     items: Pick<Articulo, 'id' | 'descripcion'>[];
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
@@ -182,6 +184,10 @@ export default function TransactionsIndex({
         filters.applicant || '',
     );
 
+    // ─── Filtro: Fechas ──────────────────────────────────────────────────────
+    const [fromDate, setFromDate] = useState(filters.from || '');
+    const [toDate, setToDate] = useState(filters.to || '');
+
     // ─── Efecto de búsqueda con debounce ─────────────────────────────────────
     const isMounted = useRef(false);
 
@@ -194,7 +200,9 @@ export default function TransactionsIndex({
         const hasChanges =
             selectedArticleId !== (filters.article || '') ||
             selectedPlate !== (filters.plate || '') ||
-            applicantQuery !== (filters.applicant || '');
+            applicantQuery !== (filters.applicant || '') ||
+            fromDate !== (filters.from || '') ||
+            toDate !== (filters.to || '');
 
         if (!hasChanges) return;
 
@@ -203,6 +211,8 @@ export default function TransactionsIndex({
             if (selectedArticleId) activeFilters.article = selectedArticleId;
             if (selectedPlate) activeFilters.plate = selectedPlate;
             if (applicantQuery) activeFilters.applicant = applicantQuery;
+            if (fromDate) activeFilters.from = fromDate;
+            if (toDate) activeFilters.to = toDate;
 
             router.get(index.url(), activeFilters, {
                 preserveState: true,
@@ -212,7 +222,7 @@ export default function TransactionsIndex({
         }, 300);
 
         return () => clearTimeout(timeoutId);
-    }, [selectedArticleId, selectedPlate, applicantQuery, filters]);
+    }, [selectedArticleId, selectedPlate, applicantQuery, fromDate, toDate, filters]);
 
     function clearFilters() {
         setArticleSearch('');
@@ -220,12 +230,16 @@ export default function TransactionsIndex({
         setPlateSearch('');
         setSelectedPlate('');
         setApplicantQuery('');
+        setFromDate('');
+        setToDate('');
     }
 
     const hasActiveFilters =
         Boolean(selectedArticleId) ||
         Boolean(selectedPlate) ||
-        Boolean(applicantQuery);
+        Boolean(applicantQuery) ||
+        Boolean(fromDate) ||
+        Boolean(toDate);
 
     return (
         <>
@@ -258,6 +272,8 @@ export default function TransactionsIndex({
                                     params.set('plate', selectedPlate);
                                 if (applicantQuery)
                                     params.set('applicant', applicantQuery);
+                                if (fromDate) params.set('from', fromDate);
+                                if (toDate) params.set('to', toDate);
                                 const qs = params.toString();
                                 window.open(
                                     '/pdf/transactions' + (qs ? '?' + qs : ''),
@@ -430,6 +446,28 @@ export default function TransactionsIndex({
                                 onChange={(e) =>
                                     setApplicantQuery(e.target.value)
                                 }
+                            />
+                        </div>
+
+                        {/* Filtro Fecha Desde */}
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="from">Desde</Label>
+                            <Input
+                                id="from"
+                                type="date"
+                                value={fromDate}
+                                onChange={(e) => setFromDate(e.target.value)}
+                            />
+                        </div>
+
+                        {/* Filtro Fecha Hasta */}
+                        <div className="grid min-w-[140px] flex-1 gap-2">
+                            <Label htmlFor="to">Hasta</Label>
+                            <Input
+                                id="to"
+                                type="date"
+                                value={toDate}
+                                onChange={(e) => setToDate(e.target.value)}
                             />
                         </div>
 

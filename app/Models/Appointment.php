@@ -18,6 +18,7 @@ class Appointment extends Model
         'applicant',
         'scheduled_date',
         'status',
+        'completed_by',
     ];
 
     /**
@@ -32,6 +33,7 @@ class Appointment extends Model
             'type' => 'string',
             'scheduled_date' => 'date',
             'status' => 'string',
+            'completed_by' => 'integer',
         ];
     }
 
@@ -44,5 +46,10 @@ class Appointment extends Model
         return $query->where('type', 'normal')
             ->whereDate('scheduled_date', $date)
             ->whereIn('status', ['agendado', 'en_proceso']);
+    }
+
+    public function completedBy()
+    {
+        return $this->belongsTo(User::class, 'completed_by');
     }
 }

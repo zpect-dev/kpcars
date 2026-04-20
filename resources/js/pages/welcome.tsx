@@ -26,7 +26,7 @@ export default function Welcome() {
                                 href={dashboard()}
                                 className="inline-flex w-full items-center justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
                             >
-                                Ir al Dashboard
+                                Ir a Vehículos
                             </Link>
                         ) : (
                             <>

@@ -18,7 +18,9 @@ class TransactionController extends Controller
      */
     public function index(Request $request): Response
     {
-        $filters = $request->only(['article', 'plate', 'applicant']);
+        abort_if($request->user()->isMechanic(), 403);
+
+        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
 
         $articleId = $filters['article'] ?? null;
 
@@ -26,6 +28,7 @@ class TransactionController extends Controller
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
+            ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
             ->latest()
             ->paginate(60)
             ->withQueryString();

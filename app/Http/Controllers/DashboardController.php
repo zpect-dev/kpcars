@@ -17,8 +17,10 @@ class DashboardController extends Controller
     /**
      * Handle the incoming request.
      */
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request)
     {
+        abort_if($request->user()->isMechanic(), 403);
+
         $filters = $request->only(['empresa_id', 'inversion_id']);
 
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])

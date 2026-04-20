@@ -1,6 +1,7 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Ban,
     CalendarPlus,
     CheckCircle2,
     ChevronLeft,
@@ -28,6 +29,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -42,7 +44,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
-type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado';
+type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado' | 'cancelado';
 type AppointmentType = 'normal' | 'emergencia';
 
 interface AppointmentRow {
@@ -53,6 +55,9 @@ interface AppointmentRow {
     applicant: string;
     scheduled_date: string;
     status: AppointmentStatus;
+    completed_by?: {
+        name: string;
+    } | null;
 }
 
 interface PaginationInfo {
@@ -86,19 +91,19 @@ const STATUS_STYLES: Record<AppointmentStatus, string> = {
         'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
     completado:
         'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    cancelado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
     agendado: 'Agendado',
     en_proceso: 'En proceso',
     completado: 'Completado',
+    cancelado: 'Cancelado',
 };
 
 const TYPE_STYLES: Record<AppointmentType, string> = {
-    normal:
-        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-    emergencia:
-        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    normal: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    emergencia: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const TYPE_LABEL: Record<AppointmentType, string> = {
@@ -124,6 +129,9 @@ export default function AppointmentsIndex({
     const [status, setStatus] = useState(filters.status || '');
     const [plate, setPlate] = useState(filters.plate || '');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const { auth } = usePage<any>().props;
+    const isMechanic = auth.user.role === 'mecanico';
 
     const today = useRef(new Date().toISOString().slice(0, 10)).current;
 
@@ -169,11 +177,7 @@ export default function AppointmentsIndex({
         form.post('/appointments', {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset(
-                    'license_plate',
-                    'applicant',
-                    'service',
-                );
+                form.reset('license_plate', 'applicant', 'service');
                 form.setData('type', 'normal');
                 setIsDialogOpen(false);
             },
@@ -250,15 +254,16 @@ export default function AppointmentsIndex({
                             Turnos Asignados
                         </h1>
                     </div>
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm">
-                                <CalendarPlus className="h-4 w-4" />
-                                <span className="hidden sm:inline">
-                                    Agendar Turno
-                                </span>
-                            </Button>
-                        </DialogTrigger>
+                    {!isMechanic && (
+                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm">
+                                    <CalendarPlus className="h-4 w-4" />
+                                    <span className="hidden sm:inline">
+                                        Agendar Turno
+                                    </span>
+                                </Button>
+                            </DialogTrigger>
                         <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
                                 <DialogTitle>Agendar Turno</DialogTitle>
@@ -295,7 +300,7 @@ export default function AppointmentsIndex({
                                             )
                                         }
                                         className={cn(
-                                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                                             form.data.type === 'emergencia'
                                                 ? 'bg-red-600'
                                                 : 'bg-gray-200 dark:bg-gray-700',
@@ -303,7 +308,7 @@ export default function AppointmentsIndex({
                                     >
                                         <span
                                             className={cn(
-                                                'pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform mt-0.5 ml-0.5',
+                                                'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
                                                 form.data.type ===
                                                     'emergencia' &&
                                                     'translate-x-4',
@@ -319,7 +324,7 @@ export default function AppointmentsIndex({
                                                     : 'text-muted-foreground',
                                             )}
                                         />
-                                        <Label className="text-sm cursor-pointer select-none">
+                                        <Label className="cursor-pointer text-sm select-none">
                                             Turno de emergencia
                                         </Label>
                                     </div>
@@ -429,9 +434,8 @@ export default function AppointmentsIndex({
                                                 form.data.type ===
                                                 'emergencia' ? (
                                                     <span>
-                                                        Cupos normales
-                                                        agotados — emergencia
-                                                        disponible
+                                                        Cupos normales agotados
+                                                        — emergencia disponible
                                                     </span>
                                                 ) : (
                                                     <span>
@@ -454,16 +458,17 @@ export default function AppointmentsIndex({
                                     />
                                 </div>
 
-                                <div className="flex justify-end pt-2">
+                                <DialogFooter>
                                     <Button type="submit" disabled={!canSubmit}>
                                         {form.processing
                                             ? 'Procesando...'
                                             : 'Guardar Turno'}
                                     </Button>
-                                </div>
+                                </DialogFooter>
                             </form>
                         </DialogContent>
                     </Dialog>
+                    )}
                 </div>
 
                 {/* Filtros */}
@@ -509,6 +514,9 @@ export default function AppointmentsIndex({
                                     <SelectItem value="completado">
                                         Completado
                                     </SelectItem>
+                                    <SelectItem value="cancelado">
+                                        Cancelado
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
@@ -535,7 +543,7 @@ export default function AppointmentsIndex({
                                     'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
-                                        : 'border-border/40 text-muted-foreground/30 cursor-not-allowed',
+                                        : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
@@ -547,28 +555,34 @@ export default function AppointmentsIndex({
                 {/* Tabla */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="overflow-x-auto">
-                        <table className="w-full table-fixed min-w-[900px] text-left text-sm text-muted-foreground">
+                        <table className="w-full min-w-[900px] table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase">
                                 <tr>
-                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        # Turno
+                                    </th>
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Fecha
                                     </th>
-                                    <th className="w-[25%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Servicio
                                     </th>
-                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Patente
                                     </th>
-                                    <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Solicitante
                                     </th>
-                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Tipo
                                     </th>
-                                    <th className="w-[13%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Estado
                                     </th>
-                                    <th className="w-[10%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Completado por
+                                    </th>
+                                    <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
                                 </tr>
@@ -577,7 +591,7 @@ export default function AppointmentsIndex({
                                 {appointments.data.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={9}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay turnos que coincidan con los
@@ -591,35 +605,48 @@ export default function AppointmentsIndex({
                                                 key={a.id}
                                                 className="bg-card transition-colors hover:bg-muted/40"
                                             >
-                                                <td className="px-4 py-3 font-medium truncate text-foreground sm:px-6 sm:py-4" title={formatDate(
+                                                <td className="px-4 py-3 font-medium text-foreground sm:px-6 sm:py-4">
+                                                    #{a.id}
+                                                </td>
+                                                <td
+                                                    className="truncate px-4 py-3 font-medium text-muted-foreground sm:px-6 sm:py-4"
+                                                    title={formatDate(
                                                         a.scheduled_date,
-                                                    )}>
+                                                    )}
+                                                >
                                                     {formatDate(
                                                         a.scheduled_date,
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={a.service}>
+                                                <td
+                                                    className="truncate px-4 py-3 sm:px-6 sm:py-4"
+                                                    title={a.service}
+                                                >
                                                     {a.service}
                                                 </td>
-                                                <td className="px-4 py-3 font-mono truncate text-foreground sm:px-6 sm:py-4" title={a.license_plate}>
+                                                <td
+                                                    className="truncate px-4 py-3 font-mono text-foreground sm:px-6 sm:py-4"
+                                                    title={a.license_plate}
+                                                >
                                                     {a.license_plate}
                                                 </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={a.applicant}>
+                                                <td
+                                                    className="truncate px-4 py-3 sm:px-6 sm:py-4"
+                                                    title={a.applicant}
+                                                >
                                                     {a.applicant}
                                                 </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                     <span
                                                         className={cn(
                                                             'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                                            TYPE_STYLES[
-                                                                a.type
-                                                            ],
+                                                            TYPE_STYLES[a.type],
                                                         )}
                                                     >
                                                         {TYPE_LABEL[a.type]}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                     <span
                                                         className={cn(
                                                             'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
@@ -631,7 +658,29 @@ export default function AppointmentsIndex({
                                                         {STATUS_LABEL[a.status]}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
+                                                <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                    {a.status ===
+                                                        'completado' &&
+                                                    a.completed_by ? (
+                                                        <span
+                                                            className="font-medium text-foreground"
+                                                            title={
+                                                                a.completed_by
+                                                                    .name
+                                                            }
+                                                        >
+                                                            {
+                                                                a.completed_by
+                                                                    .name
+                                                            }
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/40 italic">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger
                                                             asChild
@@ -699,6 +748,27 @@ export default function AppointmentsIndex({
                                                                 Marcar
                                                                 completado
                                                             </DropdownMenuItem>
+                                                            {!isMechanic && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem
+                                                                        disabled={
+                                                                            a.status ===
+                                                                            'cancelado'
+                                                                        }
+                                                                        onSelect={() =>
+                                                                            changeStatus(
+                                                                                a.id,
+                                                                                'cancelado',
+                                                                            )
+                                                                        }
+                                                                        className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                                    >
+                                                                        <Ban className="h-4 w-4" />
+                                                                        Cancelar turno
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </td>

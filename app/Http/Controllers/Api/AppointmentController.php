@@ -120,4 +120,21 @@ class AppointmentController extends Controller
             'appointment' => $appointment,
         ], 201);
     }
+
+    /**
+     * Cancel an appointment from an external web system.
+     */
+    public function cancelExternal(Request $request, Appointment $appointment): JsonResponse
+    {
+        if ($appointment->status === 'cancelado') {
+            return response()->json(['message' => 'El turno ya se encuentra cancelado.'], 400);
+        }
+
+        $appointment->update(['status' => 'cancelado']);
+
+        return response()->json([
+            'message' => 'Turno cancelado exitosamente.',
+            'appointment' => $appointment,
+        ]);
+    }
 }

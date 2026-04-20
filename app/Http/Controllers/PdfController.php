@@ -30,13 +30,14 @@ class PdfController extends Controller
      */
     public function transactions(Request $request): Response
     {
-        $filters = $request->only(['article', 'plate', 'applicant']);
+        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
+            ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
             ->latest()
             ->get();
 

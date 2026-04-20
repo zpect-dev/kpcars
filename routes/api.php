@@ -37,5 +37,6 @@ Route::middleware('auth:sanctum')->group(function () {
         // External integration endpoints
         Route::get('sync-turnos', AppointmentSyncController::class);
         Route::post('turnos-externos', [AppointmentController::class, 'storeExternal']);
+        Route::patch('turnos-externos/{appointment}/cancelar', [AppointmentController::class, 'cancelExternal']);
     });
 });

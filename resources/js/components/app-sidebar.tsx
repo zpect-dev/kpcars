@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, LayoutGrid, Package, Users } from 'lucide-react';
+import { CalendarClock, CarFront, Package, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -33,12 +33,17 @@ export function AppSidebar() {
         }
     }, [url, isMobile, setOpenMobile]);
 
-    const mainNavItems: NavItem[] = [
-        {
-            title: 'Dashboard',
+    const mainNavItems: NavItem[] = [];
+
+    if (auth.user.role !== 'mecanico') {
+        mainNavItems.push({
+            title: 'Vehículos',
             href: dashboard.url(),
-            icon: LayoutGrid,
-        },
+            icon: CarFront,
+        });
+    }
+
+    mainNavItems.push(
         {
             title: 'Inventario',
             href: articulosIndex.url(),
@@ -49,18 +54,13 @@ export function AppSidebar() {
             href: '/appointments',
             icon: CalendarClock,
         },
-    ];
+    );
 
     if (auth.user.role === 'administrador') {
         mainNavItems.push({
             title: 'Usuarios',
-            href: '#',
+            href: '/users',
             icon: Users,
-            items: [
-                { title: 'Administradores', href: '/users?role=administrador' },
-                { title: 'Mecánicos', href: '/users?role=mecanico' },
-                { title: 'Choferes', href: '/users?role=chofer' },
-            ],
         });
     }
 

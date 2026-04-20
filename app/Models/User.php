@@ -15,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\UserRole;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'correo', 'telefono', 'fecha_vencimiento_licencia'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -35,6 +35,7 @@ class User extends Authenticatable
             'must_change_password' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
+            'fecha_vencimiento_licencia' => 'date',
         ];
     }
 
@@ -51,6 +52,11 @@ class User extends Authenticatable
     public function isChofer(): bool
     {
         return $this->role === UserRole::CHOFER;
+    }
+
+    public function isInversor(): bool
+    {
+        return $this->role === UserRole::INVERSOR;
     }
 
     /**
