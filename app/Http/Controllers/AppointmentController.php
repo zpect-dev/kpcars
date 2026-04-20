@@ -40,10 +40,21 @@ class AppointmentController extends Controller
             ->orderBy('patente')
             ->get();
 
+        // Cupos normales usados por día (próximos 60 días) para el calendario del frontend
+        $dailySlots = Appointment::selectRaw('DATE(scheduled_date) as fecha, COUNT(*) as used')
+            ->where('type', 'normal')
+            ->whereIn('status', ['agendado', 'en_proceso'])
+            ->whereDate('scheduled_date', '>=', now()->toDateString())
+            ->groupBy(DB::raw('DATE(scheduled_date)'))
+            ->pluck('used', 'fecha')
+            ->toArray();
+
         return Inertia::render('Appointments/Index', [
-            'appointments'  => $appointments,
-            'filters'       => $filters,
-            'vehiculos'  => $vehiculos,
+            'appointments' => $appointments,
+            'filters'      => $filters,
+            'vehiculos'    => $vehiculos,
+            'dailySlots'   => $dailySlots,
+            'maxSlots'     => 4,
         ]);
     }
 
@@ -57,6 +68,7 @@ class AppointmentController extends Controller
             'license_plate' => ['required', 'string', 'max:20'],
             'applicant' => ['required', 'string', 'max:255'],
             'preferred_date' => ['required', 'date'],
+            'type' => ['required', 'in:normal,emergencia'],
         ]);
 
         $preferred = Carbon::parse($validated['preferred_date'])->startOfDay();
@@ -67,25 +79,23 @@ class AppointmentController extends Controller
                 strtoupper(trim($validated['license_plate'])),
                 trim($validated['applicant']),
                 $preferred,
+                $validated['type'],
             );
         } catch (RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
         $humanAssigned = $appointment->scheduled_date->translatedFormat('d/m/Y');
+        $typeLabel = $validated['type'] === 'emergencia' ? ' (emergencia)' : '';
 
         return redirect()->back()->with(
             'success',
-            "Turno agendado exitosamente para el día {$humanAssigned}.",
+            "Turno{$typeLabel} agendado exitosamente para el día {$humanAssigned}.",
         );
     }
 
     /**
      * Update the status of an appointment.
-     *
-     * Si el turno está cancelado y se lo reactiva a agendado/completado, se
-     * re-valida la capacidad del día bajo bloqueo pesimista para evitar
-     * exceder los cupos por una reactivación concurrente.
      */
     public function updateStatus(Request $request, Appointment $appointment): RedirectResponse
     {

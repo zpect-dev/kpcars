@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AppointmentSyncController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\VehiculoController;
@@ -32,5 +33,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('mi-vehiculo', [VehiculoController::class, 'show']);
         Route::get('mis-turnos', [AppointmentController::class, 'index']);
         Route::post('mis-turnos', [AppointmentController::class, 'store']);
+
+        // External integration endpoints
+        Route::get('sync-turnos', AppointmentSyncController::class);
+        Route::post('turnos-externos', [AppointmentController::class, 'storeExternal']);
     });
 });

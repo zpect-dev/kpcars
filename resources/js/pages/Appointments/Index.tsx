@@ -1,5 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
+    AlertTriangle,
     CalendarPlus,
     CheckCircle2,
     ChevronLeft,
@@ -7,7 +8,6 @@ import {
     Clock,
     MoreHorizontal,
     X,
-    XCircle,
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -43,10 +43,12 @@ import {
 import { cn } from '@/lib/utils';
 
 type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado';
+type AppointmentType = 'normal' | 'emergencia';
 
 interface AppointmentRow {
     id: number;
     service: string;
+    type: AppointmentType;
     license_plate: string;
     applicant: string;
     scheduled_date: string;
@@ -73,6 +75,8 @@ interface Props {
     appointments: PaginationInfo;
     filters: Filters;
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
+    dailySlots: Record<string, number>;
+    maxSlots: number;
 }
 
 const STATUS_STYLES: Record<AppointmentStatus, string> = {
@@ -90,21 +94,30 @@ const STATUS_LABEL: Record<AppointmentStatus, string> = {
     completado: 'Completado',
 };
 
+const TYPE_STYLES: Record<AppointmentType, string> = {
+    normal:
+        'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+    emergencia:
+        'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+};
+
+const TYPE_LABEL: Record<AppointmentType, string> = {
+    normal: 'Normal',
+    emergencia: 'Emergencia',
+};
+
 function formatDate(iso: string): string {
-    // Server sends either 'YYYY-MM-DD' or 'YYYY-MM-DDTHH:MM:SS.000Z' depending on cast.
     const d = iso.length >= 10 ? iso.slice(0, 10) : iso;
     const [y, m, day] = d.split('-');
     return `${day}/${m}/${y}`;
-}
-
-function dayKey(iso: string): string {
-    return iso.length >= 10 ? iso.slice(0, 10) : iso;
 }
 
 export default function AppointmentsIndex({
     appointments,
     filters,
     vehiculos,
+    dailySlots,
+    maxSlots,
 }: Props) {
     const [from, setFrom] = useState(filters.from || '');
     const [to, setTo] = useState(filters.to || '');
@@ -119,6 +132,7 @@ export default function AppointmentsIndex({
         license_plate: '' as string,
         applicant: '' as string,
         preferred_date: today,
+        type: 'normal' as AppointmentType,
     });
 
     const isMounted = useRef(false);
@@ -133,12 +147,34 @@ export default function AppointmentsIndex({
         [vehiculos],
     );
 
+    /**
+     * Check if a given date string (YYYY-MM-DD) has exhausted normal slots.
+     */
+    const isDateFull = (dateStr: string): boolean => {
+        return (dailySlots[dateStr] ?? 0) >= maxSlots;
+    };
+
+    /**
+     * Get the slot usage text for the selected date.
+     */
+    const selectedDateSlots = useMemo(() => {
+        const date = form.data.preferred_date;
+        if (!date) return null;
+        const used = dailySlots[date] ?? 0;
+        return { used, max: maxSlots, full: used >= maxSlots };
+    }, [form.data.preferred_date, dailySlots, maxSlots]);
+
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         form.post('/appointments', {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset('license_plate', 'applicant', 'service');
+                form.reset(
+                    'license_plate',
+                    'applicant',
+                    'service',
+                );
+                form.setData('type', 'normal');
                 setIsDialogOpen(false);
             },
         });
@@ -226,12 +262,69 @@ export default function AppointmentsIndex({
                         <DialogContent className="sm:max-w-[425px]">
                             <DialogHeader>
                                 <DialogTitle>Agendar Turno</DialogTitle>
+                                <DialogDescription className="sr-only">
+                                    Completa los datos para agendar un turno
+                                </DialogDescription>
                             </DialogHeader>
 
                             <form
                                 onSubmit={handleSubmit}
                                 className="grid gap-4 py-4"
                             >
+                                {/* Toggle emergencia */}
+                                <div
+                                    className={cn(
+                                        'flex items-center gap-3 rounded-md border p-3 transition-colors',
+                                        form.data.type === 'emergencia'
+                                            ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                            : 'border-border bg-card',
+                                    )}
+                                >
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={
+                                            form.data.type === 'emergencia'
+                                        }
+                                        onClick={() =>
+                                            form.setData(
+                                                'type',
+                                                form.data.type === 'normal'
+                                                    ? 'emergencia'
+                                                    : 'normal',
+                                            )
+                                        }
+                                        className={cn(
+                                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                            form.data.type === 'emergencia'
+                                                ? 'bg-red-600'
+                                                : 'bg-gray-200 dark:bg-gray-700',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'pointer-events-none block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform mt-0.5 ml-0.5',
+                                                form.data.type ===
+                                                    'emergencia' &&
+                                                    'translate-x-4',
+                                            )}
+                                        />
+                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                        <AlertTriangle
+                                            className={cn(
+                                                'h-4 w-4',
+                                                form.data.type === 'emergencia'
+                                                    ? 'text-red-600'
+                                                    : 'text-muted-foreground',
+                                            )}
+                                        />
+                                        <Label className="text-sm cursor-pointer select-none">
+                                            Turno de emergencia
+                                        </Label>
+                                    </div>
+                                </div>
+
                                 <div className="grid gap-2">
                                     <Label htmlFor="service">Servicio</Label>
                                     <Input
@@ -308,6 +401,54 @@ export default function AppointmentsIndex({
                                             )
                                         }
                                     />
+                                    {/* Slot usage indicator */}
+                                    {selectedDateSlots && (
+                                        <div
+                                            className={cn(
+                                                'flex items-center gap-1.5 text-xs',
+                                                selectedDateSlots.full
+                                                    ? 'text-red-600'
+                                                    : selectedDateSlots.used >=
+                                                        maxSlots - 1
+                                                      ? 'text-amber-600'
+                                                      : 'text-muted-foreground',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'inline-block h-2 w-2 rounded-full',
+                                                    selectedDateSlots.full
+                                                        ? 'bg-red-500'
+                                                        : selectedDateSlots.used >=
+                                                            maxSlots - 1
+                                                          ? 'bg-amber-500'
+                                                          : 'bg-green-500',
+                                                )}
+                                            />
+                                            {selectedDateSlots.full ? (
+                                                form.data.type ===
+                                                'emergencia' ? (
+                                                    <span>
+                                                        Cupos normales
+                                                        agotados — emergencia
+                                                        disponible
+                                                    </span>
+                                                ) : (
+                                                    <span>
+                                                        Sin cupos normales
+                                                        disponibles — active
+                                                        emergencia
+                                                    </span>
+                                                )
+                                            ) : (
+                                                <span>
+                                                    {selectedDateSlots.used}/
+                                                    {selectedDateSlots.max}{' '}
+                                                    cupos normales usados
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     <InputError
                                         message={form.errors.preferred_date}
                                     />
@@ -409,22 +550,25 @@ export default function AppointmentsIndex({
                         <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase">
                                 <tr>
-                                    <th className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Fecha
                                     </th>
-                                    <th className="w-[30%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[25%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Servicio
                                     </th>
-                                    <th className="w-[13%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Patente
                                     </th>
-                                    <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Solicitante
+                                    </th>
+                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Tipo
                                     </th>
                                     <th className="w-[13%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Estado
                                     </th>
-                                    <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[10%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
                                 </tr>
@@ -433,7 +577,7 @@ export default function AppointmentsIndex({
                                 {appointments.data.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={6}
+                                            colSpan={7}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay turnos que coincidan con los
@@ -460,6 +604,18 @@ export default function AppointmentsIndex({
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
                                                     {a.applicant}
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
+                                                    <span
+                                                        className={cn(
+                                                            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                                            TYPE_STYLES[
+                                                                a.type
+                                                            ],
+                                                        )}
+                                                    >
+                                                        {TYPE_LABEL[a.type]}
+                                                    </span>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap sm:px-6 sm:py-4">
                                                     <span

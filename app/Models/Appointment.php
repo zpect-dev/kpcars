@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Appointment extends Model
 {
@@ -13,6 +13,7 @@ class Appointment extends Model
 
     protected $fillable = [
         'service',
+        'type',
         'license_plate',
         'applicant',
         'scheduled_date',
@@ -28,8 +29,20 @@ class Appointment extends Model
     {
         return [
             'service' => 'string',
+            'type' => 'string',
             'scheduled_date' => 'date',
             'status' => 'string',
         ];
+    }
+
+    /**
+     * Scope: turnos normales activos (no completados) en una fecha dada.
+     * Usado para validar el límite de cupos diarios.
+     */
+    public function scopeNormalOnDate(Builder $query, string $date): Builder
+    {
+        return $query->where('type', 'normal')
+            ->whereDate('scheduled_date', $date)
+            ->whereIn('status', ['agendado', 'en_proceso']);
     }
 }

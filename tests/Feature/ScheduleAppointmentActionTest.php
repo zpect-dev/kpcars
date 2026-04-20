@@ -4,135 +4,180 @@ declare(strict_types=1);
 
 use App\Actions\ScheduleAppointmentAction;
 use App\Models\Appointment;
-use App\Models\ServiceType;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
-
-uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->action = new ScheduleAppointmentAction();
-
-    $this->basico = ServiceType::create([
-        'name' => 'Básico',
-        'description' => 'Cambio de aceite.',
-        'required_slots' => 1,
-    ]);
-    $this->medio = ServiceType::create([
-        'name' => 'Medio',
-        'description' => 'Frenos.',
-        'required_slots' => 3,
-    ]);
-    $this->complejo = ServiceType::create([
-        'name' => 'Complejo',
-        'description' => 'Ajuste de motor.',
-        'required_slots' => 5,
-    ]);
 });
 
-it('agenda un turno normal para la fecha preferida', function () {
-    // Lunes 2026-04-13
-    $preferred = Carbon::parse('2026-04-13');
+it('agenda un turno normal con cupos disponibles', function () {
+    $preferred = Carbon::parse('2026-04-22'); // Miércoles
 
     $appointment = $this->action->execute(
-        $this->basico,
+        'Cambio de aceite',
         'ABC123',
         'Juan Pérez',
         $preferred,
+        'normal',
     );
 
     expect($appointment)->toBeInstanceOf(Appointment::class)
-        ->and($appointment->scheduled_date->toDateString())->toBe('2026-04-13')
+        ->and($appointment->scheduled_date->toDateString())->toBe('2026-04-22')
         ->and($appointment->license_plate)->toBe('ABC123')
         ->and($appointment->applicant)->toBe('Juan Pérez')
-        ->and($appointment->service_type_id)->toBe($this->basico->id)
-        ->and($appointment->status)->toBe('pending');
+        ->and($appointment->type)->toBe('normal')
+        ->and($appointment->status)->toBe('agendado');
 });
 
-it('desplaza al día siguiente cuando se excede la capacidad diaria', function () {
-    // Lunes 2026-04-13 — llenamos con 18 cupos (Básico x18 → 18 cupos).
-    $preferred = Carbon::parse('2026-04-13');
-    for ($i = 0; $i < 18; $i++) {
-        Appointment::create([
-            'service_type_id' => $this->basico->id,
-            'license_plate' => 'FILL'.$i,
-            'applicant' => 'Fill',
-            'scheduled_date' => $preferred->toDateString(),
-            'status' => 'pending',
-        ]);
-    }
+it('rechaza un turno normal cuando los 4 cupos están ocupados', function () {
+    $date = Carbon::parse('2026-04-22');
 
-    // Intentamos agendar "Complejo" (5 cupos): 18 + 5 = 23 > 20 → debe ir al martes.
-    $appointment = $this->action->execute(
-        $this->complejo,
-        'XYZ999',
-        'Ana García',
-        $preferred,
-    );
-
-    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-14');
-});
-
-it('omite los domingos al buscar disponibilidad', function () {
-    // Sábado 2026-04-18 → debe saltar domingo 19 y agendar lunes 20.
-    $sabado = Carbon::parse('2026-04-18');
-    // Saturamos el sábado: Complejo x4 = 20 cupos.
+    // Llenar los 4 cupos normales
     for ($i = 0; $i < 4; $i++) {
         Appointment::create([
-            'service_type_id' => $this->complejo->id,
-            'license_plate' => 'SAT'.$i,
-            'applicant' => 'Sat',
-            'scheduled_date' => $sabado->toDateString(),
-            'status' => 'pending',
+            'service' => 'Servicio '.$i,
+            'license_plate' => 'FILL'.$i,
+            'applicant' => 'Fill',
+            'scheduled_date' => $date->toDateString(),
+            'type' => 'normal',
+            'status' => 'agendado',
         ]);
     }
 
+    // El 5to normal debe ser rechazado
+    $this->action->execute(
+        'Servicio extra',
+        'XYZ999',
+        'Ana García',
+        $date,
+        'normal',
+    );
+})->throws(RuntimeException::class, 'No hay cupos normales disponibles para esta fecha.');
+
+it('permite turno de emergencia aunque los cupos normales estén llenos', function () {
+    $date = Carbon::parse('2026-04-22');
+
+    // Llenar los 4 cupos normales
+    for ($i = 0; $i < 4; $i++) {
+        Appointment::create([
+            'service' => 'Servicio '.$i,
+            'license_plate' => 'FILL'.$i,
+            'applicant' => 'Fill',
+            'scheduled_date' => $date->toDateString(),
+            'type' => 'normal',
+            'status' => 'agendado',
+        ]);
+    }
+
+    // Emergencia siempre pasa
     $appointment = $this->action->execute(
-        $this->basico,
-        'DOM001',
-        'Cliente Domingo',
-        $sabado,
+        'Reparación urgente',
+        'EMR001',
+        'Carlos López',
+        $date,
+        'emergencia',
     );
 
-    // No debe caer en domingo 2026-04-19 (Carbon::parse('2026-04-19')->isSunday() === true)
-    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-20')
-        ->and($appointment->scheduled_date->isSunday())->toBeFalse();
+    expect($appointment->type)->toBe('emergencia')
+        ->and($appointment->scheduled_date->toDateString())->toBe('2026-04-22');
 });
 
-it('si la fecha preferida es domingo, avanza al lunes aunque haya capacidad', function () {
-    $domingo = Carbon::parse('2026-04-19');
+it('rechaza domingos para ambos tipos de turno', function (string $type) {
+    $domingo = Carbon::parse('2026-04-26'); // Domingo
     expect($domingo->isSunday())->toBeTrue();
 
-    $appointment = $this->action->execute(
-        $this->basico,
+    $this->action->execute(
+        'Servicio',
         'SUN001',
         'Cliente',
         $domingo,
+        $type,
+    );
+})->throws(RuntimeException::class, 'El taller no atiende los días domingo.')
+  ->with(['normal', 'emergencia']);
+
+it('los turnos de emergencia no afectan el conteo de cupos normales', function () {
+    $date = Carbon::parse('2026-04-22');
+
+    // 3 normales + 2 emergencias
+    for ($i = 0; $i < 3; $i++) {
+        Appointment::create([
+            'service' => 'Normal '.$i,
+            'license_plate' => 'NRM'.$i,
+            'applicant' => 'Cliente',
+            'scheduled_date' => $date->toDateString(),
+            'type' => 'normal',
+            'status' => 'agendado',
+        ]);
+    }
+    for ($i = 0; $i < 2; $i++) {
+        Appointment::create([
+            'service' => 'Emergencia '.$i,
+            'license_plate' => 'EMR'.$i,
+            'applicant' => 'Cliente',
+            'scheduled_date' => $date->toDateString(),
+            'type' => 'emergencia',
+            'status' => 'agendado',
+        ]);
+    }
+
+    // El 4to normal todavía debe ser posible (solo 3 normales usados)
+    $appointment = $this->action->execute(
+        'Cuarto normal',
+        'OK001',
+        'Cliente',
+        $date,
+        'normal',
     );
 
-    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-20');
+    expect($appointment->type)->toBe('normal')
+        ->and($appointment->scheduled_date->toDateString())->toBe('2026-04-22');
+
+    // Total de normales ahora es 4, verificar que sea el límite
+    expect(Appointment::normalOnDate($date->toDateString())->count())->toBe(4);
 });
 
-it('los turnos cancelados no cuentan contra la capacidad diaria', function () {
-    $preferred = Carbon::parse('2026-04-13');
+it('los turnos completados no cuentan contra la capacidad diaria', function () {
+    $date = Carbon::parse('2026-04-22');
 
-    // 20 cupos ocupados pero todos cancelados → el día sigue libre.
+    // 4 normales pero todos completados → no cuentan
     for ($i = 0; $i < 4; $i++) {
         Appointment::create([
-            'service_type_id' => $this->complejo->id,
-            'license_plate' => 'CNL'.$i,
-            'applicant' => 'Cancelado',
-            'scheduled_date' => $preferred->toDateString(),
-            'status' => 'cancelled',
+            'service' => 'Completado '.$i,
+            'license_plate' => 'CMP'.$i,
+            'applicant' => 'Cliente',
+            'scheduled_date' => $date->toDateString(),
+            'type' => 'normal',
+            'status' => 'completado',
         ]);
     }
 
     $appointment = $this->action->execute(
-        $this->complejo,
-        'OK001',
+        'Nuevo turno',
+        'NEW001',
         'Cliente',
-        $preferred,
+        $date,
+        'normal',
     );
 
-    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-13');
+    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-22');
+});
+
+it('permite múltiples turnos de emergencia sin límite', function () {
+    $date = Carbon::parse('2026-04-22');
+
+    // Crear 10 turnos de emergencia → todos deben pasar
+    for ($i = 0; $i < 10; $i++) {
+        $appointment = $this->action->execute(
+            'Emergencia '.$i,
+            'EMR'.$i,
+            'Cliente',
+            $date,
+            'emergencia',
+        );
+
+        expect($appointment->type)->toBe('emergencia');
+    }
+
+    expect(Appointment::whereDate('scheduled_date', $date->toDateString())->count())->toBe(10);
 });

@@ -62,6 +62,7 @@ class AppointmentController extends Controller
         $validated = $request->validate([
             'service' => ['required', 'string', 'max:255'],
             'preferred_date' => ['required', 'date'],
+            'type' => ['sometimes', 'in:normal,emergencia'],
         ]);
 
         $preferred = Carbon::parse($validated['preferred_date'])->startOfDay();
@@ -72,6 +73,43 @@ class AppointmentController extends Controller
                 strtoupper($asignacion->vehiculo->patente),
                 $user->name,
                 $preferred,
+                $validated['type'] ?? 'normal',
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => "Turno agendado exitosamente para el día {$appointment->scheduled_date->translatedFormat('d/m/Y')}.",
+            'appointment' => $appointment,
+        ], 201);
+    }
+
+    /**
+     * Schedule a new appointment from an external web system.
+     *
+     * Requires all fields explicitly (same as the internal web form).
+     * No vehicle assignment check — the external system provides everything.
+     */
+    public function storeExternal(Request $request, ScheduleAppointmentAction $action): JsonResponse
+    {
+        $validated = $request->validate([
+            'service' => ['required', 'string', 'max:255'],
+            'license_plate' => ['required', 'string', 'max:20'],
+            'applicant' => ['required', 'string', 'max:255'],
+            'preferred_date' => ['required', 'date'],
+            'type' => ['sometimes', 'in:normal,emergencia'],
+        ]);
+
+        $preferred = Carbon::parse($validated['preferred_date'])->startOfDay();
+
+        try {
+            $appointment = $action->execute(
+                trim($validated['service']),
+                strtoupper(trim($validated['license_plate'])),
+                trim($validated['applicant']),
+                $preferred,
+                $validated['type'] ?? 'normal',
             );
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
