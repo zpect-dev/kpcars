@@ -112,8 +112,6 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         name: '',
         dni: '',
         role: 'MECANICO',
-        password: '',
-        password_confirmation: '',
         correo: '',
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',
@@ -626,47 +624,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="password">
-                                    Contraseña Provisional
-                                </Label>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    value={createForm.data.password}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'password',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                                <InputError
-                                    message={createForm.errors.password}
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="password_confirmation">
-                                    Confirmar Contraseña
-                                </Label>
-                                <Input
-                                    id="password_confirmation"
-                                    type="password"
-                                    value={
-                                        createForm.data.password_confirmation
-                                    }
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'password_confirmation',
-                                            e.target.value,
-                                        )
-                                    }
-                                    required
-                                />
-                            </div>
+                        <div className="rounded-lg border border-border bg-muted/50 p-3">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                <span className="font-semibold text-foreground">Contraseña Automática:</span> La contraseña provisional se generará combinando la <span className="font-medium text-foreground text-red-600">primera letra del nombre (Mayúscula)</span> seguido del <span className="font-medium text-foreground text-red-600">DNI</span> sin puntos.
+                            </p>
                         </div>
 
                         <DialogFooter>

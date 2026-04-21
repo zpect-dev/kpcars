@@ -18,7 +18,7 @@ class PasswordUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' => $this->passwordRules(),
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
         ];
     }
 }

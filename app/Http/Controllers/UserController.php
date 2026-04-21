@@ -23,7 +23,6 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'dni' => ['required', 'string', 'max:20', 'unique:users,dni'],
             'role' => ['required', Rule::enum(UserRole::class)],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
             'correo' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
@@ -35,12 +34,15 @@ class UserController extends Controller
             $photoPath = $request->file('profile_photo')->store('profile-photos', 'public');
         }
 
+        // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
+        $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)) . $validated['dni'];
+
         User::create([
             'name' => $validated['name'],
             'dni' => $validated['dni'],
             'role' => $validated['role'],
-            'password' => Hash::make($validated['password']),
-            'must_change_password' => true, // Opcional, pero util para cuentas nuevas
+            'password' => Hash::make($generatedPassword),
+            'must_change_password' => true,
             'correo' => $validated['correo'] ?? null,
             'telefono' => $validated['telefono'] ?? null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
