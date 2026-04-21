@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\AnnulTransactionAction;
 use App\Models\Articulo;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
@@ -39,5 +40,17 @@ class TransactionController extends Controller
             'items'        => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
             'vehiculos'    => Vehiculo::orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
         ]);
+    }
+
+    /**
+     * Annul the specified transaction.
+     */
+    public function annul(Transaccion $transaccion, AnnulTransactionAction $annulAction)
+    {
+        abort_unless(auth()->user()->isAdmin(), 403, 'Solo los administradores pueden anular transacciones.');
+
+        $annulAction->execute($transaccion);
+
+        return back()->with('success', 'Transacción anulada correctamente.');
     }
 }

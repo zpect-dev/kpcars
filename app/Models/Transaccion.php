@@ -20,7 +20,18 @@ class Transaccion extends Model
         'tipo',
         'cantidad',
         'descripcion',
+        'inactiva',
     ];
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('activa', function (Builder $builder) {
+            $builder->where('inactiva', false);
+        });
+    }
 
     /**
      * Get the attributes that should be cast.
@@ -31,6 +42,7 @@ class Transaccion extends Model
     {
         return [
             'cantidad' => 'integer',
+            'inactiva' => 'boolean',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

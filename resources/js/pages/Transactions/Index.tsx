@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowLeft,
     ChevronLeft,
@@ -7,12 +7,23 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     FileDown,
+    RotateCcw,
+    AlertTriangle,
+    Loader2,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { index } from '@/routes/transactions';
 import { index as articulosIndex } from '@/routes/articulos';
 import type { Articulo, Vehiculo, User } from '@/types';
@@ -43,6 +54,9 @@ interface PaginationInfo {
 }
 
 interface Props {
+    auth: {
+        user: User;
+    };
     transactions: PaginationInfo;
     filters: {
         article?: string;
@@ -56,11 +70,37 @@ interface Props {
 }
 
 export default function TransactionsIndex({
+    auth,
     transactions,
     filters,
     items,
     vehiculos,
 }: Props) {
+    const isAdmin = auth.user.role === 'administrador';
+
+    // ─── Estado anulación ────────────────────────────────────────────────────
+    const [annulDialog, setAnnulDialog] = useState(false);
+    const [selectedTx, setSelectedTx] = useState<Transaccion | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    function openAnnulModal(tx: Transaccion) {
+        setSelectedTx(tx);
+        setAnnulDialog(true);
+    }
+
+    function handleAnnul() {
+        if (!selectedTx) return;
+
+        setIsProcessing(true);
+        router.post(`/transactions/${selectedTx.id}/annul`, {}, {
+            onSuccess: () => {
+                setAnnulDialog(false);
+                setSelectedTx(null);
+            },
+            onFinish: () => setIsProcessing(false),
+            preserveScroll: true,
+        });
+    }
     // ─── Filtro: Artículo (select con dropdown) ──────────────────────────────
     const [articleSearch, setArticleSearch] = useState('');
     const [selectedArticleId, setSelectedArticleId] = useState(
@@ -540,6 +580,14 @@ export default function TransactionsIndex({
                                     >
                                         Usuario
                                     </th>
+                                    {isAdmin && (
+                                        <th
+                                            scope="col"
+                                            className="w-[5%] px-3 py-3 text-center font-medium tracking-wider sm:px-6 sm:py-4"
+                                        >
+                                            
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -629,6 +677,20 @@ export default function TransactionsIndex({
                                             >
                                                 {tx.user?.name || 'N/A'}
                                             </td>
+                                            {isAdmin && (
+                                                <td className="px-3 py-3 text-center sm:px-6 sm:py-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            openAnnulModal(tx)
+                                                        }
+                                                        className="text-muted-foreground transition-colors hover:text-amber-500"
+                                                        title="Anular transacción"
+                                                    >
+                                                        <RotateCcw className="h-4 w-4" />
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))
                                 )}
@@ -695,11 +757,86 @@ export default function TransactionsIndex({
                                             {tx.user?.name || 'N/A'}
                                         </span>
                                     </p>
+                                    {isAdmin && (
+                                        <div className="mt-1 flex justify-end pt-2 border-t border-border/50">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 gap-1.5 text-xs text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400"
+                                                onClick={() =>
+                                                    openAnnulModal(tx)
+                                                }
+                                            >
+                                                <RotateCcw className="h-3.5 w-3.5" />
+                                                Anular
+                                            </Button>
+                                        </div>
+                                    )}
                                 </li>
                             ))
                         )}
                     </ul>
                 </div>
+
+                {/* Confirmar Anulación Modal */}
+                <Dialog open={annulDialog} onOpenChange={setAnnulDialog}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2 text-red-600">
+                                <AlertTriangle className="h-5 w-5" />
+                                Confirmar Anulación
+                            </DialogTitle>
+                            <DialogDescription className="pt-2">
+                                ¿Estás seguro de que deseas anular esta transacción?
+                                Esta acción **revertirá el stock** del artículo (
+                                <span className="font-semibold text-foreground">
+                                    {selectedTx?.articulo?.descripcion}
+                                </span>
+                                ) y ocultará este registro permanentemente.
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="my-4 rounded-lg bg-muted/50 p-3 text-xs space-y-1">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Tipo:</span>
+                                <span className="font-medium text-foreground">{selectedTx?.tipo === 'IN' ? 'Ingreso' : 'Egreso'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Cantidad:</span>
+                                <span className="font-medium text-foreground">{selectedTx?.cantidad} unidades</span>
+                            </div>
+                            {selectedTx?.vehiculo && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Vehículo:</span>
+                                    <span className="font-medium text-foreground">{selectedTx.vehiculo.patente}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <DialogFooter className="gap-2 sm:justify-end">
+                            <Button
+                                variant="outline"
+                                onClick={() => setAnnulDialog(false)}
+                                disabled={isProcessing}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleAnnul}
+                                disabled={isProcessing}
+                                className="gap-2 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400"
+                            >
+                                {isProcessing ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                    <RotateCcw className="h-4 w-4" />
+                                )}
+                                Confirmar Anulación
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Paginación */}
                 {transactions.last_page > 1 && (

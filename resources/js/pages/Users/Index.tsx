@@ -14,6 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
+import { cn } from '@/lib/utils';
 
 import { index as usersIndex, updateRole, store } from '@/routes/users';
 
@@ -237,20 +238,22 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
             <Head title={pageTitle} />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
-                    <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                        <div className="relative w-full sm:max-w-xs">
-                            <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+                        {/* Buscador */}
+                        <div className="relative w-full lg:max-w-xs">
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 type="text"
                                 placeholder="Buscar por nombre o DNI..."
-                                className="bg-card pl-9 shadow-xs"
+                                className="bg-card pl-9 shadow-sm"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        {/* Filtros de Rol */}
+                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-1.5">
                             {filterRoles.map((r) => (
                                 <Button
                                     key={r.value}
@@ -260,7 +263,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                             : 'outline'
                                     }
                                     size="sm"
-                                    className="h-8 rounded-md px-4 text-xs font-medium"
+                                    className={cn(
+                                        "h-9 rounded-md px-4 text-xs font-medium transition-all",
+                                        filterRole === r.value ? "shadow-sm" : ""
+                                    )}
                                     onClick={() =>
                                         router.get(
                                             usersIndex.url(),
@@ -275,8 +281,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                         </div>
                     </div>
 
-                    <div className="flex gap-2">
-                        <Button size="sm" onClick={openCreateModal}>
+                    {/* Botón Acción */}
+                    <div className="flex w-full sm:w-auto">
+                        <Button className="w-full sm:w-auto" size="default" onClick={openCreateModal}>
                             <Plus className="mr-2 h-4 w-4" />
                             Nuevo Usuario
                         </Button>
