@@ -27,7 +27,13 @@ class UserController extends Controller
             'correo' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
+            'profile_photo' => ['nullable', 'image', 'max:2048'],
         ]);
+
+        $photoPath = null;
+        if ($request->hasFile('profile_photo')) {
+            $photoPath = $request->file('profile_photo')->store('profile-photos', 'public');
+        }
 
         User::create([
             'name' => $validated['name'],
@@ -38,6 +44,7 @@ class UserController extends Controller
             'correo' => $validated['correo'] ?? null,
             'telefono' => $validated['telefono'] ?? null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
+            'profile_photo_path' => $photoPath,
         ]);
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
@@ -51,7 +58,8 @@ class UserController extends Controller
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
             })
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia']);
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path'])
+            ->append('profile_photo_url');
         
         $roles = collect(UserRole::cases())->map(fn($role) => [
             'value' => $role->value,
@@ -127,7 +135,15 @@ class UserController extends Controller
             'correo' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
+            'profile_photo' => ['nullable', 'image', 'max:2048'],
         ]);
+
+        if ($request->hasFile('profile_photo')) {
+            if ($user->profile_photo_path) {
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_photo_path);
+            }
+            $validated['profile_photo_path'] = $request->file('profile_photo')->store('profile-photos', 'public');
+        }
 
         $user->update($validated);
 

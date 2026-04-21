@@ -38,6 +38,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
     Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
+    Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
 
     Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
 

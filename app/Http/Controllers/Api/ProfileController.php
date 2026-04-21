@@ -19,10 +19,13 @@ class ProfileController extends Controller
 
         return response()->json([
             'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'dni' => $user->dni,
-                'role' => $user->role->value,
+                'id'                => $user->id,
+                'name'              => $user->name,
+                'dni'               => $user->dni,
+                'role'              => $user->role->value,
+                'correo'            => $user->correo,
+                'telefono'          => $user->telefono,
+                'profile_photo_url' => $user->profile_photo_url,
             ],
         ]);
     }

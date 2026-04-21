@@ -56,4 +56,34 @@ class PdfController extends Controller
 
         return $pdf->download('transacciones-' . now()->format('Y-m-d') . '.pdf');
     }
+
+    /**
+     * Generate PDF with appointments, respecting current filters.
+     */
+    public function appointments(Request $request): Response
+    {
+        $filters = $request->only(['from', 'to', 'status', 'plate']);
+
+        if (! $request->has('from') && ! $request->has('to')) {
+            $filters['from'] = now()->toDateString();
+            $filters['to'] = now()->toDateString();
+        }
+
+        $from = ! empty($filters['from']) ? \Carbon\Carbon::parse($filters['from'])->toDateString() : null;
+        $to   = ! empty($filters['to'])   ? \Carbon\Carbon::parse($filters['to'])->toDateString()   : null;
+
+        $appointments = \App\Models\Appointment::with('completedBy:id,name')
+            ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
+            ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
+            ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
+            ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
+            ->orderBy('scheduled_date')
+            ->orderBy('id')
+            ->get();
+
+        $pdf = Pdf::loadView('pdf.appointments', compact('appointments', 'filters'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('turnos-' . now()->format('Y-m-d') . '.pdf');
+    }
 }

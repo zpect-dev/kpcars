@@ -7,6 +7,7 @@ import {
     ChevronLeft,
     ChevronRight,
     Clock,
+    FileDown,
     MoreHorizontal,
     X,
     Wrench,
@@ -261,6 +262,24 @@ export default function AppointmentsIndex({
                             Turnos Asignados
                         </h1>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const params = new URLSearchParams();
+                                if (from) params.set('from', from);
+                                if (to) params.set('to', to);
+                                if (status) params.set('status', status);
+                                if (plate) params.set('plate', plate);
+                                const qs = params.toString();
+                                window.open('/pdf/appointments' + (qs ? '?' + qs : ''), '_blank');
+                            }}
+                        >
+                            <FileDown className="h-4 w-4" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </Button>
+
                     {!isMechanic && (
                         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                             <DialogTrigger asChild>
@@ -476,6 +495,7 @@ export default function AppointmentsIndex({
                         </DialogContent>
                     </Dialog>
                     )}
+                    </div>
                 </div>
 
                 {/* Filtros */}

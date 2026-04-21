@@ -1,6 +1,7 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Camera } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,6 +26,7 @@ interface User {
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
+    profile_photo_url?: string | null;
 }
 
 interface RoleOption {
@@ -36,6 +38,41 @@ interface Props {
     users: User[];
     roles: RoleOption[];
     filterRoles: RoleOption[];
+}
+
+function AvatarDropzone({ file, currentUrl, onDrop }: { file: File | null, currentUrl?: string | null, onDrop: (files: File[]) => void }) {
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop,
+        accept: {
+            'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+        },
+        maxFiles: 1,
+        multiple: false
+    });
+
+    const previewUrl = useMemo(() => file ? URL.createObjectURL(file) : currentUrl, [file, currentUrl]);
+
+    return (
+        <div 
+            {...getRootProps()} 
+            className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-primary bg-primary/10 border-solid' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
+        >
+            <input {...getInputProps()} />
+            {previewUrl ? (
+                <>
+                    <img src={previewUrl} alt="Avatar" className="h-full w-full object-cover bg-muted" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                        <Camera className="h-6 w-6 text-white" />
+                    </div>
+                </>
+            ) : (
+                <div className="flex flex-col items-center text-muted-foreground outline-none">
+                    <Camera className="h-6 w-6 mb-1 opacity-50 transition-opacity group-hover:opacity-100" />
+                    <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">Subir</span>
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function UsersIndex({ users, roles, filterRoles }: Props) {
@@ -80,15 +117,18 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         correo: '',
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',
+        profile_photo: null as File | null,
     });
 
     const [userToEdit, setUserToEdit] = useState<User | null>(null);
     const editForm = useForm({
+        _method: 'put',
         name: '',
         dni: '',
         correo: '',
         telefono: '',
         fecha_vencimiento_licencia: '',
+        profile_photo: null as File | null,
     });
 
     function openEditModal(user: User) {
@@ -100,11 +140,13 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         }
 
         editForm.setData({
+            _method: 'put',
             name: user.name,
             dni: user.dni,
             correo: user.correo || '',
             telefono: user.telefono || '+54 ',
             fecha_vencimiento_licencia: formattedDate,
+            profile_photo: null,
         });
         editForm.clearErrors();
     }
@@ -118,7 +160,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         e.preventDefault();
         if (!userToEdit) return;
         
-        editForm.put(`/users/${userToEdit.id}`, {
+        editForm.post(`/users/${userToEdit.id}`, {
             onSuccess: () => closeEditModal(),
             preserveScroll: true,
         });
@@ -305,10 +347,20 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                             className="bg-card transition-colors hover:bg-muted/40 cursor-pointer"
                                         >
                                             <td
-                                                className="truncate px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4"
-                                                title={user.name}
+                                                className="px-4 py-3 sm:px-6 sm:py-4"
                                             >
-                                                {user.name}
+                                                <div className="flex items-center gap-3">
+                                                    {user.profile_photo_url && (
+                                                        <img 
+                                                            src={user.profile_photo_url} 
+                                                            alt={user.name} 
+                                                            className="h-8 w-8 rounded-full border border-border object-cover shrink-0 bg-muted"
+                                                        />
+                                                    )}
+                                                    <span className="truncate font-semibold text-foreground truncate max-w-[150px]" title={user.name}>
+                                                        {user.name}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
                                                 <div className="flex flex-col gap-0.5">
@@ -458,6 +510,15 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                 required
                             />
                             <InputError message={createForm.errors.name} />
+                        </div>
+
+                        <div className="flex flex-col items-center gap-2 mb-2">
+                            <Label>Foto de Perfil (Opcional)</Label>
+                            <AvatarDropzone 
+                                file={createForm.data.profile_photo} 
+                                onDrop={(files) => createForm.setData('profile_photo', files[0])} 
+                            />
+                            <InputError message={createForm.errors.profile_photo} />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -642,6 +703,16 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                     </DialogHeader>
 
                     <form onSubmit={handleEditSubmit} className="grid gap-4">
+                        <div className="flex flex-col items-center gap-2 mb-2">
+                            <Label>Foto Actual</Label>
+                            <AvatarDropzone 
+                                file={editForm.data.profile_photo} 
+                                currentUrl={userToEdit?.profile_photo_url}
+                                onDrop={(files) => editForm.setData('profile_photo', files[0])} 
+                            />
+                            <InputError message={editForm.errors.profile_photo} />
+                        </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="edit-name">Nombre Completo</Label>
                             <Input

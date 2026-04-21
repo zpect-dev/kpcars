@@ -15,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\UserRole;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'correo', 'telefono', 'fecha_vencimiento_licencia'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -38,6 +38,19 @@ class User extends Authenticatable
             'fecha_vencimiento_licencia' => 'date',
         ];
     }
+
+    public function profilePhotoUrl(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::get(function (): string {
+            return $this->profile_photo_path
+                    ? \Illuminate\Support\Facades\Storage::url($this->profile_photo_path)
+                    : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=7F9CF5&background=EBF4FF';
+        });
+    }
+
+    protected $appends = [
+        'profile_photo_url',
+    ];
 
     public function isAdmin(): bool
     {
