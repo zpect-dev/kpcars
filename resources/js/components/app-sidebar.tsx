@@ -41,20 +41,34 @@ export function AppSidebar() {
             href: dashboard.url(),
             icon: CarFront,
         });
-    }
 
-    mainNavItems.push(
-        {
-            title: 'Inventario',
-            href: articulosIndex.url(),
-            icon: Package,
-        },
-        {
-            title: 'Turnos',
-            href: '/appointments',
-            icon: CalendarClock,
-        },
-    );
+        mainNavItems.push(
+            {
+                title: 'Inventario',
+                href: articulosIndex.url(),
+                icon: Package,
+            },
+            {
+                title: 'Turnos',
+                href: '/appointments',
+                icon: CalendarClock,
+            },
+        );
+    } else {
+        // Mechanic gets Turnos first, then Inventario
+        mainNavItems.push(
+            {
+                title: 'Turnos',
+                href: '/appointments',
+                icon: CalendarClock,
+            },
+            {
+                title: 'Inventario',
+                href: articulosIndex.url(),
+                icon: Package,
+            },
+        );
+    }
 
     if (auth.user.role === 'administrador') {
         mainNavItems.push({
@@ -70,7 +84,10 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard.url()} prefetch>
+                            <Link 
+                                href={auth.user.role === 'mecanico' ? '/appointments' : dashboard.url()} 
+                                prefetch
+                            >
                                 <AppLogo />
                             </Link>
                         </SidebarMenuButton>

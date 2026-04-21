@@ -78,12 +78,55 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         password: '',
         password_confirmation: '',
         correo: '',
+        telefono: '+54 ',
+        fecha_vencimiento_licencia: '',
+    });
+
+    const [userToEdit, setUserToEdit] = useState<User | null>(null);
+    const editForm = useForm({
+        name: '',
+        dni: '',
+        correo: '',
         telefono: '',
         fecha_vencimiento_licencia: '',
     });
 
+    function openEditModal(user: User) {
+        setUserToEdit(user);
+        
+        let formattedDate = '';
+        if (user.fecha_vencimiento_licencia) {
+            formattedDate = user.fecha_vencimiento_licencia.split('T')[0].split(' ')[0];
+        }
+
+        editForm.setData({
+            name: user.name,
+            dni: user.dni,
+            correo: user.correo || '',
+            telefono: user.telefono || '+54 ',
+            fecha_vencimiento_licencia: formattedDate,
+        });
+        editForm.clearErrors();
+    }
+
+    function closeEditModal() {
+        setUserToEdit(null);
+        editForm.reset();
+    }
+
+    function handleEditSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!userToEdit) return;
+        
+        editForm.put(`/users/${userToEdit.id}`, {
+            onSuccess: () => closeEditModal(),
+            preserveScroll: true,
+        });
+    }
+
     function openCreateModal() {
         createForm.reset();
+        createForm.setData('telefono', '+54 ');
         createForm.clearErrors();
         setShowCreateModal(true);
     }
@@ -99,6 +142,36 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
             onSuccess: () => closeCreateModal(),
             preserveScroll: true,
         });
+    }
+
+    function formatPhone(value: string) {
+        // Eliminar todo lo que no sea número
+        const digits = value.replace(/\D/g, '');
+        
+        // Si no tiene el 54 al inicio, intentamos agregarlo o mantenerlo simple
+        // Pero basándonos en tu requerimiento: +54 9 11 2585-9685
+        if (digits.length <= 2) return '+54 ';
+        
+        let formatted = '+54 ';
+        const rest = digits.slice(2); // Lo que viene después del 54
+        
+        if (rest.length > 0) {
+            // El 9 (móvil)
+            formatted += rest.slice(0, 1);
+            if (rest.length > 1) {
+                // Espacio y el 11 (área)
+                formatted += ' ' + rest.slice(1, 3);
+                if (rest.length > 3) {
+                    // Espacio y los primeros 4 del número
+                    formatted += ' ' + rest.slice(3, 7);
+                    if (rest.length > 7) {
+                        // Guion y los últimos 4
+                        formatted += '-' + rest.slice(7, 11);
+                    }
+                }
+            }
+        }
+        return formatted;
     }
 
     const { auth } = usePage<any>().props;
@@ -228,7 +301,8 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     filteredUsers.map((user) => (
                                         <tr
                                             key={user.id}
-                                            className="bg-card transition-colors hover:bg-muted/40"
+                                            onClick={() => openEditModal(user)}
+                                            className="bg-card transition-colors hover:bg-muted/40 cursor-pointer"
                                         >
                                             <td
                                                 className="truncate px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4"
@@ -298,11 +372,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                                 }
                                             >
                                                 <button
-                                                    onClick={() =>
-                                                        confirmToggleStatus(
-                                                            user,
-                                                        )
-                                                    }
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        confirmToggleStatus(user);
+                                                    }}
                                                     disabled={
                                                         user.id === auth.user.id
                                                     }
@@ -326,6 +399,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                                     </span>
                                                 ) : (
                                                     <select
+                                                        onClick={(e) => e.stopPropagation()}
                                                         value={user.role}
                                                         onChange={(e) =>
                                                             handleRoleChange(
@@ -454,10 +528,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     onChange={(e) =>
                                         createForm.setData(
                                             'telefono',
-                                            e.target.value,
+                                            formatPhone(e.target.value),
                                         )
                                     }
-                                    placeholder="+56 9..."
+                                    placeholder="+54 9 11 1234-5678"
                                 />
                                 <InputError
                                     message={createForm.errors.telefono}
@@ -549,6 +623,118 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                 {createForm.processing
                                     ? 'Creando...'
                                     : 'Crear Usuario'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={!!userToEdit}
+                onOpenChange={(open) => !open && closeEditModal()}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Editar Datos Personales</DialogTitle>
+                        <DialogDescription>
+                            Modifica los datos personales de {userToEdit?.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleEditSubmit} className="grid gap-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-name">Nombre Completo</Label>
+                            <Input
+                                id="edit-name"
+                                value={editForm.data.name}
+                                onChange={(e) =>
+                                    editForm.setData('name', e.target.value)
+                                }
+                                placeholder="Ej. Juan Pérez"
+                                required
+                            />
+                            <InputError message={editForm.errors.name} />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-dni">DNI</Label>
+                            <Input
+                                id="edit-dni"
+                                value={editForm.data.dni}
+                                onChange={(e) =>
+                                    editForm.setData('dni', e.target.value)
+                                }
+                                placeholder="Sin puntos"
+                                required
+                            />
+                            <InputError message={editForm.errors.dni} />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="edit-correo">Correo</Label>
+                            <Input
+                                id="edit-correo"
+                                type="email"
+                                value={editForm.data.correo}
+                                onChange={(e) =>
+                                    editForm.setData('correo', e.target.value)
+                                }
+                                placeholder="usuario@correo.com"
+                            />
+                            <InputError message={editForm.errors.correo} />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-telefono">Teléfono</Label>
+                                <Input
+                                    id="edit-telefono"
+                                    value={editForm.data.telefono}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'telefono',
+                                            formatPhone(e.target.value),
+                                        )
+                                    }
+                                    placeholder="+54 9 11 1234-5678"
+                                />
+                                <InputError message={editForm.errors.telefono} />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-fecha_vencimiento_licencia">
+                                    Vencimiento Licencia
+                                </Label>
+                                <Input
+                                    id="edit-fecha_vencimiento_licencia"
+                                    type="date"
+                                    value={editForm.data.fecha_vencimiento_licencia}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'fecha_vencimiento_licencia',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                                <InputError
+                                    message={editForm.errors.fecha_vencimiento_licencia}
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeEditModal}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={editForm.processing}
+                            >
+                                {editForm.processing ? 'Guardando...' : 'Guardar Cambios'}
                             </Button>
                         </DialogFooter>
                     </form>

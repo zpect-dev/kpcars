@@ -206,9 +206,10 @@ export default function AppointmentsIndex({
         if (!hasChanges) return;
 
         const timeoutId = setTimeout(() => {
-            const active: Record<string, string> = {};
-            if (from) active.from = from;
-            if (to) active.to = to;
+            const active: Record<string, string> = {
+                from: from,
+                to: to,
+            };
             if (status) active.status = status;
             if (plate) active.plate = plate;
 
@@ -227,6 +228,12 @@ export default function AppointmentsIndex({
         setTo('');
         setStatus('');
         setPlate('');
+        // Enviar explícitamente from y to vacíos con preserveState: false
+        router.get(
+            '/appointments',
+            { from: '', to: '' },
+            { preserveState: false, preserveScroll: true },
+        );
     }
 
     const hasActiveFilters = !!(from || to || status || plate);

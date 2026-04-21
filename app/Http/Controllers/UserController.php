@@ -116,4 +116,21 @@ class UserController extends Controller
         $message = $newInactivoStatus ? 'Usuario desactivado y sus vehículos fueron desasignados.' : 'Usuario activado correctamente.';
         return redirect()->back()->with('success', $message);
     }
+
+    public function update(Request $request, User $user)
+    {
+        Gate::authorize('manage-users');
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'dni' => ['required', 'string', 'max:20', Rule::unique('users')->ignore($user->id)],
+            'correo' => ['nullable', 'email', 'max:255'],
+            'telefono' => ['nullable', 'string', 'max:50'],
+            'fecha_vencimiento_licencia' => ['nullable', 'date'],
+        ]);
+
+        $user->update($validated);
+
+        return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
+    }
 }

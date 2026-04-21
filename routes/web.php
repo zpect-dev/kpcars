@@ -13,7 +13,7 @@ use App\Http\Controllers\VehiculoController;
 Route::get('/', function () {
     if (auth()->check()) {
         if (auth()->user()->isMechanic()) {
-            return redirect()->route('articulos.index');
+            return redirect()->route('appointments.index');
         }
         return redirect()->route('dashboard');
     }
@@ -46,6 +46,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('users', [UserController::class, 'index'])->name('users.index');
     Route::post('users', [UserController::class, 'store'])->name('users.store');
+    Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
 });
