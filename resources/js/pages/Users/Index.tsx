@@ -111,7 +111,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
     const createForm = useForm({
         name: '',
         dni: '',
-        role: 'MECANICO',
+        role: 'mecanico',
         correo: '',
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',

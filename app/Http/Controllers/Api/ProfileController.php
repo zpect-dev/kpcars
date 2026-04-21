@@ -24,8 +24,9 @@ class ProfileController extends Controller
                 'dni'               => $user->dni,
                 'role'              => $user->role->value,
                 'correo'            => $user->correo,
-                'telefono'          => $user->telefono,
-                'profile_photo_url' => $user->profile_photo_url,
+                'telefono'                   => $user->telefono,
+                'fecha_vencimiento_licencia' => $user->fecha_vencimiento_licencia?->toDateString(),
+                'profile_photo_url'          => $user->profile_photo_url,
             ],
         ]);
     }

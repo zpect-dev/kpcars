@@ -14,27 +14,11 @@ use RuntimeException;
 
 class AppointmentController extends Controller
 {
-    /**
-     * List appointments for the driver's currently assigned vehicle.
-     *
-     * Filters by the license plate of the active assignment.
-     */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $asignacion = $user->asignacionActiva()->with('vehiculo')->first();
-
-        if (! $asignacion) {
-            return response()->json([
-                'appointments' => [],
-                'message' => 'No tiene un vehículo asignado actualmente.',
-            ]);
-        }
-
-        $patente = $asignacion->vehiculo->patente;
-
-        $appointments = Appointment::where('license_plate', $patente)
+        $appointments = Appointment::where('conductor_id', $user->id)
             ->orderByDesc('scheduled_date')
             ->paginate(20);
 

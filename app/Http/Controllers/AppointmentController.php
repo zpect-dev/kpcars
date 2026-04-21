@@ -45,7 +45,7 @@ class AppointmentController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        $vehiculos = Vehiculo::select('id', 'patente', 'marca', 'modelo')
+        $vehiculos = Vehiculo::select('id', 'patente', 'marca', 'modelo', 'user_id')
             ->orderBy('patente')
             ->get();
 

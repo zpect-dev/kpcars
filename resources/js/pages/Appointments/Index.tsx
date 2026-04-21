@@ -83,7 +83,7 @@ interface Filters {
 interface Props {
     appointments: PaginationInfo;
     filters: Filters;
-    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
+    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'user_id'>[];
     conductores: { id: number; name: string }[];
     dailySlots: Record<string, number>;
     maxSlots: number;
@@ -396,12 +396,14 @@ export default function AppointmentsIndex({
                                         placeholder="Buscar patente..."
                                         options={patenteOptions}
                                         value={form.data.license_plate}
-                                        onSelect={(o) =>
-                                            form.setData(
-                                                'license_plate',
-                                                o.value,
-                                            )
-                                        }
+                                        onSelect={(o) => {
+                                            form.setData('license_plate', o.value);
+                                            // Autocompletar conductor asignado
+                                            const v = vehiculos.find(v => v.patente === o.value);
+                                            if (v && v.user_id) {
+                                                form.setData('conductor_id', v.user_id);
+                                            }
+                                        }}
                                         uppercase
                                     />
                                     <InputError
