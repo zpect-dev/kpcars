@@ -2,6 +2,8 @@ export type User = {
     id: number;
     name: string;
     dni: string;
+    correo?: string;
+    role?: string;
     avatar?: string;
     two_factor_enabled?: boolean;
     created_at: string;

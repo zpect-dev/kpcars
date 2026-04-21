@@ -271,10 +271,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     )}
                 </div>
 
-                {/* Tabla */}
+                {/* Tabla + cards */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full table-fixed min-w-[800px] text-left text-sm text-muted-foreground">
+                    {/* Desktop */}
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
@@ -375,6 +376,77 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {filteredItems.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No hay artículos registrados o no coinciden con
+                                la búsqueda.
+                            </li>
+                        ) : (
+                            filteredItems.map((item) => {
+                                const lowStock = item.stock <= item.min_stock;
+                                return (
+                                    <li
+                                        key={item.id}
+                                        className={cn(
+                                            'flex items-start justify-between gap-3 p-4',
+                                            lowStock &&
+                                                'bg-red-50 dark:bg-red-950/30',
+                                        )}
+                                    >
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                            <p
+                                                className={cn(
+                                                    'line-clamp-2 text-sm font-semibold',
+                                                    lowStock
+                                                        ? 'text-red-800 dark:text-red-300'
+                                                        : 'text-foreground',
+                                                )}
+                                            >
+                                                {item.descripcion}
+                                            </p>
+                                            <div className="flex items-baseline gap-4 text-xs">
+                                                <span>
+                                                    Stock:{' '}
+                                                    <span
+                                                        className={cn(
+                                                            'text-base font-semibold',
+                                                            lowStock
+                                                                ? 'text-red-700 dark:text-red-400'
+                                                                : 'text-foreground',
+                                                        )}
+                                                    >
+                                                        {item.stock}
+                                                    </span>
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                    Mín:{' '}
+                                                    <span className="font-medium">
+                                                        {item.min_stock}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {!isMechanic && (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() =>
+                                                    openMovModal(item)
+                                                }
+                                                className="shrink-0"
+                                            >
+                                                <ArrowUpCircle className="h-4 w-4" />
+                                                Salida
+                                            </Button>
+                                        )}
+                                    </li>
+                                );
+                            })
+                        )}
+                    </ul>
                 </div>
             </div>
 

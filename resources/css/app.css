@@ -152,7 +152,12 @@
     }
 
     table tbody tr {
-        height: 4rem; /* Altura fija para todas las filas */
+        min-height: 3.5rem; /* Altura mínima; crece con contenido largo */
+    }
+
+    table tbody td {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
     }
 
     table td {

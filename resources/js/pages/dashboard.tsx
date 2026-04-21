@@ -316,8 +316,9 @@ export default function Dashboard({
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-[160px] flex-1 gap-2">
+                    <div className="flex flex-wrap items-end gap-4">
+                        {/* Buscar */}
+                        <div className="flex w-full flex-col gap-2 lg:flex-1 lg:min-w-[240px]">
                             <Label htmlFor="search">Buscar</Label>
                             <div className="relative">
                                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -380,7 +381,9 @@ export default function Dashboard({
                                     )}
                             </div>
                         </div>
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+
+                        {/* Empresa */}
+                        <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                             <Label htmlFor="empresa_filter">Empresa</Label>
                             <Select
                                 value={empresaId || 'all'}
@@ -390,7 +393,7 @@ export default function Dashboard({
                             >
                                 <SelectTrigger
                                     id="empresa_filter"
-                                    className="w-full"
+                                    className="w-full lg:w-[180px]"
                                 >
                                     <SelectValue placeholder="Todas" />
                                 </SelectTrigger>
@@ -407,7 +410,9 @@ export default function Dashboard({
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+
+                        {/* Inversión */}
+                        <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                             <Label htmlFor="inversion_filter">Inversión</Label>
                             <Select
                                 value={inversionId || 'all'}
@@ -417,7 +422,7 @@ export default function Dashboard({
                             >
                                 <SelectTrigger
                                     id="inversion_filter"
-                                    className="w-full"
+                                    className="w-full lg:w-[180px]"
                                 >
                                     <SelectValue placeholder="Todas" />
                                 </SelectTrigger>
@@ -434,7 +439,9 @@ export default function Dashboard({
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="grid gap-2">
+
+                        {/* Conductor */}
+                        <div className="flex w-full flex-col gap-2 lg:w-auto">
                             <Label>Conductor</Label>
                             <div className="flex h-9 gap-1.5">
                                 {(
@@ -461,7 +468,7 @@ export default function Dashboard({
                                         type="button"
                                         onClick={() => setAsignacionFiltro(val)}
                                         className={cn(
-                                            'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
+                                            'flex h-full flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] lg:flex-none',
                                             asignacionFiltro === val
                                                 ? val === 'con'
                                                     ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
@@ -478,29 +485,32 @@ export default function Dashboard({
                             </div>
                         </div>
 
-                        <div className="ml-auto flex items-end">
+                        {/* Limpiar */}
+                        <div className="flex w-full items-center justify-end lg:w-auto">
                             <button
                                 type="button"
                                 onClick={clearFilters}
                                 disabled={!hasActiveFilters}
                                 title="Limpiar filtros"
                                 className={cn(
-                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                    'flex h-9 w-full items-center justify-center gap-2 rounded-lg border transition-all duration-150 lg:w-9 lg:px-0',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
                                         : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
+                                <span className="lg:hidden text-xs">Limpiar filtros</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Tabla */}
+                {/* Tabla + cards */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px] table-fixed text-left text-sm text-muted-foreground">
+                    {/* Desktop */}
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -588,11 +598,7 @@ export default function Dashboard({
                                             <td
                                                 className="truncate px-4 py-3 sm:px-6 sm:py-4"
                                                 title={
-                                                    vehiculo.user?.name || (
-                                                        <span className="text-muted-foreground italic">
-                                                            No asignado
-                                                        </span>
-                                                    )
+                                                    vehiculo.user?.name || 'No asignado'
                                                 }
                                             >
                                                 {vehiculo.user?.name || (
@@ -664,6 +670,118 @@ export default function Dashboard({
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {filteredVehiculos.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No hay vehículos que coincidan con los filtros.
+                            </li>
+                        ) : (
+                            filteredVehiculos.map((vehiculo) => (
+                                <li
+                                    key={vehiculo.id}
+                                    className="flex flex-col gap-2 p-4"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <span className="font-mono text-base font-semibold text-foreground">
+                                            {vehiculo.patente}
+                                        </span>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="-mr-2 -mt-1 shrink-0"
+                                                >
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                    <span className="sr-only">
+                                                        Acciones
+                                                    </span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>
+                                                    Acciones
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        router.get(
+                                                            `/vehiculos/${vehiculo.id}/asignaciones`,
+                                                        )
+                                                    }
+                                                >
+                                                    <History className="h-4 w-4" />
+                                                    Historial conductores
+                                                </DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        openEdit(vehiculo)
+                                                    }
+                                                >
+                                                    <Pencil className="h-4 w-4" />
+                                                    Editar
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        setDeletingVehiculo(
+                                                            vehiculo,
+                                                        )
+                                                    }
+                                                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                    Eliminar
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-foreground">
+                                            {vehiculo.marca} {vehiculo.modelo}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            Año: {vehiculo.anio}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {vehiculo.empresa?.nombre ? (
+                                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
+                                                {vehiculo.empresa.nombre}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs italic text-muted-foreground">
+                                                Sin empresa
+                                            </span>
+                                        )}
+                                        {vehiculo.inversion?.nombre ? (
+                                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
+                                                {vehiculo.inversion.nombre}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs italic text-muted-foreground">
+                                                Sin inversión
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Conductor:{' '}
+                                        {vehiculo.user?.name ? (
+                                            <span className="font-medium text-foreground">
+                                                {vehiculo.user.name}
+                                            </span>
+                                        ) : (
+                                            <span className="italic">
+                                                No asignado
+                                            </span>
+                                        )}
+                                    </div>
+                                </li>
+                            ))
+                        )}
+                    </ul>
                 </div>
             </div>
 

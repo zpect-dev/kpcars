@@ -111,7 +111,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
     const createForm = useForm({
         name: '',
         dni: '',
-        role: 'mecanico',
+        role: 'chofer',
         correo: '',
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',
@@ -284,8 +284,8 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                 </div>
 
                 <div className="w-full self-start overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[700px] table-fixed text-left text-sm text-muted-foreground">
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
@@ -478,6 +478,99 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {filteredUsers.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No se encontraron usuarios que coincidan con la búsqueda.
+                            </li>
+                        ) : (
+                            filteredUsers.map((user) => (
+                                <li
+                                    key={user.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => openEditModal(user)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            openEditModal(user);
+                                        }
+                                    }}
+                                    className="flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex min-w-0 items-center gap-3">
+                                            {user.profile_photo_url && (
+                                                <img
+                                                    src={user.profile_photo_url}
+                                                    alt={user.name}
+                                                    className="h-10 w-10 shrink-0 rounded-full border border-border bg-muted object-cover"
+                                                />
+                                            )}
+                                            <div className="min-w-0 flex-1">
+                                                <p
+                                                    className="truncate font-semibold text-foreground"
+                                                    title={user.name}
+                                                >
+                                                    {user.name}
+                                                </p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {roles.find((r) => r.value === user.role)?.label || user.role}
+                                                    {user.id === auth.user.id ? ' (Tú)' : ''}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                confirmToggleStatus(user);
+                                            }}
+                                            disabled={user.id === auth.user.id}
+                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} ${user.id === auth.user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                        >
+                                            {user.inactivo ? 'Inactivo' : 'Activo'}
+                                        </button>
+                                    </div>
+
+                                    <div className="flex flex-col gap-0.5 text-xs">
+                                        {user.correo ? (
+                                            <span className="truncate" title={user.correo}>
+                                                {user.correo}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground/50 italic">Sin correo</span>
+                                        )}
+                                        {user.telefono ? (
+                                            <span className="truncate" title={user.telefono}>
+                                                {user.telefono}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground/50 italic">Sin teléfono</span>
+                                        )}
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-muted-foreground uppercase tracking-wider">DNI</span>
+                                            <span className="font-medium text-foreground">{user.dni}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-muted-foreground uppercase tracking-wider">Licencia</span>
+                                            {user.fecha_vencimiento_licencia ? (
+                                                <span className="text-foreground" title="Vencimiento de Licencia">
+                                                    {new Date(user.fecha_vencimiento_licencia).toLocaleDateString()}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground/50 italic">N/A</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </li>
+                            ))
+                        )}
+                    </ul>
                 </div>
             </div>
 
@@ -564,65 +657,69 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             </div>
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="correo">Correo</Label>
-                            <Input
-                                id="correo"
-                                type="email"
-                                value={createForm.data.correo}
-                                onChange={(e) =>
-                                    createForm.setData('correo', e.target.value)
-                                }
-                                placeholder="usuario@correo.com"
-                            />
-                            <InputError message={createForm.errors.correo} />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
+                        {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
-                                <Label htmlFor="telefono">Teléfono</Label>
+                                <Label htmlFor="correo">Correo</Label>
                                 <Input
-                                    id="telefono"
-                                    value={createForm.data.telefono}
+                                    id="correo"
+                                    type="email"
+                                    value={createForm.data.correo}
                                     onChange={(e) =>
-                                        createForm.setData(
-                                            'telefono',
-                                            formatPhone(e.target.value),
-                                        )
+                                        createForm.setData('correo', e.target.value)
                                     }
-                                    placeholder="+54 9 11 1234-5678"
+                                    placeholder="usuario@correo.com"
                                 />
-                                <InputError
-                                    message={createForm.errors.telefono}
-                                />
+                                <InputError message={createForm.errors.correo} />
                             </div>
+                        )}
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="fecha_vencimiento_licencia">
-                                    Vencimiento Licencia
-                                </Label>
-                                <Input
-                                    id="fecha_vencimiento_licencia"
-                                    type="date"
-                                    value={
-                                        createForm.data
-                                            .fecha_vencimiento_licencia
-                                    }
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'fecha_vencimiento_licencia',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <InputError
-                                    message={
-                                        createForm.errors
-                                            .fecha_vencimiento_licencia
-                                    }
-                                />
+                        {createForm.data.role === 'chofer' && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label htmlFor="telefono">Teléfono</Label>
+                                    <Input
+                                        id="telefono"
+                                        value={createForm.data.telefono}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'telefono',
+                                                formatPhone(e.target.value),
+                                            )
+                                        }
+                                        placeholder="+54 9 11 1234-5678"
+                                    />
+                                    <InputError
+                                        message={createForm.errors.telefono}
+                                    />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="fecha_vencimiento_licencia">
+                                        Vencimiento Licencia
+                                    </Label>
+                                    <Input
+                                        id="fecha_vencimiento_licencia"
+                                        type="date"
+                                        value={
+                                            createForm.data
+                                                .fecha_vencimiento_licencia
+                                        }
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'fecha_vencimiento_licencia',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={
+                                            createForm.errors
+                                                .fecha_vencimiento_licencia
+                                        }
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <div className="rounded-lg border border-border bg-muted/50 p-3">
                             <p className="text-xs text-muted-foreground leading-relaxed">

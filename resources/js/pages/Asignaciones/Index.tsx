@@ -81,10 +81,10 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                     </Button>
                 </div>
 
-                {/* Tabla */}
+                {/* Tabla (desktop) + Cards (mobile) */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full table-fixed min-w-[700px] text-left text-sm text-muted-foreground">
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase tracking-wider text-muted-foreground">
                                 <tr>
                                     <th className="w-[25%] px-4 py-3 font-medium sm:px-6 sm:py-4">Conductor</th>
@@ -160,6 +160,67 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {asignaciones.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No hay historial de conductores para este vehículo.
+                            </li>
+                        ) : (
+                            asignaciones.map((a) => {
+                                const activo = a.fecha_fin === null;
+                                return (
+                                    <li key={a.id} className="flex flex-col gap-2 p-4">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1 text-xs text-foreground">
+                                                <p className="truncate" title={formatDate(a.fecha_inicio)}>
+                                                    <span className="text-muted-foreground">Inicio: </span>
+                                                    {formatDate(a.fecha_inicio)}
+                                                </p>
+                                                <p className="truncate text-muted-foreground" title={formatDate(a.fecha_fin)}>
+                                                    <span>Fin: </span>
+                                                    {formatDate(a.fecha_fin)}
+                                                </p>
+                                            </div>
+                                            {activo ? (
+                                                <span className="inline-flex shrink-0 items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                    Activo
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                                                    Finalizado
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            {a.conductor ? (
+                                                <>
+                                                    <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="truncate font-medium text-foreground">
+                                                        {a.conductor.name}
+                                                    </span>
+                                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                                        · DNI {a.conductor.dni}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UserX className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                    <span className="italic text-muted-foreground">Sin conductor</span>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        <p className="text-xs text-muted-foreground">
+                                            Asignado por: {a.asignado_por ?? '—'}
+                                        </p>
+                                    </li>
+                                );
+                            })
+                        )}
+                    </ul>
                 </div>
             </div>
         </>

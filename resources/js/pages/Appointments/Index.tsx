@@ -516,8 +516,8 @@ export default function AppointmentsIndex({
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="from">Desde</Label>
                             <Input
                                 id="from"
@@ -526,7 +526,7 @@ export default function AppointmentsIndex({
                                 onChange={(e) => setFrom(e.target.value)}
                             />
                         </div>
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="to">Hasta</Label>
                             <Input
                                 id="to"
@@ -535,7 +535,7 @@ export default function AppointmentsIndex({
                                 onChange={(e) => setTo(e.target.value)}
                             />
                         </div>
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="status">Estado</Label>
                             <Select
                                 value={status || 'all'}
@@ -563,7 +563,7 @@ export default function AppointmentsIndex({
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="plate">Patente</Label>
                             <Input
                                 id="plate"
@@ -576,29 +576,31 @@ export default function AppointmentsIndex({
                             />
                         </div>
 
-                        <div className="ml-auto flex items-end">
+                        <div className="col-span-full flex items-end sm:col-span-2 lg:col-span-1">
                             <button
                                 type="button"
                                 onClick={clearFilters}
                                 disabled={!hasActiveFilters}
                                 title="Limpiar filtros"
                                 className={cn(
-                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                    'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-150 lg:w-9 lg:px-0',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
                                         : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
+                                <span className="lg:hidden">Limpiar filtros</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Tabla */}
+                {/* Tabla + cards */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[900px] table-fixed text-left text-sm text-muted-foreground">
+                    {/* Desktop */}
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase">
                                 <tr>
                                     <th className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -822,6 +824,161 @@ export default function AppointmentsIndex({
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {appointments.data.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No hay turnos que coincidan con los filtros.
+                            </li>
+                        ) : (
+                            appointments.data.map((a) => (
+                                <li
+                                    key={a.id}
+                                    className="flex flex-col gap-2 p-4"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-semibold text-foreground">
+                                                #{a.id}
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                                    STATUS_STYLES[a.status],
+                                                )}
+                                            >
+                                                {STATUS_LABEL[a.status]}
+                                            </span>
+                                        </div>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="-mr-2 -mt-1 shrink-0"
+                                                >
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                    <span className="sr-only">
+                                                        Acciones
+                                                    </span>
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuLabel>
+                                                    Cambiar estado
+                                                </DropdownMenuLabel>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    disabled={
+                                                        a.status === 'agendado'
+                                                    }
+                                                    onSelect={() =>
+                                                        changeStatus(
+                                                            a.id,
+                                                            'agendado',
+                                                        )
+                                                    }
+                                                >
+                                                    <Clock className="h-4 w-4" />
+                                                    Marcar agendado
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    disabled={
+                                                        a.status ===
+                                                        'en_proceso'
+                                                    }
+                                                    onSelect={() =>
+                                                        changeStatus(
+                                                            a.id,
+                                                            'en_proceso',
+                                                        )
+                                                    }
+                                                >
+                                                    <Wrench className="h-4 w-4" />
+                                                    Marcar en proceso
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    disabled={
+                                                        a.status ===
+                                                        'completado'
+                                                    }
+                                                    onSelect={() =>
+                                                        changeStatus(
+                                                            a.id,
+                                                            'completado',
+                                                        )
+                                                    }
+                                                >
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    Marcar completado
+                                                </DropdownMenuItem>
+                                                {!isMechanic && (
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            disabled={
+                                                                a.status ===
+                                                                'cancelado'
+                                                            }
+                                                            onSelect={() =>
+                                                                changeStatus(
+                                                                    a.id,
+                                                                    'cancelado',
+                                                                )
+                                                            }
+                                                            className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                        >
+                                                            <Ban className="h-4 w-4" />
+                                                            Cancelar turno
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span>
+                                            {formatDate(a.scheduled_date)}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                                TYPE_STYLES[a.type],
+                                            )}
+                                        >
+                                            {TYPE_LABEL[a.type]}
+                                        </span>
+                                    </div>
+                                    <p className="line-clamp-2 text-sm text-foreground">
+                                        {a.service}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <span className="font-mono font-medium text-foreground">
+                                            {a.license_plate}
+                                        </span>
+                                        {a.conductor?.name && (
+                                            <span>
+                                                Solicitante:{' '}
+                                                <span className="text-foreground">
+                                                    {a.conductor.name}
+                                                </span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    {a.status === 'completado' &&
+                                        a.completed_by && (
+                                            <div className="text-xs text-muted-foreground">
+                                                Completado por{' '}
+                                                <span className="font-medium text-foreground">
+                                                    {a.completed_by.name}
+                                                </span>
+                                            </div>
+                                        )}
+                                </li>
+                            ))
+                        )}
+                    </ul>
 
                     {/* Paginación */}
                     {appointments.last_page > 1 && (

@@ -291,9 +291,9 @@ export default function TransactionsIndex({
 
                 {/* Panel de Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-wrap items-end gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
                         {/* Filtro Artículo */}
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="article">Artículo</Label>
                             <div className="relative">
                                 <Input
@@ -364,7 +364,7 @@ export default function TransactionsIndex({
                         </div>
 
                         {/* Filtro Patente */}
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="plate">Patente</Label>
                             <div className="relative">
                                 <Input
@@ -437,7 +437,7 @@ export default function TransactionsIndex({
                         </div>
 
                         {/* Filtro Solicitante */}
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="applicant">Solicitante</Label>
                             <Input
                                 id="applicant"
@@ -450,7 +450,7 @@ export default function TransactionsIndex({
                         </div>
 
                         {/* Filtro Fecha Desde */}
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="from">Desde</Label>
                             <Input
                                 id="from"
@@ -461,7 +461,7 @@ export default function TransactionsIndex({
                         </div>
 
                         {/* Filtro Fecha Hasta */}
-                        <div className="grid min-w-[140px] flex-1 gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="to">Hasta</Label>
                             <Input
                                 id="to"
@@ -471,29 +471,31 @@ export default function TransactionsIndex({
                             />
                         </div>
 
-                        <div className="ml-auto flex items-end">
+                        <div className="col-span-full flex items-end sm:col-span-2 lg:col-span-1">
                             <button
                                 type="button"
                                 onClick={clearFilters}
                                 disabled={!hasActiveFilters}
                                 title="Limpiar filtros"
                                 className={cn(
-                                    'flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                    'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-150 lg:w-9 lg:px-0',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
                                         : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
+                                <span className="lg:hidden">Limpiar filtros</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Table */}
+                {/* Table + cards */}
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1000px] table-fixed text-left text-sm text-muted-foreground">
+                    {/* Desktop */}
+                    <div className="hidden overflow-x-auto md:block">
+                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
@@ -633,9 +635,72 @@ export default function TransactionsIndex({
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Mobile cards */}
+                    <ul className="divide-y divide-border md:hidden">
+                        {transactions.data.length === 0 ? (
+                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
+                                No hay transacciones registradas o no coinciden
+                                con la búsqueda.
+                            </li>
+                        ) : (
+                            transactions.data.map((tx) => (
+                                <li
+                                    key={tx.id}
+                                    className="flex flex-col gap-1.5 p-4"
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className="line-clamp-2 flex-1 text-sm font-semibold text-foreground">
+                                            {tx.articulo?.descripcion || 'N/A'}
+                                        </p>
+                                        <div className="flex shrink-0 items-center gap-1.5 text-sm">
+                                            {tx.tipo === 'IN' ? (
+                                                <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                            ) : (
+                                                <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                            )}
+                                            <span className="font-semibold text-foreground">
+                                                {tx.cantidad}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                        <span>
+                                            {new Date(
+                                                tx.created_at,
+                                            ).toLocaleString('es-AR')}
+                                        </span>
+                                        {tx.vehiculo && (
+                                            <span className="font-mono font-medium text-foreground">
+                                                {tx.vehiculo.patente}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {tx.descripcion && (
+                                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                                            {tx.descripcion}
+                                        </p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        {tx.solicitante ? (
+                                            <>
+                                                <span className="text-foreground">
+                                                    {tx.solicitante}
+                                                </span>{' '}
+                                                ·{' '}
+                                            </>
+                                        ) : null}
+                                        por{' '}
+                                        <span className="text-foreground">
+                                            {tx.user?.name || 'N/A'}
+                                        </span>
+                                    </p>
+                                </li>
+                            ))
+                        )}
+                    </ul>
                 </div>
 
-                {/* Paginación */}
                 {/* Paginación */}
                 {transactions.last_page > 1 && (
                     <div className="flex items-center justify-center gap-4 py-4">
