@@ -31,7 +31,7 @@ class DashboardController extends Controller
             ->get();
 
         $empresas    = Empresa::orderBy('nombre')->get(['id', 'nombre']);
-        $inversiones = Inversion::orderBy('nombre')->get(['id', 'nombre']);
+        $inversiones = Inversion::orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
         $users       = User::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('dashboard', [
