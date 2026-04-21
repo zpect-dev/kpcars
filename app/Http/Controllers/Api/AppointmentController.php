@@ -34,8 +34,7 @@ class AppointmentController extends Controller
 
         $patente = $asignacion->vehiculo->patente;
 
-        $appointments = Appointment::with('conductor:id,name')
-            ->where('license_plate', $patente)
+        $appointments = Appointment::where('license_plate', $patente)
             ->orderByDesc('scheduled_date')
             ->paginate(20);
 
