@@ -30,11 +30,11 @@ class ScheduleAppointmentAction
     public function execute(
         string $service,
         string $plate,
-        string $applicant,
+        ?int $conductorId,
         Carbon $preferredDate,
         string $type = 'normal',
     ): Appointment {
-        return DB::transaction(function () use ($service, $plate, $applicant, $preferredDate, $type) {
+        return DB::transaction(function () use ($service, $plate, $conductorId, $preferredDate, $type) {
             $requestedDate = $preferredDate->copy()->startOfDay();
 
             if ($requestedDate->isSunday()) {
@@ -52,12 +52,12 @@ class ScheduleAppointmentAction
             }
 
             return Appointment::create([
-                'service' => $service,
-                'license_plate' => $plate,
-                'applicant' => $applicant,
+                'service'        => $service,
+                'license_plate'  => $plate,
+                'conductor_id'   => $conductorId,
                 'scheduled_date' => $requestedDate->toDateString(),
-                'type' => $type,
-                'status' => 'agendado',
+                'type'           => $type,
+                'status'         => 'agendado',
             ]);
         });
     }

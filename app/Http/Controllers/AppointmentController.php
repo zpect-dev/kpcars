@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\ScheduleAppointmentAction;
+use App\Enums\UserRole;
 use App\Models\Appointment;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +35,7 @@ class AppointmentController extends Controller
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->toDateString() : null;
         $to   = ! empty($filters['to'])   ? Carbon::parse($filters['to'])->toDateString()   : null;
 
-        $appointments = Appointment::with('completedBy:id,name')
+        $appointments = Appointment::with(['completedBy:id,name', 'conductor:id,name'])
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
             ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
@@ -46,6 +48,11 @@ class AppointmentController extends Controller
         $vehiculos = Vehiculo::select('id', 'patente', 'marca', 'modelo')
             ->orderBy('patente')
             ->get();
+
+        $conductores = User::where('role', UserRole::CHOFER)
+            ->where('inactivo', false)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         // Cupos normales usados por día (próximos 60 días) para el calendario del frontend
         $dailySlots = Appointment::selectRaw('DATE(scheduled_date) as fecha, COUNT(*) as used')
@@ -60,6 +67,7 @@ class AppointmentController extends Controller
             'appointments' => $appointments,
             'filters'      => $filters,
             'vehiculos'    => $vehiculos,
+            'conductores'  => $conductores,
             'dailySlots'   => $dailySlots,
             'maxSlots'     => 4,
         ]);
@@ -73,11 +81,11 @@ class AppointmentController extends Controller
         abort_if($request->user()->isMechanic(), 403);
         
         $validated = $request->validate([
-            'service' => ['required', 'string', 'max:255'],
-            'license_plate' => ['required', 'string', 'max:20'],
-            'applicant' => ['required', 'string', 'max:255'],
+            'service'        => ['required', 'string', 'max:255'],
+            'license_plate'  => ['required', 'string', 'max:20'],
+            'conductor_id'   => ['required', 'integer', 'exists:users,id'],
             'preferred_date' => ['required', 'date'],
-            'type' => ['required', 'in:normal,emergencia'],
+            'type'           => ['required', 'in:normal,emergencia'],
         ]);
 
         $preferred = Carbon::parse($validated['preferred_date'])->startOfDay();
@@ -86,7 +94,7 @@ class AppointmentController extends Controller
             $appointment = $action->execute(
                 trim($validated['service']),
                 strtoupper(trim($validated['license_plate'])),
-                trim($validated['applicant']),
+                (int) $validated['conductor_id'],
                 $preferred,
                 $validated['type'],
             );

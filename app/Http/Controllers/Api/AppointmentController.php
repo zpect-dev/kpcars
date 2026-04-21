@@ -34,7 +34,8 @@ class AppointmentController extends Controller
 
         $patente = $asignacion->vehiculo->patente;
 
-        $appointments = Appointment::where('license_plate', $patente)
+        $appointments = Appointment::with('conductor:id,name')
+            ->where('license_plate', $patente)
             ->orderByDesc('scheduled_date')
             ->paginate(20);
 
@@ -71,7 +72,7 @@ class AppointmentController extends Controller
             $appointment = $action->execute(
                 trim($validated['service']),
                 strtoupper($asignacion->vehiculo->patente),
-                $user->name,
+                $user->id,
                 $preferred,
                 $validated['type'] ?? 'normal',
             );
@@ -107,7 +108,7 @@ class AppointmentController extends Controller
             $appointment = $action->execute(
                 trim($validated['service']),
                 strtoupper(trim($validated['license_plate'])),
-                trim($validated['applicant']),
+                null,
                 $preferred,
                 $validated['type'] ?? 'normal',
             );

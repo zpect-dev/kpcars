@@ -72,7 +72,7 @@ class PdfController extends Controller
         $from = ! empty($filters['from']) ? \Carbon\Carbon::parse($filters['from'])->toDateString() : null;
         $to   = ! empty($filters['to'])   ? \Carbon\Carbon::parse($filters['to'])->toDateString()   : null;
 
-        $appointments = \App\Models\Appointment::with('completedBy:id,name')
+        $appointments = \App\Models\Appointment::with(['completedBy:id,name', 'conductor:id,name'])
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
             ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))

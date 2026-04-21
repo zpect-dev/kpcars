@@ -197,7 +197,7 @@
                         {{ $appt->license_plate }}
                     </td>
                     <td>{{ $appt->service }}</td>
-                    <td>{{ $appt->applicant ?? '-' }}</td>
+                    <td>{{ $appt->conductor->name ?? '-' }}</td>
                     <td style="text-align:center">
                         @if($appt->type === 'emergencia')
                         <span class="tipo-emergencia">Emergencia</span>

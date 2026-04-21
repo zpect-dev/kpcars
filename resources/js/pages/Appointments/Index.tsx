@@ -53,7 +53,10 @@ interface AppointmentRow {
     service: string;
     type: AppointmentType;
     license_plate: string;
-    applicant: string;
+    conductor?: {
+        id: number;
+        name: string;
+    } | null;
     scheduled_date: string;
     status: AppointmentStatus;
     completed_by?: {
@@ -81,6 +84,7 @@ interface Props {
     appointments: PaginationInfo;
     filters: Filters;
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
+    conductores: { id: number; name: string }[];
     dailySlots: Record<string, number>;
     maxSlots: number;
 }
@@ -122,6 +126,7 @@ export default function AppointmentsIndex({
     appointments,
     filters,
     vehiculos,
+    conductores,
     dailySlots,
     maxSlots,
 }: Props) {
@@ -139,7 +144,7 @@ export default function AppointmentsIndex({
     const form = useForm({
         service: '' as string,
         license_plate: '' as string,
-        applicant: '' as string,
+        conductor_id: '' as string | number,
         preferred_date: today,
         type: 'normal' as AppointmentType,
     });
@@ -154,6 +159,15 @@ export default function AppointmentsIndex({
                 sub: `${v.marca} ${v.modelo}`,
             })),
         [vehiculos],
+    );
+
+    const conductorOptions: ComboboxOption[] = useMemo(
+        () =>
+            conductores.map((c) => ({
+                value: String(c.id),
+                label: c.name,
+            })),
+        [conductores],
     );
 
     /**
@@ -178,7 +192,7 @@ export default function AppointmentsIndex({
         form.post('/appointments', {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset('license_plate', 'applicant', 'service');
+                form.reset('license_plate', 'conductor_id', 'service');
                 form.setData('type', 'normal');
                 setIsDialogOpen(false);
             },
@@ -189,7 +203,7 @@ export default function AppointmentsIndex({
         !form.processing &&
         form.data.service.trim() !== '' &&
         form.data.license_plate.trim() !== '' &&
-        form.data.applicant.trim() !== '' &&
+        form.data.conductor_id !== '' &&
         form.data.preferred_date !== '';
 
     useEffect(() => {
@@ -396,23 +410,23 @@ export default function AppointmentsIndex({
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="applicant">
+                                    <Label htmlFor="conductor_id">
                                         Solicitante
                                     </Label>
-                                    <Input
-                                        id="applicant"
-                                        type="text"
-                                        placeholder="Nombre del solicitante"
-                                        value={form.data.applicant}
-                                        onChange={(e) =>
+                                    <Combobox
+                                        id="conductor_id"
+                                        placeholder="Seleccionar chofer..."
+                                        options={conductorOptions}
+                                        value={String(form.data.conductor_id)}
+                                        onSelect={(o) =>
                                             form.setData(
-                                                'applicant',
-                                                e.target.value,
+                                                'conductor_id',
+                                                o.value,
                                             )
                                         }
                                     />
                                     <InputError
-                                        message={form.errors.applicant}
+                                        message={form.errors.conductor_id}
                                     />
                                 </div>
 
@@ -659,9 +673,9 @@ export default function AppointmentsIndex({
                                                 </td>
                                                 <td
                                                     className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                    title={a.applicant}
+                                                    title={a.conductor?.name || '-'}
                                                 >
-                                                    {a.applicant}
+                                                    {a.conductor?.name || '-'}
                                                 </td>
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                     <span

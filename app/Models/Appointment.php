@@ -15,7 +15,7 @@ class Appointment extends Model
         'service',
         'type',
         'license_plate',
-        'applicant',
+        'conductor_id',
         'scheduled_date',
         'status',
         'completed_by',
@@ -51,5 +51,10 @@ class Appointment extends Model
     public function completedBy()
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function conductor()
+    {
+        return $this->belongsTo(User::class, 'conductor_id');
     }
 }
