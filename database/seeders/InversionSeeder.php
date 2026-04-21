@@ -12,6 +12,10 @@ class InversionSeeder extends Seeder
      */
     public function run(): void
     {
+        if (Inversion::count() > 0) {
+            return;
+        }
+
         Inversion::create(['nombre' => 'INV_1']);
         Inversion::create(['nombre' => 'INV_2']);
         Inversion::create(['nombre' => 'INV_3']);

@@ -12,6 +12,10 @@ class EmpresaSeeder extends Seeder
      */
     public function run(): void
     {
+        if (Empresa::count() > 0) {
+            return;
+        }
+
         Empresa::create(['nombre' => 'EMP_1']);
         Empresa::create(['nombre' => 'EMP_2']);
     }
