@@ -81,6 +81,9 @@ export default function Dashboard({
     const [deletingVehiculo, setDeletingVehiculo] = useState<Vehiculo | null>(
         null,
     );
+    const [unassigningVehiculo, setUnassigningVehiculo] = useState<Vehiculo | null>(
+        null,
+    );
 
     const isMounted = useRef(false);
 
@@ -271,6 +274,15 @@ export default function Dashboard({
         router.delete(`/vehiculos/${deletingVehiculo.id}`, {
             preserveScroll: true,
             onSuccess: () => setDeletingVehiculo(null),
+        });
+    }
+
+    // --- Unassign ---
+    function handleUnassign() {
+        if (!unassigningVehiculo) return;
+        router.patch(`/vehiculos/${unassigningVehiculo.id}/desasignar`, {}, {
+            preserveScroll: true,
+            onSuccess: () => setUnassigningVehiculo(null),
         });
     }
 
@@ -639,6 +651,19 @@ export default function Dashboard({
                                                             Historial
                                                             conductores
                                                         </DropdownMenuItem>
+                                                        {vehiculo.user_id && (
+                                                            <DropdownMenuItem
+                                                                onSelect={() =>
+                                                                    setUnassigningVehiculo(
+                                                                        vehiculo,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <UserX className="h-4 w-4" />
+                                                                Desasignar
+                                                                conductor
+                                                            </DropdownMenuItem>
+                                                        )}
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             onSelect={() =>
@@ -715,6 +740,18 @@ export default function Dashboard({
                                                     <History className="h-4 w-4" />
                                                     Historial conductores
                                                 </DropdownMenuItem>
+                                                {vehiculo.user_id && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            setUnassigningVehiculo(
+                                                                vehiculo,
+                                                            )
+                                                        }
+                                                    >
+                                                        <UserX className="h-4 w-4" />
+                                                        Desasignar conductor
+                                                    </DropdownMenuItem>
+                                                )}
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem
                                                     onSelect={() =>
@@ -808,18 +845,56 @@ export default function Dashboard({
                 </DialogContent>
             </Dialog>
 
+            {/* Unassign Confirmation Dialog */}
+            <Dialog
+                open={unassigningVehiculo !== null}
+                onOpenChange={(open) => !open && setUnassigningVehiculo(null)}
+            >
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Desasignar Conductor</DialogTitle>
+                        <DialogDescription>
+                            ¿Está seguro que desea desasignar al conductor{' '}
+                            <span className="font-semibold text-foreground">
+                                {unassigningVehiculo?.user?.name}
+                            </span>{' '}
+                            del vehículo{' '}
+                            <span className="font-semibold text-foreground">
+                                {unassigningVehiculo?.patente}
+                            </span>?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => setUnassigningVehiculo(null)}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="default"
+                            className="bg-gray-900 hover:bg-gray-800 text-white"
+                            onClick={handleUnassign}
+                        >
+                            Desasignar
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             {/* Delete confirmation Dialog */}
             <Dialog
                 open={deletingVehiculo !== null}
                 onOpenChange={(open) => !open && setDeletingVehiculo(null)}
             >
-                <DialogContent className="sm:max-w-[400px]">
+                <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
                         <DialogTitle>Eliminar Vehículo</DialogTitle>
                         <DialogDescription>
-                            ¿Está seguro de que desea eliminar el vehículo{' '}
-                            <strong>{deletingVehiculo?.patente}</strong>? Esta
-                            acción no se puede deshacer.
+                            ¿Está seguro que desea eliminar el vehículo{' '}
+                            <span className="font-semibold text-foreground">
+                                {deletingVehiculo?.patente}
+                            </span>? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-3 pt-4">

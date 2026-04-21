@@ -87,6 +87,25 @@ class VehiculoController extends Controller
         return redirect()->back()->with('success', "Vehículo {$validated['patente']} actualizado correctamente.");
     }
 
+    public function desasignar(Vehiculo $vehiculo): RedirectResponse
+    {
+        if (!$vehiculo->user_id) {
+            return redirect()->back()->with('warning', 'El vehículo no tiene un conductor asignado.');
+        }
+
+        DB::transaction(function () use ($vehiculo) {
+            // Cerrar asignación activa
+            Asignacion::where('vehiculo_id', $vehiculo->id)
+                ->whereNull('fecha_fin')
+                ->update(['fecha_fin' => now()]);
+
+            // Quitar conductor del vehículo
+            $vehiculo->update(['user_id' => null]);
+        });
+
+        return redirect()->back()->with('success', "Conductor desasignado correctamente del vehículo {$vehiculo->patente}.");
+    }
+
     public function destroy(Vehiculo $vehiculo): RedirectResponse
     {
         $patente = $vehiculo->patente;

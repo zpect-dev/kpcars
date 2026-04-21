@@ -25,6 +25,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
     Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->name('vehiculos.update');
+    Route::patch('vehiculos/{vehiculo}/desasignar', [VehiculoController::class, 'desasignar'])->name('vehiculos.desasignar');
     Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
 
     Route::get('articulos', [ArticuloController::class, 'index'])->name('articulos.index');
