@@ -635,14 +635,14 @@ export default function AppointmentsIndex({
                         </div>
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="plate">Patente</Label>
-                            <Input
+                            <Combobox
                                 id="plate"
-                                type="text"
                                 placeholder="Buscar patente..."
+                                options={patenteOptions}
                                 value={plate}
-                                onChange={(e) =>
-                                    setPlate(e.target.value.toUpperCase())
-                                }
+                                onSelect={(o) => setPlate(o.value)}
+                                onInputChange={(text) => setPlate(text)}
+                                uppercase
                             />
                         </div>
 
