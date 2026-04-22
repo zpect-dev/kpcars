@@ -45,7 +45,7 @@ class Appointment extends Model
     {
         return $query->where('type', 'normal')
             ->whereDate('scheduled_date', $date)
-            ->whereIn('status', ['agendado', 'en_proceso']);
+            ->whereIn('status', ['agendado', 'en_proceso', 'completado']);
     }
 
     public function completedBy()

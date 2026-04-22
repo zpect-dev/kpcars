@@ -56,7 +56,7 @@ class AppointmentController extends Controller
         // Cupos normales usados por día (próximos 60 días) para el calendario del frontend
         $dailySlots = Appointment::selectRaw('DATE(scheduled_date) as fecha, COUNT(*) as used')
             ->where('type', 'normal')
-            ->whereIn('status', ['agendado', 'en_proceso'])
+            ->whereIn('status', ['agendado', 'en_proceso', 'completado'])
             ->whereDate('scheduled_date', '>=', now()->toDateString())
             ->groupBy(DB::raw('DATE(scheduled_date)'))
             ->pluck('used', 'fecha')
