@@ -49,8 +49,7 @@ class AppointmentController extends Controller
             ->orderBy('patente')
             ->get();
 
-        $conductores = User::where('role', UserRole::CHOFER)
-            ->where('inactivo', false)
+        $conductores = User::where('inactivo', false)
             ->orderBy('name')
             ->get(['id', 'name']);
 

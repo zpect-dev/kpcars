@@ -20,17 +20,18 @@ class AppointmentSyncController extends Controller
     public function __invoke(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'from' => ['required', 'date'],
-            'to'   => ['required', 'date', 'after_or_equal:from'],
+            'from' => ['nullable', 'date'],
+            'to'   => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
-        $appointments = Appointment::whereBetween('scheduled_date', [
-                $validated['from'],
-                $validated['to'],
-            ])
+        $from = $validated['from'] ?? now()->toDateString();
+        $to   = $validated['to']   ?? now()->addMonths(2)->toDateString();
+
+        $appointments = Appointment::with('conductor:id,name')
+            ->whereBetween('scheduled_date', [$from, $to])
             ->orderBy('scheduled_date')
             ->orderBy('id')
-            ->get(['id', 'service', 'type', 'license_plate', 'applicant', 'scheduled_date', 'status', 'created_at']);
+            ->get(['id', 'service', 'type', 'license_plate', 'conductor_id', 'scheduled_date', 'status', 'created_at']);
 
         return response()->json([
             'count'        => $appointments->count(),
