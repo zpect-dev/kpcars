@@ -53,6 +53,11 @@ class AppointmentController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $mecanicos = User::where('role', UserRole::MECANICO)
+            ->where('inactivo', false)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         // Cupos normales usados por día (próximos 60 días) para el calendario del frontend
         $dailySlots = Appointment::selectRaw('DATE(scheduled_date) as fecha, COUNT(*) as used')
             ->where('type', 'normal')
@@ -71,6 +76,7 @@ class AppointmentController extends Controller
             'filters'        => $filters,
             'vehiculos'      => $vehiculos,
             'conductores'    => $conductores,
+            'mecanicos'      => $mecanicos,
             'dailySlots'     => $dailySlots,
             'remainingToday' => $remainingToday,
             'maxSlots'       => 4,
@@ -122,6 +128,7 @@ class AppointmentController extends Controller
     {
         $validated = $request->validate([
             'status' => ['required', 'in:agendado,en_proceso,completado,cancelado'],
+            'completed_by_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
         $newStatus = $validated['status'];
@@ -131,16 +138,30 @@ class AppointmentController extends Controller
             abort_if($request->user()->isMechanic(), 403, 'Los mecánicos no pueden cancelar turnos.');
         }
 
-        if ($oldStatus === $newStatus) {
+        if ($newStatus === 'completado') {
+            if (empty($validated['completed_by_id'])) {
+                return redirect()->back()->with('error', 'Debes seleccionar el mecánico que completó el turno.');
+            }
+            $mecanico = User::find($validated['completed_by_id']);
+            if (! $mecanico || $mecanico->role !== UserRole::MECANICO) {
+                return redirect()->back()->with('error', 'El usuario seleccionado no es un mecánico válido.');
+            }
+        }
+
+        if ($oldStatus === $newStatus && $newStatus !== 'completado') {
             return redirect()->back();
         }
 
         try {
-            DB::transaction(function () use ($appointment, $newStatus) {
+            DB::transaction(function () use ($appointment, $newStatus, $validated) {
                 $payload = ['status' => $newStatus];
-                
+
                 if ($newStatus === 'completado') {
-                    $payload['completed_by'] = auth()->id();
+                    $payload['completed_by'] = (int) $validated['completed_by_id'];
+                    $payload['completed_at'] = now();
+                } else {
+                    $payload['completed_by'] = null;
+                    $payload['completed_at'] = null;
                 }
 
                 $appointment->update($payload);

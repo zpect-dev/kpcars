@@ -62,6 +62,7 @@ interface AppointmentRow {
     completed_by?: {
         name: string;
     } | null;
+    completed_at?: string | null;
 }
 
 interface PaginationInfo {
@@ -85,6 +86,7 @@ interface Props {
     filters: Filters;
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'user_id'>[];
     conductores: { id: number; name: string }[];
+    mecanicos: { id: number; name: string }[];
     dailySlots: Record<string, number>;
     remainingToday: number;
     maxSlots: number;
@@ -123,11 +125,19 @@ function formatDate(iso: string): string {
     return `${day}/${m}/${y}`;
 }
 
+function formatDateTime(iso: string): string {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function AppointmentsIndex({
     appointments,
     filters,
     vehiculos,
     conductores,
+    mecanicos,
     dailySlots,
     remainingToday,
     maxSlots,
@@ -137,9 +147,25 @@ export default function AppointmentsIndex({
     const [status, setStatus] = useState(filters.status || '');
     const [plate, setPlate] = useState(filters.plate || '');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(null);
+    const [selectedMecanicoId, setSelectedMecanicoId] = useState<string>('');
+
+    const mecanicoOptions: ComboboxOption[] = useMemo(
+        () =>
+            mecanicos.map((m) => ({
+                value: String(m.id),
+                label: m.name,
+            })),
+        [mecanicos],
+    );
 
     const { auth } = usePage<any>().props;
     const isMechanic = auth.user.role === 'mecanico';
+
+    const mecanicosVisibles = useMemo(
+        () => mecanicos.filter((m) => m.id !== auth.user.id),
+        [mecanicos, auth.user.id],
+    );
 
     const today = useRef(new Date().toISOString().slice(0, 10)).current;
 
@@ -256,12 +282,37 @@ export default function AppointmentsIndex({
     const hasActiveFilters = !!(from || to || status || plate);
 
     function changeStatus(id: number, next: AppointmentStatus) {
+        if (next === 'completado') {
+            setSelectedMecanicoId('');
+            // Un pequeño delay evita el parpadeo visual entre el cierre del dropdown
+            // y la apertura del modal controlado por estado.
+            setTimeout(() => {
+                setCompleteDialog({ id });
+            }, 10);
+            return;
+        }
         router.patch(
             `/appointments/${id}/status`,
             { status: next },
             {
                 preserveScroll: true,
                 preserveState: true,
+            },
+        );
+    }
+
+    function submitComplete() {
+        if (!completeDialog || !selectedMecanicoId) return;
+        router.patch(
+            `/appointments/${completeDialog.id}/status`,
+            { status: 'completado', completed_by_id: Number(selectedMecanicoId) },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    setCompleteDialog(null);
+                    setSelectedMecanicoId('');
+                },
             },
         );
     }
@@ -643,8 +694,11 @@ export default function AppointmentsIndex({
                                     <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Estado
                                     </th>
-                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Completado por
+                                    </th>
+                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Fecha completado
                                     </th>
                                     <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
@@ -655,7 +709,7 @@ export default function AppointmentsIndex({
                                 {appointments.data.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={9}
+                                            colSpan={10}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay turnos que coincidan con los
@@ -744,6 +798,17 @@ export default function AppointmentsIndex({
                                                         </span>
                                                     )}
                                                 </td>
+                                                <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                    {a.status === 'completado' && a.completed_at ? (
+                                                        <span className="text-muted-foreground">
+                                                            {formatDateTime(a.completed_at)}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/40 italic">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </td>
                                                 <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger
@@ -801,12 +866,12 @@ export default function AppointmentsIndex({
                                                                     a.status ===
                                                                     'completado'
                                                                 }
-                                                                onSelect={() =>
-                                                                    changeStatus(
-                                                                        a.id,
-                                                                        'completado',
-                                                                    )
-                                                                }
+                                                                onSelect={(e) => {
+                                                                    e.preventDefault();
+                                                                    setTimeout(() => {
+                                                                        changeStatus(a.id, 'completado');
+                                                                    }, 200);
+                                                                }}
                                                             >
                                                                 <CheckCircle2 className="h-4 w-4" />
                                                                 Marcar
@@ -922,12 +987,12 @@ export default function AppointmentsIndex({
                                                         a.status ===
                                                         'completado'
                                                     }
-                                                    onSelect={() =>
-                                                        changeStatus(
-                                                            a.id,
-                                                            'completado',
-                                                        )
-                                                    }
+                                                    onSelect={(e) => {
+                                                        e.preventDefault();
+                                                        setTimeout(() => {
+                                                            changeStatus(a.id, 'completado');
+                                                        }, 200);
+                                                    }}
                                                 >
                                                     <CheckCircle2 className="h-4 w-4" />
                                                     Marcar completado
@@ -992,6 +1057,14 @@ export default function AppointmentsIndex({
                                                 <span className="font-medium text-foreground">
                                                     {a.completed_by.name}
                                                 </span>
+                                                {a.completed_at && (
+                                                    <>
+                                                        {' '}el{' '}
+                                                        <span className="font-medium text-foreground">
+                                                            {formatDateTime(a.completed_at)}
+                                                        </span>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                 </li>
@@ -1048,6 +1121,66 @@ export default function AppointmentsIndex({
                     )}
                 </div>
             </div>
+
+            <Dialog
+                open={completeDialog !== null}
+                onOpenChange={(o) => {
+                    if (!o) {
+                        setCompleteDialog(null);
+                        setSelectedMecanicoId('');
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>Marcar turno como completado</DialogTitle>
+                        <DialogDescription>
+                            Selecciona el mecánico que completó este turno.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2 py-2">
+                        <Label>Mecánico</Label>
+                        {mecanicosVisibles.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No hay mecánicos disponibles.
+                            </p>
+                        ) : (
+                            <div className="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                                {mecanicosVisibles.map((m) => {
+                                    const isSelected = selectedMecanicoId === String(m.id);
+                                    return (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => setSelectedMecanicoId(String(m.id))}
+                                            className={cn(
+                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
+                                                isSelected
+                                                    ? 'bg-primary/10 text-foreground font-medium'
+                                                    : 'hover:bg-muted/60 text-muted-foreground',
+                                            )}
+                                        >
+                                            <span>{m.name}</span>
+                                            {isSelected && (
+                                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            onClick={submitComplete}
+                            disabled={!selectedMecanicoId}
+                        >
+                            Confirmar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

@@ -19,6 +19,7 @@ class Appointment extends Model
         'scheduled_date',
         'status',
         'completed_by',
+        'completed_at',
     ];
 
     /**
@@ -34,6 +35,7 @@ class Appointment extends Model
             'scheduled_date' => 'date',
             'status' => 'string',
             'completed_by' => 'integer',
+            'completed_at' => 'datetime',
         ];
     }
 

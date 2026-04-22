@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
 export interface ComboboxOption {
     /** Unique identifier for the option */
@@ -97,7 +98,12 @@ export function Combobox({
     }
 
     function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (!showDropdown || filtered.length === 0) return;
+        if (!showDropdown || filtered.length === 0) {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                setShowDropdown(true);
+            }
+            return;
+        }
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -113,7 +119,7 @@ export function Combobox({
         } else if (e.key === 'Tab') {
             const target =
                 highlightedIndex >= 0 ? filtered[highlightedIndex] : filtered[0];
-            if (target) {
+            if (target && showDropdown) {
                 e.preventDefault();
                 handleSelect(target);
             }
@@ -124,21 +130,35 @@ export function Combobox({
     }
 
     return (
-        <div className={cn('relative', className)}>
-            <Input
-                id={id}
-                ref={inputRef}
-                autoComplete="off"
-                placeholder={placeholder}
-                value={inputText}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setShowDropdown(true)}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                disabled={disabled}
-            />
-            {showDropdown && (
-                <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+        <Popover open={showDropdown} onOpenChange={setShowDropdown}>
+            <PopoverTrigger asChild>
+                <div 
+                    className={cn('relative', className)}
+                    onPointerDown={(e) => {
+                        // Si ya está abierto, evitamos que el trigger lo cierre (toggle off)
+                        if (showDropdown) e.preventDefault();
+                    }}
+                >
+                    <Input
+                        id={id}
+                        ref={inputRef}
+                        autoComplete="off"
+                        placeholder={placeholder}
+                        value={inputText}
+                        onChange={handleChange}
+                        onKeyDown={handleKeyDown}
+                        onFocus={() => setShowDropdown(true)}
+                        disabled={disabled}
+                    />
+                </div>
+            </PopoverTrigger>
+            <PopoverContent
+                className="p-0 border-none shadow-none"
+                style={{ width: inputRef.current?.offsetWidth }}
+                onOpenAutoFocus={(e) => e.preventDefault()}
+                onCloseAutoFocus={(e) => e.preventDefault()}
+            >
+                <div className="w-full overflow-hidden rounded-md border border-border bg-popover shadow-md min-w-[var(--radix-popover-trigger-width)]">
                     <div className="max-h-52 overflow-y-auto">
                         {filtered.length === 0 ? (
                             <p className="px-3 py-2 text-sm text-muted-foreground">
@@ -152,11 +172,14 @@ export function Combobox({
                                     className={cn(
                                         'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
                                         highlightedIndex === idx
-                                            ? 'bg-accent'
+                                            ? 'bg-accent text-accent-foreground'
                                             : 'hover:bg-accent/60',
                                     )}
                                     onMouseEnter={() => setHighlightedIndex(idx)}
-                                    onMouseDown={() => handleSelect(option)}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelect(option);
+                                    }}
                                 >
                                     <span className="font-medium">{option.label}</span>
                                     {option.sub && (
@@ -169,7 +192,7 @@ export function Combobox({
                         )}
                     </div>
                 </div>
-            )}
-        </div>
+            </PopoverContent>
+        </Popover>
     );
 }
