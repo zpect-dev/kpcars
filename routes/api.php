@@ -30,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // These require the password to have been changed first
     Route::middleware(EnsurePasswordChanged::class)->group(function () {
         Route::get('me', [ProfileController::class, 'show']);
+        Route::patch('me', [ProfileController::class, 'update']);
         Route::get('mi-vehiculo', [VehiculoController::class, 'show']);
         Route::get('mi-historial-vehiculos', [VehiculoController::class, 'history']);
         Route::get('mis-turnos', [AppointmentController::class, 'index']);

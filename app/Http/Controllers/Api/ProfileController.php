@@ -30,4 +30,21 @@ class ProfileController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Update the authenticated user's contact information.
+     */
+    public function update(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'correo'   => ['nullable', 'string', 'email', 'max:255'],
+            'telefono' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $request->user()->update($validated);
+
+        return response()->json([
+            'message' => 'Datos de contacto actualizados correctamente.',
+        ]);
+    }
 }
