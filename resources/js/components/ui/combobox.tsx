@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { Popover, PopoverAnchor, PopoverContent } from './popover';
 
 export interface ComboboxOption {
     /** Unique identifier for the option */
@@ -131,14 +131,8 @@ export function Combobox({
 
     return (
         <Popover open={showDropdown} onOpenChange={setShowDropdown}>
-            <PopoverTrigger asChild>
-                <div 
-                    className={cn('relative', className)}
-                    onPointerDown={(e) => {
-                        // Si ya está abierto, evitamos que el trigger lo cierre (toggle off)
-                        if (showDropdown) e.preventDefault();
-                    }}
-                >
+            <PopoverAnchor asChild>
+                <div className={cn('relative', className)}>
                     <Input
                         id={id}
                         ref={inputRef}
@@ -148,15 +142,23 @@ export function Combobox({
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
                         onFocus={() => setShowDropdown(true)}
+                        onMouseDown={() => setShowDropdown(true)}
                         disabled={disabled}
                     />
                 </div>
-            </PopoverTrigger>
+            </PopoverAnchor>
             <PopoverContent
                 className="p-0 border-none shadow-none"
                 style={{ width: inputRef.current?.offsetWidth }}
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => {
+                    // Evita que un clic sobre el input cierre el popover:
+                    // el onFocus/onMouseDown lo mantendría abierto y causaría flicker.
+                    if (inputRef.current?.contains(e.target as Node)) {
+                        e.preventDefault();
+                    }
+                }}
             >
                 <div className="w-full overflow-hidden rounded-md border border-border bg-popover shadow-md min-w-[var(--radix-popover-trigger-width)]">
                     <div className="max-h-52 overflow-y-auto">
