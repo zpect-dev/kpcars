@@ -62,13 +62,18 @@ class AppointmentController extends Controller
             ->pluck('used', 'fecha')
             ->toArray();
 
+        $today = now()->toDateString();
+        $usedToday = $dailySlots[$today] ?? 0;
+        $remainingToday = max(0, 4 - $usedToday);
+
         return Inertia::render('Appointments/Index', [
-            'appointments' => $appointments,
-            'filters'      => $filters,
-            'vehiculos'    => $vehiculos,
-            'conductores'  => $conductores,
-            'dailySlots'   => $dailySlots,
-            'maxSlots'     => 4,
+            'appointments'   => $appointments,
+            'filters'        => $filters,
+            'vehiculos'      => $vehiculos,
+            'conductores'    => $conductores,
+            'dailySlots'     => $dailySlots,
+            'remainingToday' => $remainingToday,
+            'maxSlots'       => 4,
         ]);
     }
 

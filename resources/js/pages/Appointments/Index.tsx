@@ -86,6 +86,7 @@ interface Props {
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'user_id'>[];
     conductores: { id: number; name: string }[];
     dailySlots: Record<string, number>;
+    remainingToday: number;
     maxSlots: number;
 }
 
@@ -128,6 +129,7 @@ export default function AppointmentsIndex({
     vehiculos,
     conductores,
     dailySlots,
+    remainingToday,
     maxSlots,
 }: Props) {
     const [from, setFrom] = useState(filters.from || '');
@@ -271,10 +273,27 @@ export default function AppointmentsIndex({
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div>
+                    <div className="flex flex-col gap-1">
                         <h1 className="text-lg font-semibold text-foreground sm:text-xl">
                             Turnos Asignados
                         </h1>
+                        <div className="flex items-center gap-2">
+                            <span className={cn(
+                                "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+                                remainingToday > 0 
+                                    ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                                    : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                            )}>
+                                <span className={cn(
+                                    "h-1.5 w-1.5 rounded-full",
+                                    remainingToday > 0 ? "bg-green-500" : "bg-red-500"
+                                )} />
+                                {remainingToday === 0 
+                                    ? "Sin cupos disponibles para hoy" 
+                                    : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`
+                                }
+                            </span>
+                        </div>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
