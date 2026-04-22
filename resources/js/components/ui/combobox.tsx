@@ -153,9 +153,19 @@ export function Combobox({
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
                 onPointerDownOutside={(e) => {
-                    // Evita que un clic sobre el input cierre el popover:
-                    // el onFocus/onMouseDown lo mantendría abierto y causaría flicker.
-                    if (inputRef.current?.contains(e.target as Node)) {
+                    // El target del CustomEvent de Radix es el propio Content,
+                    // el elemento realmente clickeado está en detail.originalEvent.target.
+                    const original = (e.detail as { originalEvent: PointerEvent })
+                        .originalEvent.target as Node | null;
+                    if (original && inputRef.current?.contains(original)) {
+                        e.preventDefault();
+                    }
+                }}
+                onFocusOutside={(e) => {
+                    // Mismo caso para el evento de foco fuera.
+                    const original = (e.detail as { originalEvent: FocusEvent })
+                        .originalEvent.target as Node | null;
+                    if (original && inputRef.current?.contains(original)) {
                         e.preventDefault();
                     }
                 }}
