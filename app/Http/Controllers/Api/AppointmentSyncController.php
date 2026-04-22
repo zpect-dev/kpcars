@@ -29,6 +29,7 @@ class AppointmentSyncController extends Controller
 
         $appointments = Appointment::with('conductor:id,name')
             ->whereBetween('scheduled_date', [$from, $to])
+            ->where('status', '!=', 'cancelado')
             ->orderBy('scheduled_date')
             ->orderBy('id')
             ->get(['id', 'service', 'type', 'license_plate', 'conductor_id', 'scheduled_date', 'status', 'created_at']);
