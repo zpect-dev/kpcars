@@ -134,6 +134,10 @@ class AppointmentController extends Controller
         $newStatus = $validated['status'];
         $oldStatus = $appointment->status;
 
+        if ($oldStatus === 'completado' && $request->user()->isMechanic()) {
+            abort(403, 'Los turnos completados solo pueden ser modificados por un administrador.');
+        }
+
         if ($newStatus === 'cancelado') {
             abort_if($request->user()->isMechanic(), 403, 'Los mecánicos no pueden cancelar turnos.');
         }

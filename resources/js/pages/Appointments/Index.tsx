@@ -84,7 +84,10 @@ interface Filters {
 interface Props {
     appointments: PaginationInfo;
     filters: Filters;
-    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'user_id'>[];
+    vehiculos: Pick<
+        Vehiculo,
+        'id' | 'patente' | 'marca' | 'modelo' | 'user_id'
+    >[];
     conductores: { id: number; name: string }[];
     mecanicos: { id: number; name: string }[];
     dailySlots: Record<string, number>;
@@ -147,7 +150,9 @@ export default function AppointmentsIndex({
     const [status, setStatus] = useState(filters.status || '');
     const [plate, setPlate] = useState(filters.plate || '');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(null);
+    const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(
+        null,
+    );
     const [selectedMecanicoId, setSelectedMecanicoId] = useState<string>('');
 
     const mecanicoOptions: ComboboxOption[] = useMemo(
@@ -305,7 +310,10 @@ export default function AppointmentsIndex({
         if (!completeDialog || !selectedMecanicoId) return;
         router.patch(
             `/appointments/${completeDialog.id}/status`,
-            { status: 'completado', completed_by_id: Number(selectedMecanicoId) },
+            {
+                status: 'completado',
+                completed_by_id: Number(selectedMecanicoId),
+            },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -329,20 +337,25 @@ export default function AppointmentsIndex({
                             Turnos Asignados
                         </h1>
                         <div className="flex items-center gap-2">
-                            <span className={cn(
-                                "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
-                                remainingToday > 0 
-                                    ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400"
-                                    : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400"
-                            )}>
-                                <span className={cn(
-                                    "h-1.5 w-1.5 rounded-full",
-                                    remainingToday > 0 ? "bg-green-500" : "bg-red-500"
-                                )} />
-                                {remainingToday === 0 
-                                    ? "Sin cupos disponibles para hoy" 
-                                    : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`
-                                }
+                            <span
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+                                    remainingToday > 0
+                                        ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+                                        : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
+                                )}
+                            >
+                                <span
+                                    className={cn(
+                                        'h-1.5 w-1.5 rounded-full',
+                                        remainingToday > 0
+                                            ? 'bg-green-500'
+                                            : 'bg-red-500',
+                                    )}
+                                />
+                                {remainingToday === 0
+                                    ? 'Sin cupos disponibles para hoy'
+                                    : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`}
                             </span>
                         </div>
                     </div>
@@ -357,230 +370,278 @@ export default function AppointmentsIndex({
                                 if (status) params.set('status', status);
                                 if (plate) params.set('plate', plate);
                                 const qs = params.toString();
-                                window.open('/pdf/appointments' + (qs ? '?' + qs : ''), '_blank');
+                                window.open(
+                                    '/pdf/appointments' + (qs ? '?' + qs : ''),
+                                    '_blank',
+                                );
                             }}
                         >
                             <FileDown className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
+                            <span className="hidden sm:inline">
+                                Exportar PDF
+                            </span>
                         </Button>
 
-                    {!isMechanic && (
-                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm">
-                                    <CalendarPlus className="h-4 w-4" />
-                                    <span className="hidden sm:inline">
-                                        Agendar Turno
-                                    </span>
-                                </Button>
-                            </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                            <DialogHeader>
-                                <DialogTitle>Agendar Turno</DialogTitle>
-                                <DialogDescription className="sr-only">
-                                    Completa los datos para agendar un turno
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <form
-                                onSubmit={handleSubmit}
-                                className="grid gap-4 py-4"
+                        {!isMechanic && (
+                            <Dialog
+                                open={isDialogOpen}
+                                onOpenChange={setIsDialogOpen}
                             >
-                                {/* Toggle emergencia */}
-                                <div
-                                    className={cn(
-                                        'flex items-center gap-3 rounded-md border p-3 transition-colors',
-                                        form.data.type === 'emergencia'
-                                            ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
-                                            : 'border-border bg-card',
-                                    )}
-                                >
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={
-                                            form.data.type === 'emergencia'
-                                        }
-                                        onClick={() =>
-                                            form.setData(
-                                                'type',
-                                                form.data.type === 'normal'
-                                                    ? 'emergencia'
-                                                    : 'normal',
-                                            )
-                                        }
-                                        className={cn(
-                                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                            form.data.type === 'emergencia'
-                                                ? 'bg-red-600'
-                                                : 'bg-gray-200 dark:bg-gray-700',
-                                        )}
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <CalendarPlus className="h-4 w-4" />
+                                        <span className="hidden sm:inline">
+                                            Agendar Turno
+                                        </span>
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>Agendar Turno</DialogTitle>
+                                        <DialogDescription className="sr-only">
+                                            Completa los datos para agendar un
+                                            turno
+                                        </DialogDescription>
+                                    </DialogHeader>
+
+                                    <form
+                                        onSubmit={handleSubmit}
+                                        className="grid gap-4 py-4"
                                     >
-                                        <span
-                                            className={cn(
-                                                'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
-                                                form.data.type ===
-                                                    'emergencia' &&
-                                                    'translate-x-4',
-                                            )}
-                                        />
-                                    </button>
-                                    <div className="flex items-center gap-1.5">
-                                        <AlertTriangle
-                                            className={cn(
-                                                'h-4 w-4',
-                                                form.data.type === 'emergencia'
-                                                    ? 'text-red-600'
-                                                    : 'text-muted-foreground',
-                                            )}
-                                        />
-                                        <Label className="cursor-pointer text-sm select-none">
-                                            Turno de emergencia
-                                        </Label>
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="service">Servicio</Label>
-                                    <Input
-                                        id="service"
-                                        type="text"
-                                        placeholder="Ej. Cambio de aceite"
-                                        value={form.data.service}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'service',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <InputError message={form.errors.service} />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="license_plate">
-                                        Patente
-                                    </Label>
-                                    <Combobox
-                                        id="license_plate"
-                                        placeholder="Buscar patente..."
-                                        options={patenteOptions}
-                                        value={form.data.license_plate}
-                                        onSelect={(o) => {
-                                            form.setData('license_plate', o.value);
-                                            // Autocompletar conductor asignado
-                                            const v = vehiculos.find(v => v.patente === o.value);
-                                            if (v && v.user_id) {
-                                                form.setData('conductor_id', v.user_id);
-                                            }
-                                        }}
-                                        uppercase
-                                    />
-                                    <InputError
-                                        message={form.errors.license_plate}
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="conductor_id">
-                                        Solicitante
-                                    </Label>
-                                    <Combobox
-                                        id="conductor_id"
-                                        placeholder="Seleccionar chofer..."
-                                        options={conductorOptions}
-                                        value={String(form.data.conductor_id)}
-                                        onSelect={(o) =>
-                                            form.setData(
-                                                'conductor_id',
-                                                o.value,
-                                            )
-                                        }
-                                    />
-                                    <InputError
-                                        message={form.errors.conductor_id}
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="preferred_date">
-                                        Fecha Solicitada
-                                    </Label>
-                                    <Input
-                                        id="preferred_date"
-                                        type="date"
-                                        min={today}
-                                        value={form.data.preferred_date}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'preferred_date',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {/* Slot usage indicator */}
-                                    {selectedDateSlots && (
+                                        {/* Toggle emergencia */}
                                         <div
                                             className={cn(
-                                                'flex items-center gap-1.5 text-xs',
-                                                selectedDateSlots.full
-                                                    ? 'text-red-600'
-                                                    : selectedDateSlots.used >=
-                                                        maxSlots - 1
-                                                      ? 'text-amber-600'
-                                                      : 'text-muted-foreground',
+                                                'flex items-center gap-3 rounded-md border p-3 transition-colors',
+                                                form.data.type === 'emergencia'
+                                                    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                    : 'border-border bg-card',
                                             )}
                                         >
-                                            <span
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={
+                                                    form.data.type ===
+                                                    'emergencia'
+                                                }
+                                                onClick={() =>
+                                                    form.setData(
+                                                        'type',
+                                                        form.data.type ===
+                                                            'normal'
+                                                            ? 'emergencia'
+                                                            : 'normal',
+                                                    )
+                                                }
                                                 className={cn(
-                                                    'inline-block h-2 w-2 rounded-full',
-                                                    selectedDateSlots.full
-                                                        ? 'bg-red-500'
-                                                        : selectedDateSlots.used >=
-                                                            maxSlots - 1
-                                                          ? 'bg-amber-500'
-                                                          : 'bg-green-500',
+                                                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                                                    form.data.type ===
+                                                        'emergencia'
+                                                        ? 'bg-red-600'
+                                                        : 'bg-gray-200 dark:bg-gray-700',
                                                 )}
-                                            />
-                                            {selectedDateSlots.full ? (
-                                                form.data.type ===
-                                                'emergencia' ? (
-                                                    <span>
-                                                        Cupos normales agotados
-                                                        — emergencia disponible
-                                                    </span>
-                                                ) : (
-                                                    <span>
-                                                        Sin cupos normales
-                                                        disponibles — active
-                                                        emergencia
-                                                    </span>
-                                                )
-                                            ) : (
-                                                <span>
-                                                    {selectedDateSlots.used}/
-                                                    {selectedDateSlots.max}{' '}
-                                                    cupos normales usados
-                                                </span>
-                                            )}
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
+                                                        form.data.type ===
+                                                            'emergencia' &&
+                                                            'translate-x-4',
+                                                    )}
+                                                />
+                                            </button>
+                                            <div className="flex items-center gap-1.5">
+                                                <AlertTriangle
+                                                    className={cn(
+                                                        'h-4 w-4',
+                                                        form.data.type ===
+                                                            'emergencia'
+                                                            ? 'text-red-600'
+                                                            : 'text-muted-foreground',
+                                                    )}
+                                                />
+                                                <Label className="cursor-pointer text-sm select-none">
+                                                    Turno de emergencia
+                                                </Label>
+                                            </div>
                                         </div>
-                                    )}
-                                    <InputError
-                                        message={form.errors.preferred_date}
-                                    />
-                                </div>
 
-                                <DialogFooter>
-                                    <Button type="submit" disabled={!canSubmit}>
-                                        {form.processing
-                                            ? 'Procesando...'
-                                            : 'Guardar Turno'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                    )}
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="service">
+                                                Servicio
+                                            </Label>
+                                            <Input
+                                                id="service"
+                                                type="text"
+                                                placeholder="Ej. Cambio de aceite"
+                                                value={form.data.service}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'service',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={form.errors.service}
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="license_plate">
+                                                Patente
+                                            </Label>
+                                            <Combobox
+                                                id="license_plate"
+                                                placeholder="Buscar patente..."
+                                                options={patenteOptions}
+                                                value={form.data.license_plate}
+                                                onSelect={(o) => {
+                                                    form.setData(
+                                                        'license_plate',
+                                                        o.value,
+                                                    );
+                                                    // Autocompletar conductor asignado
+                                                    const v = vehiculos.find(
+                                                        (v) =>
+                                                            v.patente ===
+                                                            o.value,
+                                                    );
+                                                    if (v && v.user_id) {
+                                                        form.setData(
+                                                            'conductor_id',
+                                                            v.user_id,
+                                                        );
+                                                    }
+                                                }}
+                                                uppercase
+                                            />
+                                            <InputError
+                                                message={
+                                                    form.errors.license_plate
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="conductor_id">
+                                                Solicitante
+                                            </Label>
+                                            <Combobox
+                                                id="conductor_id"
+                                                placeholder="Seleccionar chofer..."
+                                                options={conductorOptions}
+                                                value={String(
+                                                    form.data.conductor_id,
+                                                )}
+                                                onSelect={(o) =>
+                                                    form.setData(
+                                                        'conductor_id',
+                                                        o.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    form.errors.conductor_id
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="preferred_date">
+                                                Fecha Solicitada
+                                            </Label>
+                                            <Input
+                                                id="preferred_date"
+                                                type="date"
+                                                min={today}
+                                                value={form.data.preferred_date}
+                                                onChange={(e) =>
+                                                    form.setData(
+                                                        'preferred_date',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            {/* Slot usage indicator */}
+                                            {selectedDateSlots && (
+                                                <div
+                                                    className={cn(
+                                                        'flex items-center gap-1.5 text-xs',
+                                                        selectedDateSlots.full
+                                                            ? 'text-red-600'
+                                                            : selectedDateSlots.used >=
+                                                                maxSlots - 1
+                                                              ? 'text-amber-600'
+                                                              : 'text-muted-foreground',
+                                                    )}
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            'inline-block h-2 w-2 rounded-full',
+                                                            selectedDateSlots.full
+                                                                ? 'bg-red-500'
+                                                                : selectedDateSlots.used >=
+                                                                    maxSlots - 1
+                                                                  ? 'bg-amber-500'
+                                                                  : 'bg-green-500',
+                                                        )}
+                                                    />
+                                                    {selectedDateSlots.full ? (
+                                                        form.data.type ===
+                                                        'emergencia' ? (
+                                                            <span>
+                                                                Cupos normales
+                                                                agotados —
+                                                                emergencia
+                                                                disponible
+                                                            </span>
+                                                        ) : (
+                                                            <span>
+                                                                Sin cupos
+                                                                normales
+                                                                disponibles —
+                                                                active
+                                                                emergencia
+                                                            </span>
+                                                        )
+                                                    ) : (
+                                                        <span>
+                                                            {
+                                                                selectedDateSlots.used
+                                                            }
+                                                            /
+                                                            {
+                                                                selectedDateSlots.max
+                                                            }{' '}
+                                                            cupos normales
+                                                            usados
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <InputError
+                                                message={
+                                                    form.errors.preferred_date
+                                                }
+                                            />
+                                        </div>
+
+                                        <DialogFooter>
+                                            <Button
+                                                type="submit"
+                                                disabled={!canSubmit}
+                                            >
+                                                {form.processing
+                                                    ? 'Procesando...'
+                                                    : 'Guardar Turno'}
+                                            </Button>
+                                        </DialogFooter>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+                        )}
                     </div>
                 </div>
 
@@ -660,7 +721,9 @@ export default function AppointmentsIndex({
                                 )}
                             >
                                 <X className="h-4 w-4" />
-                                <span className="lg:hidden">Limpiar filtros</span>
+                                <span className="lg:hidden">
+                                    Limpiar filtros
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -750,7 +813,9 @@ export default function AppointmentsIndex({
                                                 </td>
                                                 <td
                                                     className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                    title={a.conductor?.name || '-'}
+                                                    title={
+                                                        a.conductor?.name || '-'
+                                                    }
                                                 >
                                                     {a.conductor?.name || '-'}
                                                 </td>
@@ -799,9 +864,13 @@ export default function AppointmentsIndex({
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                    {a.status === 'completado' && a.completed_at ? (
+                                                    {a.status ===
+                                                        'completado' &&
+                                                    a.completed_at ? (
                                                         <span className="text-muted-foreground">
-                                                            {formatDateTime(a.completed_at)}
+                                                            {formatDateTime(
+                                                                a.completed_at,
+                                                            )}
                                                         </span>
                                                     ) : (
                                                         <span className="text-muted-foreground/40 italic">
@@ -818,6 +887,7 @@ export default function AppointmentsIndex({
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 className="h-8 w-8 p-0"
+                                                                disabled={isMechanic && a.status === 'completado'}
                                                             >
                                                                 <MoreHorizontal className="h-4 w-4" />
                                                                 <span className="sr-only">
@@ -866,12 +936,12 @@ export default function AppointmentsIndex({
                                                                     a.status ===
                                                                     'completado'
                                                                 }
-                                                                onSelect={(e) => {
-                                                                    e.preventDefault();
-                                                                    setTimeout(() => {
-                                                                        changeStatus(a.id, 'completado');
-                                                                    }, 200);
-                                                                }}
+                                                                onSelect={() =>
+                                                                    changeStatus(
+                                                                        a.id,
+                                                                        'completado',
+                                                                    )
+                                                                }
                                                             >
                                                                 <CheckCircle2 className="h-4 w-4" />
                                                                 Marcar
@@ -894,7 +964,8 @@ export default function AppointmentsIndex({
                                                                         className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
                                                                     >
                                                                         <Ban className="h-4 w-4" />
-                                                                        Cancelar turno
+                                                                        Cancelar
+                                                                        turno
                                                                     </DropdownMenuItem>
                                                                 </>
                                                             )}
@@ -940,7 +1011,8 @@ export default function AppointmentsIndex({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="-mr-2 -mt-1 shrink-0"
+                                                    className="-mt-1 -mr-2 shrink-0"
+                                                    disabled={isMechanic && a.status === 'completado'}
                                                 >
                                                     <MoreHorizontal className="h-4 w-4" />
                                                     <span className="sr-only">
@@ -987,12 +1059,12 @@ export default function AppointmentsIndex({
                                                         a.status ===
                                                         'completado'
                                                     }
-                                                    onSelect={(e) => {
-                                                        e.preventDefault();
-                                                        setTimeout(() => {
-                                                            changeStatus(a.id, 'completado');
-                                                        }, 200);
-                                                    }}
+                                                    onSelect={() =>
+                                                        changeStatus(
+                                                            a.id,
+                                                            'completado',
+                                                        )
+                                                    }
                                                 >
                                                     <CheckCircle2 className="h-4 w-4" />
                                                     Marcar completado
@@ -1059,9 +1131,12 @@ export default function AppointmentsIndex({
                                                 </span>
                                                 {a.completed_at && (
                                                     <>
-                                                        {' '}el{' '}
+                                                        {' '}
+                                                        el{' '}
                                                         <span className="font-medium text-foreground">
-                                                            {formatDateTime(a.completed_at)}
+                                                            {formatDateTime(
+                                                                a.completed_at,
+                                                            )}
                                                         </span>
                                                     </>
                                                 )}
@@ -1145,19 +1220,24 @@ export default function AppointmentsIndex({
                                 No hay mecánicos disponibles.
                             </p>
                         ) : (
-                            <div className="max-h-60 overflow-y-auto rounded-md border border-border divide-y divide-border">
+                            <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border">
                                 {mecanicosVisibles.map((m) => {
-                                    const isSelected = selectedMecanicoId === String(m.id);
+                                    const isSelected =
+                                        selectedMecanicoId === String(m.id);
                                     return (
                                         <button
                                             key={m.id}
                                             type="button"
-                                            onClick={() => setSelectedMecanicoId(String(m.id))}
+                                            onClick={() =>
+                                                setSelectedMecanicoId(
+                                                    String(m.id),
+                                                )
+                                            }
                                             className={cn(
                                                 'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
                                                 isSelected
-                                                    ? 'bg-primary/10 text-foreground font-medium'
-                                                    : 'hover:bg-muted/60 text-muted-foreground',
+                                                    ? 'bg-primary/10 font-medium text-foreground'
+                                                    : 'text-muted-foreground hover:bg-muted/60',
                                             )}
                                         >
                                             <span>{m.name}</span>
