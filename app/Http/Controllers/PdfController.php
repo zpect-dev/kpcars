@@ -82,7 +82,7 @@ class PdfController extends Controller
             ->get();
 
         $pdf = Pdf::loadView('pdf.appointments', compact('appointments', 'filters'))
-            ->setPaper('a4', 'portrait');
+            ->setPaper('a4', 'landscape');
 
         return $pdf->download('turnos-' . now()->format('Y-m-d') . '.pdf');
     }

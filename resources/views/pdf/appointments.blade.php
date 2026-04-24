@@ -13,7 +13,7 @@
 
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
-            font-size: 10px;
+            font-size: 16px;
             color: #1a1a1a;
             background: #fff;
         }
@@ -25,14 +25,14 @@
         }
 
         .header h1 {
-            font-size: 18px;
+            font-size: 32px;
             font-weight: 700;
             color: #1a1a1a;
         }
 
         .header .meta {
             margin-top: 4px;
-            font-size: 9px;
+            font-size: 14px;
             color: #6b7280;
         }
 
@@ -47,7 +47,7 @@
             background: #fff7ed;
             border: 1px solid #fed7aa;
             border-radius: 6px;
-            font-size: 9px;
+            font-size: 14px;
             color: #7c2d12;
         }
 
@@ -72,7 +72,7 @@
         thead th {
             padding: 8px 10px;
             text-align: left;
-            font-size: 8.5px;
+            font-size: 15px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -84,14 +84,14 @@
         }
 
         tbody td {
-            padding: 7px 10px;
+            padding: 10px 12px;
             border-bottom: 1px solid #e5e7eb;
             vertical-align: middle;
         }
 
         .status-badge {
             display: inline-block;
-            font-size: 8px;
+            font-size: 14px;
             font-weight: 700;
             padding: 2px 7px;
             border-radius: 10px;
@@ -122,7 +122,7 @@
             display: inline-block;
             background: #f3f4f6;
             color: #374151;
-            font-size: 8px;
+            font-size: 14px;
             font-weight: 700;
             padding: 2px 7px;
             border-radius: 10px;
@@ -132,7 +132,7 @@
             display: inline-block;
             background: #fee2e2;
             color: #991b1b;
-            font-size: 8px;
+            font-size: 14px;
             font-weight: 700;
             padding: 2px 7px;
             border-radius: 10px;
@@ -142,7 +142,7 @@
             margin-top: 20px;
             padding-top: 10px;
             border-top: 1px solid #e5e7eb;
-            font-size: 9px;
+            font-size: 14px;
             color: #9ca3af;
             display: flex;
             justify-content: space-between;
@@ -176,12 +176,12 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width:8%; text-align:center"># Turno</th>
-                    <th style="width:14%">Fecha</th>
-                    <th style="width:16%">Patente</th>
-                    <th style="width:34%">Servicio</th>
-                    <th style="width:16%">Solicitante</th>
-                    <th style="width:12%; text-align:center">Tipo</th>
+                    <th style="width:6%; text-align:center">#</th>
+                    <th style="width:10%">Fecha</th>
+                    <th style="width:14%">Patente</th>
+                    <th style="width:40%">Servicio</th>
+                    <th style="width:20%">Solicitante</th>
+                    <th style="width:10%; text-align:center">Tipo</th>
                 </tr>
             </thead>
             <tbody>
