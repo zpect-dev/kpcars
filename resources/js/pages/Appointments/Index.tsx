@@ -226,8 +226,6 @@ export default function AppointmentsIndex({
         form.post('/appointments', {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset('license_plate', 'conductor_id', 'service');
-                form.setData('type', 'normal');
                 setIsDialogOpen(false);
             },
         });
@@ -386,7 +384,13 @@ export default function AppointmentsIndex({
                         {!isMechanic && !isInversor && (
                             <Dialog
                                 open={isDialogOpen}
-                                onOpenChange={setIsDialogOpen}
+                                onOpenChange={(open) => {
+                                    setIsDialogOpen(open);
+                                    if (!open) {
+                                        form.reset();
+                                        form.clearErrors();
+                                    }
+                                }}
                             >
                                 <DialogTrigger asChild>
                                     <Button size="sm">
