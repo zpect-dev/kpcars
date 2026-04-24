@@ -297,9 +297,14 @@ export default function Dashboard({
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
+                    <div className="flex items-center gap-3">
                         <h1 className="text-lg font-semibold text-foreground sm:text-xl">
                             Vehículos
                         </h1>
+                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/50">
+                            {filteredVehiculos.length} {filteredVehiculos.length === 1 ? 'vehículo' : 'vehículos'}
+                        </span>
+                    </div>
                     </div>
                     {!isInversor && (
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
