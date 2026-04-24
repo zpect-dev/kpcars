@@ -32,8 +32,17 @@ class VehiculoController extends Controller
         DB::transaction(function () use ($validated, $request) {
             $vehiculo = Vehiculo::create($validated);
 
-            // Si se asigna conductor al crear, registrar en historial
+            // Si se asigna conductor al crear, asegurar que no tenga otro vehículo
             if (!empty($validated['user_id'])) {
+                Vehiculo::where('user_id', $validated['user_id'])
+                    ->get()
+                    ->each(function ($v) {
+                        $v->update(['user_id' => null]);
+                        Asignacion::where('vehiculo_id', $v->id)
+                            ->whereNull('fecha_fin')
+                            ->update(['fecha_fin' => now()]);
+                    });
+
                 Asignacion::create([
                     'vehiculo_id'  => $vehiculo->id,
                     'conductor_id' => $validated['user_id'],
@@ -78,6 +87,17 @@ class VehiculoController extends Controller
 
                 // Abrir nueva asignación si hay conductor nuevo
                 if ($conductorNuevo) {
+                    // Si el conductor ya tenía otro vehículo, desasignarlo automáticamente
+                    Vehiculo::where('user_id', $conductorNuevo)
+                        ->where('id', '!=', $vehiculo->id)
+                        ->get()
+                        ->each(function ($v) {
+                            $v->update(['user_id' => null]);
+                            Asignacion::where('vehiculo_id', $v->id)
+                                ->whereNull('fecha_fin')
+                                ->update(['fecha_fin' => now()]);
+                        });
+
                     Asignacion::create([
                         'vehiculo_id'  => $vehiculo->id,
                         'conductor_id' => $conductorNuevo,
