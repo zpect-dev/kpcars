@@ -103,6 +103,10 @@ function AvatarDropzone({
 export default function UsersIndex({ users, roles, filterRoles, empresas }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [previewImage, setPreviewImage] = useState<{
+        url: string;
+        name: string;
+    } | null>(null);
 
     const filteredUsers = useMemo(() => {
         if (!searchTerm) return users;
@@ -394,7 +398,14 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                                                 user.profile_photo_url
                                                             }
                                                             alt={user.name}
-                                                            className="h-8 w-8 shrink-0 rounded-full border border-border bg-muted object-cover"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setPreviewImage({
+                                                                    url: user.profile_photo_url!,
+                                                                    name: user.name,
+                                                                });
+                                                            }}
+                                                            className="h-8 w-8 shrink-0 cursor-zoom-in rounded-full border border-border bg-muted object-cover transition hover:opacity-80"
                                                         />
                                                     )}
                                                     <span
@@ -559,7 +570,14 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                                 <img
                                                     src={user.profile_photo_url}
                                                     alt={user.name}
-                                                    className="h-10 w-10 shrink-0 rounded-full border border-border bg-muted object-cover"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setPreviewImage({
+                                                            url: user.profile_photo_url!,
+                                                            name: user.name,
+                                                        });
+                                                    }}
+                                                    className="h-10 w-10 shrink-0 cursor-zoom-in rounded-full border border-border bg-muted object-cover transition hover:opacity-80"
                                                 />
                                             )}
                                             <div className="min-w-0 flex-1">
@@ -1093,6 +1111,26 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                             Confirmar
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={!!previewImage}
+                onOpenChange={(open) => !open && setPreviewImage(null)}
+            >
+                <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
+                    <DialogHeader className="sr-only">
+                        <DialogTitle>
+                            {previewImage?.name ?? 'Imagen'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {previewImage && (
+                        <img
+                            src={previewImage.url}
+                            alt={previewImage.name}
+                            className="max-h-[85vh] w-full rounded-lg object-contain"
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
         </>
