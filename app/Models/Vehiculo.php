@@ -43,4 +43,13 @@ class Vehiculo extends Model
     {
         return $this->hasMany(Asignacion::class)->orderByDesc('fecha_inicio');
     }
+
+    public function scopeVisibleTo($query, ?User $user)
+    {
+        if ($user && $user->empresa_id) {
+            $query->where('empresa_id', $user->empresa_id);
+        }
+
+        return $query;
+    }
 }

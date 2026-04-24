@@ -28,6 +28,7 @@ interface User {
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
     profile_photo_url?: string | null;
+    empresa_id?: number | null;
 }
 
 interface RoleOption {
@@ -35,48 +36,71 @@ interface RoleOption {
     label: string;
 }
 
+interface Empresa {
+    id: number;
+    nombre: string;
+}
+
 interface Props {
     users: User[];
     roles: RoleOption[];
     filterRoles: RoleOption[];
+    empresas: Empresa[];
 }
 
-function AvatarDropzone({ file, currentUrl, onDrop }: { file: File | null, currentUrl?: string | null, onDrop: (files: File[]) => void }) {
+function AvatarDropzone({
+    file,
+    currentUrl,
+    onDrop,
+}: {
+    file: File | null;
+    currentUrl?: string | null;
+    onDrop: (files: File[]) => void;
+}) {
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
         accept: {
-            'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+            'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
         },
         maxFiles: 1,
-        multiple: false
+        multiple: false,
     });
 
-    const previewUrl = useMemo(() => file ? URL.createObjectURL(file) : currentUrl, [file, currentUrl]);
+    const previewUrl = useMemo(
+        () => (file ? URL.createObjectURL(file) : currentUrl),
+        [file, currentUrl],
+    );
 
     return (
-        <div 
-            {...getRootProps()} 
-            className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-primary bg-primary/10 border-solid' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
+        <div
+            {...getRootProps()}
+            className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-solid border-primary bg-primary/10' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
         >
             <input {...getInputProps()} />
             {previewUrl ? (
                 <>
-                    <img src={previewUrl} alt="Avatar" className="h-full w-full object-cover bg-muted" />
+                    <img
+                        src={previewUrl}
+                        alt="Avatar"
+                        className="h-full w-full bg-muted object-cover"
+                    />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                         <Camera className="h-6 w-6 text-white" />
                     </div>
                 </>
             ) : (
                 <div className="flex flex-col items-center text-muted-foreground outline-none">
-                    <Camera className="h-6 w-6 mb-1 opacity-50 transition-opacity group-hover:opacity-100" />
-                    <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">Subir</span>
+                    <Camera className="mb-1 h-6 w-6 opacity-50 transition-opacity group-hover:opacity-100" />
+                    <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">
+                        Subir
+                    </span>
                 </div>
             )}
         </div>
     );
 }
 
-export default function UsersIndex({ users, roles, filterRoles }: Props) {
+export default function UsersIndex({ users, roles, filterRoles, empresas }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -117,6 +141,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
+        empresa_id: '' as string,
     });
 
     const [userToEdit, setUserToEdit] = useState<User | null>(null);
@@ -128,14 +153,17 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
         telefono: '',
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
+        empresa_id: '' as string,
     });
 
     function openEditModal(user: User) {
         setUserToEdit(user);
-        
+
         let formattedDate = '';
         if (user.fecha_vencimiento_licencia) {
-            formattedDate = user.fecha_vencimiento_licencia.split('T')[0].split(' ')[0];
+            formattedDate = user.fecha_vencimiento_licencia
+                .split('T')[0]
+                .split(' ')[0];
         }
 
         editForm.setData({
@@ -146,6 +174,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
             telefono: user.telefono || '+54 ',
             fecha_vencimiento_licencia: formattedDate,
             profile_photo: null,
+            empresa_id: user.empresa_id ? String(user.empresa_id) : '',
         });
         editForm.clearErrors();
     }
@@ -158,7 +187,7 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
     function handleEditSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!userToEdit) return;
-        
+
         editForm.post(`/users/${userToEdit.id}`, {
             onSuccess: () => closeEditModal(),
             preserveScroll: true,
@@ -188,14 +217,14 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
     function formatPhone(value: string) {
         // Eliminar todo lo que no sea número
         const digits = value.replace(/\D/g, '');
-        
+
         // Si no tiene el 54 al inicio, intentamos agregarlo o mantenerlo simple
         // Pero basándonos en tu requerimiento: +54 9 11 2585-9685
         if (digits.length <= 2) return '+54 ';
-        
+
         let formatted = '+54 ';
         const rest = digits.slice(2); // Lo que viene después del 54
-        
+
         if (rest.length > 0) {
             // El 9 (móvil)
             formatted += rest.slice(0, 1);
@@ -264,8 +293,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     }
                                     size="sm"
                                     className={cn(
-                                        "h-9 rounded-md px-4 text-xs font-medium transition-all",
-                                        filterRole === r.value ? "shadow-sm" : ""
+                                        'h-9 rounded-md px-4 text-xs font-medium transition-all',
+                                        filterRole === r.value
+                                            ? 'shadow-sm'
+                                            : '',
                                     )}
                                     onClick={() =>
                                         router.get(
@@ -283,7 +314,11 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
 
                     {/* Botón Acción */}
                     <div className="flex w-full sm:w-auto">
-                        <Button className="w-full sm:w-auto" size="default" onClick={openCreateModal}>
+                        <Button
+                            className="w-full sm:w-auto"
+                            size="default"
+                            onClick={openCreateModal}
+                        >
                             <Plus className="mr-2 h-4 w-4" />
                             Nuevo Usuario
                         </Button>
@@ -349,20 +384,23 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                         <tr
                                             key={user.id}
                                             onClick={() => openEditModal(user)}
-                                            className="bg-card transition-colors hover:bg-muted/40 cursor-pointer"
+                                            className="cursor-pointer bg-card transition-colors hover:bg-muted/40"
                                         >
-                                            <td
-                                                className="px-4 py-3 sm:px-6 sm:py-4"
-                                            >
+                                            <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex items-center gap-3">
                                                     {user.profile_photo_url && (
-                                                        <img 
-                                                            src={user.profile_photo_url} 
-                                                            alt={user.name} 
-                                                            className="h-8 w-8 rounded-full border border-border object-cover shrink-0 bg-muted"
+                                                        <img
+                                                            src={
+                                                                user.profile_photo_url
+                                                            }
+                                                            alt={user.name}
+                                                            className="h-8 w-8 shrink-0 rounded-full border border-border bg-muted object-cover"
                                                         />
                                                     )}
-                                                    <span className="truncate font-semibold text-foreground truncate max-w-[150px]" title={user.name}>
+                                                    <span
+                                                        className="max-w-[150px] truncate font-semibold text-foreground"
+                                                        title={user.name}
+                                                    >
                                                         {user.name}
                                                     </span>
                                                 </div>
@@ -431,7 +469,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        confirmToggleStatus(user);
+                                                        confirmToggleStatus(
+                                                            user,
+                                                        );
                                                     }}
                                                     disabled={
                                                         user.id === auth.user.id
@@ -456,7 +496,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                                     </span>
                                                 ) : (
                                                     <select
-                                                        onClick={(e) => e.stopPropagation()}
+                                                        onClick={(e) =>
+                                                            e.stopPropagation()
+                                                        }
                                                         value={user.role}
                                                         onChange={(e) =>
                                                             handleRoleChange(
@@ -490,7 +532,8 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                     <ul className="divide-y divide-border md:hidden">
                         {filteredUsers.length === 0 ? (
                             <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No se encontraron usuarios que coincidan con la búsqueda.
+                                No se encontraron usuarios que coincidan con la
+                                búsqueda.
                             </li>
                         ) : (
                             filteredUsers.map((user) => (
@@ -500,7 +543,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     tabIndex={0}
                                     onClick={() => openEditModal(user)}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' || e.key === ' ') {
+                                        if (
+                                            e.key === 'Enter' ||
+                                            e.key === ' '
+                                        ) {
                                             e.preventDefault();
                                             openEditModal(user);
                                         }
@@ -524,8 +570,14 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                                     {user.name}
                                                 </p>
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    {roles.find((r) => r.value === user.role)?.label || user.role}
-                                                    {user.id === auth.user.id ? ' (Tú)' : ''}
+                                                    {roles.find(
+                                                        (r) =>
+                                                            r.value ===
+                                                            user.role,
+                                                    )?.label || user.role}
+                                                    {user.id === auth.user.id
+                                                        ? ' (Tú)'
+                                                        : ''}
                                                 </p>
                                             </div>
                                         </div>
@@ -537,40 +589,65 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                             disabled={user.id === auth.user.id}
                                             className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} ${user.id === auth.user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                                         >
-                                            {user.inactivo ? 'Inactivo' : 'Activo'}
+                                            {user.inactivo
+                                                ? 'Inactivo'
+                                                : 'Activo'}
                                         </button>
                                     </div>
 
                                     <div className="flex flex-col gap-0.5 text-xs">
                                         {user.correo ? (
-                                            <span className="truncate" title={user.correo}>
+                                            <span
+                                                className="truncate"
+                                                title={user.correo}
+                                            >
                                                 {user.correo}
                                             </span>
                                         ) : (
-                                            <span className="text-muted-foreground/50 italic">Sin correo</span>
+                                            <span className="text-muted-foreground/50 italic">
+                                                Sin correo
+                                            </span>
                                         )}
                                         {user.telefono ? (
-                                            <span className="truncate" title={user.telefono}>
+                                            <span
+                                                className="truncate"
+                                                title={user.telefono}
+                                            >
                                                 {user.telefono}
                                             </span>
                                         ) : (
-                                            <span className="text-muted-foreground/50 italic">Sin teléfono</span>
+                                            <span className="text-muted-foreground/50 italic">
+                                                Sin teléfono
+                                            </span>
                                         )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="flex flex-col gap-0.5">
-                                            <span className="text-muted-foreground uppercase tracking-wider">DNI</span>
-                                            <span className="font-medium text-foreground">{user.dni}</span>
+                                            <span className="tracking-wider text-muted-foreground uppercase">
+                                                DNI
+                                            </span>
+                                            <span className="font-medium text-foreground">
+                                                {user.dni}
+                                            </span>
                                         </div>
                                         <div className="flex flex-col gap-0.5">
-                                            <span className="text-muted-foreground uppercase tracking-wider">Licencia</span>
+                                            <span className="tracking-wider text-muted-foreground uppercase">
+                                                Licencia
+                                            </span>
                                             {user.fecha_vencimiento_licencia ? (
-                                                <span className="text-foreground" title="Vencimiento de Licencia">
-                                                    {new Date(user.fecha_vencimiento_licencia).toLocaleDateString()}
+                                                <span
+                                                    className="text-foreground"
+                                                    title="Vencimiento de Licencia"
+                                                >
+                                                    {new Date(
+                                                        user.fecha_vencimiento_licencia,
+                                                    ).toLocaleDateString()}
                                                 </span>
                                             ) : (
-                                                <span className="text-muted-foreground/50 italic">N/A</span>
+                                                <span className="text-muted-foreground/50 italic">
+                                                    N/A
+                                                </span>
                                             )}
                                         </div>
                                     </div>
@@ -610,13 +687,20 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             <InputError message={createForm.errors.name} />
                         </div>
 
-                        <div className="flex flex-col items-center gap-2 mb-2">
+                        <div className="mb-2 flex flex-col items-center gap-2">
                             <Label>Foto de Perfil (Opcional)</Label>
-                            <AvatarDropzone 
-                                file={createForm.data.profile_photo} 
-                                onDrop={(files) => createForm.setData('profile_photo', files[0])} 
+                            <AvatarDropzone
+                                file={createForm.data.profile_photo}
+                                onDrop={(files) =>
+                                    createForm.setData(
+                                        'profile_photo',
+                                        files[0],
+                                    )
+                                }
                             />
-                            <InputError message={createForm.errors.profile_photo} />
+                            <InputError
+                                message={createForm.errors.profile_photo}
+                            />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
@@ -664,6 +748,37 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             </div>
                         </div>
 
+                        {createForm.data.role === 'inversor' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="empresa_id">Empresa</Label>
+                                <select
+                                    id="empresa_id"
+                                    value={createForm.data.empresa_id}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'empresa_id',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
+                                    {empresas.map((e) => (
+                                        <option
+                                            key={e.id}
+                                            value={e.id}
+                                            className="bg-background text-foreground"
+                                        >
+                                            {e.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={createForm.errors.empresa_id}
+                                />
+                            </div>
+                        )}
+
                         {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
                                 <Label htmlFor="correo">Correo</Label>
@@ -672,11 +787,16 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     type="email"
                                     value={createForm.data.correo}
                                     onChange={(e) =>
-                                        createForm.setData('correo', e.target.value)
+                                        createForm.setData(
+                                            'correo',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="usuario@correo.com"
                                 />
-                                <InputError message={createForm.errors.correo} />
+                                <InputError
+                                    message={createForm.errors.correo}
+                                />
                             </div>
                         )}
 
@@ -729,8 +849,20 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                         )}
 
                         <div className="rounded-lg border border-border bg-muted/50 p-3">
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                                <span className="font-semibold text-foreground">Contraseña Automática:</span> La contraseña provisional se generará combinando la <span className="font-medium text-foreground text-red-600">primera letra del nombre (Mayúscula)</span> seguido del <span className="font-medium text-foreground text-red-600">DNI</span> sin puntos.
+                            <p className="text-xs leading-relaxed text-muted-foreground">
+                                <span className="font-semibold text-foreground">
+                                    Contraseña Automática:
+                                </span>{' '}
+                                La contraseña provisional se generará combinando
+                                la{' '}
+                                <span className="font-medium text-foreground text-red-600">
+                                    primera letra del nombre (Mayúscula)
+                                </span>{' '}
+                                seguido del{' '}
+                                <span className="font-medium text-foreground text-red-600">
+                                    DNI
+                                </span>{' '}
+                                sin puntos.
                             </p>
                         </div>
 
@@ -768,14 +900,18 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                     </DialogHeader>
 
                     <form onSubmit={handleEditSubmit} className="grid gap-4">
-                        <div className="flex flex-col items-center gap-2 mb-2">
+                        <div className="mb-2 flex flex-col items-center gap-2">
                             <Label>Foto Actual</Label>
-                            <AvatarDropzone 
-                                file={editForm.data.profile_photo} 
+                            <AvatarDropzone
+                                file={editForm.data.profile_photo}
                                 currentUrl={userToEdit?.profile_photo_url}
-                                onDrop={(files) => editForm.setData('profile_photo', files[0])} 
+                                onDrop={(files) =>
+                                    editForm.setData('profile_photo', files[0])
+                                }
                             />
-                            <InputError message={editForm.errors.profile_photo} />
+                            <InputError
+                                message={editForm.errors.profile_photo}
+                            />
                         </div>
 
                         <div className="grid gap-2">
@@ -820,6 +956,37 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                             <InputError message={editForm.errors.correo} />
                         </div>
 
+                        {userToEdit?.role === 'inversor' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-empresa_id">Empresa</Label>
+                                <select
+                                    id="edit-empresa_id"
+                                    value={editForm.data.empresa_id}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'empresa_id',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
+                                    {empresas.map((e) => (
+                                        <option
+                                            key={e.id}
+                                            value={e.id}
+                                            className="bg-background text-foreground"
+                                        >
+                                            {e.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={editForm.errors.empresa_id}
+                                />
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="edit-telefono">Teléfono</Label>
@@ -834,7 +1001,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     }
                                     placeholder="+54 9 11 1234-5678"
                                 />
-                                <InputError message={editForm.errors.telefono} />
+                                <InputError
+                                    message={editForm.errors.telefono}
+                                />
                             </div>
 
                             <div className="grid gap-2">
@@ -844,7 +1013,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                 <Input
                                     id="edit-fecha_vencimiento_licencia"
                                     type="date"
-                                    value={editForm.data.fecha_vencimiento_licencia}
+                                    value={
+                                        editForm.data.fecha_vencimiento_licencia
+                                    }
                                     onChange={(e) =>
                                         editForm.setData(
                                             'fecha_vencimiento_licencia',
@@ -853,7 +1024,10 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                     }
                                 />
                                 <InputError
-                                    message={editForm.errors.fecha_vencimiento_licencia}
+                                    message={
+                                        editForm.errors
+                                            .fecha_vencimiento_licencia
+                                    }
                                 />
                             </div>
                         </div>
@@ -870,7 +1044,9 @@ export default function UsersIndex({ users, roles, filterRoles }: Props) {
                                 type="submit"
                                 disabled={editForm.processing}
                             >
-                                {editForm.processing ? 'Guardando...' : 'Guardar Cambios'}
+                                {editForm.processing
+                                    ? 'Guardando...'
+                                    : 'Guardar Cambios'}
                             </Button>
                         </DialogFooter>
                     </form>

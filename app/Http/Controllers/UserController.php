@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Models\Empresa;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -27,7 +28,12 @@ class UserController extends Controller
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
+            'empresa_id' => ['nullable', 'exists:empresas,id'],
         ]);
+
+        if ($validated['role'] !== UserRole::INVERSOR->value) {
+            $validated['empresa_id'] = null;
+        }
 
         $photoPath = null;
         if ($request->hasFile('profile_photo')) {
@@ -47,6 +53,7 @@ class UserController extends Controller
             'telefono' => $validated['telefono'] ?? null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
+            'empresa_id' => $validated['empresa_id'] ?? null,
         ]);
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
@@ -60,9 +67,11 @@ class UserController extends Controller
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
             })
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id'])
             ->append('profile_photo_url');
-        
+
+        $empresas = Empresa::orderBy('nombre')->get(['id', 'nombre']);
+
         $roles = collect(UserRole::cases())->map(fn($role) => [
             'value' => $role->value,
             'label' => $role->label()
@@ -77,6 +86,7 @@ class UserController extends Controller
             'users' => $users,
             'roles' => $roles,
             'filterRoles' => $filterRoles,
+            'empresas' => $empresas,
         ]);
     }
 
@@ -92,7 +102,12 @@ class UserController extends Controller
             return redirect()->back()->with('error', 'No puedes cambiar tu propio rol.');
         }
 
-        $user->update(['role' => $validated['role']]);
+        $payload = ['role' => $validated['role']];
+        if ($validated['role'] !== UserRole::INVERSOR->value) {
+            $payload['empresa_id'] = null;
+        }
+
+        $user->update($payload);
 
         return redirect()->back()->with('success', 'Rol actualizado correctamente.');
     }
@@ -138,7 +153,12 @@ class UserController extends Controller
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
+            'empresa_id' => ['nullable', 'exists:empresas,id'],
         ]);
+
+        if (! $user->isInversor()) {
+            unset($validated['empresa_id']);
+        }
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo_path) {

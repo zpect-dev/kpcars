@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     History,
     LayoutList,
@@ -63,6 +63,9 @@ export default function Dashboard({
     users,
     filters,
 }: Props) {
+    const { auth } = usePage<any>().props;
+    const isInversor = auth?.user?.role === 'inversor';
+
     const [search, setSearch] = useState('');
     const [showSearchDropdown, setShowSearchDropdown] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -298,6 +301,7 @@ export default function Dashboard({
                             Vehículos
                         </h1>
                     </div>
+                    {!isInversor && (
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
                             <Button size="sm">
@@ -324,6 +328,7 @@ export default function Dashboard({
                             />
                         </DialogContent>
                     </Dialog>
+                    )}
                 </div>
 
                 {/* Filtros */}
@@ -395,33 +400,35 @@ export default function Dashboard({
                         </div>
 
                         {/* Empresa */}
-                        <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
-                            <Label htmlFor="empresa_filter">Empresa</Label>
-                            <Select
-                                value={empresaId || 'all'}
-                                onValueChange={(v) =>
-                                    setEmpresaId(v === 'all' ? '' : v)
-                                }
-                            >
-                                <SelectTrigger
-                                    id="empresa_filter"
-                                    className="w-full lg:w-[180px]"
+                        {!isInversor && (
+                            <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
+                                <Label htmlFor="empresa_filter">Empresa</Label>
+                                <Select
+                                    value={empresaId || 'all'}
+                                    onValueChange={(v) =>
+                                        setEmpresaId(v === 'all' ? '' : v)
+                                    }
                                 >
-                                    <SelectValue placeholder="Todas" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
-                                    {empresas.map((e) => (
-                                        <SelectItem
-                                            key={e.id}
-                                            value={String(e.id)}
-                                        >
-                                            {e.nombre}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                                    <SelectTrigger
+                                        id="empresa_filter"
+                                        className="w-full lg:w-[180px]"
+                                    >
+                                        <SelectValue placeholder="Todas" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas</SelectItem>
+                                        {empresas.map((e) => (
+                                            <SelectItem
+                                                key={e.id}
+                                                value={String(e.id)}
+                                            >
+                                                {e.nombre}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         {/* Inversión */}
                         <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
@@ -651,7 +658,7 @@ export default function Dashboard({
                                                             Historial
                                                             conductores
                                                         </DropdownMenuItem>
-                                                        {vehiculo.user_id && (
+                                                        {!isInversor && vehiculo.user_id && (
                                                             <DropdownMenuItem
                                                                 onSelect={() =>
                                                                     setUnassigningVehiculo(
@@ -664,6 +671,8 @@ export default function Dashboard({
                                                                 conductor
                                                             </DropdownMenuItem>
                                                         )}
+                                                        {!isInversor && (
+                                                        <>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
                                                             onSelect={() =>
@@ -686,6 +695,8 @@ export default function Dashboard({
                                                             <Trash2 className="h-4 w-4" />
                                                             Eliminar
                                                         </DropdownMenuItem>
+                                                        </>
+                                                        )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </td>
@@ -740,7 +751,7 @@ export default function Dashboard({
                                                     <History className="h-4 w-4" />
                                                     Historial conductores
                                                 </DropdownMenuItem>
-                                                {vehiculo.user_id && (
+                                                {!isInversor && vehiculo.user_id && (
                                                     <DropdownMenuItem
                                                         onSelect={() =>
                                                             setUnassigningVehiculo(
@@ -752,6 +763,8 @@ export default function Dashboard({
                                                         Desasignar conductor
                                                     </DropdownMenuItem>
                                                 )}
+                                                {!isInversor && (
+                                                <>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem
                                                     onSelect={() =>
@@ -772,6 +785,8 @@ export default function Dashboard({
                                                     <Trash2 className="h-4 w-4" />
                                                     Eliminar
                                                 </DropdownMenuItem>
+                                                </>
+                                                )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </div>

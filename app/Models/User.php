@@ -12,10 +12,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Enums\UserRole;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -83,6 +84,11 @@ class User extends Authenticatable
     /**
      * Get the current active vehicle assignment for the User (conductor).
      */
+    public function empresa(): BelongsTo
+    {
+        return $this->belongsTo(Empresa::class);
+    }
+
     public function asignacionActiva(): HasOne
     {
         return $this->hasOne(Asignacion::class, 'conductor_id')

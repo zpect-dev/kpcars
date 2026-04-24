@@ -42,18 +42,19 @@ export function AppSidebar() {
             icon: CarFront,
         });
 
-        mainNavItems.push(
-            {
+        if (auth.user.role !== 'inversor') {
+            mainNavItems.push({
                 title: 'Inventario',
                 href: articulosIndex.url(),
                 icon: Package,
-            },
-            {
-                title: 'Turnos',
-                href: '/appointments',
-                icon: CalendarClock,
-            },
-        );
+            });
+        }
+
+        mainNavItems.push({
+            title: 'Turnos',
+            href: '/appointments',
+            icon: CalendarClock,
+        });
     } else {
         // Mechanic gets Turnos first, then Inventario
         mainNavItems.push(

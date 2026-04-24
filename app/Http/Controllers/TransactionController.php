@@ -20,6 +20,7 @@ class TransactionController extends Controller
     public function index(Request $request): Response
     {
         abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isInversor(), 403);
 
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
 
@@ -38,7 +39,7 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'filters'      => $filters,
             'items'        => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
-            'vehiculos'    => Vehiculo::orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
+            'vehiculos'    => Vehiculo::visibleTo($request->user())->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
         ]);
     }
 

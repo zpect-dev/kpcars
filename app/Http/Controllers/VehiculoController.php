@@ -14,6 +14,8 @@ class VehiculoController extends Controller
 {
     public function store(Request $request): RedirectResponse
     {
+        abort_if($request->user()->isInversor(), 403);
+
         $validated = $request->validate([
             'patente'      => ['required', 'string', 'max:20', 'unique:vehiculos,patente'],
             'marca'        => ['required', 'string', 'max:100'],
@@ -46,6 +48,8 @@ class VehiculoController extends Controller
 
     public function update(Request $request, Vehiculo $vehiculo): RedirectResponse
     {
+        abort_if($request->user()->isInversor(), 403);
+
         $validated = $request->validate([
             'patente'      => ['required', 'string', 'max:20', "unique:vehiculos,patente,{$vehiculo->id}"],
             'marca'        => ['required', 'string', 'max:100'],
@@ -87,8 +91,10 @@ class VehiculoController extends Controller
         return redirect()->back()->with('success', "Vehículo {$validated['patente']} actualizado correctamente.");
     }
 
-    public function desasignar(Vehiculo $vehiculo): RedirectResponse
+    public function desasignar(Request $request, Vehiculo $vehiculo): RedirectResponse
     {
+        abort_if($request->user()->isInversor(), 403);
+
         if (!$vehiculo->user_id) {
             return redirect()->back()->with('warning', 'El vehículo no tiene un conductor asignado.');
         }
@@ -106,8 +112,10 @@ class VehiculoController extends Controller
         return redirect()->back()->with('success', "Conductor desasignado correctamente del vehículo {$vehiculo->patente}.");
     }
 
-    public function destroy(Vehiculo $vehiculo): RedirectResponse
+    public function destroy(Request $request, Vehiculo $vehiculo): RedirectResponse
     {
+        abort_if($request->user()->isInversor(), 403);
+
         $patente = $vehiculo->patente;
         $vehiculo->delete();
 

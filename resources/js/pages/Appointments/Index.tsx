@@ -166,6 +166,7 @@ export default function AppointmentsIndex({
 
     const { auth } = usePage<any>().props;
     const isMechanic = auth.user.role === 'mecanico';
+    const isInversor = auth.user.role === 'inversor';
 
     const mecanicosVisibles = useMemo(
         () => mecanicos.filter((m) => m.id !== auth.user.id),
@@ -382,7 +383,7 @@ export default function AppointmentsIndex({
                             </span>
                         </Button>
 
-                        {!isMechanic && (
+                        {!isMechanic && !isInversor && (
                             <Dialog
                                 open={isDialogOpen}
                                 onOpenChange={setIsDialogOpen}
@@ -879,6 +880,7 @@ export default function AppointmentsIndex({
                                                     )}
                                                 </td>
                                                 <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4">
+                                                    {!isInversor && (
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger
                                                             asChild
@@ -971,6 +973,7 @@ export default function AppointmentsIndex({
                                                             )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -1006,6 +1009,7 @@ export default function AppointmentsIndex({
                                                 {STATUS_LABEL[a.status]}
                                             </span>
                                         </div>
+                                        {!isInversor && (
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button
@@ -1092,6 +1096,7 @@ export default function AppointmentsIndex({
                                                 )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                         <span>

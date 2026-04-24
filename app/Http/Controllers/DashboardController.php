@@ -24,13 +24,16 @@ class DashboardController extends Controller
         $filters = $request->only(['empresa_id', 'inversion_id']);
 
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
+            ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
             ->when(! empty($filters['empresa_id']), fn ($q) => $q->where('empresa_id', $filters['empresa_id']))
             ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
             ->orderBy('patente')
             ->get();
 
-        $empresas    = Empresa::orderBy('nombre')->get(['id', 'nombre']);
+        $empresas    = $request->user()->isInversor()
+            ? collect()
+            : Empresa::orderBy('nombre')->get(['id', 'nombre']);
         $inversiones = Inversion::orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
         $users       = User::orderBy('name')->get(['id', 'name']);
 
