@@ -61,9 +61,14 @@ class AsignacionController extends Controller
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
         ]);
 
-        $file = $request->file('file');
-        $action->execute($file->path(), $file->getClientOriginalExtension());
+        try {
+            $file = $request->file('file');
+            $action->execute($file->path(), $file->getClientOriginalExtension());
 
-        return redirect()->back()->with('success', 'Asignaciones importadas correctamente.');
+            return redirect()->back()->with('success', 'Asignaciones importadas correctamente.');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error importando asignaciones: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Error al importar: ' . $e->getMessage());
+        }
     }
 }
