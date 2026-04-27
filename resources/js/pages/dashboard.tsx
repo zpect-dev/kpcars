@@ -93,37 +93,12 @@ export default function Dashboard({
         try {
             sessionStorage.setItem(
                 FILTERS_STORAGE_KEY,
-                JSON.stringify({
-                    search,
-                    asignacionFiltro,
-                    empresaId,
-                    inversionId,
-                }),
+                JSON.stringify({ search, asignacionFiltro }),
             );
         } catch {
             // ignore quota / unavailable storage
         }
-    }, [search, asignacionFiltro, empresaId, inversionId]);
-
-    useEffect(() => {
-        const urlHasFilters = !!(filters.empresa_id || filters.inversion_id);
-        const storedHasFilters = !!(
-            storedFilters?.empresaId || storedFilters?.inversionId
-        );
-        if (urlHasFilters || !storedHasFilters) return;
-
-        const active: Record<string, string> = {};
-        if (storedFilters.empresaId) active.empresa_id = storedFilters.empresaId;
-        if (storedFilters.inversionId)
-            active.inversion_id = storedFilters.inversionId;
-
-        router.get('/dashboard', active, {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [search, asignacionFiltro]);
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);

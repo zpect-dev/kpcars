@@ -53,7 +53,13 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                             variant="outline"
                             size="sm"
                             className="px-2"
-                            onClick={() => router.get('/dashboard')}
+                            onClick={() => {
+                                if (window.history.length > 1) {
+                                    window.history.back();
+                                } else {
+                                    router.get('/dashboard');
+                                }
+                            }}
                         >
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
