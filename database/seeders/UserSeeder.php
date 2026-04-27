@@ -94,12 +94,12 @@ class UserSeeder extends Seeder
 
         foreach ($users as $userData) {
             $firstLetter = mb_strtoupper(mb_substr($userData['name'], 0, 1));
-            $password = $firstLetter . $userData['dni'];
+            $password = $firstLetter.$userData['dni'];
 
             User::updateOrCreate(
                 ['dni' => $userData['dni']],
                 [
-                    'name'     => $userData['name'],
+                    'name' => $userData['name'],
                     'password' => $password, // cast 'hashed' in model handles bcrypt
                 ],
             );

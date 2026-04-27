@@ -7,7 +7,7 @@ use App\Models\Appointment;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {
-    $this->action = new ScheduleAppointmentAction();
+    $this->action = new ScheduleAppointmentAction;
 });
 
 it('agenda un turno normal con cupos disponibles', function () {
@@ -94,7 +94,7 @@ it('rechaza domingos para ambos tipos de turno', function (string $type) {
         $type,
     );
 })->throws(RuntimeException::class, 'El taller no atiende los días domingo.')
-  ->with(['normal', 'emergencia']);
+    ->with(['normal', 'emergencia']);
 
 it('los turnos de emergencia no afectan el conteo de cupos normales', function () {
     $date = Carbon::parse('2026-04-22');

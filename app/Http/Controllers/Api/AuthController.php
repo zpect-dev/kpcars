@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
-use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -40,7 +39,6 @@ class AuthController extends Controller
                 'dni' => ['Su cuenta se encuentra deshabilitada. Contacte al administrador.'],
             ]);
         }
-
 
         // Revoke previous tokens to enforce single-session
         $user->tokens()->delete();

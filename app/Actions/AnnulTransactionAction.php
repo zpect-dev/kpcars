@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Models\Transaccion;
-use Illuminate\Support\Facades\DB;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class AnnulTransactionAction
 {
@@ -18,7 +18,7 @@ class AnnulTransactionAction
         DB::transaction(function () use ($transaction) {
             $articulo = $transaction->articulo;
 
-            if (!$articulo) {
+            if (! $articulo) {
                 throw new Exception('No se encontró el artículo asociado a la transacción.');
             }
 

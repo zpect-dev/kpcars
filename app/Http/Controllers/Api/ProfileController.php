@@ -19,14 +19,14 @@ class ProfileController extends Controller
 
         return response()->json([
             'user' => [
-                'id'                => $user->id,
-                'name'              => $user->name,
-                'dni'               => $user->dni,
-                'role'              => $user->role->value,
-                'correo'            => $user->correo,
-                'telefono'                   => $user->telefono,
+                'id' => $user->id,
+                'name' => $user->name,
+                'dni' => $user->dni,
+                'role' => $user->role->value,
+                'correo' => $user->correo,
+                'telefono' => $user->telefono,
                 'fecha_vencimiento_licencia' => $user->fecha_vencimiento_licencia?->toDateString(),
-                'profile_photo_url'          => $user->profile_photo_url,
+                'profile_photo_url' => $user->profile_photo_url,
             ],
         ]);
     }
@@ -37,7 +37,7 @@ class ProfileController extends Controller
     public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'correo'   => ['nullable', 'string', 'email', 'max:255'],
+            'correo' => ['nullable', 'string', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
         ]);
 

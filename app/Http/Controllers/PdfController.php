@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Appointment;
 use App\Models\Articulo;
 use App\Models\Transaccion;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -22,7 +24,7 @@ class PdfController extends Controller
         $pdf = Pdf::loadView('pdf.stock', compact('articulos'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('stock-' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('stock-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**
@@ -46,7 +48,7 @@ class PdfController extends Controller
         if ($articleId) {
             $articulo = Articulo::find((int) $articleId);
             if ($articulo) {
-                $viewData['articleName']  = $articulo->descripcion;
+                $viewData['articleName'] = $articulo->descripcion;
                 $viewData['articleStock'] = $articulo->stock;
             }
         }
@@ -54,7 +56,7 @@ class PdfController extends Controller
         $pdf = Pdf::loadView('pdf.transactions', $viewData)
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('transacciones-' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('transacciones-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**
@@ -69,12 +71,12 @@ class PdfController extends Controller
             $filters['to'] = now()->toDateString();
         }
 
-        $from = ! empty($filters['from']) ? \Carbon\Carbon::parse($filters['from'])->toDateString() : null;
-        $to   = ! empty($filters['to'])   ? \Carbon\Carbon::parse($filters['to'])->toDateString()   : null;
+        $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->toDateString() : null;
+        $to = ! empty($filters['to']) ? Carbon::parse($filters['to'])->toDateString() : null;
 
-        $appointments = \App\Models\Appointment::with(['completedBy:id,name', 'conductor:id,name'])
+        $appointments = Appointment::with(['completedBy:id,name', 'conductor:id,name'])
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
-            ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
+            ->when($to, fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
             ->orderBy('scheduled_date')
@@ -84,6 +86,6 @@ class PdfController extends Controller
         $pdf = Pdf::loadView('pdf.appointments', compact('appointments', 'filters'))
             ->setPaper('a4', 'landscape');
 
-        return $pdf->download('turnos-' . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download('turnos-'.now()->format('Y-m-d').'.pdf');
     }
 }

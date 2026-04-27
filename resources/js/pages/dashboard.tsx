@@ -1,5 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    FileUp,
     History,
     LayoutList,
     MoreHorizontal,
@@ -78,15 +79,15 @@ export default function Dashboard({
     >('all');
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     const [editingVehiculo, setEditingVehiculo] = useState<Vehiculo | null>(
         null,
     );
     const [deletingVehiculo, setDeletingVehiculo] = useState<Vehiculo | null>(
         null,
     );
-    const [unassigningVehiculo, setUnassigningVehiculo] = useState<Vehiculo | null>(
-        null,
-    );
+    const [unassigningVehiculo, setUnassigningVehiculo] =
+        useState<Vehiculo | null>(null);
 
     const isMounted = useRef(false);
 
@@ -234,6 +235,22 @@ export default function Dashboard({
         });
     }
 
+    // --- Import form ---
+    const importForm = useForm({
+        file: null as File | null,
+    });
+
+    function handleImport(e: React.FormEvent) {
+        e.preventDefault();
+        importForm.post('/asignaciones/import', {
+            preserveScroll: true,
+            onSuccess: () => {
+                importForm.reset();
+                setIsImportOpen(false);
+            },
+        });
+    }
+
     // --- Edit form ---
     const editForm = useForm({
         patente: '',
@@ -283,10 +300,14 @@ export default function Dashboard({
     // --- Unassign ---
     function handleUnassign() {
         if (!unassigningVehiculo) return;
-        router.patch(`/vehiculos/${unassigningVehiculo.id}/desasignar`, {}, {
-            preserveScroll: true,
-            onSuccess: () => setUnassigningVehiculo(null),
-        });
+        router.patch(
+            `/vehiculos/${unassigningVehiculo.id}/desasignar`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setUnassigningVehiculo(null),
+            },
+        );
     }
 
     return (
@@ -297,42 +318,117 @@ export default function Dashboard({
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                            Vehículos
-                        </h1>
-                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border/50">
-                            {filteredVehiculos.length} {filteredVehiculos.length === 1 ? 'vehículo' : 'vehículos'}
-                        </span>
-                    </div>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                                Vehículos
+                            </h1>
+                            <span className="inline-flex items-center rounded-full border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                {filteredVehiculos.length}{' '}
+                                {filteredVehiculos.length === 1
+                                    ? 'vehículo'
+                                    : 'vehículos'}
+                            </span>
+                        </div>
                     </div>
                     {!isInversor && (
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button size="sm">
-                                <Plus className="h-4 w-4" />
-                                <span className="hidden sm:inline">
-                                    Registrar Vehículo
-                                </span>
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[480px]">
-                            <DialogHeader>
-                                <DialogTitle>Registrar Vehículo</DialogTitle>
-                                <DialogDescription>
-                                    Complete los datos del nuevo vehículo.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <VehiculoForm
-                                form={createForm}
-                                onSubmit={handleCreate}
-                                empresas={empresas}
-                                inversiones={inversiones}
-                                users={users}
-                                submitLabel="Registrar"
-                            />
-                        </DialogContent>
-                    </Dialog>
+                        <div className="flex items-center gap-2">
+                            <Dialog
+                                open={isImportOpen}
+                                onOpenChange={setIsImportOpen}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                        <FileUp className="h-4 w-4" />
+                                        <span className="ml-2 hidden sm:inline">
+                                            Importar Asignaciones
+                                        </span>
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[425px]">
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Importar Asignaciones
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Sube un archivo Excel (.xlsx, .csv)
+                                            con las columnas: patente, chofer,
+                                            fecha_inicio, fecha_fin.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <form
+                                        onSubmit={handleImport}
+                                        className="grid gap-4 py-4"
+                                    >
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="file">
+                                                Archivo
+                                            </Label>
+                                            <Input
+                                                id="file"
+                                                type="file"
+                                                accept=".xlsx,.xls,.csv"
+                                                onChange={(e) =>
+                                                    importForm.setData(
+                                                        'file',
+                                                        e.target.files?.[0] ||
+                                                            null,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={importForm.errors.file}
+                                            />
+                                        </div>
+                                        <div className="flex justify-end pt-2">
+                                            <Button
+                                                type="submit"
+                                                disabled={
+                                                    importForm.processing ||
+                                                    !importForm.data.file
+                                                }
+                                            >
+                                                {importForm.processing
+                                                    ? 'Importando...'
+                                                    : 'Importar'}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </DialogContent>
+                            </Dialog>
+
+                            <Dialog
+                                open={isCreateOpen}
+                                onOpenChange={setIsCreateOpen}
+                            >
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <Plus className="h-4 w-4" />
+                                        <span className="hidden sm:inline">
+                                            Registrar Vehículo
+                                        </span>
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="sm:max-w-[480px]">
+                                    <DialogHeader>
+                                        <DialogTitle>
+                                            Registrar Vehículo
+                                        </DialogTitle>
+                                        <DialogDescription>
+                                            Complete los datos del nuevo
+                                            vehículo.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    <VehiculoForm
+                                        form={createForm}
+                                        onSubmit={handleCreate}
+                                        empresas={empresas}
+                                        inversiones={inversiones}
+                                        users={users}
+                                        submitLabel="Registrar"
+                                    />
+                                </DialogContent>
+                            </Dialog>
+                        </div>
                     )}
                 </div>
 
@@ -340,7 +436,7 @@ export default function Dashboard({
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
                     <div className="flex flex-wrap items-end gap-4">
                         {/* Buscar */}
-                        <div className="flex w-full flex-col gap-2 lg:flex-1 lg:min-w-[240px]">
+                        <div className="flex w-full flex-col gap-2 lg:min-w-[240px] lg:flex-1">
                             <Label htmlFor="search">Buscar</Label>
                             <div className="relative">
                                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -421,7 +517,9 @@ export default function Dashboard({
                                         <SelectValue placeholder="Todas" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">Todas</SelectItem>
+                                        <SelectItem value="all">
+                                            Todas
+                                        </SelectItem>
                                         {empresas.map((e) => (
                                             <SelectItem
                                                 key={e.id}
@@ -524,7 +622,9 @@ export default function Dashboard({
                                 )}
                             >
                                 <X className="h-4 w-4" />
-                                <span className="lg:hidden text-xs">Limpiar filtros</span>
+                                <span className="text-xs lg:hidden">
+                                    Limpiar filtros
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -622,7 +722,8 @@ export default function Dashboard({
                                             <td
                                                 className="truncate px-4 py-3 sm:px-6 sm:py-4"
                                                 title={
-                                                    vehiculo.user?.name || 'No asignado'
+                                                    vehiculo.user?.name ||
+                                                    'No asignado'
                                                 }
                                             >
                                                 {vehiculo.user?.name || (
@@ -663,44 +764,45 @@ export default function Dashboard({
                                                             Historial
                                                             conductores
                                                         </DropdownMenuItem>
-                                                        {!isInversor && vehiculo.user_id && (
-                                                            <DropdownMenuItem
-                                                                onSelect={() =>
-                                                                    setUnassigningVehiculo(
-                                                                        vehiculo,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <UserX className="h-4 w-4" />
-                                                                Desasignar
-                                                                conductor
-                                                            </DropdownMenuItem>
-                                                        )}
+                                                        {!isInversor &&
+                                                            vehiculo.user_id && (
+                                                                <DropdownMenuItem
+                                                                    onSelect={() =>
+                                                                        setUnassigningVehiculo(
+                                                                            vehiculo,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <UserX className="h-4 w-4" />
+                                                                    Desasignar
+                                                                    conductor
+                                                                </DropdownMenuItem>
+                                                            )}
                                                         {!isInversor && (
-                                                        <>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onSelect={() =>
-                                                                openEdit(
-                                                                    vehiculo,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                            Editar
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onSelect={() =>
-                                                                setDeletingVehiculo(
-                                                                    vehiculo,
-                                                                )
-                                                            }
-                                                            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                            Eliminar
-                                                        </DropdownMenuItem>
-                                                        </>
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    onSelect={() =>
+                                                                        openEdit(
+                                                                            vehiculo,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil className="h-4 w-4" />
+                                                                    Editar
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    onSelect={() =>
+                                                                        setDeletingVehiculo(
+                                                                            vehiculo,
+                                                                        )
+                                                                    }
+                                                                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                    Eliminar
+                                                                </DropdownMenuItem>
+                                                            </>
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -733,7 +835,7 @@ export default function Dashboard({
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="-mr-2 -mt-1 shrink-0"
+                                                    className="-mt-1 -mr-2 shrink-0"
                                                 >
                                                     <MoreHorizontal className="h-4 w-4" />
                                                     <span className="sr-only">
@@ -756,41 +858,44 @@ export default function Dashboard({
                                                     <History className="h-4 w-4" />
                                                     Historial conductores
                                                 </DropdownMenuItem>
-                                                {!isInversor && vehiculo.user_id && (
-                                                    <DropdownMenuItem
-                                                        onSelect={() =>
-                                                            setUnassigningVehiculo(
-                                                                vehiculo,
-                                                            )
-                                                        }
-                                                    >
-                                                        <UserX className="h-4 w-4" />
-                                                        Desasignar conductor
-                                                    </DropdownMenuItem>
-                                                )}
+                                                {!isInversor &&
+                                                    vehiculo.user_id && (
+                                                        <DropdownMenuItem
+                                                            onSelect={() =>
+                                                                setUnassigningVehiculo(
+                                                                    vehiculo,
+                                                                )
+                                                            }
+                                                        >
+                                                            <UserX className="h-4 w-4" />
+                                                            Desasignar conductor
+                                                        </DropdownMenuItem>
+                                                    )}
                                                 {!isInversor && (
-                                                <>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onSelect={() =>
-                                                        openEdit(vehiculo)
-                                                    }
-                                                >
-                                                    <Pencil className="h-4 w-4" />
-                                                    Editar
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onSelect={() =>
-                                                        setDeletingVehiculo(
-                                                            vehiculo,
-                                                        )
-                                                    }
-                                                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                    Eliminar
-                                                </DropdownMenuItem>
-                                                </>
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem
+                                                            onSelect={() =>
+                                                                openEdit(
+                                                                    vehiculo,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                            Editar
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onSelect={() =>
+                                                                setDeletingVehiculo(
+                                                                    vehiculo,
+                                                                )
+                                                            }
+                                                            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                            Eliminar
+                                                        </DropdownMenuItem>
+                                                    </>
                                                 )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
@@ -809,7 +914,7 @@ export default function Dashboard({
                                                 {vehiculo.empresa.nombre}
                                             </span>
                                         ) : (
-                                            <span className="text-xs italic text-muted-foreground">
+                                            <span className="text-xs text-muted-foreground italic">
                                                 Sin empresa
                                             </span>
                                         )}
@@ -818,7 +923,7 @@ export default function Dashboard({
                                                 {vehiculo.inversion.nombre}
                                             </span>
                                         ) : (
-                                            <span className="text-xs italic text-muted-foreground">
+                                            <span className="text-xs text-muted-foreground italic">
                                                 Sin inversión
                                             </span>
                                         )}
@@ -881,7 +986,8 @@ export default function Dashboard({
                             del vehículo{' '}
                             <span className="font-semibold text-foreground">
                                 {unassigningVehiculo?.patente}
-                            </span>?
+                            </span>
+                            ?
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-3 pt-4">
@@ -893,7 +999,7 @@ export default function Dashboard({
                         </Button>
                         <Button
                             variant="default"
-                            className="bg-gray-900 hover:bg-gray-800 text-white"
+                            className="bg-gray-900 text-white hover:bg-gray-800"
                             onClick={handleUnassign}
                         >
                             Desasignar
@@ -914,7 +1020,8 @@ export default function Dashboard({
                             ¿Está seguro que desea eliminar el vehículo{' '}
                             <span className="font-semibold text-foreground">
                                 {deletingVehiculo?.patente}
-                            </span>? Esta acción no se puede deshacer.
+                            </span>
+                            ? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-3 pt-4">
@@ -1044,11 +1151,11 @@ function VehiculoForm({
             </div>
 
             <div className="grid gap-2">
-                <Label htmlFor="propietario">Propietario</Label>
+                <Label htmlFor="propietario">Titular</Label>
                 <Input
                     id="propietario"
                     type="text"
-                    placeholder="Nombre del propietario (opcional)"
+                    placeholder="Nombre del titular (opcional)"
                     value={form.data.propietario}
                     onChange={(e) =>
                         form.setData('propietario', e.target.value)

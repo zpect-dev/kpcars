@@ -17,14 +17,14 @@ class VehiculoController extends Controller
         abort_if($request->user()->isInversor(), 403);
 
         $validated = $request->validate([
-            'patente'      => ['required', 'string', 'max:20', 'unique:vehiculos,patente'],
-            'marca'        => ['required', 'string', 'max:100'],
-            'modelo'       => ['required', 'string', 'max:100'],
-            'anio'         => ['required', 'string', 'max:10'],
-            'propietario'  => ['nullable', 'string', 'max:255'],
+            'patente' => ['required', 'string', 'max:20', 'unique:vehiculos,patente'],
+            'marca' => ['required', 'string', 'max:100'],
+            'modelo' => ['required', 'string', 'max:100'],
+            'anio' => ['required', 'string', 'max:10'],
+            'propietario' => ['nullable', 'string', 'max:255'],
             'inversion_id' => ['required', 'exists:inversiones,id'],
-            'empresa_id'   => ['nullable', 'exists:empresas,id'],
-            'user_id'      => ['nullable', 'exists:users,id'],
+            'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'user_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
@@ -33,7 +33,7 @@ class VehiculoController extends Controller
             $vehiculo = Vehiculo::create($validated);
 
             // Si se asigna conductor al crear, asegurar que no tenga otro vehículo
-            if (!empty($validated['user_id'])) {
+            if (! empty($validated['user_id'])) {
                 Vehiculo::where('user_id', $validated['user_id'])
                     ->get()
                     ->each(function ($v) {
@@ -44,7 +44,7 @@ class VehiculoController extends Controller
                     });
 
                 Asignacion::create([
-                    'vehiculo_id'  => $vehiculo->id,
+                    'vehiculo_id' => $vehiculo->id,
                     'conductor_id' => $validated['user_id'],
                     'asignado_por' => $request->user()->id,
                     'fecha_inicio' => now(),
@@ -60,21 +60,21 @@ class VehiculoController extends Controller
         abort_if($request->user()->isInversor(), 403);
 
         $validated = $request->validate([
-            'patente'      => ['required', 'string', 'max:20', "unique:vehiculos,patente,{$vehiculo->id}"],
-            'marca'        => ['required', 'string', 'max:100'],
-            'modelo'       => ['required', 'string', 'max:100'],
-            'anio'         => ['required', 'string', 'max:10'],
-            'propietario'  => ['nullable', 'string', 'max:255'],
+            'patente' => ['required', 'string', 'max:20', "unique:vehiculos,patente,{$vehiculo->id}"],
+            'marca' => ['required', 'string', 'max:100'],
+            'modelo' => ['required', 'string', 'max:100'],
+            'anio' => ['required', 'string', 'max:10'],
+            'propietario' => ['nullable', 'string', 'max:255'],
             'inversion_id' => ['required', 'exists:inversiones,id'],
-            'empresa_id'   => ['nullable', 'exists:empresas,id'],
-            'user_id'      => ['nullable', 'exists:users,id'],
+            'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'user_id' => ['nullable', 'exists:users,id'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
 
         DB::transaction(function () use ($validated, $vehiculo, $request) {
             $conductorAnterior = $vehiculo->user_id;
-            $conductorNuevo    = $validated['user_id'] ?? null;
+            $conductorNuevo = $validated['user_id'] ?? null;
 
             $vehiculo->update($validated);
 
@@ -99,7 +99,7 @@ class VehiculoController extends Controller
                         });
 
                     Asignacion::create([
-                        'vehiculo_id'  => $vehiculo->id,
+                        'vehiculo_id' => $vehiculo->id,
                         'conductor_id' => $conductorNuevo,
                         'asignado_por' => $request->user()->id,
                         'fecha_inicio' => now(),
@@ -115,7 +115,7 @@ class VehiculoController extends Controller
     {
         abort_if($request->user()->isInversor(), 403);
 
-        if (!$vehiculo->user_id) {
+        if (! $vehiculo->user_id) {
             return redirect()->back()->with('warning', 'El vehículo no tiene un conductor asignado.');
         }
 

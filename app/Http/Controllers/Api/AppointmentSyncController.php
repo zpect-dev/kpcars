@@ -21,11 +21,11 @@ class AppointmentSyncController extends Controller
     {
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
-            'to'   => ['nullable', 'date', 'after_or_equal:from'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
         ]);
 
         $from = $validated['from'] ?? now()->toDateString();
-        $to   = $validated['to']   ?? now()->addMonths(2)->toDateString();
+        $to = $validated['to'] ?? now()->addMonths(2)->toDateString();
 
         $appointments = Appointment::with('conductor:id,name')
             ->whereBetween('scheduled_date', [$from, $to])
@@ -35,7 +35,7 @@ class AppointmentSyncController extends Controller
             ->get(['id', 'service', 'type', 'license_plate', 'conductor_id', 'scheduled_date', 'status', 'created_at']);
 
         return response()->json([
-            'count'        => $appointments->count(),
+            'count' => $appointments->count(),
             'appointments' => $appointments,
         ]);
     }

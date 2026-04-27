@@ -15,7 +15,7 @@ class Asignacion extends Model
 
     protected $casts = [
         'fecha_inicio' => 'datetime',
-        'fecha_fin'    => 'datetime',
+        'fecha_fin' => 'datetime',
     ];
 
     public function vehiculo(): BelongsTo

@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
-use Inertia\Response;
 
 class DashboardController extends Controller
 {
@@ -31,18 +30,18 @@ class DashboardController extends Controller
             ->orderBy('patente')
             ->get();
 
-        $empresas    = $request->user()->isInversor()
+        $empresas = $request->user()->isInversor()
             ? collect()
             : Empresa::orderBy('nombre')->get(['id', 'nombre']);
         $inversiones = Inversion::orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
-        $users       = User::orderBy('name')->get(['id', 'name']);
+        $users = User::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('dashboard', [
-            'vehiculos'   => $vehiculos,
-            'empresas'    => $empresas,
+            'vehiculos' => $vehiculos,
+            'empresas' => $empresas,
             'inversiones' => $inversiones,
-            'users'       => $users,
-            'filters'     => $filters,
+            'users' => $users,
+            'filters' => $filters,
         ]);
     }
 }

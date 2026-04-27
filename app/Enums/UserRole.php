@@ -13,7 +13,7 @@ enum UserRole: string
 
     public function label(): string
     {
-        return match($this) {
+        return match ($this) {
             self::CHOFER => 'Chofer',
             self::MECANICO => 'Mecánico',
             self::ADMINISTRADOR => 'Administrador',
@@ -23,7 +23,7 @@ enum UserRole: string
 
     public function pluralLabel(): string
     {
-        return match($this) {
+        return match ($this) {
             self::CHOFER => 'Choferes',
             self::MECANICO => 'Mecánicos',
             self::ADMINISTRADOR => 'Administradores',

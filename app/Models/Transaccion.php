@@ -80,7 +80,7 @@ class Transaccion extends Model
         return $query->when($search, function (Builder $q, string $search) {
             $q->whereHas('vehiculo', function (Builder $q2) use ($search) {
                 $q2->where('marca', 'like', "%{$search}%")
-                   ->orWhere('modelo', 'like', "%{$search}%");
+                    ->orWhere('modelo', 'like', "%{$search}%");
             });
         });
     }
@@ -125,7 +125,7 @@ class Transaccion extends Model
      */
     public function scopeFilterByDate(Builder $query, ?string $from, ?string $to = null): Builder
     {
-        return $query->when($from, fn($q) => $q->whereDate('created_at', '>=', $from))
-                     ->when($to, fn($q) => $q->whereDate('created_at', '<=', $to));
+        return $query->when($from, fn ($q) => $q->whereDate('created_at', '>=', $from))
+            ->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to));
     }
 }

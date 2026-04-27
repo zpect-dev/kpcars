@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asignacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,14 +56,14 @@ class VehiculoController extends Controller
     {
         $user = $request->user();
 
-        $asignaciones = \App\Models\Asignacion::where('conductor_id', $user->id)
+        $asignaciones = Asignacion::where('conductor_id', $user->id)
             ->with(['vehiculo'])
             ->orderByDesc('fecha_inicio')
             ->get();
 
         $history = $asignaciones->map(function ($asignacion) {
             $vehiculo = $asignacion->vehiculo;
-            
+
             return [
                 'id' => $asignacion->id,
                 'fecha_inicio' => $asignacion->fecha_inicio?->toDateTimeString(),
@@ -82,4 +83,3 @@ class VehiculoController extends Controller
         ]);
     }
 }
-

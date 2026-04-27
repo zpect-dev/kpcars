@@ -18,8 +18,8 @@ beforeEach(function () {
         'password' => bcrypt('password'),
     ]);
     $this->inversion = Inversion::create(['nombre' => 'Test Inversion']);
-    
-    $this->action = new ProcessStockMovementAction();
+
+    $this->action = new ProcessStockMovementAction;
 });
 
 it('ingresa stock correctamente sin patente', function () {
@@ -36,7 +36,7 @@ it('ingresa stock correctamente sin patente', function () {
 
     expect($articulo->stock)->toBe(25);
     expect(Transaccion::count())->toBe(1);
-    
+
     $transaccion = Transaccion::first();
     expect($transaccion->tipo)->toBe('IN')
         ->and($transaccion->cantidad)->toBe(15)
@@ -64,7 +64,7 @@ it('egresa stock correctamente indicando patente', function () {
     $articulo->refresh();
 
     expect($articulo->stock)->toBe(3);
-    
+
     $transaccion = Transaccion::first();
     expect($transaccion->tipo)->toBe('OUT')
         ->and($transaccion->cantidad)->toBe(2)

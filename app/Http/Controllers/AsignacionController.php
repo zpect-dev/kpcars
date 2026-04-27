@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\ImportAsignacionesAction;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AsignacionController extends Controller
 {
@@ -18,25 +19,25 @@ class AsignacionController extends Controller
         $asignaciones = $vehiculo->asignaciones()
             ->with(['conductor:id,name,dni', 'asignadoPor:id,name'])
             ->get()
-            ->map(fn($a) => [
-                'id'           => $a->id,
-                'conductor'    => $a->conductor ? [
-                    'id'   => $a->conductor->id,
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'conductor' => $a->conductor ? [
+                    'id' => $a->conductor->id,
                     'name' => $a->conductor->name,
-                    'dni'  => $a->conductor->dni,
+                    'dni' => $a->conductor->dni,
                 ] : null,
                 'asignado_por' => $a->asignadoPor?->name,
                 'fecha_inicio' => $a->fecha_inicio?->toISOString(),
-                'fecha_fin'    => $a->fecha_fin?->toISOString(),
+                'fecha_fin' => $a->fecha_fin?->toISOString(),
             ]);
 
         return Inertia::render('Asignaciones/Index', [
-            'vehiculo'    => [
-                'id'     => $vehiculo->id,
+            'vehiculo' => [
+                'id' => $vehiculo->id,
                 'patente' => $vehiculo->patente,
-                'marca'   => $vehiculo->marca,
-                'modelo'  => $vehiculo->modelo,
-                'anio'    => $vehiculo->anio,
+                'marca' => $vehiculo->marca,
+                'modelo' => $vehiculo->modelo,
+                'anio' => $vehiculo->anio,
             ],
             'asignaciones' => $asignaciones,
         ]);
@@ -51,6 +52,18 @@ class AsignacionController extends Controller
         $pdf = Pdf::loadView('pdf.asignaciones', compact('vehiculo', 'asignaciones'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download("asignaciones-{$vehiculo->patente}-" . now()->format('Y-m-d') . '.pdf');
+        return $pdf->download("asignaciones-{$vehiculo->patente}-".now()->format('Y-m-d').'.pdf');
+    }
+
+    public function import(Request $request, ImportAsignacionesAction $action): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls,csv'],
+        ]);
+
+        $file = $request->file('file');
+        $action->execute($file->path(), $file->getClientOriginalExtension());
+
+        return redirect()->back()->with('success', 'Asignaciones importadas correctamente.');
     }
 }

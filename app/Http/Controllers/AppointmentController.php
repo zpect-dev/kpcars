@@ -33,11 +33,11 @@ class AppointmentController extends Controller
         }
 
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->toDateString() : null;
-        $to   = ! empty($filters['to'])   ? Carbon::parse($filters['to'])->toDateString()   : null;
+        $to = ! empty($filters['to']) ? Carbon::parse($filters['to'])->toDateString() : null;
 
         $appointments = Appointment::with(['completedBy:id,name', 'conductor:id,name'])
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
-            ->when($to,   fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
+            ->when($to, fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
             ->orderBy('scheduled_date')
@@ -72,14 +72,14 @@ class AppointmentController extends Controller
         $remainingToday = max(0, 4 - $usedToday);
 
         return Inertia::render('Appointments/Index', [
-            'appointments'   => $appointments,
-            'filters'        => $filters,
-            'vehiculos'      => $vehiculos,
-            'conductores'    => $conductores,
-            'mecanicos'      => $mecanicos,
-            'dailySlots'     => $dailySlots,
+            'appointments' => $appointments,
+            'filters' => $filters,
+            'vehiculos' => $vehiculos,
+            'conductores' => $conductores,
+            'mecanicos' => $mecanicos,
+            'dailySlots' => $dailySlots,
             'remainingToday' => $remainingToday,
-            'maxSlots'       => 4,
+            'maxSlots' => 4,
         ]);
     }
 
@@ -90,13 +90,13 @@ class AppointmentController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
         abort_if($request->user()->isInversor(), 403);
-        
+
         $validated = $request->validate([
-            'service'        => ['required', 'string', 'max:255'],
-            'license_plate'  => ['required', 'string', 'max:20'],
-            'conductor_id'   => ['required', 'integer', 'exists:users,id'],
+            'service' => ['required', 'string', 'max:255'],
+            'license_plate' => ['required', 'string', 'max:20'],
+            'conductor_id' => ['required', 'integer', 'exists:users,id'],
             'preferred_date' => ['required', 'date'],
-            'type'           => ['required', 'in:normal,emergencia'],
+            'type' => ['required', 'in:normal,emergencia'],
         ]);
 
         $preferred = Carbon::parse($validated['preferred_date'])->startOfDay();
@@ -178,10 +178,10 @@ class AppointmentController extends Controller
         }
 
         $labels = [
-            'agendado'   => 'agendado',
+            'agendado' => 'agendado',
             'en_proceso' => 'en proceso',
             'completado' => 'completado',
-            'cancelado'  => 'cancelado',
+            'cancelado' => 'cancelado',
         ];
 
         return redirect()->back()->with(

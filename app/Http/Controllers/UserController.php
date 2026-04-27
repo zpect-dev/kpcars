@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\UserRole;
+use App\Models\Asignacion;
 use App\Models\Empresa;
 use App\Models\User;
+use App\Models\Vehiculo;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Illuminate\Support\Facades\Gate;
-
-use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
@@ -41,7 +44,7 @@ class UserController extends Controller
         }
 
         // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
-        $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)) . $validated['dni'];
+        $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)).$validated['dni'];
 
         User::create([
             'name' => $validated['name'],
@@ -72,14 +75,14 @@ class UserController extends Controller
 
         $empresas = Empresa::orderBy('nombre')->get(['id', 'nombre']);
 
-        $roles = collect(UserRole::cases())->map(fn($role) => [
+        $roles = collect(UserRole::cases())->map(fn ($role) => [
             'value' => $role->value,
-            'label' => $role->label()
+            'label' => $role->label(),
         ]);
 
-        $filterRoles = collect(UserRole::cases())->map(fn($role) => [
+        $filterRoles = collect(UserRole::cases())->map(fn ($role) => [
             'value' => $role->value,
-            'label' => $role->pluralLabel()
+            'label' => $role->pluralLabel(),
         ]);
 
         return Inertia::render('Users/Index', [
@@ -114,31 +117,32 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        \Illuminate\Support\Facades\Gate::authorize('manage-users');
+        Gate::authorize('manage-users');
 
         if ($user->id === auth()->id()) {
             return redirect()->back()->with('error', 'No puedes cambiar tu propio estado.');
         }
 
-        $newInactivoStatus = !$user->inactivo;
+        $newInactivoStatus = ! $user->inactivo;
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $newInactivoStatus) {
+        DB::transaction(function () use ($user, $newInactivoStatus) {
             $user->update(['inactivo' => $newInactivoStatus]);
 
             // Si el usuario es desactivado, quitar asignaciones de vehículos
             if ($newInactivoStatus) {
                 // Cerrar las asignaciones activas en el historial
-                \App\Models\Asignacion::where('conductor_id', $user->id)
+                Asignacion::where('conductor_id', $user->id)
                     ->whereNull('fecha_fin')
                     ->update(['fecha_fin' => now()]);
 
                 // Desvincular vehículos que estuvieran a su nombre
-                \App\Models\Vehiculo::where('user_id', $user->id)
+                Vehiculo::where('user_id', $user->id)
                     ->update(['user_id' => null]);
             }
         });
 
         $message = $newInactivoStatus ? 'Usuario desactivado y sus vehículos fueron desasignados.' : 'Usuario activado correctamente.';
+
         return redirect()->back()->with('success', $message);
     }
 
@@ -162,7 +166,7 @@ class UserController extends Controller
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo_path) {
-                \Illuminate\Support\Facades\Storage::disk('public')->delete($user->profile_photo_path);
+                Storage::disk('public')->delete($user->profile_photo_path);
             }
             $validated['profile_photo_path'] = $request->file('profile_photo')->store('profile-photos', 'public');
         }

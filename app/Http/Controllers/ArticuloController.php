@@ -10,10 +10,10 @@ use App\Models\Vehiculo;
 use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
-use Illuminate\Support\Facades\DB;
 
 class ArticuloController extends Controller
 {
@@ -58,7 +58,7 @@ class ArticuloController extends Controller
 
             if ($articulo) {
                 // Update min_stock if changed
-                if ((int)$articulo->min_stock !== (int)$validated['min_stock']) {
+                if ((int) $articulo->min_stock !== (int) $validated['min_stock']) {
                     $articulo->update(['min_stock' => $validated['min_stock']]);
                 }
             } else {

@@ -37,9 +37,9 @@ class TransactionController extends Controller
 
         return Inertia::render('Transactions/Index', [
             'transactions' => $transactions,
-            'filters'      => $filters,
-            'items'        => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
-            'vehiculos'    => Vehiculo::visibleTo($request->user())->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
+            'filters' => $filters,
+            'items' => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
+            'vehiculos' => Vehiculo::visibleTo($request->user())->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
         ]);
     }
 

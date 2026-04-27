@@ -17,7 +17,7 @@ class VehiculoSeeder extends Seeder
         $inversiones = Inversion::pluck('id', 'nombre')->toArray();
         $empresas = Empresa::pluck('id', 'nombre')->toArray();
 
-        $rawData = "EMP_1	INV_01	AA589UJ	TOYOTA ETIOS PLATINUM 1.5	2016
+        $rawData = 'EMP_1	INV_01	AA589UJ	TOYOTA ETIOS PLATINUM 1.5	2016
 EMP_1	INV_01	AA526QE	TOYOTA ETIOS XLS 1.5 6M/T	2016
 EMP_1	INV_01	AD839ET	TOYOTA ETIOS X 1.5 6M/T	2019
 EMP_1	INV_01	PGX530	TOYOTA ETIOS XS 1.5	2015
@@ -110,13 +110,15 @@ EMP_2	INV_01	PGF356	TOYOTA COROLLA XEI 1.8 6M/T	2015
 EMP_2	INV_01	AB203QO	TOYOTA COROLLA XEI 1.8 6M/T	2017
 EMP_2	INV_01	AB300UI	TOYOTA COROLLA SE-G 1.8 CVT	2017
 EMP_2	INV_01	AA909FL	TOYOTA COROLLA SE-G 1.8 CVT	2016
-EMP_2	INV_01	AA042ZU	TOYOTA COROLLA XLI 1.8 6M/T	2016";
+EMP_2	INV_01	AA042ZU	TOYOTA COROLLA XLI 1.8 6M/T	2016';
 
         $lines = explode("\n", $rawData);
-        
+
         foreach ($lines as $line) {
             $cols = explode("\t", trim($line));
-            if (count($cols) < 5) continue;
+            if (count($cols) < 5) {
+                continue;
+            }
 
             $empresaName = $cols[0];
             $inversionName = str_replace('INV_0', 'INV_', $cols[1]); // Normalize INV_01 to INV_1

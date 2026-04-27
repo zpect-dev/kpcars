@@ -10,22 +10,22 @@ return new class extends Migration
     {
         Schema::create('transacciones', function (Blueprint $table) {
             $table->id();
-            
+
             $table->foreignId('articulo_id')->constrained('articulos');
-            
+
             $table->foreignId('user_id')->constrained('users');
-            
+
             $table->foreignId('vehiculo_id')->nullable()->constrained('vehiculos');
-            
+
             $table->string('solicitante')->nullable();
-            
+
             $table->enum('tipo', ['IN', 'OUT']);
-            
+
             $table->integer('cantidad');
-            
+
             $table->index('tipo');
             $table->index('created_at');
-            
+
             $table->timestamps();
         });
     }

@@ -52,12 +52,12 @@ class ScheduleAppointmentAction
             }
 
             return Appointment::create([
-                'service'        => $service,
-                'license_plate'  => $plate,
-                'conductor_id'   => $conductorId,
+                'service' => $service,
+                'license_plate' => $plate,
+                'conductor_id' => $conductorId,
                 'scheduled_date' => $requestedDate->toDateString(),
-                'type'           => $type,
-                'status'         => 'agendado',
+                'type' => $type,
+                'status' => 'agendado',
             ]);
         });
     }

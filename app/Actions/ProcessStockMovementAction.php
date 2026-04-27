@@ -7,21 +7,19 @@ namespace App\Actions;
 use App\Models\Articulo;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
-use Exception;
 
 class ProcessStockMovementAction
 {
     /**
      * Executes the stock movement (IN/OUT) within a database transaction.
-     * 
-     * @param Articulo $articulo
-     * @param string $type ('IN' or 'OUT')
-     * @param int $quantity The amount being added or consumed
-     * @param string|null $licensePlate Required only for OUT transactions
-     * @return void
-     * 
+     *
+     * @param  string  $type  ('IN' or 'OUT')
+     * @param  int  $quantity  The amount being added or consumed
+     * @param  string|null  $licensePlate  Required only for OUT transactions
+     *
      * @throws InvalidArgumentException
      * @throws Exception
      */
@@ -38,10 +36,10 @@ class ProcessStockMovementAction
                 if ($articulo->stock < $quantity) {
                     throw new Exception('Stock insuficiente para realizar esta operación.');
                 }
-                
+
                 // Lookup vehicle based on licensePlate
                 $vehiculo = Vehiculo::where('patente', $licensePlate)->first();
-                if (!$vehiculo) {
+                if (! $vehiculo) {
                     throw new Exception("El vehículo con patente {$licensePlate} no existe en la base de datos.");
                 }
                 $vehiculoId = $vehiculo->id;
