@@ -1155,7 +1155,7 @@ function VehiculoForm({
                 <Input
                     id="propietario"
                     type="text"
-                    placeholder="Nombre del titular (opcional)"
+                    placeholder="Nombre del titular"
                     value={form.data.propietario}
                     onChange={(e) =>
                         form.setData('propietario', e.target.value)

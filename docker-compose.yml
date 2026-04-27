@@ -24,17 +24,7 @@ services:
     ports:
       - '127.0.0.1:3307:3306'
     healthcheck:
-      test:
-        [
-          'CMD',
-          'mysqladmin',
-          'ping',
-          '-h',
-          '127.0.0.1',
-          '-u',
-          'root',
-          '-p${DB_PASSWORD}',
-        ]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,6 +41,9 @@ services:
       - kpcars_net
     env_file:
       - .env
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
     volumes:
       - storage_public:/var/www/storage/app/public
     healthcheck:
@@ -73,8 +66,8 @@ services:
     networks:
       - kpcars_net
     environment:
-      - VIRTUAL_HOST=${APP_DOMAIN}
-      - LETSENCRYPT_HOST=${APP_DOMAIN}
+      - VIRTUAL_HOST=${APP_DOMAIN:-localhost}
+      - LETSENCRYPT_HOST=${APP_DOMAIN:-localhost}
     expose:
       - '80'
     volumes:

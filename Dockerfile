@@ -54,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libfcgi-bin \
     libicu-dev \
+    libzip-dev \
     unixodbc-dev \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc -o /etc/apt/keyrings/microsoft.asc \
@@ -65,6 +66,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     intl \
     opcache \
     pdo_mysql \
+    zip \
     && pecl install pdo_sqlsrv-5.12.0 sqlsrv-5.12.0 \
     && docker-php-ext-enable pdo_sqlsrv sqlsrv \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
