@@ -245,6 +245,7 @@ export default function Dashboard({
         empresa_id: '' as string,
         user_id: '' as string,
         fecha_vencimiento_vtv: '',
+        fecha_vencimiento_gnc: '',
     });
 
     function handleCreate(e: React.FormEvent) {
@@ -285,9 +286,12 @@ export default function Dashboard({
         empresa_id: '' as string,
         user_id: '' as string,
         fecha_vencimiento_vtv: '',
+        fecha_vencimiento_gnc: '',
     });
 
-    function vtvStatus(dateStr?: string | null): 'ok' | 'warning' | 'expired' | null {
+    function vtvStatus(
+        dateStr?: string | null,
+    ): 'ok' | 'warning' | 'expired' | null {
         if (!dateStr) {
             return null;
         }
@@ -337,9 +341,20 @@ export default function Dashboard({
 
     function openEdit(v: Vehiculo) {
         let formattedVtv = '';
+        let formattedGnc = '';
 
         if (v.fecha_vencimiento_vtv) {
-            formattedVtv = v.fecha_vencimiento_vtv.split('T')[0].split(' ')[0].slice(0, 7);
+            formattedVtv = v.fecha_vencimiento_vtv
+                .split('T')[0]
+                .split(' ')[0]
+                .slice(0, 7);
+        }
+
+        if (v.fecha_vencimiento_gnc) {
+            formattedGnc = v.fecha_vencimiento_gnc
+                .split('T')[0]
+                .split(' ')[0]
+                .slice(0, 7);
         }
 
         editForm.setData({
@@ -352,6 +367,7 @@ export default function Dashboard({
             empresa_id: String(v.empresa_id || ''),
             user_id: String(v.user_id || ''),
             fecha_vencimiento_vtv: formattedVtv,
+            fecha_vencimiento_gnc: formattedGnc,
         });
         setEditingVehiculo(v);
     }
@@ -734,6 +750,9 @@ export default function Dashboard({
                                     <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         VTV
                                     </th>
+                                    <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        GNC
+                                    </th>
                                     <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
@@ -743,7 +762,7 @@ export default function Dashboard({
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={8}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -819,7 +838,24 @@ export default function Dashboard({
                                                     <span
                                                         className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
                                                     >
-                                                        {formatVtv(vehiculo.fecha_vencimiento_vtv)}
+                                                        {formatVtv(
+                                                            vehiculo.fecha_vencimiento_vtv,
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        N/A
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                {vehiculo.fecha_vencimiento_gnc ? (
+                                                    <span
+                                                        className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
+                                                    >
+                                                        {formatVtv(
+                                                            vehiculo.fecha_vencimiento_gnc,
+                                                        )}
                                                     </span>
                                                 ) : (
                                                     <span className="text-muted-foreground/50 italic">
@@ -1038,13 +1074,29 @@ export default function Dashboard({
                                     <div className="text-xs text-muted-foreground">
                                         VTV:{' '}
                                         {vehiculo.fecha_vencimiento_vtv ? (
-                                            <span className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}>
-                                                {formatVtv(vehiculo.fecha_vencimiento_vtv)}
+                                            <span
+                                                className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
+                                            >
+                                                {formatVtv(
+                                                    vehiculo.fecha_vencimiento_vtv,
+                                                )}
                                             </span>
                                         ) : (
-                                            <span className="italic">
-                                                N/A
+                                            <span className="italic">N/A</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        GNC:{' '}
+                                        {vehiculo.fecha_vencimiento_gnc ? (
+                                            <span
+                                                className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
+                                            >
+                                                {formatVtv(
+                                                    vehiculo.fecha_vencimiento_gnc,
+                                                )}
                                             </span>
+                                        ) : (
+                                            <span className="italic">N/A</span>
                                         )}
                                     </div>
                                 </li>
@@ -1149,8 +1201,18 @@ export default function Dashboard({
 }
 
 const MESES_VTV = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+    'Enero',
+    'Febrero',
+    'Marzo',
+    'Abril',
+    'Mayo',
+    'Junio',
+    'Julio',
+    'Agosto',
+    'Septiembre',
+    'Octubre',
+    'Noviembre',
+    'Diciembre',
 ];
 
 function VtvMonthYearPicker({
@@ -1181,7 +1243,10 @@ function VtvMonthYearPicker({
                 </SelectTrigger>
                 <SelectContent>
                     {MESES_VTV.map((nombre, i) => (
-                        <SelectItem key={i} value={String(i + 1).padStart(2, '0')}>
+                        <SelectItem
+                            key={i}
+                            value={String(i + 1).padStart(2, '0')}
+                        >
                             {nombre}
                         </SelectItem>
                     ))}
@@ -1227,6 +1292,7 @@ interface VehiculoFormProps {
             empresa_id: string;
             user_id: string;
             fecha_vencimiento_vtv: string;
+            fecha_vencimiento_gnc: string;
         }>
     >;
     onSubmit: (e: React.FormEvent) => void;
@@ -1374,13 +1440,23 @@ function VehiculoForm({
                 <InputError message={form.errors.user_id} />
             </div>
 
-            <div className="grid gap-2">
-                <Label>Vencimiento VTV</Label>
-                <VtvMonthYearPicker
-                    value={form.data.fecha_vencimiento_vtv}
-                    onChange={(v) => form.setData('fecha_vencimiento_vtv', v)}
-                />
-                <InputError message={form.errors.fecha_vencimiento_vtv} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                    <Label>Vencimiento VTV</Label>
+                    <VtvMonthYearPicker
+                        value={form.data.fecha_vencimiento_vtv}
+                        onChange={(v) => form.setData('fecha_vencimiento_vtv', v)}
+                    />
+                    <InputError message={form.errors.fecha_vencimiento_vtv} />
+                </div>
+                <div className="grid gap-2">
+                    <Label>Vencimiento GNC</Label>
+                    <VtvMonthYearPicker
+                        value={form.data.fecha_vencimiento_gnc}
+                        onChange={(v) => form.setData('fecha_vencimiento_gnc', v)}
+                    />
+                    <InputError message={form.errors.fecha_vencimiento_gnc} />
+                </div>
             </div>
 
             <div className="flex justify-end pt-2">

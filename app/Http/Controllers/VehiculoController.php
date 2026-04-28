@@ -26,12 +26,17 @@ class VehiculoController extends Controller
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', 'exists:users,id'],
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
+            'fecha_vencimiento_gnc' => ['nullable', 'date_format:Y-m'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
 
         if (! empty($validated['fecha_vencimiento_vtv'])) {
             $validated['fecha_vencimiento_vtv'] .= '-01';
+        }
+
+        if (! empty($validated['fecha_vencimiento_gnc'])) {
+            $validated['fecha_vencimiento_gnc'] .= '-01';
         }
 
         DB::transaction(function () use ($validated, $request) {
@@ -74,12 +79,17 @@ class VehiculoController extends Controller
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', 'exists:users,id'],
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
+            'fecha_vencimiento_gnc' => ['nullable', 'date_format:Y-m'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
 
         if (! empty($validated['fecha_vencimiento_vtv'])) {
             $validated['fecha_vencimiento_vtv'] .= '-01';
+        }
+
+        if (! empty($validated['fecha_vencimiento_gnc'])) {
+            $validated['fecha_vencimiento_gnc'] .= '-01';
         }
 
         DB::transaction(function () use ($validated, $vehiculo, $request) {

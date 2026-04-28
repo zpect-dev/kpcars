@@ -25,6 +25,7 @@ export interface Vehiculo {
     inversion_id: number;
     empresa_id: number | null;
     fecha_vencimiento_vtv?: string | null;
+    fecha_vencimiento_gnc?: string | null;
     user?: User | null;
     inversion?: Inversion | null;
     empresa?: Empresa | null;
@@ -58,6 +59,22 @@ export interface Appointment {
     scheduled_date: string;
     status: 'pending' | 'completed' | 'cancelled';
     service_type?: ServiceType;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface Revision {
+    id: number;
+    vehiculo_id: number;
+    fecha_vencimiento_vtv?: string | null;
+    fecha_vencimiento_gnc?: string | null;
+    limpieza: 'mala' | 'buena';
+    nivel_nafta: 'bajo' | 'optimo';
+    kilometraje: number;
+    rueda_auxiliar: boolean;
+    kit_seguridad: boolean;
+    observaciones?: string | null;
+    vehiculo?: Vehiculo | null;
     created_at?: string;
     updated_at?: string;
 }

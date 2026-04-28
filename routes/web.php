@@ -5,6 +5,7 @@ use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PdfController;
+use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehiculoController;
@@ -56,6 +57,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+
+    Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
+    Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
 });
 
 require __DIR__.'/settings.php';

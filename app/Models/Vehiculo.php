@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv'])]
+#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
 class Vehiculo extends Model
 {
+    use HasFactory;
     /**
      * Get the attributes that should be cast.
      *
@@ -21,6 +23,7 @@ class Vehiculo extends Model
     {
         return [
             'fecha_vencimiento_vtv' => 'date',
+            'fecha_vencimiento_gnc' => 'date',
         ];
     }
 
@@ -54,6 +57,14 @@ class Vehiculo extends Model
     public function asignaciones(): HasMany
     {
         return $this->hasMany(Asignacion::class)->orderByDesc('fecha_inicio');
+    }
+
+    /**
+     * Get the revision history for the vehicle.
+     */
+    public function revisiones(): HasMany
+    {
+        return $this->hasMany(Revision::class)->orderByDesc('created_at');
     }
 
     public function scopeVisibleTo($query, ?User $user)
