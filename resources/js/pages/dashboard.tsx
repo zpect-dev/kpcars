@@ -244,6 +244,7 @@ export default function Dashboard({
         inversion_id: '' as string,
         empresa_id: '' as string,
         user_id: '' as string,
+        fecha_vencimiento_vtv: '',
     });
 
     function handleCreate(e: React.FormEvent) {
@@ -283,9 +284,64 @@ export default function Dashboard({
         inversion_id: '' as string,
         empresa_id: '' as string,
         user_id: '' as string,
+        fecha_vencimiento_vtv: '',
     });
 
+    function vtvStatus(dateStr?: string | null): 'ok' | 'warning' | 'expired' | null {
+        if (!dateStr) {
+            return null;
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const datePart = dateStr.split('T')[0].split(' ')[0];
+        const [year, month] = datePart.split('-').map(Number);
+        const vtv = new Date(year, month, 0);
+        vtv.setHours(0, 0, 0, 0);
+
+        if (vtv < today) {
+            return 'expired';
+        }
+
+        const oneMonth = new Date(today);
+        oneMonth.setMonth(oneMonth.getMonth() + 1);
+
+        if (vtv <= oneMonth) {
+            return 'warning';
+        }
+
+        return 'ok';
+    }
+
+    function vtvColorClass(dateStr?: string | null): string {
+        const status = vtvStatus(dateStr);
+
+        switch (status) {
+            case 'ok':
+                return 'text-green-700 dark:text-green-400';
+            case 'warning':
+                return 'text-yellow-600 dark:text-yellow-400';
+            case 'expired':
+                return 'text-red-600 dark:text-red-400';
+            default:
+                return 'text-muted-foreground/50 italic';
+        }
+    }
+
+    function formatVtv(dateStr?: string | null): string {
+        if (!dateStr) return '';
+        const datePart = dateStr.split('T')[0].split(' ')[0];
+        const [year, month] = datePart.split('-');
+        return `${month}/${year}`;
+    }
+
     function openEdit(v: Vehiculo) {
+        let formattedVtv = '';
+
+        if (v.fecha_vencimiento_vtv) {
+            formattedVtv = v.fecha_vencimiento_vtv.split('T')[0].split(' ')[0].slice(0, 7);
+        }
+
         editForm.setData({
             patente: v.patente,
             marca: v.marca,
@@ -295,6 +351,7 @@ export default function Dashboard({
             inversion_id: String(v.inversion_id || ''),
             empresa_id: String(v.empresa_id || ''),
             user_id: String(v.user_id || ''),
+            fecha_vencimiento_vtv: formattedVtv,
         });
         setEditingVehiculo(v);
     }
@@ -656,7 +713,7 @@ export default function Dashboard({
                 <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     {/* Desktop */}
                     <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -671,10 +728,13 @@ export default function Dashboard({
                                     <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Inversión
                                     </th>
-                                    <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Conductor
                                     </th>
-                                    <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        VTV
+                                    </th>
+                                    <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
                                 </tr>
@@ -683,7 +743,7 @@ export default function Dashboard({
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={6}
+                                            colSpan={7}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -751,6 +811,19 @@ export default function Dashboard({
                                                 {vehiculo.user?.name || (
                                                     <span className="text-muted-foreground italic">
                                                         No asignado
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                {vehiculo.fecha_vencimiento_vtv ? (
+                                                    <span
+                                                        className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
+                                                    >
+                                                        {formatVtv(vehiculo.fecha_vencimiento_vtv)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        N/A
                                                     </span>
                                                 )}
                                             </td>
@@ -962,6 +1035,18 @@ export default function Dashboard({
                                             </span>
                                         )}
                                     </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        VTV:{' '}
+                                        {vehiculo.fecha_vencimiento_vtv ? (
+                                            <span className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}>
+                                                {formatVtv(vehiculo.fecha_vencimiento_vtv)}
+                                            </span>
+                                        ) : (
+                                            <span className="italic">
+                                                N/A
+                                            </span>
+                                        )}
+                                    </div>
                                 </li>
                             ))
                         )}
@@ -1063,6 +1148,72 @@ export default function Dashboard({
     );
 }
 
+const MESES_VTV = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+function VtvMonthYearPicker({
+    value,
+    onChange,
+}: {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [yearPart, monthPart] = value ? value.split('-') : ['', ''];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 12 }, (_, i) => currentYear - 1 + i);
+
+    const setMonth = (m: string) => {
+        const y = yearPart || String(currentYear);
+        onChange(`${y}-${m}`);
+    };
+    const setYear = (y: string) => {
+        const m = monthPart || '01';
+        onChange(`${y}-${m}`);
+    };
+
+    return (
+        <div className="flex gap-2">
+            <Select value={monthPart} onValueChange={setMonth}>
+                <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                    {MESES_VTV.map((nombre, i) => (
+                        <SelectItem key={i} value={String(i + 1).padStart(2, '0')}>
+                            {nombre}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select value={yearPart} onValueChange={setYear}>
+                <SelectTrigger className="w-[110px]">
+                    <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                    {years.map((y) => (
+                        <SelectItem key={y} value={String(y)}>
+                            {y}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            {value && (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onChange('')}
+                    aria-label="Limpiar VTV"
+                >
+                    <X className="h-4 w-4" />
+                </Button>
+            )}
+        </div>
+    );
+}
+
 // --- Reusable form component for create & edit ---
 interface VehiculoFormProps {
     form: ReturnType<
@@ -1075,6 +1226,7 @@ interface VehiculoFormProps {
             inversion_id: string;
             empresa_id: string;
             user_id: string;
+            fecha_vencimiento_vtv: string;
         }>
     >;
     onSubmit: (e: React.FormEvent) => void;
@@ -1220,6 +1372,15 @@ function VehiculoForm({
                     onSelect={(o) => form.setData('user_id', o.value)}
                 />
                 <InputError message={form.errors.user_id} />
+            </div>
+
+            <div className="grid gap-2">
+                <Label>Vencimiento VTV</Label>
+                <VtvMonthYearPicker
+                    value={form.data.fecha_vencimiento_vtv}
+                    onChange={(v) => form.setData('fecha_vencimiento_vtv', v)}
+                />
+                <InputError message={form.errors.fecha_vencimiento_vtv} />
             </div>
 
             <div className="flex justify-end pt-2">

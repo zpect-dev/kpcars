@@ -25,9 +25,14 @@ class VehiculoController extends Controller
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', 'exists:users,id'],
+            'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
+
+        if (! empty($validated['fecha_vencimiento_vtv'])) {
+            $validated['fecha_vencimiento_vtv'] .= '-01';
+        }
 
         DB::transaction(function () use ($validated, $request) {
             $vehiculo = Vehiculo::create($validated);
@@ -68,9 +73,14 @@ class VehiculoController extends Controller
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', 'exists:users,id'],
+            'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
+
+        if (! empty($validated['fecha_vencimiento_vtv'])) {
+            $validated['fecha_vencimiento_vtv'] .= '-01';
+        }
 
         DB::transaction(function () use ($validated, $vehiculo, $request) {
             $conductorAnterior = $vehiculo->user_id;

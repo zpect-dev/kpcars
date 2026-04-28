@@ -9,9 +9,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id'])]
+#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv'])]
 class Vehiculo extends Model
 {
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'fecha_vencimiento_vtv' => 'date',
+        ];
+    }
+
     /**
      * Get the user that is assigned to the vehicle.
      */

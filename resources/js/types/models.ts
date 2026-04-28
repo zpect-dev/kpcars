@@ -24,6 +24,7 @@ export interface Vehiculo {
     user_id: number | null;
     inversion_id: number;
     empresa_id: number | null;
+    fecha_vencimiento_vtv?: string | null;
     user?: User | null;
     inversion?: Inversion | null;
     empresa?: Empresa | null;

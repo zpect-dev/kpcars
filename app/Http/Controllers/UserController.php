@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Enums\DepositoMoneda;
 use App\Enums\UserRole;
 use App\Models\Asignacion;
 use App\Models\Empresa;
@@ -32,6 +33,8 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
 
         if ($validated['role'] !== UserRole::INVERSOR->value) {
@@ -57,6 +60,8 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
             'empresa_id' => $validated['empresa_id'] ?? null,
+            'deposito' => $validated['deposito'] ?? null,
+            'deposito_moneda' => isset($validated['deposito']) ? ($validated['deposito_moneda'] ?? null) : null,
         ]);
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
@@ -70,7 +75,7 @@ class UserController extends Controller
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
             })
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
 
         $empresas = Empresa::orderBy('nombre')->get(['id', 'nombre']);
@@ -85,11 +90,18 @@ class UserController extends Controller
             'label' => $role->pluralLabel(),
         ]);
 
+        $monedas = collect(DepositoMoneda::cases())->map(fn ($m) => [
+            'value' => $m->value,
+            'label' => $m->label(),
+            'symbol' => $m->symbol(),
+        ]);
+
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
             'filterRoles' => $filterRoles,
             'empresas' => $empresas,
+            'monedas' => $monedas,
         ]);
     }
 
@@ -158,10 +170,18 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
 
         if (! $user->isInversor()) {
             unset($validated['empresa_id']);
+        }
+
+        // Limpiar moneda si no hay depósito
+        if (empty($validated['deposito'])) {
+            $validated['deposito'] = null;
+            $validated['deposito_moneda'] = null;
         }
 
         if ($request->hasFile('profile_photo')) {

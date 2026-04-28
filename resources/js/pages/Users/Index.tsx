@@ -29,6 +29,8 @@ interface User {
     fecha_vencimiento_licencia?: string | null;
     profile_photo_url?: string | null;
     empresa_id?: number | null;
+    deposito?: string | null;
+    deposito_moneda?: string | null;
 }
 
 interface RoleOption {
@@ -41,11 +43,18 @@ interface Empresa {
     nombre: string;
 }
 
+interface MonedaOption {
+    value: string;
+    label: string;
+    symbol: string;
+}
+
 interface Props {
     users: User[];
     roles: RoleOption[];
     filterRoles: RoleOption[];
     empresas: Empresa[];
+    monedas: MonedaOption[];
 }
 
 function AvatarDropzone({
@@ -100,7 +109,7 @@ function AvatarDropzone({
     );
 }
 
-export default function UsersIndex({ users, roles, filterRoles, empresas }: Props) {
+export default function UsersIndex({ users, roles, filterRoles, empresas, monedas }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [previewImage, setPreviewImage] = useState<{
@@ -146,6 +155,8 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
         empresa_id: '' as string,
+        deposito: '' as string,
+        deposito_moneda: 'USD' as string,
     });
 
     const [userToEdit, setUserToEdit] = useState<User | null>(null);
@@ -158,12 +169,15 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
         empresa_id: '' as string,
+        deposito: '' as string,
+        deposito_moneda: 'USD' as string,
     });
 
     function openEditModal(user: User) {
         setUserToEdit(user);
 
         let formattedDate = '';
+
         if (user.fecha_vencimiento_licencia) {
             formattedDate = user.fecha_vencimiento_licencia
                 .split('T')[0]
@@ -179,6 +193,8 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
             fecha_vencimiento_licencia: formattedDate,
             profile_photo: null,
             empresa_id: user.empresa_id ? String(user.empresa_id) : '',
+            deposito: user.deposito ?? '',
+            deposito_moneda: user.deposito_moneda || 'USD',
         });
         editForm.clearErrors();
     }
@@ -246,6 +262,13 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
             }
         }
         return formatted;
+    }
+
+    function formatDeposito(user: User) {
+        if (!user.deposito) return null;
+        const m = monedas.find((x) => x.value === user.deposito_moneda);
+        const symbol = m?.symbol ?? '$';
+        return `${symbol} ${Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
     const { auth } = usePage<any>().props;
@@ -331,7 +354,7 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
 
                 <div className="w-full self-start overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
+                        <table className="w-full text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
                                     <th
@@ -366,7 +389,13 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Depósito
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Rol
                                     </th>
@@ -376,7 +405,7 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                 {filteredUsers.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={6}
+                                            colSpan={7}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No se encontraron usuarios que
@@ -493,6 +522,17 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                                         ? 'Inactivo'
                                                         : 'Activo'}
                                                 </button>
+                                            </td>
+                                            <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
+                                                {user.deposito ? (
+                                                    <span className="font-medium text-foreground">
+                                                        {formatDeposito(user)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        —
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
                                                 {user.id === auth.user.id ? (
@@ -640,7 +680,7 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="grid grid-cols-3 gap-3 text-xs">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="tracking-wider text-muted-foreground uppercase">
                                                 DNI
@@ -665,6 +705,20 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                             ) : (
                                                 <span className="text-muted-foreground/50 italic">
                                                     N/A
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="tracking-wider text-muted-foreground uppercase">
+                                                Depósito
+                                            </span>
+                                            {user.deposito ? (
+                                                <span className="font-medium text-foreground">
+                                                    {formatDeposito(user)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-muted-foreground/50 italic">
+                                                    —
                                                 </span>
                                             )}
                                         </div>
@@ -866,6 +920,59 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                             </div>
                         )}
 
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="deposito">Depósito (Garantía)</Label>
+                                <Input
+                                    id="deposito"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={createForm.data.deposito}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'deposito',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="0.00"
+                                />
+                                <InputError
+                                    message={createForm.errors.deposito}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="deposito_moneda">Moneda</Label>
+                                <select
+                                    id="deposito_moneda"
+                                    value={createForm.data.deposito_moneda}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'deposito_moneda',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {monedas.map((m) => (
+                                        <option
+                                            key={m.value}
+                                            value={m.value}
+                                            className="bg-background text-foreground"
+                                        >
+                                            {m.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={
+                                        createForm.errors.deposito_moneda
+                                    }
+                                />
+                            </div>
+                        </div>
+
                         <div className="rounded-lg border border-border bg-muted/50 p-3">
                             <p className="text-xs leading-relaxed text-muted-foreground">
                                 <span className="font-semibold text-foreground">
@@ -1045,6 +1152,59 @@ export default function UsersIndex({ users, roles, filterRoles, empresas }: Prop
                                     message={
                                         editForm.errors
                                             .fecha_vencimiento_licencia
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-deposito">Depósito (Garantía)</Label>
+                                <Input
+                                    id="edit-deposito"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={editForm.data.deposito}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'deposito',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="0.00"
+                                />
+                                <InputError
+                                    message={editForm.errors.deposito}
+                                />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-deposito_moneda">Moneda</Label>
+                                <select
+                                    id="edit-deposito_moneda"
+                                    value={editForm.data.deposito_moneda}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'deposito_moneda',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {monedas.map((m) => (
+                                        <option
+                                            key={m.value}
+                                            value={m.value}
+                                            className="bg-background text-foreground"
+                                        >
+                                            {m.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={
+                                        editForm.errors.deposito_moneda
                                     }
                                 />
                             </div>
