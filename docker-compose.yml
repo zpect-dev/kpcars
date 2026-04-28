@@ -96,6 +96,7 @@ services:
       - vhost:/etc/nginx/vhost.d
       - html:/usr/share/nginx/html
       - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./nginx-proxy-conf/custom_proxy_settings.conf:/etc/nginx/conf.d/custom_proxy_settings.conf:ro
     restart: unless-stopped
 
   # --- SSL certificate manager (Let's Encrypt) ---
