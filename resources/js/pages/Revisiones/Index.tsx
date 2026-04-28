@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Search,
+    UserCheck,
     X,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -355,17 +356,27 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
                                 </div>
                                 
                                 {row.revision_semanal ? (
-                                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                        <span className="rounded-md border border-border bg-muted/50 px-2 py-1 font-medium">
-                                            Km: {row.revision_semanal.kilometraje.toLocaleString('es-AR')}
-                                        </span>
-                                        <span className="rounded-md border border-border bg-muted/50 px-2 py-1 capitalize font-medium">
-                                            Nafta {row.revision_semanal.nivel_nafta}
-                                        </span>
-                                        {row.revision_semanal.observaciones && (
-                                            <span className="rounded-md bg-amber-100 px-2 py-1 font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                                                Obs
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                            <span className="rounded-md border border-border bg-muted/50 px-2 py-1 font-medium">
+                                                Km: {row.revision_semanal.kilometraje.toLocaleString('es-AR')}
                                             </span>
+                                            <span className="rounded-md border border-border bg-muted/50 px-2 py-1 capitalize font-medium">
+                                                Nafta {row.revision_semanal.nivel_nafta}
+                                            </span>
+                                            {row.revision_semanal.observaciones && (
+                                                <span className="rounded-md bg-amber-100 px-2 py-1 font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    Obs
+                                                </span>
+                                            )}
+                                        </div>
+                                        {row.revision_semanal.revisor && (
+                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                <UserCheck className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                                                <span className="truncate">
+                                                    Revisado por <span className="font-medium text-foreground">{row.revision_semanal.revisor.name}</span>
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
                                 ) : (

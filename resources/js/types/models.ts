@@ -66,6 +66,7 @@ export interface Appointment {
 export interface Revision {
     id: number;
     vehiculo_id: number;
+    revisado_por?: number | null;
     fecha_vencimiento_vtv?: string | null;
     fecha_vencimiento_gnc?: string | null;
     limpieza: 'mala' | 'buena';
@@ -75,6 +76,7 @@ export interface Revision {
     kit_seguridad: boolean;
     observaciones?: string | null;
     vehiculo?: Vehiculo | null;
+    revisor?: { id: number; name: string } | null;
     created_at?: string;
     updated_at?: string;
 }

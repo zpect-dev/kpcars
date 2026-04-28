@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'vehiculo_id',
+    'revisado_por',
     'fecha_vencimiento_vtv',
     'fecha_vencimiento_gnc',
     'limpieza',
@@ -45,5 +46,10 @@ class Revision extends Model
     public function vehiculo(): BelongsTo
     {
         return $this->belongsTo(Vehiculo::class);
+    }
+
+    public function revisor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revisado_por');
     }
 }

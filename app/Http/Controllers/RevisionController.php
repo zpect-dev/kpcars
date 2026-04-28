@@ -30,7 +30,8 @@ class RevisionController extends Controller
             ->orderBy('patente')
             ->get()
             ->map(function (Vehiculo $vehiculo) use ($weekStart): array {
-                $revision = Revision::where('vehiculo_id', $vehiculo->id)
+                $revision = Revision::with('revisor:id,name')
+                    ->where('vehiculo_id', $vehiculo->id)
                     ->where('created_at', '>=', $weekStart)
                     ->latest()
                     ->first();
@@ -78,6 +79,8 @@ class RevisionController extends Controller
         if (! empty($validated['fecha_vencimiento_gnc'])) {
             $validated['fecha_vencimiento_gnc'] .= '-01';
         }
+
+        $validated['revisado_por'] = $request->user()->id;
 
         $action->execute($vehiculo, $validated);
 

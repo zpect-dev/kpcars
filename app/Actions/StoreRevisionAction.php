@@ -23,6 +23,7 @@ class StoreRevisionAction
         return DB::transaction(function () use ($vehiculo, $data): Revision {
             $revision = Revision::create([
                 'vehiculo_id' => $vehiculo->id,
+                'revisado_por' => $data['revisado_por'] ?? null,
                 'fecha_vencimiento_vtv' => $data['fecha_vencimiento_vtv'] ?? null,
                 'fecha_vencimiento_gnc' => $data['fecha_vencimiento_gnc'] ?? null,
                 'limpieza' => $data['limpieza'],
