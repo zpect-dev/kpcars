@@ -88,20 +88,20 @@ class RevisionController extends Controller
     }
 
     /**
-     * Calculate the start of the current "week" (Wednesday).
+     * Calculate the start of the current "week" (Tuesday).
      *
-     * The inspection week runs Wednesday → Tuesday.
-     * If today is Wednesday or later, the week started this Wednesday.
-     * If today is Monday or Tuesday, the week started last Wednesday.
+     * The inspection week runs Tuesday → Monday.
+     * If today is Tuesday or later, the week started this Tuesday.
+     * If today is Monday, the week started last Tuesday.
      */
     public static function currentWeekStart(): Carbon
     {
         $today = Carbon::today();
 
         // dayOfWeek: Sunday=0, Monday=1, Tuesday=2, Wednesday=3, ...
-        // Days since last Wednesday (0 if today is Wednesday)
-        $daysSinceWednesday = ($today->dayOfWeek - Carbon::WEDNESDAY + 7) % 7;
+        // Days since last Tuesday (0 if today is Tuesday)
+        $daysSinceTuesday = ($today->dayOfWeek - Carbon::TUESDAY + 7) % 7;
 
-        return $today->copy()->subDays($daysSinceWednesday)->startOfDay();
+        return $today->copy()->subDays($daysSinceTuesday)->startOfDay();
     }
 }
