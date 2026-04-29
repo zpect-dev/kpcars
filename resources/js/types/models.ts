@@ -74,6 +74,7 @@ export interface Revision {
     kilometraje: number;
     rueda_auxiliar: boolean;
     kit_seguridad: boolean;
+    sticker: boolean;
     observaciones?: string | null;
     vehiculo?: Vehiculo | null;
     revisor?: { id: number; name: string } | null;

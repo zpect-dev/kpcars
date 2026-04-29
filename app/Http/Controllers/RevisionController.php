@@ -68,6 +68,7 @@ class RevisionController extends Controller
             'kilometraje' => ['required', 'integer', 'min:0'],
             'rueda_auxiliar' => ['required', 'boolean'],
             'kit_seguridad' => ['required', 'boolean'],
+            'sticker' => ['required', 'boolean'],
             'observaciones' => ['nullable', 'string', 'max:1000'],
         ]);
 

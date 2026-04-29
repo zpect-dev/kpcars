@@ -149,6 +149,7 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
         kilometraje: '',
         rueda_auxiliar: false,
         kit_seguridad: false,
+        sticker: false,
         observaciones: '',
     });
 
@@ -169,6 +170,7 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
             kilometraje: row.ultimo_kilometraje ? String(row.ultimo_kilometraje) : '',
             rueda_auxiliar: false,
             kit_seguridad: false,
+            sticker: false,
             observaciones: '',
         });
         setWizardOpen(true);
@@ -494,6 +496,12 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
                                     checked={form.data.kit_seguridad}
                                     onChange={(v) => form.setData('kit_seguridad', v)}
                                 />
+                                <ToggleSwitch
+                                    id="sticker"
+                                    label="¿Posee sticker?"
+                                    checked={form.data.sticker}
+                                    onChange={(v) => form.setData('sticker', v)}
+                                />
                             </div>
                         )}
 
@@ -587,6 +595,10 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
                                 <div className="space-y-1">
                                     <span className="text-xs text-muted-foreground">Kit seguridad</span>
                                     <p className="font-medium">{selectedRow.revision_semanal.kit_seguridad ? 'Sí' : 'No'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-muted-foreground">Sticker</span>
+                                    <p className="font-medium">{selectedRow.revision_semanal.sticker ? 'Sí' : 'No'}</p>
                                 </div>
                             </div>
                             {selectedRow.revision_semanal.observaciones && (

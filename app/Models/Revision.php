@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'kilometraje',
     'rueda_auxiliar',
     'kit_seguridad',
+    'sticker',
     'observaciones',
 ])]
 class Revision extends Model
@@ -37,6 +38,7 @@ class Revision extends Model
             'kilometraje' => 'integer',
             'rueda_auxiliar' => 'boolean',
             'kit_seguridad' => 'boolean',
+            'sticker' => 'boolean',
         ];
     }
 
