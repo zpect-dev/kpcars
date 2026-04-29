@@ -27,6 +27,7 @@ class RevisionController extends Controller
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
             ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
+            ->whereNotNull('user_id')
             ->orderBy('patente')
             ->get()
             ->map(function (Vehiculo $vehiculo) use ($weekStart): array {
