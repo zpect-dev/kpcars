@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-
+use Barryvdh\DomPDF\Facade\Pdf;
+use Inertia\Response;
 class UserController extends Controller
 {
     public function store(Request $request)
@@ -74,6 +75,13 @@ class UserController extends Controller
         $users = User::orderBy('name')
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
+            })
+            ->when($request->query('status'), function ($query, $status) {
+                if ($status === 'activos') {
+                    $query->where('inactivo', false);
+                } elseif ($status === 'inactivos') {
+                    $query->where('inactivo', true);
+                }
             })
             ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
@@ -194,5 +202,53 @@ class UserController extends Controller
         $user->update($validated);
 
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
+    }
+
+    public function asignaciones(User $user): Response
+    {
+        Gate::authorize('manage-users');
+
+        $asignaciones = Asignacion::where('conductor_id', $user->id)
+            ->with(['vehiculo', 'asignadoPor:id,name'])
+            ->orderBy('fecha_inicio', 'desc')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'vehiculo' => $a->vehiculo ? [
+                    'id' => $a->vehiculo->id,
+                    'patente' => $a->vehiculo->patente,
+                    'marca' => $a->vehiculo->marca,
+                    'modelo' => $a->vehiculo->modelo,
+                    'anio' => $a->vehiculo->anio,
+                ] : null,
+                'asignado_por' => $a->asignadoPor?->name,
+                'fecha_inicio' => $a->fecha_inicio?->toISOString(),
+                'fecha_fin' => $a->fecha_fin?->toISOString(),
+            ]);
+
+        return Inertia::render('Users/Asignaciones', [
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'dni' => $user->dni,
+                'role' => $user->role,
+            ],
+            'asignaciones' => $asignaciones,
+        ]);
+    }
+
+    public function asignacionesPdf(User $user): \Illuminate\Http\Response
+    {
+        Gate::authorize('manage-users');
+
+        $asignaciones = Asignacion::where('conductor_id', $user->id)
+            ->with(['vehiculo', 'asignadoPor:id,name'])
+            ->orderBy('fecha_inicio', 'desc')
+            ->get();
+
+        $pdf = Pdf::loadView('pdf.user-asignaciones', compact('user', 'asignaciones'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download("asignaciones-{$user->dni}-".now()->format('Y-m-d').'.pdf');
     }
 }

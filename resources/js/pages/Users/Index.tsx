@@ -274,6 +274,7 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
     const { auth } = usePage<any>().props;
     const urlParams = new URLSearchParams(window.location.search);
     const filterRole = urlParams.get('role');
+    const filterStatus = urlParams.get('status');
     const pageTitle = filterRole
         ? `Usuarios - ${filterRole.charAt(0).toUpperCase() + filterRole.slice(1)}`
         : 'Gestión de Usuarios';
@@ -314,14 +315,14 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                 <Button
                                     key={r.value}
                                     variant={
-                                        filterRole === r.value
+                                        filterRole === r.value && !filterStatus
                                             ? 'default'
                                             : 'outline'
                                     }
                                     size="sm"
                                     className={cn(
                                         'h-9 rounded-md px-4 text-xs font-medium transition-all',
-                                        filterRole === r.value
+                                        filterRole === r.value && !filterStatus
                                             ? 'shadow-sm'
                                             : '',
                                     )}
@@ -336,6 +337,45 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                     {r.label}
                                 </Button>
                             ))}
+                            {filterRole === 'chofer' && (
+                                <>
+                                    <div className="mx-1 hidden w-px bg-border sm:block" />
+                                    <Button
+                                        variant={filterStatus === 'activos' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={cn(
+                                            'h-9 rounded-md px-4 text-xs font-medium transition-all',
+                                            filterStatus === 'activos' ? 'shadow-sm' : '',
+                                        )}
+                                        onClick={() =>
+                                            router.get(
+                                                usersIndex.url(),
+                                                { role: 'chofer', status: filterStatus === 'activos' ? undefined : 'activos' },
+                                                { preserveState: false },
+                                            )
+                                        }
+                                    >
+                                        Activos
+                                    </Button>
+                                    <Button
+                                        variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
+                                        size="sm"
+                                        className={cn(
+                                            'h-9 rounded-md px-4 text-xs font-medium transition-all',
+                                            filterStatus === 'inactivos' ? 'shadow-sm' : '',
+                                        )}
+                                        onClick={() =>
+                                            router.get(
+                                                usersIndex.url(),
+                                                { role: 'chofer', status: filterStatus === 'inactivos' ? undefined : 'inactivos' },
+                                                { preserveState: false },
+                                            )
+                                        }
+                                    >
+                                        Inactivos
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -1210,22 +1250,34 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                             </div>
                         </div>
 
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={closeEditModal}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={editForm.processing}
-                            >
-                                {editForm.processing
-                                    ? 'Guardando...'
-                                    : 'Guardar Cambios'}
-                            </Button>
+                        <DialogFooter className="sm:justify-between">
+                            {userToEdit && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)}
+                                    className="mb-2 sm:mb-0"
+                                >
+                                    Ver Asignaciones
+                                </Button>
+                            )}
+                            <div className="flex flex-col-reverse sm:flex-row gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeEditModal}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={editForm.processing}
+                                >
+                                    {editForm.processing
+                                        ? 'Guardando...'
+                                        : 'Guardar Cambios'}
+                                </Button>
+                            </div>
                         </DialogFooter>
                     </form>
                 </DialogContent>
