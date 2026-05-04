@@ -148,19 +148,19 @@ export default function CobrosShow({
                                             <div className="border-t border-border">
                                                 {/* Desktop table */}
                                                 <div className="hidden md:block">
-                                                    <table className="w-full text-left text-sm">
+                                                    <table className="w-full text-left text-sm table-fixed">
                                                         <thead className="bg-muted/30 text-xs text-muted-foreground uppercase">
                                                             <tr>
-                                                                <th className="px-4 py-2 font-medium">
+                                                                <th className="w-[45%] px-4 py-2 font-medium">
                                                                     Artículo
                                                                 </th>
-                                                                <th className="px-4 py-2 text-right font-medium">
+                                                                <th className="w-[15%] px-4 py-2 text-right font-medium">
                                                                     Cantidad
                                                                 </th>
-                                                                <th className="px-4 py-2 text-right font-medium">
+                                                                <th className="w-[20%] px-4 py-2 text-right font-medium">
                                                                     Precio Unit.
                                                                 </th>
-                                                                <th className="px-4 py-2 text-right font-medium">
+                                                                <th className="w-[20%] px-4 py-2 text-right font-medium">
                                                                     Subtotal
                                                                 </th>
                                                             </tr>
