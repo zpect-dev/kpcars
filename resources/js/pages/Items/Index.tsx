@@ -2,10 +2,13 @@ import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
     ArrowDownCircle,
     ArrowUpCircle,
+    Check,
     FileDown,
     History,
+    Pencil,
     Plus,
     Search,
+    X,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
@@ -22,7 +25,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { index, movimiento, store } from '@/routes/articulos';
+import { index, movimiento, store, updatePrecio } from '@/routes/articulos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -31,9 +34,43 @@ interface Props {
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
 }
 
+function formatARS(value: number): string {
+    return new Intl.NumberFormat('es-AR', {
+        style: 'currency',
+        currency: 'ARS',
+        minimumFractionDigits: 2,
+    }).format(value);
+}
+
 export default function ItemsIndex({ items, vehiculos }: Props) {
     const { auth } = usePage<any>().props;
     const isMechanic = auth.user.role === 'mecanico';
+    const isAdmin = auth.user.role === 'administrador';
+
+    // ─── Edición inline de precio ────────────────────────────────────────────
+    const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+    const [editingPriceValue, setEditingPriceValue] = useState('');
+
+    function startEditPrice(item: Articulo) {
+        setEditingPriceId(item.id);
+        setEditingPriceValue(String(item.precio));
+    }
+
+    function cancelEditPrice() {
+        setEditingPriceId(null);
+        setEditingPriceValue('');
+    }
+
+    function submitPrice(item: Articulo) {
+        const precio = Number(editingPriceValue);
+        if (isNaN(precio) || precio < 0) return;
+
+        router.patch(updatePrecio.url(item.id), { precio }, {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => cancelEditPrice(),
+        });
+    }
 
     // ─── Buscador de artículos ───────────────────────────────────────────────
     const [itemSearch, setItemSearch] = useState('');
@@ -118,6 +155,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         descripcion: '',
         stock: '0',
         min_stock: '0',
+        precio: '0',
     });
 
     // Filtro del dropdown de sugerencias basado en lo escrito
@@ -164,6 +202,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             descripcion: '',
             stock: '0',
             min_stock: '0',
+            precio: '0',
         });
         setTimeout(() => descripcionRef.current?.focus(), 50);
     }
@@ -280,26 +319,32 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="w-[50%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[36%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Actual
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Mínimo
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Precio
                                     </th>
                                     {!isMechanic && (
                                         <th
                                             scope="col"
-                                            className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                            className="w-[18%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
                                             Acciones
                                         </th>
@@ -354,6 +399,44 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={String(item.min_stock)}>
                                                     {item.min_stock}
+                                                </td>
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                    {editingPriceId === item.id ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={editingPriceValue}
+                                                                onChange={(e) => setEditingPriceValue(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') submitPrice(item);
+                                                                    if (e.key === 'Escape') cancelEditPrice();
+                                                                }}
+                                                                className="h-7 w-24 text-xs"
+                                                                autoFocus
+                                                            />
+                                                            <button type="button" onClick={() => submitPrice(item)} className="text-foreground hover:text-foreground/80">
+                                                                <Check className="h-3.5 w-3.5" />
+                                                            </button>
+                                                            <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
+                                                                <X className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className={cn(
+                                                                'inline-flex items-center gap-1 text-sm',
+                                                                isAdmin && 'cursor-pointer hover:underline',
+                                                            )}
+                                                            onClick={() => isAdmin && startEditPrice(item)}
+                                                            disabled={!isAdmin}
+                                                        >
+                                                            {formatARS(Number(item.precio))}
+                                                            {isAdmin && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                                                        </button>
+                                                    )}
                                                 </td>
                                                 {!isMechanic && (
                                                     <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
@@ -425,6 +508,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     Mín:{' '}
                                                     <span className="font-medium">
                                                         {item.min_stock}
+                                                    </span>
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                    Precio:{' '}
+                                                    <span className="font-medium">
+                                                        {formatARS(Number(item.precio))}
                                                     </span>
                                                 </span>
                                             </div>
@@ -728,6 +817,29 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 />
                             </div>
                         </div>
+
+                        {isNewMode && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="precio">Precio (ARS)</Label>
+                                <Input
+                                    id="precio"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={createForm.data.precio}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'precio',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="0.00"
+                                />
+                                <InputError
+                                    message={createForm.errors.precio}
+                                />
+                            </div>
+                        )}
 
                         <DialogFooter className="sm:justify-between">
                             <Button

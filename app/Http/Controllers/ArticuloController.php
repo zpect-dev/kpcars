@@ -47,6 +47,7 @@ class ArticuloController extends Controller
             'descripcion' => ['required', 'string', 'max:255'],
             'stock' => ['required', 'integer', 'min:0'],
             'min_stock' => ['required', 'integer', 'min:0'],
+            'precio' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $descripcion = trim($validated['descripcion']);
@@ -67,6 +68,7 @@ class ArticuloController extends Controller
                     'descripcion' => $descripcion,
                     'stock' => 0,
                     'min_stock' => $validated['min_stock'],
+                    'precio' => $validated['precio'] ?? 0,
                 ]);
                 $isNew = true;
             }
@@ -125,5 +127,21 @@ class ArticuloController extends Controller
         }
 
         return redirect()->back()->with('success', 'Movimiento registrado correctamente.');
+    }
+
+    /**
+     * Update the price for a given item.
+     */
+    public function updatePrecio(Request $request, Articulo $articulo): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403, 'Solo los administradores pueden modificar precios.');
+
+        $validated = $request->validate([
+            'precio' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $articulo->update(['precio' => $validated['precio']]);
+
+        return redirect()->back()->with('success', "Precio actualizado para \"{$articulo->descripcion}\".");
     }
 }

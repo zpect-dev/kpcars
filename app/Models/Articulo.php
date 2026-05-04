@@ -15,6 +15,7 @@ class Articulo extends Model
         'descripcion',
         'stock',
         'min_stock',
+        'precio',
     ];
 
     /**
@@ -27,6 +28,7 @@ class Articulo extends Model
         return [
             'stock' => 'integer',
             'min_stock' => 'integer',
+            'precio' => 'decimal:2',
         ];
     }
 

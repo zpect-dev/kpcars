@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Models\Cobro;
 use App\Models\Transaccion;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,9 @@ class AnnulTransactionAction
 
             // Mark the transaction as inactive
             $transaction->update(['inactiva' => true]);
+
+            // Remove associated cobro if exists
+            Cobro::where('transaccion_id', $transaction->id)->delete();
         });
     }
 }

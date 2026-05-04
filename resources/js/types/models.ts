@@ -38,6 +38,7 @@ export interface Articulo {
     descripcion: string;
     stock: number;
     min_stock: number;
+    precio: number;
     created_at?: string;
     updated_at?: string;
 }
@@ -80,4 +81,45 @@ export interface Revision {
     revisor?: { id: number; name: string } | null;
     created_at?: string;
     updated_at?: string;
+}
+
+// ─── Cobros Module ──────────────────────────────────────────────────────────────
+
+export interface CobroResumenInversion {
+    inversion_id: number;
+    empresa_id: number;
+    inversion_nombre: string;
+    empresa_nombre: string;
+    total: number;
+    transacciones_count: number;
+}
+
+export interface CierreDetalle {
+    inversion_nombre: string;
+    total: number;
+}
+
+export interface CierreHistorial {
+    id: number;
+    user: { id: number; name: string } | null;
+    total: number;
+    detalles: CierreDetalle[];
+    created_at: string;
+}
+
+export interface CobroDesglose {
+    vehiculo_id: number;
+    patente: string;
+    marca: string;
+    modelo: string;
+    subtotal: number;
+}
+
+export interface CobroTransaccion {
+    id: number;
+    patente: string;
+    articulo: string;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
 }

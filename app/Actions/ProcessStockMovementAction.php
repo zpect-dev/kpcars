@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Models\Articulo;
+use App\Models\Cobro;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
 use Exception;
@@ -26,7 +27,7 @@ class ProcessStockMovementAction
     public function execute(Articulo $articulo, string $type, int $quantity, ?string $licensePlate = null, ?string $solicitante = null, ?string $descripcion = null): void
     {
         DB::transaction(function () use ($articulo, $type, $quantity, $licensePlate, $solicitante, $descripcion) {
-            $vehiculoId = null;
+            $vehiculo = null;
 
             if ($type === 'OUT') {
                 if (empty($licensePlate)) {
@@ -42,7 +43,6 @@ class ProcessStockMovementAction
                 if (! $vehiculo) {
                     throw new Exception("El vehículo con patente {$licensePlate} no existe en la base de datos.");
                 }
-                $vehiculoId = $vehiculo->id;
             }
 
             // Append-only constraint dictates we register transaction concurrently with stock update
@@ -57,15 +57,24 @@ class ProcessStockMovementAction
             $articulo->save();
 
             // Insertar historial append-only
-            Transaccion::create([
+            $transaccion = Transaccion::create([
                 'articulo_id' => $articulo->id,
                 'user_id' => auth()->id(),
-                'vehiculo_id' => $vehiculoId,
+                'vehiculo_id' => $vehiculo?->id,
                 'solicitante' => $solicitante,
                 'tipo' => $type,
                 'cantidad' => $quantity,
                 'descripcion' => $descripcion,
             ]);
+
+            // Auto-generate cobro for OUT transactions to non-EXTERNO vehicles
+            if ($type === 'OUT' && $vehiculo && $licensePlate !== 'EXTERNO') {
+                Cobro::create([
+                    'inversion_id' => $vehiculo->inversion_id,
+                    'transaccion_id' => $transaccion->id,
+                    'empresa_id' => $vehiculo->empresa_id,
+                ]);
+            }
         });
     }
 }

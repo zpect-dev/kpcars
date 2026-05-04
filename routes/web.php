@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
+use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
@@ -62,6 +63,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
     Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
+
+    Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
+    Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
+    Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
+
+    Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
 });
 
 require __DIR__.'/settings.php';

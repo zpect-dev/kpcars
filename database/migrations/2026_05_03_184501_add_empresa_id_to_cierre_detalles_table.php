@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Add empresa_id to cierre_detalles for proper isolation of snapshots.
+     */
+    public function up(): void
+    {
+        Schema::table('cierre_detalles', function (Blueprint $table) {
+            $table->foreignId('empresa_id')->nullable()->after('inversion_id')->constrained()->nullOnDelete();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('cierre_detalles', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('empresa_id');
+        });
+    }
+};

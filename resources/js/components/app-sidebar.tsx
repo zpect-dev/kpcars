@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, CarFront, ClipboardCheck, Package, Users } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { index as articulosIndex } from '@/routes/articulos';
+import { index as cobrosIndex } from '@/routes/cobros';
 import type { NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [];
@@ -47,6 +48,14 @@ export function AppSidebar() {
                 title: 'Inventario',
                 href: articulosIndex.url(),
                 icon: Package,
+            });
+        }
+
+        if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
+            mainNavItems.push({
+                title: 'Cobros',
+                href: cobrosIndex.url(),
+                icon: Receipt,
             });
         }
 
