@@ -88,4 +88,42 @@ class PdfController extends Controller
 
         return $pdf->download('turnos-'.now()->format('Y-m-d').'.pdf');
     }
+
+    /**
+     * Generate PDF with pending cobros details grouped by inversion.
+     */
+    public function cobros(Request $request): Response
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isChofer(), 403);
+
+        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+
+        // Fetch all pending cobros with relations
+        $cobros = \App\Models\Cobro::query()
+            ->pendientes()
+            ->forEmpresa($empresaId)
+            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
+            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
+            ->join('inversiones', 'cobros.inversion_id', '=', 'inversiones.id')
+            ->select([
+                'inversiones.nombre as inversion_nombre',
+                'articulos.descripcion as articulo_descripcion',
+                'vehiculos.patente',
+                'transacciones.cantidad',
+                'articulos.precio',
+            ])
+            ->selectRaw('articulos.precio * transacciones.cantidad as subtotal')
+            ->orderBy('inversiones.nombre')
+            ->get();
+
+        // Group by inversion
+        $inversiones = $cobros->groupBy('inversion_nombre');
+
+        $pdf = Pdf::loadView('pdf.cobros', compact('inversiones'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('cobros-'.now()->format('Y-m-d').'.pdf');
+    }
 }

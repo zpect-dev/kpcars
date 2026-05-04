@@ -6,6 +6,7 @@ import {
     Lock,
     Receipt,
     User,
+    Download,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -106,16 +107,29 @@ export default function CobrosIndex({
                         )}
                     </div>
 
-                    {isAdmin && (
+                    <div className="flex items-center gap-2">
                         <Button
+                            variant="outline"
                             size="sm"
-                            onClick={() => setShowCierreModal(true)}
                             disabled={resumen.length === 0}
+                            onClick={() => {
+                                window.open('/pdf/cobros', '_blank');
+                            }}
                         >
-                            <Lock className="h-4 w-4" />
-                            Cierre de Caja
+                            <Download className="h-4 w-4 mr-1.5" />
+                            Exportar PDF
                         </Button>
-                    )}
+                        {isAdmin && (
+                            <Button
+                                size="sm"
+                                onClick={() => setShowCierreModal(true)}
+                                disabled={resumen.length === 0}
+                            >
+                                <Lock className="h-4 w-4 mr-1.5" />
+                                Cierre de Caja
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Total General Card */}
