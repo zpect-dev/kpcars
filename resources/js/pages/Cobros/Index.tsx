@@ -116,7 +116,7 @@ export default function CobrosIndex({
                                 window.open('/pdf/cobros', '_blank');
                             }}
                         >
-                            <Download className="h-4 w-4 mr-1.5" />
+                            <Download className="mr-1.5 h-4 w-4" />
                             Exportar PDF
                         </Button>
                         {isAdmin && (
@@ -125,7 +125,7 @@ export default function CobrosIndex({
                                 onClick={() => setShowCierreModal(true)}
                                 disabled={resumen.length === 0}
                             >
-                                <Lock className="h-4 w-4 mr-1.5" />
+                                <Lock className="mr-1.5 h-4 w-4" />
                                 Cierre de Caja
                             </Button>
                         )}
@@ -154,7 +154,7 @@ export default function CobrosIndex({
                     <div className="rounded-xl border border-border bg-card p-12 text-center shadow-sm">
                         <Receipt className="mx-auto h-10 w-10 text-muted-foreground/50" />
                         <p className="mt-3 text-sm text-muted-foreground">
-                            No hay cobros pendientes en el período actual.
+                            No hay cobros pendientes en la semana actual.
                         </p>
                     </div>
                 ) : (
