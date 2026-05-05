@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
     ArrowLeft,
@@ -6,6 +6,7 @@ import {
     Check,
     CheckCircle2,
     ClipboardCheck,
+    History,
     Search,
     UserCheck,
     X,
@@ -40,7 +41,6 @@ interface VehiculoRow {
 
 interface Props {
     vehiculos: VehiculoRow[];
-    semana_inicio: string;
 }
 
 const MESES = [
@@ -133,13 +133,15 @@ function ToggleSwitch({ checked, onChange, label, id }: { checked: boolean; onCh
     );
 }
 
-export default function Revisiones({ vehiculos, semana_inicio }: Props) {
+export default function Revisiones({ vehiculos }: Props) {
     const [wizardOpen, setWizardOpen] = useState(false);
     const [detailOpen, setDetailOpen] = useState(false);
     const [selectedRow, setSelectedRow] = useState<VehiculoRow | null>(null);
     const [step, setStep] = useState(0);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'revisado' | 'pendiente'>('all');
+    
+    const { auth } = usePage<any>().props;
 
     const form = useForm({
         fecha_vencimiento_vtv: '',
@@ -223,23 +225,45 @@ export default function Revisiones({ vehiculos, semana_inicio }: Props) {
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex flex-col gap-1">
                         <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                            Revisiones Semanales
+                            Revisiones Semanales (En curso)
                         </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Gestión de revisiones actuales
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                Semana del {new Date(semana_inicio + 'T00:00:00').toLocaleDateString('es-AR')}
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                                {revisadosCount} revisados
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                {pendientesCount} pendientes
                             </span>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                            {revisadosCount} revisados
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                            {pendientesCount} pendientes
-                        </span>
+                        {auth.user.role === 'administrador' && (
+                            <div className="flex items-center gap-2">
+                                <Button 
+                                    variant="outline"
+                                    asChild
+                                >
+                                    <Link href="/revisiones/historial">
+                                        <History className="mr-2 h-4 w-4" />
+                                        Ver Historial
+                                    </Link>
+                                </Button>
+                                <Button 
+                                    onClick={() => {
+                                        if(confirm('¿Estás seguro de cerrar el periodo de revisiones actual? Esto guardará el historial e iniciará un nuevo periodo en blanco.')) {
+                                            router.post(route('revisiones.cerrar'));
+                                        }
+                                    }}
+                                >
+                                    Cerrar Revisiones
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 </div>
 

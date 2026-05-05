@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'kit_seguridad',
     'sticker',
     'observaciones',
+    'cierre_revision_id',
 ])]
 class Revision extends Model
 {
@@ -53,5 +54,10 @@ class Revision extends Model
     public function revisor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'revisado_por');
+    }
+
+    public function cierre(): BelongsTo
+    {
+        return $this->belongsTo(CierreRevision::class, 'cierre_revision_id');
     }
 }

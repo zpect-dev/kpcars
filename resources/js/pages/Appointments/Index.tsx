@@ -2,6 +2,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Ban,
+    CalendarIcon,
     CalendarPlus,
     CheckCircle2,
     ChevronLeft,
@@ -43,7 +44,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { AppointmentCalendar } from './AppointmentCalendar';
 
 type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado' | 'cancelado';
 type AppointmentType = 'normal' | 'emergencia';
@@ -553,84 +556,16 @@ export default function AppointmentsIndex({
                                             />
                                         </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="preferred_date">
-                                                Fecha Solicitada
-                                            </Label>
-                                            <Input
-                                                id="preferred_date"
-                                                type="date"
-                                                min={today}
+                                        <div className="grid gap-2 col-span-full">
+                                            <AppointmentCalendar
                                                 value={form.data.preferred_date}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'preferred_date',
-                                                        e.target.value,
-                                                    )
-                                                }
+                                                onChange={(val) => form.setData('preferred_date', val)}
+                                                minDate={today}
+                                                dailySlots={dailySlots}
+                                                maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots} // Allow selection if emergency
+                                                viewMode="week"
                                             />
-                                            {/* Slot usage indicator */}
-                                            {selectedDateSlots && (
-                                                <div
-                                                    className={cn(
-                                                        'flex items-center gap-1.5 text-xs',
-                                                        selectedDateSlots.full
-                                                            ? 'text-red-600'
-                                                            : selectedDateSlots.used >=
-                                                                maxSlots - 1
-                                                              ? 'text-amber-600'
-                                                              : 'text-muted-foreground',
-                                                    )}
-                                                >
-                                                    <span
-                                                        className={cn(
-                                                            'inline-block h-2 w-2 rounded-full',
-                                                            selectedDateSlots.full
-                                                                ? 'bg-red-500'
-                                                                : selectedDateSlots.used >=
-                                                                    maxSlots - 1
-                                                                  ? 'bg-amber-500'
-                                                                  : 'bg-green-500',
-                                                        )}
-                                                    />
-                                                    {selectedDateSlots.full ? (
-                                                        form.data.type ===
-                                                        'emergencia' ? (
-                                                            <span>
-                                                                Cupos normales
-                                                                agotados —
-                                                                emergencia
-                                                                disponible
-                                                            </span>
-                                                        ) : (
-                                                            <span>
-                                                                Sin cupos
-                                                                normales
-                                                                disponibles —
-                                                                active
-                                                                emergencia
-                                                            </span>
-                                                        )
-                                                    ) : (
-                                                        <span>
-                                                            {
-                                                                selectedDateSlots.used
-                                                            }
-                                                            /
-                                                            {
-                                                                selectedDateSlots.max
-                                                            }{' '}
-                                                            cupos normales
-                                                            usados
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                            <InputError
-                                                message={
-                                                    form.errors.preferred_date
-                                                }
-                                            />
+                                            <InputError message={form.errors.preferred_date} />
                                         </div>
 
                                         <DialogFooter>
@@ -652,24 +587,98 @@ export default function AppointmentsIndex({
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
+                        {/* Funcionalidad Desde/Hasta guardada por si se necesita a futuro:
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="from">Desde</Label>
-                            <Input
-                                id="from"
-                                type="date"
-                                value={from}
-                                onChange={(e) => setFrom(e.target.value)}
-                            />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        id="from"
+                                        variant="outline"
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !from && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {from ? formatDate(from) : <span>Seleccionar fecha</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <AppointmentCalendar
+                                        value={from}
+                                        onChange={(v) => setFrom(v)}
+                                        title={null}
+                                        className="border-0 bg-popover"
+                                    />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="to">Hasta</Label>
-                            <Input
-                                id="to"
-                                type="date"
-                                value={to}
-                                onChange={(e) => setTo(e.target.value)}
-                            />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        id="to"
+                                        variant="outline"
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !to && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {to ? formatDate(to) : <span>Seleccionar fecha</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <AppointmentCalendar
+                                        value={to}
+                                        onChange={(v) => setTo(v)}
+                                        title={null}
+                                        className="border-0 bg-popover"
+                                    />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        */}
+
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="date">Rango de Fechas</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button
+                                        id="date"
+                                        variant="outline"
+                                        className={cn(
+                                            "w-full justify-start text-left font-normal",
+                                            !from && !to && "text-muted-foreground"
+                                        )}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {from && to 
+                                            ? from === to 
+                                                ? formatDate(from) 
+                                                : `${formatDate(from)} - ${formatDate(to)}`
+                                            : <span>Seleccionar rango</span>}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                    <AppointmentCalendar
+                                        mode="range"
+                                        rangeValue={{ from, to }}
+                                        onRangeChange={(range) => {
+                                            setFrom(range.from);
+                                            setTo(range.to);
+                                        }}
+                                        title={null}
+                                        className="border-0 bg-popover"
+                                        dailySlots={dailySlots}
+                                        maxSlots={maxSlots}
+                                        isFilterMode={true}
+                                    />
+                                </PopoverContent>
+                            </Popover>
                         </div>
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="status">Estado</Label>
@@ -712,7 +721,7 @@ export default function AppointmentsIndex({
                             />
                         </div>
 
-                        <div className="col-span-full flex items-end sm:col-span-2 lg:col-span-1">
+                        <div className="col-span-full flex items-end sm:col-span-1 lg:col-span-1">
                             <button
                                 type="button"
                                 onClick={clearFilters}

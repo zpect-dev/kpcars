@@ -22,18 +22,16 @@ class RevisionController extends Controller
     {
         abort_if($request->user()->isInversor(), 403);
 
-        $weekStart = self::currentWeekStart();
-
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
             ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
             ->whereNotNull('user_id')
             ->orderBy('patente')
             ->get()
-            ->map(function (Vehiculo $vehiculo) use ($weekStart): array {
+            ->map(function (Vehiculo $vehiculo): array {
                 $revision = Revision::with('revisor:id,name')
                     ->where('vehiculo_id', $vehiculo->id)
-                    ->where('created_at', '>=', $weekStart)
+                    ->whereNull('cierre_revision_id')
                     ->latest()
                     ->first();
 
@@ -50,7 +48,6 @@ class RevisionController extends Controller
 
         return Inertia::render('Revisiones/Index', [
             'vehiculos' => $vehiculos,
-            'semana_inicio' => $weekStart->toDateString(),
         ]);
     }
 
@@ -88,22 +85,40 @@ class RevisionController extends Controller
 
         return redirect()->back()->with('success', "Revisión registrada para {$vehiculo->patente}.");
     }
-
-    /**
-     * Calculate the start of the current "week" (Tuesday).
-     *
-     * The inspection week runs Tuesday → Monday.
-     * If today is Tuesday or later, the week started this Tuesday.
-     * If today is Monday, the week started last Tuesday.
-     */
-    public static function currentWeekStart(): Carbon
+    public function cerrar(Request $request, \App\Actions\CerrarRevisionesAction $action): RedirectResponse
     {
-        $today = Carbon::today();
+        abort_if(!$request->user()->isAdmin(), 403, 'Solo administradores pueden cerrar revisiones.');
 
-        // dayOfWeek: Sunday=0, Monday=1, Tuesday=2, Wednesday=3, ...
-        // Days since last Tuesday (0 if today is Tuesday)
-        $daysSinceTuesday = ($today->dayOfWeek - Carbon::TUESDAY + 7) % 7;
+        $action->execute($request->user());
 
-        return $today->copy()->subDays($daysSinceTuesday)->startOfDay();
+        return redirect()->back()->with('success', 'Revisiones cerradas exitosamente.');
+    }
+
+    public function historial(Request $request): Response
+    {
+        abort_if($request->user()->isInversor(), 403);
+
+        $cierres = \App\Models\CierreRevision::with('user:id,name')
+            ->latest('periodo_fin')
+            ->paginate(15);
+
+        return Inertia::render('Revisiones/Historial', [
+            'cierres' => $cierres,
+        ]);
+    }
+
+    public function historialShow(Request $request, \App\Models\CierreRevision $cierre): Response
+    {
+        abort_if($request->user()->isInversor(), 403);
+
+        $cierre->load([
+            'user:id,name',
+            'detalles.vehiculo:id,patente,marca,modelo',
+            'detalles.revision.revisor:id,name',
+        ]);
+
+        return Inertia::render('Revisiones/HistorialDetalle', [
+            'cierre' => $cierre,
+        ]);
     }
 }

@@ -63,6 +63,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 
     Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
+    Route::post('revisiones/cierre', [RevisionController::class, 'cerrar'])->name('revisiones.cerrar');
+    Route::get('revisiones/historial', [RevisionController::class, 'historial'])->name('revisiones.historial');
+    Route::get('revisiones/historial/{cierre}', [RevisionController::class, 'historialShow'])->name('revisiones.historial.show');
     Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
 
     Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
