@@ -1,7 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle2, AlertCircle, UserCheck } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
@@ -27,10 +25,15 @@ interface Props {
     cierre: Cierre;
 }
 
-export default function HistorialDetalle({ cierre }: Props) {
-    const inicio = new Date(cierre.periodo_inicio + 'T00:00:00');
-    const fin = new Date(cierre.periodo_fin + 'T00:00:00');
+function formatDateRange(inicioStr: string, finStr: string) {
+    const inicio = new Date(inicioStr + 'T00:00:00');
+    const fin = new Date(finStr + 'T00:00:00');
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     
+    return `${inicio.getDate()} de ${meses[inicio.getMonth()]} - ${fin.getDate()} de ${meses[fin.getMonth()]}, ${fin.getFullYear()}`;
+}
+
+export default function HistorialDetalle({ cierre }: Props) {
     const revisadosCount = cierre.detalles.filter(d => d.estado === 'revisado').length;
     const noRevisadosCount = cierre.detalles.length - revisadosCount;
 
@@ -51,7 +54,7 @@ export default function HistorialDetalle({ cierre }: Props) {
                                 Cierre de Revisiones #{cierre.id}
                             </h1>
                             <p className="text-sm text-muted-foreground capitalize">
-                                {format(inicio, "dd 'de' MMMM", { locale: es })} - {format(fin, "dd 'de' MMMM, yyyy", { locale: es })}
+                                {formatDateRange(cierre.periodo_inicio, cierre.periodo_fin)}
                             </p>
                         </div>
                     </div>

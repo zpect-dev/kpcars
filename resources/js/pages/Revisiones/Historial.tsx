@@ -1,7 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
 import { ChevronRight, CalendarClock } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 interface Cierre {
     id: number;
@@ -16,6 +14,14 @@ interface Props {
         data: Cierre[];
         links: any[];
     };
+}
+
+function formatDateRange(inicioStr: string, finStr: string) {
+    const inicio = new Date(inicioStr + 'T00:00:00');
+    const fin = new Date(finStr + 'T00:00:00');
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    
+    return `Del ${inicio.getDate()} de ${meses[inicio.getMonth()]} al ${fin.getDate()} de ${meses[fin.getMonth()]}, ${fin.getFullYear()}`;
 }
 
 export default function Historial({ cierres }: Props) {
@@ -42,9 +48,6 @@ export default function Historial({ cierres }: Props) {
                     ) : (
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {cierres.data.map((cierre) => {
-                                const inicio = new Date(cierre.periodo_inicio + 'T00:00:00');
-                                const fin = new Date(cierre.periodo_fin + 'T00:00:00');
-                                
                                 return (
                                     <Link
                                         key={cierre.id}
@@ -59,7 +62,7 @@ export default function Historial({ cierres }: Props) {
                                         </div>
                                         <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                                             <span>
-                                                Del {format(inicio, "dd 'de' MMM", { locale: es })} al {format(fin, "dd 'de' MMM, yyyy", { locale: es })}
+                                                {formatDateRange(cierre.periodo_inicio, cierre.periodo_fin)}
                                             </span>
                                             <span className="text-xs">
                                                 Cerrado por: <span className="font-medium text-foreground">{cierre.user?.name}</span>
