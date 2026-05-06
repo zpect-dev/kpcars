@@ -46,6 +46,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     const { auth } = usePage<any>().props;
     const isMechanic = auth.user.role === 'mecanico';
     const isAdmin = auth.user.role === 'administrador';
+    const isInversor = auth.user.role === 'inversor';
+    const canWrite = !isMechanic && !isInversor;
 
     // ─── Edición inline de precio ────────────────────────────────────────────
     const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
@@ -302,10 +304,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <History className="h-4 w-4" />
                                 <span className="hidden sm:inline">Historial</span>
                             </Button>
-                            <Button size="sm" onClick={openCreateModal}>
-                                <ArrowDownCircle className="h-4 w-4" />
-                                <span className="hidden sm:inline">Ingreso</span>
-                            </Button>
+                            {canWrite && (
+                                <Button size="sm" onClick={openCreateModal}>
+                                    <ArrowDownCircle className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Ingreso</span>
+                                </Button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -341,7 +345,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     >
                                         Precio
                                     </th>
-                                    {!isMechanic && (
+                                    {canWrite && (
                                         <th
                                             scope="col"
                                             className="w-[18%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
@@ -438,7 +442,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         </button>
                                                     )}
                                                 </td>
-                                                {!isMechanic && (
+                                                {canWrite && (
                                                     <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
                                                         <Button
                                                             variant="outline"
@@ -518,7 +522,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 </span>
                                             </div>
                                         </div>
-                                        {!isMechanic && (
+                                        {canWrite && (
                                             <Button
                                                 variant="outline"
                                                 size="sm"

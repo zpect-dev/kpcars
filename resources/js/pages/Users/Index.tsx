@@ -272,6 +272,7 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
     }
 
     const { auth } = usePage<any>().props;
+    const isInversor = auth.user.role === 'inversor';
     const urlParams = new URLSearchParams(window.location.search);
     const filterRole = urlParams.get('role');
     const filterStatus = urlParams.get('status');
@@ -380,16 +381,18 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                     </div>
 
                     {/* Botón Acción */}
-                    <div className="flex w-full sm:w-auto">
-                        <Button
-                            className="w-full sm:w-auto"
-                            size="default"
-                            onClick={openCreateModal}
-                        >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Nuevo Usuario
-                        </Button>
-                    </div>
+                    {!isInversor && (
+                        <div className="flex w-full sm:w-auto">
+                            <Button
+                                className="w-full sm:w-auto"
+                                size="default"
+                                onClick={openCreateModal}
+                            >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Nuevo Usuario
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 <div className="w-full self-start overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -456,8 +459,11 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                     filteredUsers.map((user) => (
                                         <tr
                                             key={user.id}
-                                            onClick={() => openEditModal(user)}
-                                            className="cursor-pointer bg-card transition-colors hover:bg-muted/40"
+                                            onClick={() => !isInversor && openEditModal(user)}
+                                            className={cn(
+                                                'bg-card transition-colors',
+                                                !isInversor && 'cursor-pointer hover:bg-muted/40',
+                                            )}
                                         >
                                             <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex items-center gap-3">
@@ -549,14 +555,15 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        if (isInversor) return;
                                                         confirmToggleStatus(
                                                             user,
                                                         );
                                                     }}
                                                     disabled={
-                                                        user.id === auth.user.id
+                                                        user.id === auth.user.id || isInversor
                                                     }
-                                                    className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} ${user.id === auth.user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                                    className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                                                 >
                                                     {user.inactivo
                                                         ? 'Inactivo'
@@ -584,6 +591,10 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                                         )?.label ||
                                                             user.role}{' '}
                                                         (Tú)
+                                                    </span>
+                                                ) : isInversor ? (
+                                                    <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                        {roles.find((r) => r.value === user.role)?.label || user.role}
                                                     </span>
                                                 ) : (
                                                     <select
@@ -630,10 +641,11 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                             filteredUsers.map((user) => (
                                 <li
                                     key={user.id}
-                                    role="button"
-                                    tabIndex={0}
-                                    onClick={() => openEditModal(user)}
+                                    role={isInversor ? undefined : 'button'}
+                                    tabIndex={isInversor ? -1 : 0}
+                                    onClick={() => !isInversor && openEditModal(user)}
                                     onKeyDown={(e) => {
+                                        if (isInversor) return;
                                         if (
                                             e.key === 'Enter' ||
                                             e.key === ' '
@@ -642,7 +654,10 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                             openEditModal(user);
                                         }
                                     }}
-                                    className="flex cursor-pointer flex-col gap-3 p-4 transition-colors hover:bg-muted/40 focus:bg-muted/40 focus:outline-none"
+                                    className={cn(
+                                        'flex flex-col gap-3 p-4 transition-colors focus:outline-none',
+                                        !isInversor && 'cursor-pointer hover:bg-muted/40 focus:bg-muted/40',
+                                    )}
                                 >
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="flex min-w-0 items-center gap-3">
@@ -682,10 +697,11 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
+                                                if (isInversor) return;
                                                 confirmToggleStatus(user);
                                             }}
-                                            disabled={user.id === auth.user.id}
-                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} ${user.id === auth.user.id ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                            disabled={user.id === auth.user.id || isInversor}
+                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                                         >
                                             {user.inactivo
                                                 ? 'Inactivo'

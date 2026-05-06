@@ -22,8 +22,6 @@ class ArticuloController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-
         $articulos = Articulo::orderBy('descripcion')->get();
         $vehiculos = Vehiculo::visibleTo($request->user())
             ->orderBy('patente')

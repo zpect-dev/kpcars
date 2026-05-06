@@ -70,7 +70,7 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        Gate::authorize('manage-users');
+        abort_unless($request->user()->isAdmin() || $request->user()->isInversor(), 403);
 
         $users = User::orderBy('name')
             ->when($request->query('role'), function ($query, $role) {

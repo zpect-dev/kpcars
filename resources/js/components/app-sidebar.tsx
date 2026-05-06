@@ -43,13 +43,11 @@ export function AppSidebar() {
             icon: CarFront,
         });
 
-        if (auth.user.role !== 'inversor') {
-            mainNavItems.push({
-                title: 'Inventario',
-                href: articulosIndex.url(),
-                icon: Package,
-            });
-        }
+        mainNavItems.push({
+            title: 'Inventario',
+            href: articulosIndex.url(),
+            icon: Package,
+        });
 
         if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
             mainNavItems.push({
@@ -65,13 +63,11 @@ export function AppSidebar() {
             icon: CalendarClock,
         });
 
-        if (auth.user.role !== 'inversor') {
-            mainNavItems.push({
-                title: 'Revisiones',
-                href: '/revisiones',
-                icon: ClipboardCheck,
-            });
-        }
+        mainNavItems.push({
+            title: 'Revisiones',
+            href: '/revisiones',
+            icon: ClipboardCheck,
+        });
     } else {
         // Mechanic gets Turnos first, then Inventario
         mainNavItems.push(
@@ -88,7 +84,7 @@ export function AppSidebar() {
         );
     }
 
-    if (auth.user.role === 'administrador') {
+    if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
         mainNavItems.push({
             title: 'Usuarios',
             href: '/users',

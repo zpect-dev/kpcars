@@ -20,8 +20,6 @@ class RevisionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
             ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
@@ -96,8 +94,6 @@ class RevisionController extends Controller
 
     public function historial(Request $request): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-
         $cierres = \App\Models\CierreRevision::with('user:id,name')
             ->latest('periodo_fin')
             ->paginate(15);
@@ -109,8 +105,6 @@ class RevisionController extends Controller
 
     public function historialShow(Request $request, \App\Models\CierreRevision $cierre): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-
         $cierre->load([
             'user:id,name',
             'detalles.vehiculo:id,patente,marca,modelo',

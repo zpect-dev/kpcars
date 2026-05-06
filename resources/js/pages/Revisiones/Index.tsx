@@ -142,6 +142,7 @@ export default function Revisiones({ vehiculos }: Props) {
     const [filterStatus, setFilterStatus] = useState<'all' | 'revisado' | 'pendiente'>('all');
     
     const { auth } = usePage<any>().props;
+    const isInversor = auth.user.role === 'inversor';
 
     const form = useForm({
         fecha_vencimiento_vtv: '',
@@ -242,9 +243,9 @@ export default function Revisiones({ vehiculos }: Props) {
                                 {pendientesCount} pendientes
                             </span>
                         </div>
-                        {auth.user.role === 'administrador' && (
+                        {(auth.user.role === 'administrador' || isInversor) && (
                             <div className="flex items-center gap-2">
-                                <Button 
+                                <Button
                                     variant="outline"
                                     asChild
                                 >
@@ -253,15 +254,17 @@ export default function Revisiones({ vehiculos }: Props) {
                                         Ver Historial
                                     </Link>
                                 </Button>
-                                <Button 
-                                    onClick={() => {
-                                        if(confirm('¿Estás seguro de cerrar el periodo de revisiones actual? Esto guardará el historial e iniciará un nuevo periodo en blanco.')) {
-                                            router.post(route('revisiones.cerrar'));
-                                        }
-                                    }}
-                                >
-                                    Cerrar Revisiones
-                                </Button>
+                                {auth.user.role === 'administrador' && (
+                                    <Button
+                                        onClick={() => {
+                                            if(confirm('¿Estás seguro de cerrar el periodo de revisiones actual? Esto guardará el historial e iniciará un nuevo periodo en blanco.')) {
+                                                router.post(route('revisiones.cerrar'));
+                                            }
+                                        }}
+                                    >
+                                        Cerrar Revisiones
+                                    </Button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -347,13 +350,13 @@ export default function Revisiones({ vehiculos }: Props) {
                         {filtered.map((row) => (
                             <div
                                 key={row.vehiculo.id}
-                                onClick={() => row.revision_semanal ? openDetail(row) : openWizard(row)}
+                                onClick={() => row.revision_semanal ? openDetail(row) : (isInversor ? null : openWizard(row))}
                                 role="button"
                                 tabIndex={0}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                         e.preventDefault();
-                                        row.revision_semanal ? openDetail(row) : openWizard(row);
+                                        row.revision_semanal ? openDetail(row) : (isInversor ? null : openWizard(row));
                                     }
                                 }}
                                 className={cn(
@@ -407,7 +410,7 @@ export default function Revisiones({ vehiculos }: Props) {
                                     </div>
                                 ) : (
                                     <div className="text-xs text-muted-foreground mt-2">
-                                        Haga clic para iniciar la revisión
+                                        {isInversor ? 'Sin revisión registrada' : 'Haga clic para iniciar la revisión'}
                                     </div>
                                 )}
                             </div>

@@ -20,7 +20,6 @@ class TransactionController extends Controller
     public function index(Request $request): Response
     {
         abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
 
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
 
