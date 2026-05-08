@@ -176,12 +176,13 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width:6%; text-align:center">#</th>
-                    <th style="width:10%">Fecha</th>
-                    <th style="width:14%">Patente</th>
-                    <th style="width:40%">Servicio</th>
-                    <th style="width:20%">Solicitante</th>
-                    <th style="width:10%; text-align:center">Tipo</th>
+                    <th style="width:5%; text-align:center">#</th>
+                    <th style="width:9%">Fecha</th>
+                    <th style="width:11%">Patente</th>
+                    <th style="width:25%">Servicio</th>
+                    <th style="width:15%">Solicitante</th>
+                    <th style="width:8%; text-align:center">Tipo</th>
+                    <th style="width:27%">Descripción</th>
                 </tr>
             </thead>
             <tbody>
@@ -205,10 +206,13 @@
                         <span class="tipo-normal">Normal</span>
                         @endif
                     </td>
+                    <td style="color:#374151">
+                        {{ $appt->completion_description ?? '-' }}
+                    </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" style="text-align:center; padding:24px; color:#9ca3af">
+                    <td colspan="7" style="text-align:center; padding:24px; color:#9ca3af">
                         No hay turnos para los filtros seleccionados.
                     </td>
                 </tr>

@@ -66,6 +66,7 @@ interface AppointmentRow {
         name: string;
     } | null;
     completed_at?: string | null;
+    completion_description?: string | null;
 }
 
 interface PaginationInfo {
@@ -157,6 +158,7 @@ export default function AppointmentsIndex({
         null,
     );
     const [selectedMecanicoId, setSelectedMecanicoId] = useState<string>('');
+    const [completionDescription, setCompletionDescription] = useState<string>('');
 
     const mecanicoOptions: ComboboxOption[] = useMemo(
         () =>
@@ -291,6 +293,7 @@ export default function AppointmentsIndex({
     function changeStatus(id: number, next: AppointmentStatus) {
         if (next === 'completado') {
             setSelectedMecanicoId('');
+            setCompletionDescription('');
             // Un pequeño delay evita el parpadeo visual entre el cierre del dropdown
             // y la apertura del modal controlado por estado.
             setTimeout(() => {
@@ -310,11 +313,13 @@ export default function AppointmentsIndex({
 
     function submitComplete() {
         if (!completeDialog || !selectedMecanicoId) return;
+        if (completionDescription.trim() === '') return;
         router.patch(
             `/appointments/${completeDialog.id}/status`,
             {
                 status: 'completado',
                 completed_by_id: Number(selectedMecanicoId),
+                completion_description: completionDescription.trim(),
             },
             {
                 preserveScroll: true,
@@ -322,6 +327,7 @@ export default function AppointmentsIndex({
                 onSuccess: () => {
                     setCompleteDialog(null);
                     setSelectedMecanicoId('');
+                    setCompletionDescription('');
                 },
             },
         );
@@ -750,25 +756,25 @@ export default function AppointmentsIndex({
                         <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs uppercase">
                                 <tr>
-                                    <th className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[6%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         # Turno
                                     </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Fecha
                                     </th>
-                                    <th className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Servicio
                                     </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Patente
                                     </th>
-                                    <th className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Solicitante
                                     </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Tipo
                                     </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Estado
                                     </th>
                                     <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -777,7 +783,10 @@ export default function AppointmentsIndex({
                                     <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Fecha completado
                                     </th>
-                                    <th className="w-[8%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Descripción
+                                    </th>
+                                    <th className="w-[5%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
                                 </tr>
@@ -786,7 +795,7 @@ export default function AppointmentsIndex({
                                 {appointments.data.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={10}
+                                            colSpan={11}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay turnos que coincidan con los
@@ -885,6 +894,27 @@ export default function AppointmentsIndex({
                                                             {formatDateTime(
                                                                 a.completed_at,
                                                             )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/40 italic">
+                                                            -
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td
+                                                    className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4"
+                                                    title={
+                                                        a.completion_description ||
+                                                        ''
+                                                    }
+                                                >
+                                                    {a.status ===
+                                                        'completado' &&
+                                                    a.completion_description ? (
+                                                        <span className="text-muted-foreground">
+                                                            {
+                                                                a.completion_description
+                                                            }
                                                         </span>
                                                     ) : (
                                                         <span className="text-muted-foreground/40 italic">
@@ -1160,6 +1190,15 @@ export default function AppointmentsIndex({
                                                 )}
                                             </div>
                                         )}
+                                    {a.status === 'completado' &&
+                                        a.completion_description && (
+                                            <div className="text-xs text-muted-foreground">
+                                                <span className="font-medium text-foreground">
+                                                    Descripción:
+                                                </span>{' '}
+                                                {a.completion_description}
+                                            </div>
+                                        )}
                                 </li>
                             ))
                         )}
@@ -1221,6 +1260,7 @@ export default function AppointmentsIndex({
                     if (!o) {
                         setCompleteDialog(null);
                         setSelectedMecanicoId('');
+                        setCompletionDescription('');
                     }
                 }}
             >
@@ -1228,51 +1268,73 @@ export default function AppointmentsIndex({
                     <DialogHeader>
                         <DialogTitle>Marcar turno como completado</DialogTitle>
                         <DialogDescription>
-                            Selecciona el mecánico que completó este turno.
+                            Selecciona el mecánico e ingresa una descripción del trabajo realizado.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-2 py-2">
-                        <Label>Mecánico</Label>
-                        {mecanicosVisibles.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                No hay mecánicos disponibles.
-                            </p>
-                        ) : (
-                            <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border">
-                                {mecanicosVisibles.map((m) => {
-                                    const isSelected =
-                                        selectedMecanicoId === String(m.id);
-                                    return (
-                                        <button
-                                            key={m.id}
-                                            type="button"
-                                            onClick={() =>
-                                                setSelectedMecanicoId(
-                                                    String(m.id),
-                                                )
-                                            }
-                                            className={cn(
-                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
-                                                isSelected
-                                                    ? 'bg-primary/10 font-medium text-foreground'
-                                                    : 'text-muted-foreground hover:bg-muted/60',
-                                            )}
-                                        >
-                                            <span>{m.name}</span>
-                                            {isSelected && (
-                                                <CheckCircle2 className="h-4 w-4 text-primary" />
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
+                    <div className="grid gap-3 py-2">
+                        <div className="grid gap-2">
+                            <Label>Mecánico</Label>
+                            {mecanicosVisibles.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No hay mecánicos disponibles.
+                                </p>
+                            ) : (
+                                <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                                    {mecanicosVisibles.map((m) => {
+                                        const isSelected =
+                                            selectedMecanicoId === String(m.id);
+                                        return (
+                                            <button
+                                                key={m.id}
+                                                type="button"
+                                                onClick={() =>
+                                                    setSelectedMecanicoId(
+                                                        String(m.id),
+                                                    )
+                                                }
+                                                className={cn(
+                                                    'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
+                                                    isSelected
+                                                        ? 'bg-primary/10 font-medium text-foreground'
+                                                        : 'text-muted-foreground hover:bg-muted/60',
+                                                )}
+                                            >
+                                                <span>{m.name}</span>
+                                                {isSelected && (
+                                                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label htmlFor="completion_description">
+                                Descripción del trabajo realizado
+                            </Label>
+                            <textarea
+                                id="completion_description"
+                                rows={4}
+                                placeholder="Describí el trabajo realizado..."
+                                value={completionDescription}
+                                onChange={(e) =>
+                                    setCompletionDescription(e.target.value)
+                                }
+                                maxLength={2000}
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            />
+                        </div>
                     </div>
                     <DialogFooter>
                         <Button
                             type="button"
                             onClick={submitComplete}
-                            disabled={!selectedMecanicoId}
+                            disabled={
+                                !selectedMecanicoId ||
+                                completionDescription.trim() === ''
+                            }
                         >
                             Confirmar
                         </Button>

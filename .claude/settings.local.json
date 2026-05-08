@@ -1,16 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx vite:*)",
-      "Bash(xargs -0 grep -l \"className\")",
-      "Bash(composer show:*)",
-      "Bash(composer require:*)",
-      "Bash(php artisan:*)",
-      "Bash(php -r \"echo '2026-04-13: '.date\\('l', strtotime\\('2026-04-13'\\)\\).PHP_EOL; echo '2026-04-14: '.date\\('l', strtotime\\('2026-04-14'\\)\\).PHP_EOL; echo '2026-04-18: '.date\\('l', strtotime\\('2026-04-18'\\)\\).PHP_EOL; echo '2026-04-19: '.date\\('l', strtotime\\('2026-04-19'\\)\\).PHP_EOL; echo '2026-04-20: '.date\\('l', strtotime\\('2026-04-20'\\)\\).PHP_EOL;\")",
-      "Bash(npm run *)",
-      "Bash(npx tsc *)",
-      "Bash(php -l app/Http/Controllers/VehiculoController.php)",
-      "Bash(php -l app/Models/Vehiculo.php)"
+      "Bash(php artisan *)",
+      "Bash(git stash *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

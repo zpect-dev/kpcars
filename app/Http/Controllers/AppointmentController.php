@@ -132,6 +132,7 @@ class AppointmentController extends Controller
         $validated = $request->validate([
             'status' => ['required', 'in:agendado,en_proceso,completado,cancelado'],
             'completed_by_id' => ['nullable', 'integer', 'exists:users,id'],
+            'completion_description' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $newStatus = $validated['status'];
@@ -153,6 +154,9 @@ class AppointmentController extends Controller
             if (! $mecanico || $mecanico->role !== UserRole::MECANICO) {
                 return redirect()->back()->with('error', 'El usuario seleccionado no es un mecánico válido.');
             }
+            if (empty(trim($validated['completion_description'] ?? ''))) {
+                return redirect()->back()->with('error', 'Debes ingresar una descripción del trabajo realizado.');
+            }
         }
 
         if ($oldStatus === $newStatus && $newStatus !== 'completado') {
@@ -166,9 +170,11 @@ class AppointmentController extends Controller
                 if ($newStatus === 'completado') {
                     $payload['completed_by'] = (int) $validated['completed_by_id'];
                     $payload['completed_at'] = now();
+                    $payload['completion_description'] = trim($validated['completion_description']);
                 } else {
                     $payload['completed_by'] = null;
                     $payload['completed_at'] = null;
+                    $payload['completion_description'] = null;
                 }
 
                 $appointment->update($payload);
