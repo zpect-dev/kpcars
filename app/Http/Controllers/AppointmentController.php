@@ -39,7 +39,7 @@ class AppointmentController extends Controller
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
-            ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
+            ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.addcslashes($filters['plate'], '%_\\').'%'))
             ->orderBy('scheduled_date')
             ->orderBy('id')
             ->paginate(30)

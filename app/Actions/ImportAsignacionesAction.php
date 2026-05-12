@@ -13,12 +13,13 @@ use Spatie\SimpleExcel\SimpleExcelReader;
 
 class ImportAsignacionesAction
 {
-    public function execute(string $filePath, string $extension = ''): void
+    public function execute(string $filePath, string $extension = '', ?int $asignadoPorId = null): void
     {
         $rows = SimpleExcelReader::create($filePath, $extension)->getRows();
+        $asignadoPorId = $asignadoPorId ?? auth()->id();
 
-        DB::transaction(function () use ($rows) {
-            $rows->each(function (array $rawRow) {
+        DB::transaction(function () use ($rows, $asignadoPorId) {
+            $rows->each(function (array $rawRow) use ($asignadoPorId) {
                 // Ensure keys are lowercase and trimmed to handle case-insensitivity and accidental spaces
                 $row = collect($rawRow)->mapWithKeys(function ($value, $key) {
                     return [trim(strtolower((string) $key)) => $value];
@@ -34,8 +35,14 @@ class ImportAsignacionesAction
                     return; // Skip if no patente or chofer
                 }
 
-                $vehiculo = Vehiculo::where('patente', trim((string) $patente))->first();
-                $conductor = User::where('name', 'LIKE', '%'.trim((string) $chofer).'%')->first();
+                $patente = strtoupper(trim((string) $patente));
+                $chofer = trim((string) $chofer);
+
+                $vehiculo = Vehiculo::where('patente', $patente)->first();
+
+                // Prefer exact name match; fallback to LIKE only if no exact match found
+                $conductor = User::where('name', $chofer)->first()
+                    ?? User::where('name', 'LIKE', '%'.$chofer.'%')->first();
 
                 if (! $vehiculo) {
                     \Illuminate\Support\Facades\Log::warning("Vehículo not found for patente: {$patente}");
@@ -52,7 +59,7 @@ class ImportAsignacionesAction
                     Asignacion::create([
                         'vehiculo_id' => $vehiculo->id,
                         'conductor_id' => $conductor->id,
-                        'asignado_por' => 2,
+                        'asignado_por' => $asignadoPorId,
                         'fecha_inicio' => $fechaInicio,
                         'fecha_fin' => $fechaFin,
                     ]);

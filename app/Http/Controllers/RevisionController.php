@@ -25,24 +25,35 @@ class RevisionController extends Controller
             ->where('patente', '!=', 'EXTERNO')
             ->whereNotNull('user_id')
             ->orderBy('patente')
+            ->get();
+
+        $vehiculoIds = $vehiculos->pluck('id');
+
+        // Single query: open weekly revision per vehicle (still pending close)
+        $revisionesAbiertas = Revision::with('revisor:id,name')
+            ->whereIn('vehiculo_id', $vehiculoIds)
+            ->whereNull('cierre_revision_id')
+            ->orderByDesc('created_at')
             ->get()
-            ->map(function (Vehiculo $vehiculo): array {
-                $revision = Revision::with('revisor:id,name')
-                    ->where('vehiculo_id', $vehiculo->id)
-                    ->whereNull('cierre_revision_id')
-                    ->latest()
-                    ->first();
+            ->groupBy('vehiculo_id');
 
-                $lastRevision = $revision ?? Revision::where('vehiculo_id', $vehiculo->id)
-                    ->latest()
-                    ->first();
+        // Single query: most recent revision (any state) per vehicle, only kilometraje needed
+        $ultimosKm = Revision::select('vehiculo_id', 'kilometraje', 'created_at')
+            ->whereIn('vehiculo_id', $vehiculoIds)
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('vehiculo_id');
 
-                return [
-                    'vehiculo' => $vehiculo,
-                    'revision_semanal' => $revision,
-                    'ultimo_kilometraje' => $lastRevision?->kilometraje,
-                ];
-            });
+        $vehiculos = $vehiculos->map(function (Vehiculo $vehiculo) use ($revisionesAbiertas, $ultimosKm): array {
+            $revision = $revisionesAbiertas->get($vehiculo->id)?->first();
+            $ultimoKm = $revision?->kilometraje ?? $ultimosKm->get($vehiculo->id)?->first()?->kilometraje;
+
+            return [
+                'vehiculo' => $vehiculo,
+                'revision_semanal' => $revision,
+                'ultimo_kilometraje' => $ultimoKm,
+            ];
+        });
 
         return Inertia::render('Revisiones/Index', [
             'vehiculos' => $vehiculos,

@@ -78,9 +78,10 @@ class Transaccion extends Model
     public function scopeSearchByVehicle(Builder $query, ?string $search): Builder
     {
         return $query->when($search, function (Builder $q, string $search) {
-            $q->whereHas('vehiculo', function (Builder $q2) use ($search) {
-                $q2->where('marca', 'like', "%{$search}%")
-                    ->orWhere('modelo', 'like', "%{$search}%");
+            $escaped = addcslashes($search, '%_\\');
+            $q->whereHas('vehiculo', function (Builder $q2) use ($escaped) {
+                $q2->where('marca', 'like', "%{$escaped}%")
+                    ->orWhere('modelo', 'like', "%{$escaped}%");
             });
         });
     }
@@ -91,8 +92,9 @@ class Transaccion extends Model
     public function scopeSearchByPlate(Builder $query, ?string $plate): Builder
     {
         return $query->when($plate, function (Builder $q, string $plate) {
-            $q->whereHas('vehiculo', function (Builder $q2) use ($plate) {
-                $q2->where('patente', 'like', "%{$plate}%");
+            $escaped = addcslashes($plate, '%_\\');
+            $q->whereHas('vehiculo', function (Builder $q2) use ($escaped) {
+                $q2->where('patente', 'like', "%{$escaped}%");
             });
         });
     }
@@ -103,7 +105,8 @@ class Transaccion extends Model
     public function scopeSearchByApplicant(Builder $query, ?string $name): Builder
     {
         return $query->when($name, function (Builder $q, string $name) {
-            $q->where('solicitante', 'like', "%{$name}%");
+            $escaped = addcslashes($name, '%_\\');
+            $q->where('solicitante', 'like', "%{$escaped}%");
         });
     }
 

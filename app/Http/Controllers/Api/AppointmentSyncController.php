@@ -19,6 +19,8 @@ class AppointmentSyncController extends Controller
      */
     public function __invoke(Request $request): JsonResponse
     {
+        abort_unless($request->user()->isAdmin(), 403, 'No autorizado para integraciones externas.');
+
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],

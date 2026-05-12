@@ -44,14 +44,16 @@ class VehiculoController extends Controller
 
             // Si se asigna conductor al crear, asegurar que no tenga otro vehículo
             if (! empty($validated['user_id'])) {
-                Vehiculo::where('user_id', $validated['user_id'])
-                    ->get()
-                    ->each(function ($v) {
-                        $v->update(['user_id' => null]);
-                        Asignacion::where('vehiculo_id', $v->id)
-                            ->whereNull('fecha_fin')
-                            ->update(['fecha_fin' => now()]);
-                    });
+                $prevVehiculoIds = Vehiculo::where('user_id', $validated['user_id'])
+                    ->where('id', '!=', $vehiculo->id)
+                    ->pluck('id');
+
+                if ($prevVehiculoIds->isNotEmpty()) {
+                    Vehiculo::whereIn('id', $prevVehiculoIds)->update(['user_id' => null]);
+                    Asignacion::whereIn('vehiculo_id', $prevVehiculoIds)
+                        ->whereNull('fecha_fin')
+                        ->update(['fecha_fin' => now()]);
+                }
 
                 Asignacion::create([
                     'vehiculo_id' => $vehiculo->id,
@@ -107,16 +109,16 @@ class VehiculoController extends Controller
 
                 // Abrir nueva asignación si hay conductor nuevo
                 if ($conductorNuevo) {
-                    // Si el conductor ya tenía otro vehículo, desasignarlo automáticamente
-                    Vehiculo::where('user_id', $conductorNuevo)
+                    $prevVehiculoIds = Vehiculo::where('user_id', $conductorNuevo)
                         ->where('id', '!=', $vehiculo->id)
-                        ->get()
-                        ->each(function ($v) {
-                            $v->update(['user_id' => null]);
-                            Asignacion::where('vehiculo_id', $v->id)
-                                ->whereNull('fecha_fin')
-                                ->update(['fecha_fin' => now()]);
-                        });
+                        ->pluck('id');
+
+                    if ($prevVehiculoIds->isNotEmpty()) {
+                        Vehiculo::whereIn('id', $prevVehiculoIds)->update(['user_id' => null]);
+                        Asignacion::whereIn('vehiculo_id', $prevVehiculoIds)
+                            ->whereNull('fecha_fin')
+                            ->update(['fecha_fin' => now()]);
+                    }
 
                     Asignacion::create([
                         'vehiculo_id' => $vehiculo->id,

@@ -23,13 +23,15 @@ class ProcessCierreCajaAction
     public function execute(): CierreCaja
     {
         return DB::transaction(function () {
-            // Calculate totals per inversion+empresa for pending cobros
+            // Calculate totals per inversion+empresa for pending cobros.
+            // lockForUpdate prevents two concurrent cierres from snapshotting the same cobros.
             $totals = Cobro::query()
                 ->pendientes()
                 ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
                 ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
                 ->selectRaw('cobros.inversion_id, cobros.empresa_id, SUM(articulos.precio * transacciones.cantidad) as total')
                 ->groupBy('cobros.inversion_id', 'cobros.empresa_id')
+                ->lockForUpdate()
                 ->get();
 
             // Create the cierre record

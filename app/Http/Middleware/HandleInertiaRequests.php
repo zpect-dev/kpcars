@@ -39,10 +39,15 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user() ? array_merge(
-                    $request->user()->toArray(),
-                    ['role' => $request->user()->role]
-                ) : null,
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'dni' => $request->user()->dni,
+                    'correo' => $request->user()->correo,
+                    'role' => $request->user()->role,
+                    'empresa_id' => $request->user()->empresa_id,
+                    'profile_photo_url' => $request->user()->profile_photo_url,
+                ] : null,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

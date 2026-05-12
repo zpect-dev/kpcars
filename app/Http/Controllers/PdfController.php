@@ -17,8 +17,10 @@ class PdfController extends Controller
     /**
      * Generate PDF with current stock of all articles.
      */
-    public function stock(): Response
+    public function stock(Request $request): Response
     {
+        abort_if($request->user()->isInversor(), 403);
+
         $articulos = Articulo::orderBy('descripcion')->get();
 
         $pdf = Pdf::loadView('pdf.stock', compact('articulos'))
@@ -32,14 +34,19 @@ class PdfController extends Controller
      */
     public function transactions(Request $request): Response
     {
+        abort_if($request->user()->isMechanic(), 403);
+
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
+
+        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
+            ->when($inversorEmpresaId, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $inversorEmpresaId)))
             ->latest()
             ->get();
 
@@ -78,7 +85,7 @@ class PdfController extends Controller
             ->when($from, fn ($q) => $q->whereDate('scheduled_date', '>=', $from))
             ->when($to, fn ($q) => $q->whereDate('scheduled_date', '<=', $to))
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
-            ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.$filters['plate'].'%'))
+            ->when(! empty($filters['plate']), fn ($q) => $q->where('license_plate', 'like', '%'.addcslashes($filters['plate'], '%_\\').'%'))
             ->orderBy('scheduled_date')
             ->orderBy('id')
             ->get();

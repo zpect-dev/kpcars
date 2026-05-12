@@ -40,6 +40,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! $user->isChofer()) {
+            throw ValidationException::withMessages([
+                'dni' => ['Esta aplicación es de uso exclusivo para conductores.'],
+            ]);
+        }
+
         // Revoke previous tokens to enforce single-session
         $user->tokens()->delete();
 

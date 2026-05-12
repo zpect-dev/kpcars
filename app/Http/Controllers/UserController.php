@@ -72,7 +72,10 @@ class UserController extends Controller
     {
         abort_unless($request->user()->isAdmin() || $request->user()->isInversor(), 403);
 
+        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+
         $users = User::orderBy('name')
+            ->when($inversorEmpresaId, fn ($q) => $q->where('empresa_id', $inversorEmpresaId))
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
             })

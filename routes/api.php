@@ -18,8 +18,8 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// Public: Authentication
-Route::post('login', [AuthController::class, 'login']);
+// Public: Authentication (rate-limited to mitigate brute force)
+Route::post('login', [AuthController::class, 'login'])->middleware('throttle:5,1');
 
 // Protected: Requires valid Sanctum token
 Route::middleware('auth:sanctum')->group(function () {

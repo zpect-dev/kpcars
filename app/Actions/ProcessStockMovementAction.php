@@ -29,6 +29,9 @@ class ProcessStockMovementAction
         DB::transaction(function () use ($articulo, $type, $quantity, $licensePlate, $solicitante, $descripcion) {
             $vehiculo = null;
 
+            // Pessimistic lock to prevent concurrent oversell / lost updates
+            $articulo = Articulo::whereKey($articulo->id)->lockForUpdate()->firstOrFail();
+
             if ($type === 'OUT') {
                 if (empty($licensePlate)) {
                     throw new InvalidArgumentException('La patente es obligatoria para registrar un egreso de mercadería.');
@@ -45,7 +48,6 @@ class ProcessStockMovementAction
                 }
             }
 
-            // Append-only constraint dictates we register transaction concurrently with stock update
             if ($type === 'IN') {
                 $articulo->stock += $quantity;
             } elseif ($type === 'OUT') {

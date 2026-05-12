@@ -17,15 +17,19 @@ class AnnulTransactionAction
     public function execute(Transaccion $transaction): void
     {
         DB::transaction(function () use ($transaction) {
-            $articulo = $transaction->articulo;
+            // Guard: re-annulling would double-revert the stock
+            if ($transaction->inactiva) {
+                return;
+            }
+
+            $articulo = \App\Models\Articulo::whereKey($transaction->articulo_id)
+                ->lockForUpdate()
+                ->first();
 
             if (! $articulo) {
                 throw new Exception('No se encontró el artículo asociado a la transacción.');
             }
 
-            // Revert stock logic:
-            // If it was an IN (incremented stock), we now decrement it.
-            // If it was an OUT (decremented stock), we now increment it.
             if ($transaction->tipo === 'IN') {
                 $articulo->stock -= $transaction->cantidad;
             } else {
