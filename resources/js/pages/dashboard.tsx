@@ -738,9 +738,11 @@ export default function Dashboard({
                                     <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Vehículo
                                     </th>
-                                    <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Empresa
-                                    </th>
+                                    {!isInversor && (
+                                        <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                            Empresa
+                                        </th>
+                                    )}
                                     <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Inversión
                                     </th>
@@ -762,7 +764,7 @@ export default function Dashboard({
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={8}
+                                            colSpan={isInversor ? 7 : 8}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -792,20 +794,22 @@ export default function Dashboard({
                                                     </span>
                                                 </div>
                                             </td>
-                                            <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
-                                                {vehiculo.empresa?.nombre ? (
-                                                    <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
-                                                        {
-                                                            vehiculo.empresa
-                                                                .nombre
-                                                        }
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground italic">
-                                                        Sin empresa
-                                                    </span>
-                                                )}
-                                            </td>
+                                            {!isInversor && (
+                                                <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
+                                                    {vehiculo.empresa?.nombre ? (
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
+                                                            {
+                                                                vehiculo.empresa
+                                                                    .nombre
+                                                            }
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground italic">
+                                                            Sin empresa
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            )}
                                             <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
                                                 {vehiculo.inversion?.nombre ? (
                                                     <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
@@ -1040,15 +1044,16 @@ export default function Dashboard({
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {vehiculo.empresa?.nombre ? (
-                                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
-                                                {vehiculo.empresa.nombre}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground italic">
-                                                Sin empresa
-                                            </span>
-                                        )}
+                                        {!isInversor &&
+                                            (vehiculo.empresa?.nombre ? (
+                                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
+                                                    {vehiculo.empresa.nombre}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground italic">
+                                                    Sin empresa
+                                                </span>
+                                            ))}
                                         {vehiculo.inversion?.nombre ? (
                                             <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
                                                 {vehiculo.inversion.nombre}

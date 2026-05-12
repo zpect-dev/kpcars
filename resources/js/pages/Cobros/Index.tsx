@@ -58,6 +58,7 @@ export default function CobrosIndex({
 }: Props) {
     const { auth } = usePage<any>().props;
     const isAdmin = auth.user.role === 'administrador';
+    const isInversor = auth.user.role === 'inversor';
 
     // ─── Cierre de Caja Modal ─────────────────────────────────────────────
     const [showCierreModal, setShowCierreModal] = useState(false);
@@ -178,9 +179,11 @@ export default function CobrosIndex({
                                     <p className="truncate text-sm font-semibold text-foreground">
                                         {inv.inversion_nombre}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {inv.empresa_nombre}
-                                    </p>
+                                    {!isInversor && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {inv.empresa_nombre}
+                                        </p>
+                                    )}
                                     <p className="mt-1 text-lg font-bold text-foreground">
                                         {formatARS(Number(inv.total))}
                                     </p>
