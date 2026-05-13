@@ -31,6 +31,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { cerrar as cerrarRevisiones } from '@/routes/revisiones';
 import type { Revision, Vehiculo } from '@/types';
 
 interface VehiculoRow {
@@ -258,7 +259,7 @@ export default function Revisiones({ vehiculos }: Props) {
                                     <Button
                                         onClick={() => {
                                             if(confirm('¿Estás seguro de cerrar el periodo de revisiones actual? Esto guardará el historial e iniciará un nuevo periodo en blanco.')) {
-                                                router.post(route('revisiones.cerrar'));
+                                                router.post(cerrarRevisiones.url());
                                             }
                                         }}
                                     >
