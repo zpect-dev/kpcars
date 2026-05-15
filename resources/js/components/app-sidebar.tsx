@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -89,6 +89,22 @@ export function AppSidebar() {
             title: 'Usuarios',
             href: '/users',
             icon: Users,
+        });
+    }
+
+    if (auth.user.role === 'administrador') {
+        mainNavItems.push({
+            title: 'Inversiones',
+            href: '/inversiones',
+            icon: Wallet,
+        });
+    }
+
+    if (auth.user.role === 'inversor') {
+        mainNavItems.push({
+            title: 'Mi Cuenta',
+            href: '/mi-cuenta',
+            icon: Wallet,
         });
     }
 

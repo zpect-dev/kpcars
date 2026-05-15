@@ -100,4 +100,22 @@ class User extends Authenticatable
             ->whereNull('fecha_fin')
             ->latestOfMany('fecha_inicio');
     }
+
+    /**
+     * Inversiones en las que el usuario participa como inversor.
+     */
+    public function inversiones(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Inversion::class, 'inversion_user')
+            ->withPivot(['tiene_deuda', 'es_financiador'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Movimientos de deuda del usuario.
+     */
+    public function deudaMovimientos(): HasMany
+    {
+        return $this->hasMany(DeudaMovimiento::class);
+    }
 }

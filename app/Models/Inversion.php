@@ -7,11 +7,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['nombre', 'empresa_id'])]
 class Inversion extends Model
 {
+    public const MAX_INVERSORES = 6;
+
     protected $table = 'inversiones';
 
     /**
@@ -36,5 +39,23 @@ class Inversion extends Model
     public function cobros(): HasMany
     {
         return $this->hasMany(Cobro::class);
+    }
+
+    /**
+     * Inversores asignados (máximo MAX_INVERSORES por inversión).
+     */
+    public function inversores(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'inversion_user')
+            ->withPivot(['tiene_deuda', 'es_financiador'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Movimientos de deuda de todos los inversores en esta inversión.
+     */
+    public function deudaMovimientos(): HasMany
+    {
+        return $this->hasMany(DeudaMovimiento::class);
     }
 }

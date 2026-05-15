@@ -3,8 +3,11 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
+use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InversionController;
+use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\TransactionController;
@@ -73,6 +76,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
     Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
+
+    // Panel admin: inversiones e inversores asignados + deuda
+    Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');
+    Route::post('inversiones/{inversion}/inversores', [InversionController::class, 'attachInversor'])->name('inversiones.inversores.attach');
+    Route::put('inversiones/{inversion}/inversores/sync', [InversionController::class, 'syncInversores'])->name('inversiones.inversores.sync');
+    Route::patch('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'updateInversor'])->name('inversiones.inversores.update');
+    Route::delete('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'detachInversor'])->name('inversiones.inversores.detach');
+    Route::get('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'showDeuda'])->name('inversiones.deuda.show');
+    Route::post('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'storeDeudaMovimiento'])->name('inversiones.deuda.store');
+
+    // Cierres semanales de inversión (admin)
+    Route::get('cierres-inversion', [CierreInversionController::class, 'index'])->name('cierres-inversion.index');
+    Route::get('cierres-inversion/nuevo', [CierreInversionController::class, 'create'])->name('cierres-inversion.create');
+    Route::post('cierres-inversion', [CierreInversionController::class, 'store'])->name('cierres-inversion.store');
+    Route::get('cierres-inversion/{cierreInversion}', [CierreInversionController::class, 'show'])->name('cierres-inversion.show');
+
+    // Vista del inversor
+    Route::get('mi-cuenta', [MiCuentaController::class, 'index'])->name('mi-cuenta.index');
 });
 
 require __DIR__.'/settings.php';
