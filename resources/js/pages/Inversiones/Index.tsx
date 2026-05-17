@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { AlertCircle, HandCoins, Lock, Plus, Wallet } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -83,7 +83,11 @@ export default function InversionesIndex({
     ultimoCierre,
     maxInversores,
 }: Props) {
-    const [manageOpen, setManageOpen] = useState<InversionItem | null>(null);
+    const [manageOpenId, setManageOpenId] = useState<number | null>(null);
+    const manageOpen = useMemo(
+        () => inversiones.find((i) => i.id === manageOpenId) ?? null,
+        [inversiones, manageOpenId],
+    );
 
     // Inversiones sin completar los inversores requeridos
     const asignacionesIncompletas = useMemo(
@@ -198,7 +202,7 @@ export default function InversionesIndex({
                                             key={inv.id}
                                             inv={inv}
                                             tasa={ultimoCierre?.tasa ?? null}
-                                            onManage={() => setManageOpen(inv)}
+                                            onManage={() => setManageOpenId(inv.id)}
                                         />
                                     ))}
                                 </ul>
@@ -269,7 +273,7 @@ export default function InversionesIndex({
                     inversion={manageOpen}
                     inversoresDisponibles={inversoresDisponibles}
                     maxInversores={maxInversores}
-                    onClose={() => setManageOpen(null)}
+                    onClose={() => setManageOpenId(null)}
                 />
             )}
         </>
@@ -338,6 +342,7 @@ interface DraftRow {
     asignado: boolean;
     tiene_deuda: boolean;
     es_financiador: boolean;
+    saldo_deuda: number;
 }
 
 function ManageDialog({
@@ -362,6 +367,7 @@ function ManageDialog({
                 asignado: !!actual,
                 tiene_deuda: actual?.tiene_deuda ?? false,
                 es_financiador: actual?.es_financiador ?? false,
+                saldo_deuda: actual?.saldo_deuda ?? 0,
             };
         }),
     );
@@ -369,6 +375,22 @@ function ManageDialog({
     const [search, setSearch] = useState('');
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Re-sincronizar saldos y flags persistidos cuando cambian los datos de la inversión
+    // (tras guardar o tras registrar cargo/pago).
+    useEffect(() => {
+        setRows((prev) =>
+            prev.map((r) => {
+                const actual = currentMap.get(r.user_id);
+                return {
+                    ...r,
+                    saldo_deuda: actual?.saldo_deuda ?? 0,
+                    // Si el inversor dejó de ser deudor en BD (saldo a 0), refleja
+                    asignado: actual ? r.asignado : r.asignado,
+                };
+            }),
+        );
+    }, [currentMap]);
 
     const seleccionados = rows.filter((r) => r.asignado);
     const lleno = seleccionados.length >= maxInversores;
@@ -435,7 +457,6 @@ function ManageDialog({
                 preserveScroll: true,
                 onSuccess: () => {
                     setProcessing(false);
-                    onClose();
                 },
                 onError: (errs) => {
                     setProcessing(false);
@@ -495,12 +516,13 @@ function ManageDialog({
                                     <li
                                         key={r.user_id}
                                         className={cn(
-                                            'flex items-center justify-between gap-3 px-3 py-2.5 transition-colors',
+                                            'flex flex-col gap-2 px-3 py-2.5 transition-colors',
                                             r.asignado
                                                 ? 'bg-primary/5'
                                                 : 'hover:bg-muted/40',
                                         )}
                                     >
+                                        <div className="flex items-center justify-between gap-3">
                                         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
                                             <Checkbox
                                                 checked={r.asignado}
@@ -573,6 +595,40 @@ function ManageDialog({
                                             />
                                             Financia
                                         </label>
+                                        </div>
+                                        {(() => {
+                                            const persistido = currentMap.get(r.user_id);
+                                            const yaEsDeudor = !!persistido?.tiene_deuda;
+                                            const cambioPendiente =
+                                                r.asignado && r.tiene_deuda && !yaEsDeudor;
+                                            if (cambioPendiente) {
+                                                return (
+                                                    <p className="ml-11 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[11px] text-amber-800 dark:text-amber-300">
+                                                        Guardá los cambios para poder
+                                                        registrar deuda y pagos.
+                                                    </p>
+                                                );
+                                            }
+                                            if (r.asignado && yaEsDeudor) {
+                                                return (
+                                                    <DeudaPanel
+                                                        inversionId={inversion.id}
+                                                        userId={r.user_id}
+                                                        saldo={r.saldo_deuda}
+                                                        onChange={(nuevoSaldo) =>
+                                                            setRows((prev) =>
+                                                                prev.map((x) =>
+                                                                    x.user_id === r.user_id
+                                                                        ? { ...x, saldo_deuda: nuevoSaldo }
+                                                                        : x,
+                                                                ),
+                                                            )
+                                                        }
+                                                    />
+                                                );
+                                            }
+                                            return null;
+                                        })()}
                                     </li>
                                 );
                             })}
@@ -605,5 +661,110 @@ function ManageDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+// ─── Deuda Panel ──────────────────────────────────────────────────────────
+
+function DeudaPanel({
+    inversionId,
+    userId,
+    saldo,
+    onChange,
+}: {
+    inversionId: number;
+    userId: number;
+    saldo: number;
+    onChange: (nuevoSaldo: number) => void;
+}) {
+    const [cargo, setCargo] = useState('');
+    const [pago, setPago] = useState('');
+    const [busy, setBusy] = useState<'cargo' | 'pago' | null>(null);
+    const [err, setErr] = useState<string | null>(null);
+
+    function submit(tipo: 'cargo' | 'pago', value: string) {
+        const monto = parseFloat(value.replace(',', '.'));
+        if (!Number.isFinite(monto) || monto <= 0) {
+            setErr('Monto inválido.');
+            return;
+        }
+        setBusy(tipo);
+        setErr(null);
+        router.post(
+            `/inversiones/${inversionId}/inversores/${userId}/deuda`,
+            { tipo, monto, descripcion: null },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    const nuevo =
+                        tipo === 'cargo' ? saldo + monto : Math.max(0, saldo - monto);
+                    onChange(nuevo);
+                    if (tipo === 'cargo') setCargo('');
+                    else setPago('');
+                },
+                onError: (errs) => {
+                    setErr(Object.values(errs).join(' ') || 'Error al registrar.');
+                },
+                onFinish: () => setBusy(null),
+            },
+        );
+    }
+
+    return (
+        <div className="ml-11 rounded-md border border-red-500/20 bg-red-500/5 px-3 py-2">
+            <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+                    Deuda actual
+                </span>
+                <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                    {formatARS(saldo)}
+                </span>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="flex items-center gap-1.5">
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Agregar deuda"
+                        value={cargo}
+                        onChange={(e) => setCargo(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy !== null || !cargo}
+                        onClick={() => submit('cargo', cargo)}
+                    >
+                        {busy === 'cargo' ? '...' : 'Cargar'}
+                    </Button>
+                </div>
+                <div className="flex items-center gap-1.5">
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Pago recibido"
+                        value={pago}
+                        onChange={(e) => setPago(e.target.value)}
+                        className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <Button
+                        size="sm"
+                        disabled={busy !== null || !pago || saldo <= 0}
+                        onClick={() => submit('pago', pago)}
+                    >
+                        {busy === 'pago' ? '...' : 'Pagar'}
+                    </Button>
+                </div>
+            </div>
+            {err && (
+                <p className="mt-1.5 text-[11px] text-red-700 dark:text-red-400">
+                    {err}
+                </p>
+            )}
+        </div>
     );
 }

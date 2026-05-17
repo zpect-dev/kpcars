@@ -22,6 +22,7 @@ class CobroController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
         abort_if($request->user()->isChofer(), 403);
+        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
         $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
 
@@ -42,9 +43,10 @@ class CobroController extends Controller
                 COUNT(cobros.id) as transacciones_count
             ')
             ->groupBy('cobros.inversion_id', 'cobros.empresa_id', 'inversiones.nombre', 'empresas.nombre')
-            ->orderBy('empresas.nombre')
-            ->orderBy('inversiones.nombre')
-            ->get();
+            ->get()
+            ->sortBy('inversion_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy('empresa_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
         $totalGeneral = $resumen->sum('total');
 
@@ -96,6 +98,7 @@ class CobroController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
         abort_if($request->user()->isChofer(), 403);
+        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
         $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : $request->integer('empresa_id');
 
@@ -162,7 +165,7 @@ class CobroController extends Controller
      */
     public function cierreCaja(Request $request, ProcessCierreCajaAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403, 'Solo los administradores pueden ejecutar el cierre de caja.');
+        abort_unless($request->user()->isAdminAbsoluto(), 403, 'Solo los administradores con acceso absoluto pueden ejecutar el cierre de caja.');
 
         // Check there are pending cobros
         $pendingCount = Cobro::query()->pendientes()->count();

@@ -6,7 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Actions\ProcessCierreInversionAction;
 use App\Models\CierreInversion;
+use App\Models\CierreInversionPago;
 use App\Models\Inversion;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,7 +22,7 @@ class CierreInversionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $cierres = CierreInversion::with('ejecutadoPor:id,name')
             ->orderByDesc('periodo_fin')
@@ -36,11 +38,14 @@ class CierreInversionController extends Controller
      */
     public function create(Request $request): Response
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $inversiones = Inversion::with([
             'inversores:id,name',
-        ])->orderBy('nombre')->get()->map(function (Inversion $inv) {
+        ])->get()
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->map(function (Inversion $inv) {
             $deudores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->tiene_deuda)->count();
             $financiadores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->es_financiador)->count();
 
@@ -72,7 +77,7 @@ class CierreInversionController extends Controller
      */
     public function store(Request $request, ProcessCierreInversionAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $validated = $request->validate([
             'recaudaciones' => ['required', 'array'],
@@ -101,7 +106,7 @@ class CierreInversionController extends Controller
      */
     public function show(Request $request, CierreInversion $cierreInversion): Response
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $cierreInversion->load([
             'ejecutadoPor:id,name',
@@ -130,7 +135,7 @@ class CierreInversionController extends Controller
                     ])->values(),
                 ];
             })
-            ->sortByDesc('total')
+            ->sortBy(fn ($row) => mb_strtolower($row['user']['name']))
             ->values();
 
         return Inertia::render('CierresInversion/Show', [
@@ -144,11 +149,97 @@ class CierreInversionController extends Controller
                 'ejecutado_por' => $cierreInversion->ejecutadoPor,
                 'created_at' => $cierreInversion->created_at?->toIso8601String(),
             ],
-            'recaudaciones' => $cierreInversion->recaudaciones->map(fn ($r) => [
-                'inversion' => $r->inversion?->nombre,
-                'monto' => (float) $r->monto,
-            ]),
+            'recaudaciones' => $cierreInversion->recaudaciones
+                ->sortBy(fn ($r) => (string) $r->inversion?->nombre, SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->map(fn ($r) => [
+                    'inversion' => $r->inversion?->nombre,
+                    'monto' => (float) $r->monto,
+                ]),
             'porInversor' => $porInversor,
+        ]);
+    }
+
+    /**
+     * Detalle del sueldo de un inversor en un cierre puntual + histórico de pagos pasados.
+     */
+    public function showInversor(Request $request, CierreInversion $cierreInversion, User $user): Response
+    {
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
+
+        // Pagos del cierre actual
+        $pagosCierre = CierreInversionPago::with('inversion:id,nombre')
+            ->where('cierre_id', $cierreInversion->id)
+            ->where('user_id', $user->id)
+            ->get();
+
+        abort_if($pagosCierre->isEmpty(), 404);
+
+        $detalleCierre = $pagosCierre
+            ->map(fn (CierreInversionPago $p) => [
+                'inversion' => $p->inversion?->nombre,
+                'concepto' => $p->concepto,
+                'monto' => (float) $p->monto,
+            ])
+            ->sortBy(fn ($d) => (string) $d['inversion'], SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $totalCierre = (float) $pagosCierre->sum(fn (CierreInversionPago $p) => (float) $p->monto);
+
+        $totalCierreFinanciador = (float) $pagosCierre
+            ->where('concepto', CierreInversionPago::CONCEPTO_REDISTRIBUCION)
+            ->sum(fn (CierreInversionPago $p) => (float) $p->monto);
+
+        $totalCierrePropio = $totalCierre - $totalCierreFinanciador;
+
+        // Histórico: pagos del inversor en cierres anteriores (excluye el actual)
+        $historico = CierreInversionPago::with(['cierre:id,periodo_inicio,periodo_fin,tasa', 'inversion:id,nombre'])
+            ->where('user_id', $user->id)
+            ->where('cierre_id', '!=', $cierreInversion->id)
+            ->get()
+            ->groupBy('cierre_id')
+            ->map(function ($pagos) {
+                $cierre = $pagos->first()->cierre;
+
+                return [
+                    'cierre' => [
+                        'id' => $cierre->id,
+                        'periodo_inicio' => $cierre->periodo_inicio?->toIso8601String(),
+                        'periodo_fin' => $cierre->periodo_fin?->toIso8601String(),
+                        'tasa' => $cierre->tasa ? (float) $cierre->tasa : null,
+                    ],
+                    'total' => (float) $pagos->sum(fn (CierreInversionPago $p) => (float) $p->monto),
+                    'detalles' => $pagos
+                        ->map(fn (CierreInversionPago $p) => [
+                            'inversion' => $p->inversion?->nombre,
+                            'concepto' => $p->concepto,
+                            'monto' => (float) $p->monto,
+                        ])
+                        ->sortBy(fn ($d) => (string) $d['inversion'], SORT_NATURAL | SORT_FLAG_CASE)
+                        ->values(),
+                ];
+            })
+            ->sortByDesc(fn ($row) => $row['cierre']['periodo_fin'])
+            ->values();
+
+        return Inertia::render('CierresInversion/Inversor', [
+            'cierre' => [
+                'id' => $cierreInversion->id,
+                'periodo_inicio' => $cierreInversion->periodo_inicio?->toIso8601String(),
+                'periodo_fin' => $cierreInversion->periodo_fin?->toIso8601String(),
+                'tasa' => $cierreInversion->tasa ? (float) $cierreInversion->tasa : null,
+            ],
+            'inversor' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'dni' => $user->dni,
+            ],
+            'detalleCierre' => $detalleCierre,
+            'totalCierre' => $totalCierre,
+            'totalCierrePropio' => $totalCierrePropio,
+            'totalCierreFinanciador' => $totalCierreFinanciador,
+            'historico' => $historico,
+            'totalHistorico' => (float) $historico->sum('total'),
         ]);
     }
 }

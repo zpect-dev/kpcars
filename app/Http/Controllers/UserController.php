@@ -86,7 +86,7 @@ class UserController extends Controller
                     $query->where('inactivo', true);
                 }
             })
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
+            ->get(['id', 'name', 'dni', 'role', 'absoluto', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
 
         $empresas = Empresa::orderBy('nombre')->get(['id', 'nombre']);
@@ -165,6 +165,25 @@ class UserController extends Controller
         });
 
         $message = $newInactivoStatus ? 'Usuario desactivado y sus vehículos fueron desasignados.' : 'Usuario activado correctamente.';
+
+        return redirect()->back()->with('success', $message);
+    }
+
+    public function toggleAbsoluto(User $user)
+    {
+        Gate::authorize('manage-users');
+
+        if ($user->id === auth()->id()) {
+            return redirect()->back()->with('error', 'No puedes cambiar tu propia bandera de acceso absoluto.');
+        }
+
+        if (! $user->isAdmin()) {
+            return redirect()->back()->with('error', 'Solo los administradores pueden tener acceso absoluto.');
+        }
+
+        $user->update(['absoluto' => ! $user->absoluto]);
+
+        $message = $user->absoluto ? 'Acceso absoluto activado.' : 'Acceso absoluto desactivado.';
 
         return redirect()->back()->with('success', $message);
     }

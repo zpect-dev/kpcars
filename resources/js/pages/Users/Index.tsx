@@ -24,6 +24,7 @@ interface User {
     dni: string;
     role: string;
     inactivo: boolean;
+    absoluto: boolean;
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
@@ -141,6 +142,19 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                 preserveScroll: true,
                 preserveState: true,
                 onSuccess: () => setUserToToggle(null),
+            },
+        );
+    }
+
+    function toggleAbsoluto(user: User) {
+        if (user.id === auth.user.id) return;
+        if (user.role !== 'administrador') return;
+        router.patch(
+            `/users/${user.id}/toggle-absoluto`,
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
             },
         );
     }
@@ -582,46 +596,62 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                                 )}
                                             </td>
                                             <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
-                                                {user.id === auth.user.id ? (
-                                                    <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                        {roles.find(
-                                                            (r) =>
-                                                                r.value ===
-                                                                user.role,
-                                                        )?.label ||
-                                                            user.role}{' '}
-                                                        (Tú)
-                                                    </span>
-                                                ) : isInversor ? (
-                                                    <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                        {roles.find((r) => r.value === user.role)?.label || user.role}
-                                                    </span>
-                                                ) : (
-                                                    <select
-                                                        onClick={(e) =>
-                                                            e.stopPropagation()
-                                                        }
-                                                        value={user.role}
-                                                        onChange={(e) =>
-                                                            handleRoleChange(
-                                                                user.id,
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                                    >
-                                                        {roles.map((role) => (
-                                                            <option
-                                                                key={role.value}
-                                                                value={
-                                                                    role.value
-                                                                }
-                                                            >
-                                                                {role.label}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-                                                )}
+                                                <div className="flex flex-col gap-1.5">
+                                                    {user.id === auth.user.id ? (
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                            {roles.find(
+                                                                (r) =>
+                                                                    r.value ===
+                                                                    user.role,
+                                                            )?.label ||
+                                                                user.role}{' '}
+                                                            (Tú)
+                                                        </span>
+                                                    ) : isInversor ? (
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                            {roles.find((r) => r.value === user.role)?.label || user.role}
+                                                        </span>
+                                                    ) : (
+                                                        <select
+                                                            onClick={(e) =>
+                                                                e.stopPropagation()
+                                                            }
+                                                            value={user.role}
+                                                            onChange={(e) =>
+                                                                handleRoleChange(
+                                                                    user.id,
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {roles.map((role) => (
+                                                                <option
+                                                                    key={role.value}
+                                                                    value={
+                                                                        role.value
+                                                                    }
+                                                                >
+                                                                    {role.label}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                    {user.role === 'administrador' && !isInversor && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleAbsoluto(user);
+                                                            }}
+                                                            disabled={user.id === auth.user.id}
+                                                            title={user.absoluto ? 'Acceso absoluto activado — clic para revocar' : 'Sin acceso absoluto — clic para otorgar'}
+                                                            className={`inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                                        >
+                                                            {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -692,6 +722,19 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                                                         ? ' (Tú)'
                                                         : ''}
                                                 </p>
+                                                {user.role === 'administrador' && !isInversor && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleAbsoluto(user);
+                                                        }}
+                                                        disabled={user.id === auth.user.id}
+                                                        className={`mt-1 inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                                    >
+                                                        {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                         <button

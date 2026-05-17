@@ -103,6 +103,7 @@ class PdfController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
         abort_if($request->user()->isChofer(), 403);
+        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
         $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
 

@@ -62,6 +62,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
     Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+    Route::patch('users/{user}/toggle-absoluto', [UserController::class, 'toggleAbsoluto'])->name('users.toggle-absoluto');
     Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
     Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 
@@ -91,6 +92,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('cierres-inversion/nuevo', [CierreInversionController::class, 'create'])->name('cierres-inversion.create');
     Route::post('cierres-inversion', [CierreInversionController::class, 'store'])->name('cierres-inversion.store');
     Route::get('cierres-inversion/{cierreInversion}', [CierreInversionController::class, 'show'])->name('cierres-inversion.show');
+    Route::get('cierres-inversion/{cierreInversion}/inversor/{user}', [CierreInversionController::class, 'showInversor'])->name('cierres-inversion.inversor');
 
     // Vista del inversor
     Route::get('mi-cuenta', [MiCuentaController::class, 'index'])->name('mi-cuenta.index');

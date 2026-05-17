@@ -40,7 +40,11 @@ function formatDate(d: string | null): string {
     });
 }
 
-export default function CierresCreate({ inversiones, ultimoCierre, maxInversores }: Props) {
+export default function CierresCreate({
+    inversiones,
+    ultimoCierre,
+    maxInversores,
+}: Props) {
     const initial: Record<string, string> = {};
     inversiones.forEach((i) => {
         initial[String(i.id)] = '';
@@ -121,14 +125,17 @@ export default function CierresCreate({ inversiones, ultimoCierre, maxInversores
                         <div className="flex items-start gap-2">
                             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                             <div>
-                                <p className="font-medium">No se puede procesar todavía:</p>
+                                <p className="font-medium">
+                                    No se puede procesar todavía:
+                                </p>
                                 <ul className="mt-1 list-inside list-disc text-xs">
                                     {inversiones
                                         .filter((i) => !i.puede_procesar)
                                         .map((i) => (
                                             <li key={i.id}>
                                                 <strong>{i.nombre}</strong>:{' '}
-                                                {i.inversores_count !== maxInversores
+                                                {i.inversores_count !==
+                                                maxInversores
                                                     ? `tiene ${i.inversores_count}/${maxInversores} inversores`
                                                     : 'tiene deudores pero sin financiador'}
                                             </li>
@@ -160,24 +167,32 @@ export default function CierresCreate({ inversiones, ultimoCierre, maxInversores
                                 placeholder="Ej. 1050.50"
                                 className="pl-6"
                                 value={form.data.tasa}
-                                onChange={(e) => form.setData('tasa', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('tasa', e.target.value)
+                                }
                             />
                         </div>
                         <InputError message={form.errors.tasa} />
                         <p className="text-[11px] text-muted-foreground">
-                            Se usará para convertir los montos en pesos a dólares.
+                            Se usará para convertir los montos en pesos a
+                            dólares.
                         </p>
                     </div>
 
                     <p className="mb-3 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                        Recaudación por inversión
+                        Recaudado por inversión
                     </p>
 
                     <div className="grid gap-3 sm:grid-cols-2">
                         {inversiones.map((inv) => (
                             <div key={inv.id} className="grid gap-1.5">
-                                <Label htmlFor={`monto-${inv.id}`} className="flex items-center justify-between">
-                                    <span className="truncate">{inv.nombre}</span>
+                                <Label
+                                    htmlFor={`monto-${inv.id}`}
+                                    className="flex items-center justify-between"
+                                >
+                                    <span className="truncate">
+                                        {inv.nombre}
+                                    </span>
                                     {inv.puede_procesar ? (
                                         <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                                     ) : (
@@ -195,30 +210,53 @@ export default function CierresCreate({ inversiones, ultimoCierre, maxInversores
                                         min="0"
                                         placeholder="0.00"
                                         className="pl-6"
-                                        value={form.data.recaudaciones[String(inv.id)] ?? ''}
-                                        onChange={(e) => setMonto(inv.id, e.target.value)}
+                                        value={
+                                            form.data.recaudaciones[
+                                                String(inv.id)
+                                            ] ?? ''
+                                        }
+                                        onChange={(e) =>
+                                            setMonto(inv.id, e.target.value)
+                                        }
                                         disabled={!inv.puede_procesar}
                                     />
                                 </div>
                                 <p className="text-[11px] text-muted-foreground">
-                                    {inv.deudores} deudor{inv.deudores === 1 ? '' : 'es'} ·{' '}
+                                    {inv.deudores} deudor
+                                    {inv.deudores === 1 ? '' : 'es'} ·{' '}
                                     {inv.financiadores} financiador
                                     {inv.financiadores === 1 ? '' : 'es'}
-                                    {tasaNum > 0 && Number(form.data.recaudaciones[String(inv.id)]) > 0 && (
-                                        <>
-                                            {' · '}
-                                            {new Intl.NumberFormat('en-US', {
-                                                style: 'currency',
-                                                currency: 'USD',
-                                                minimumFractionDigits: 2,
-                                            }).format(
-                                                Number(form.data.recaudaciones[String(inv.id)]) / tasaNum,
-                                            )}
-                                        </>
-                                    )}
+                                    {tasaNum > 0 &&
+                                        Number(
+                                            form.data.recaudaciones[
+                                                String(inv.id)
+                                            ],
+                                        ) > 0 && (
+                                            <>
+                                                {' · '}
+                                                {new Intl.NumberFormat(
+                                                    'en-US',
+                                                    {
+                                                        style: 'currency',
+                                                        currency: 'USD',
+                                                        minimumFractionDigits: 2,
+                                                    },
+                                                ).format(
+                                                    Number(
+                                                        form.data.recaudaciones[
+                                                            String(inv.id)
+                                                        ],
+                                                    ) / tasaNum,
+                                                )}
+                                            </>
+                                        )}
                                 </p>
                                 <InputError
-                                    message={form.errors[`recaudaciones.${inv.id}` as keyof typeof form.errors] as string | undefined}
+                                    message={
+                                        form.errors[
+                                            `recaudaciones.${inv.id}` as keyof typeof form.errors
+                                        ] as string | undefined
+                                    }
                                 />
                             </div>
                         ))}
@@ -228,7 +266,9 @@ export default function CierresCreate({ inversiones, ultimoCierre, maxInversores
                         <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:gap-4">
                             <div className="flex items-center gap-2">
                                 <Calculator className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-muted-foreground">Total:</span>
+                                <span className="text-muted-foreground">
+                                    Total:
+                                </span>
                                 <span className="text-base font-bold text-foreground">
                                     {formatARS(totalRecaudado)}
                                 </span>
@@ -250,7 +290,9 @@ export default function CierresCreate({ inversiones, ultimoCierre, maxInversores
                                 tasaNum <= 0
                             }
                         >
-                            {form.processing ? 'Procesando...' : 'Ejecutar cierre'}
+                            {form.processing
+                                ? 'Procesando...'
+                                : 'Ejecutar cierre'}
                         </Button>
                     </div>
                 </form>

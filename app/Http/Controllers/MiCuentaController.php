@@ -22,9 +22,13 @@ class MiCuentaController extends Controller
 
         $user = $request->user();
 
+        abort_unless($user->inversiones()->exists(), 403);
+
         $inversiones = $user->inversiones()
             ->with('empresa:id,nombre')
             ->get()
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
             ->map(function ($inv) use ($user) {
                 $movimientos = DeudaMovimiento::with('registradoPor:id,name')
                     ->where('inversion_id', $inv->id)
