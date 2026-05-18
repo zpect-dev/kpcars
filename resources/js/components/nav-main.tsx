@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -19,6 +20,57 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
+function CollapsibleNavItem({
+    item,
+    isActive,
+    isCurrentUrl,
+}: {
+    item: NavItem;
+    isActive: boolean;
+    isCurrentUrl: (href: NavItem['href']) => boolean;
+}) {
+    const [open, setOpen] = useState(isActive);
+
+    useEffect(() => {
+        if (isActive) setOpen(true);
+    }, [isActive]);
+
+    return (
+        <Collapsible
+            asChild
+            open={open}
+            onOpenChange={setOpen}
+            className="group/collapsible"
+        >
+            <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                    <SidebarMenuButton tooltip={item.title} isActive={isActive}>
+                        {item.icon && <item.icon />}
+                        <span>{item.title}</span>
+                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                    <SidebarMenuSub>
+                        {item.items!.map((subItem) => (
+                            <SidebarMenuSubItem key={subItem.title}>
+                                <SidebarMenuSubButton
+                                    asChild
+                                    isActive={subItem.isActive ?? isCurrentUrl(subItem.href)}
+                                >
+                                    <Link href={subItem.href}>
+                                        <span>{subItem.title}</span>
+                                    </Link>
+                                </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                        ))}
+                    </SidebarMenuSub>
+                </CollapsibleContent>
+            </SidebarMenuItem>
+        </Collapsible>
+    );
+}
+
 export function NavMain({ items = [] }: { items: NavItem[] }) {
     const { isCurrentUrl } = useCurrentUrl();
 
@@ -27,44 +79,15 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
             <SidebarGroupLabel>Platform</SidebarGroupLabel>
             <SidebarMenu>
                 {items.map((item) => {
-                    const isActive = isCurrentUrl(item.href) || !!item.items?.some((subItem) => isCurrentUrl(subItem.href));
+                    const isActive = isCurrentUrl(item.href) || !!item.items?.some((subItem) => subItem.isActive ?? isCurrentUrl(subItem.href));
 
                     return item.items && item.items.length > 0 ? (
-                        <Collapsible
+                        <CollapsibleNavItem
                             key={item.title}
-                            asChild
-                            defaultOpen={isActive}
-                            className="group/collapsible"
-                        >
-                            <SidebarMenuItem>
-                                <CollapsibleTrigger asChild>
-                                    <SidebarMenuButton
-                                        tooltip={item.title}
-                                        isActive={isActive}
-                                    >
-                                        {item.icon && <item.icon />}
-                                        <span>{item.title}</span>
-                                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                                    </SidebarMenuButton>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                    <SidebarMenuSub>
-                                        {item.items.map((subItem) => (
-                                            <SidebarMenuSubItem key={subItem.title}>
-                                                <SidebarMenuSubButton
-                                                    asChild
-                                                    isActive={isCurrentUrl(subItem.href)}
-                                                >
-                                                    <Link href={subItem.href}>
-                                                        <span>{subItem.title}</span>
-                                                    </Link>
-                                                </SidebarMenuSubButton>
-                                            </SidebarMenuSubItem>
-                                        ))}
-                                    </SidebarMenuSub>
-                                </CollapsibleContent>
-                            </SidebarMenuItem>
-                        </Collapsible>
+                            item={item}
+                            isActive={isActive}
+                            isCurrentUrl={isCurrentUrl}
+                        />
                     ) : (
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton

@@ -5,6 +5,7 @@ import {
     CalendarIcon,
     CalendarPlus,
     CheckCircle2,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Clock,
@@ -13,7 +14,7 @@ import {
     X,
     Wrench,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Vehiculo } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -157,6 +158,7 @@ export default function AppointmentsIndex({
     const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(
         null,
     );
+    const [expandedId, setExpandedId] = useState<number | null>(null);
     const [selectedMecanicoId, setSelectedMecanicoId] = useState<string>('');
     const [completionDescription, setCompletionDescription] = useState<string>('');
 
@@ -804,221 +806,199 @@ export default function AppointmentsIndex({
                                     </tr>
                                 ) : (
                                     appointments.data.map((a) => {
+                                        const isExpanded = expandedId === a.id;
                                         return (
-                                            <tr
-                                                key={a.id}
-                                                className="bg-card transition-colors hover:bg-muted/40"
-                                            >
-                                                <td className="px-4 py-3 font-medium text-foreground sm:px-6 sm:py-4">
-                                                    #{a.id}
-                                                </td>
-                                                <td
-                                                    className="truncate px-4 py-3 font-medium text-muted-foreground sm:px-6 sm:py-4"
-                                                    title={formatDate(
-                                                        a.scheduled_date,
-                                                    )}
+                                            <Fragment key={a.id}>
+                                                <tr
+                                                    className="bg-card cursor-pointer transition-colors hover:bg-muted/40"
+                                                    onClick={() => setExpandedId(isExpanded ? null : a.id)}
                                                 >
-                                                    {formatDate(
-                                                        a.scheduled_date,
-                                                    )}
-                                                </td>
-                                                <td
-                                                    className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                    title={a.service}
-                                                >
-                                                    {a.service}
-                                                </td>
-                                                <td
-                                                    className="truncate px-4 py-3 font-mono text-foreground sm:px-6 sm:py-4"
-                                                    title={a.license_plate}
-                                                >
-                                                    {a.license_plate}
-                                                </td>
-                                                <td
-                                                    className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                    title={
-                                                        a.conductor?.name || '-'
-                                                    }
-                                                >
-                                                    {a.conductor?.name || '-'}
-                                                </td>
-                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                                            TYPE_STYLES[a.type],
-                                                        )}
+                                                    <td className="px-4 py-3 font-medium text-foreground sm:px-6 sm:py-4">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200', isExpanded && 'rotate-180')} />
+                                                            #{a.id}
+                                                        </div>
+                                                    </td>
+                                                    <td
+                                                        className="truncate px-4 py-3 font-medium text-muted-foreground sm:px-6 sm:py-4"
+                                                        title={formatDate(a.scheduled_date)}
                                                     >
-                                                        {TYPE_LABEL[a.type]}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                                            STATUS_STYLES[
-                                                                a.status
-                                                            ],
-                                                        )}
+                                                        {formatDate(a.scheduled_date)}
+                                                    </td>
+                                                    <td
+                                                        className="truncate px-4 py-3 sm:px-6 sm:py-4"
+                                                        title={a.service}
                                                     >
-                                                        {STATUS_LABEL[a.status]}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                    {a.status ===
-                                                        'completado' &&
-                                                    a.completed_by ? (
-                                                        <span
-                                                            className="font-medium text-foreground"
-                                                            title={
-                                                                a.completed_by
-                                                                    .name
-                                                            }
-                                                        >
-                                                            {
-                                                                a.completed_by
-                                                                    .name
-                                                            }
+                                                        {a.service}
+                                                    </td>
+                                                    <td
+                                                        className="truncate px-4 py-3 font-mono text-foreground sm:px-6 sm:py-4"
+                                                        title={a.license_plate}
+                                                    >
+                                                        {a.license_plate}
+                                                    </td>
+                                                    <td
+                                                        className="truncate px-4 py-3 sm:px-6 sm:py-4"
+                                                        title={a.conductor?.name || '-'}
+                                                    >
+                                                        {a.conductor?.name || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
+                                                            {TYPE_LABEL[a.type]}
                                                         </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground/40 italic">
-                                                            -
+                                                    </td>
+                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
+                                                            {STATUS_LABEL[a.status]}
                                                         </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                    {a.status ===
-                                                        'completado' &&
-                                                    a.completed_at ? (
-                                                        <span className="text-muted-foreground">
-                                                            {formatDateTime(
-                                                                a.completed_at,
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground/40 italic">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td
-                                                    className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4"
-                                                    title={
-                                                        a.completion_description ||
-                                                        ''
-                                                    }
-                                                >
-                                                    {a.status ===
-                                                        'completado' &&
-                                                    a.completion_description ? (
-                                                        <span className="text-muted-foreground">
-                                                            {
-                                                                a.completion_description
-                                                            }
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground/40 italic">
-                                                            -
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4">
-                                                    {!isInversor && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger
-                                                            asChild
-                                                        >
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                className="h-8 w-8 p-0"
-                                                                disabled={isMechanic && a.status === 'completado'}
-                                                            >
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                                <span className="sr-only">
-                                                                    Acciones
-                                                                </span>
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>
-                                                                Cambiar estado
-                                                            </DropdownMenuLabel>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                disabled={
-                                                                    a.status ===
-                                                                    'agendado'
-                                                                }
-                                                                onSelect={() =>
-                                                                    changeStatus(
-                                                                        a.id,
-                                                                        'agendado',
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Clock className="h-4 w-4" />
-                                                                Marcar agendado
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                disabled={
-                                                                    a.status ===
-                                                                    'en_proceso'
-                                                                }
-                                                                onSelect={() =>
-                                                                    changeStatus(
-                                                                        a.id,
-                                                                        'en_proceso',
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Wrench className="h-4 w-4" />
-                                                                Marcar en
-                                                                proceso
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                disabled={
-                                                                    a.status ===
-                                                                    'completado'
-                                                                }
-                                                                onSelect={() =>
-                                                                    changeStatus(
-                                                                        a.id,
-                                                                        'completado',
-                                                                    )
-                                                                }
-                                                            >
-                                                                <CheckCircle2 className="h-4 w-4" />
-                                                                Marcar
-                                                                completado
-                                                            </DropdownMenuItem>
-                                                            {!isMechanic && (
-                                                                <>
+                                                    </td>
+                                                    <td className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                        {a.status === 'completado' && a.completed_by ? (
+                                                            <span className="font-medium text-foreground" title={a.completed_by.name}>
+                                                                {a.completed_by.name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground/40 italic">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                        {a.status === 'completado' && a.completed_at ? (
+                                                            <span className="text-muted-foreground">{formatDateTime(a.completed_at)}</span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground/40 italic">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                        {a.status === 'completado' && a.completion_description ? (
+                                                            <span className="text-muted-foreground">{a.completion_description}</span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground/40 italic">-</span>
+                                                        )}
+                                                    </td>
+                                                    <td
+                                                        className="px-4 py-3 text-right sm:px-6 sm:py-4"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        {!isInversor && (
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        className="h-8 w-8 p-0"
+                                                                        disabled={isMechanic && a.status === 'completado'}
+                                                                    >
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                        <span className="sr-only">Acciones</span>
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
                                                                     <DropdownMenuSeparator />
                                                                     <DropdownMenuItem
-                                                                        disabled={
-                                                                            a.status ===
-                                                                            'cancelado'
-                                                                        }
-                                                                        onSelect={() =>
-                                                                            changeStatus(
-                                                                                a.id,
-                                                                                'cancelado',
-                                                                            )
-                                                                        }
-                                                                        className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                                        disabled={a.status === 'agendado'}
+                                                                        onSelect={() => changeStatus(a.id, 'agendado')}
                                                                     >
-                                                                        <Ban className="h-4 w-4" />
-                                                                        Cancelar
-                                                                        turno
+                                                                        <Clock className="h-4 w-4" />
+                                                                        Marcar agendado
                                                                     </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                    )}
-                                                </td>
-                                            </tr>
+                                                                    <DropdownMenuItem
+                                                                        disabled={a.status === 'en_proceso'}
+                                                                        onSelect={() => changeStatus(a.id, 'en_proceso')}
+                                                                    >
+                                                                        <Wrench className="h-4 w-4" />
+                                                                        Marcar en proceso
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem
+                                                                        disabled={a.status === 'completado'}
+                                                                        onSelect={() => changeStatus(a.id, 'completado')}
+                                                                    >
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                        Marcar completado
+                                                                    </DropdownMenuItem>
+                                                                    {!isMechanic && (
+                                                                        <>
+                                                                            <DropdownMenuSeparator />
+                                                                            <DropdownMenuItem
+                                                                                disabled={a.status === 'cancelado'}
+                                                                                onSelect={() => changeStatus(a.id, 'cancelado')}
+                                                                                className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                                            >
+                                                                                <Ban className="h-4 w-4" />
+                                                                                Cancelar turno
+                                                                            </DropdownMenuItem>
+                                                                        </>
+                                                                    )}
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="bg-muted/20">
+                                                        <td colSpan={11} className="px-6 py-5">
+                                                            <div className="flex flex-col gap-4">
+                                                                {/* Info general */}
+                                                                <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Turno</p>
+                                                                        <p className="text-sm font-medium text-foreground">#{a.id}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha agendada</p>
+                                                                        <p className="text-sm text-foreground">{formatDate(a.scheduled_date)}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Patente</p>
+                                                                        <p className="font-mono text-sm font-medium text-foreground">{a.license_plate}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Solicitante</p>
+                                                                        <p className="text-sm text-foreground">{a.conductor?.name || <span className="italic text-muted-foreground">—</span>}</p>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Tipo</p>
+                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
+                                                                            {TYPE_LABEL[a.type]}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Estado</p>
+                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
+                                                                            {STATUS_LABEL[a.status]}
+                                                                        </span>
+                                                                    </div>
+                                                                    {a.completed_by && (
+                                                                        <div>
+                                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Completado por</p>
+                                                                            <p className="text-sm text-foreground">{a.completed_by.name}</p>
+                                                                        </div>
+                                                                    )}
+                                                                    {a.completed_at && (
+                                                                        <div>
+                                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha completado</p>
+                                                                            <p className="text-sm text-foreground">{formatDateTime(a.completed_at)}</p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {/* Servicio */}
+                                                                <div className="border-t border-border/60 pt-3">
+                                                                    <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Servicio</p>
+                                                                    <p className="text-sm text-foreground">{a.service}</p>
+                                                                </div>
+                                                                {/* Descripción */}
+                                                                {a.completion_description && (
+                                                                    <div className="border-t border-border/60 pt-3">
+                                                                        <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Descripción del trabajo realizado</p>
+                                                                        <p className="text-sm leading-relaxed text-foreground">{a.completion_description}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </Fragment>
                                         );
                                     })
                                 )}
@@ -1033,174 +1013,142 @@ export default function AppointmentsIndex({
                                 No hay turnos que coincidan con los filtros.
                             </li>
                         ) : (
-                            appointments.data.map((a) => (
-                                <li
-                                    key={a.id}
-                                    className="flex flex-col gap-2 p-4"
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-semibold text-foreground">
-                                                #{a.id}
-                                            </span>
-                                            <span
-                                                className={cn(
-                                                    'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-                                                    STATUS_STYLES[a.status],
-                                                )}
+                            appointments.data.map((a) => {
+                                const isExpanded = expandedId === a.id;
+                                return (
+                                    <li key={a.id} className="flex flex-col gap-2 p-4">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <button
+                                                type="button"
+                                                className="flex flex-wrap items-center gap-2"
+                                                onClick={() => setExpandedId(isExpanded ? null : a.id)}
                                             >
-                                                {STATUS_LABEL[a.status]}
+                                                <span className="font-semibold text-foreground">#{a.id}</span>
+                                                <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
+                                                    {STATUS_LABEL[a.status]}
+                                                </span>
+                                                <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-200', isExpanded && 'rotate-180')} />
+                                            </button>
+                                            {!isInversor && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="-mt-1 -mr-2 shrink-0"
+                                                            disabled={isMechanic && a.status === 'completado'}
+                                                        >
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                            <span className="sr-only">Acciones</span>
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator />
+                                                        <DropdownMenuItem disabled={a.status === 'agendado'} onSelect={() => changeStatus(a.id, 'agendado')}>
+                                                            <Clock className="h-4 w-4" />Marcar agendado
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem disabled={a.status === 'en_proceso'} onSelect={() => changeStatus(a.id, 'en_proceso')}>
+                                                            <Wrench className="h-4 w-4" />Marcar en proceso
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem disabled={a.status === 'completado'} onSelect={() => changeStatus(a.id, 'completado')}>
+                                                            <CheckCircle2 className="h-4 w-4" />Marcar completado
+                                                        </DropdownMenuItem>
+                                                        {!isMechanic && (
+                                                            <>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    disabled={a.status === 'cancelado'}
+                                                                    onSelect={() => changeStatus(a.id, 'cancelado')}
+                                                                    className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                                >
+                                                                    <Ban className="h-4 w-4" />Cancelar turno
+                                                                </DropdownMenuItem>
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span>{formatDate(a.scheduled_date)}</span>
+                                            <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium', TYPE_STYLES[a.type])}>
+                                                {TYPE_LABEL[a.type]}
                                             </span>
                                         </div>
-                                        {!isInversor && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="-mt-1 -mr-2 shrink-0"
-                                                    disabled={isMechanic && a.status === 'completado'}
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">
-                                                        Acciones
-                                                    </span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>
-                                                    Cambiar estado
-                                                </DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    disabled={
-                                                        a.status === 'agendado'
-                                                    }
-                                                    onSelect={() =>
-                                                        changeStatus(
-                                                            a.id,
-                                                            'agendado',
-                                                        )
-                                                    }
-                                                >
-                                                    <Clock className="h-4 w-4" />
-                                                    Marcar agendado
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    disabled={
-                                                        a.status ===
-                                                        'en_proceso'
-                                                    }
-                                                    onSelect={() =>
-                                                        changeStatus(
-                                                            a.id,
-                                                            'en_proceso',
-                                                        )
-                                                    }
-                                                >
-                                                    <Wrench className="h-4 w-4" />
-                                                    Marcar en proceso
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    disabled={
-                                                        a.status ===
-                                                        'completado'
-                                                    }
-                                                    onSelect={() =>
-                                                        changeStatus(
-                                                            a.id,
-                                                            'completado',
-                                                        )
-                                                    }
-                                                >
-                                                    <CheckCircle2 className="h-4 w-4" />
-                                                    Marcar completado
-                                                </DropdownMenuItem>
-                                                {!isMechanic && (
-                                                    <>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            disabled={
-                                                                a.status ===
-                                                                'cancelado'
-                                                            }
-                                                            onSelect={() =>
-                                                                changeStatus(
-                                                                    a.id,
-                                                                    'cancelado',
-                                                                )
-                                                            }
-                                                            className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
-                                                        >
-                                                            <Ban className="h-4 w-4" />
-                                                            Cancelar turno
-                                                        </DropdownMenuItem>
-                                                    </>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span>
-                                            {formatDate(a.scheduled_date)}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium',
-                                                TYPE_STYLES[a.type],
+
+                                        <p className="line-clamp-2 text-sm text-foreground">{a.service}</p>
+
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                            <span className="font-mono font-medium text-foreground">{a.license_plate}</span>
+                                            {a.conductor?.name && (
+                                                <span>Solicitante: <span className="text-foreground">{a.conductor.name}</span></span>
                                             )}
-                                        >
-                                            {TYPE_LABEL[a.type]}
-                                        </span>
-                                    </div>
-                                    <p className="line-clamp-2 text-sm text-foreground">
-                                        {a.service}
-                                    </p>
-                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                        <span className="font-mono font-medium text-foreground">
-                                            {a.license_plate}
-                                        </span>
-                                        {a.conductor?.name && (
-                                            <span>
-                                                Solicitante:{' '}
-                                                <span className="text-foreground">
-                                                    {a.conductor.name}
-                                                </span>
-                                            </span>
-                                        )}
-                                    </div>
-                                    {a.status === 'completado' &&
-                                        a.completed_by && (
-                                            <div className="text-xs text-muted-foreground">
-                                                Completado por{' '}
-                                                <span className="font-medium text-foreground">
-                                                    {a.completed_by.name}
-                                                </span>
-                                                {a.completed_at && (
-                                                    <>
-                                                        {' '}
-                                                        el{' '}
-                                                        <span className="font-medium text-foreground">
-                                                            {formatDateTime(
-                                                                a.completed_at,
-                                                            )}
+                                        </div>
+
+                                        {isExpanded && (
+                                            <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                                                {/* Grid de datos */}
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Turno</p>
+                                                        <p className="text-sm font-medium text-foreground">#{a.id}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha agendada</p>
+                                                        <p className="text-sm text-foreground">{formatDate(a.scheduled_date)}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Patente</p>
+                                                        <p className="font-mono text-sm font-medium text-foreground">{a.license_plate}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Solicitante</p>
+                                                        <p className="text-sm text-foreground">{a.conductor?.name || '—'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Tipo</p>
+                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
+                                                            {TYPE_LABEL[a.type]}
                                                         </span>
-                                                    </>
+                                                    </div>
+                                                    <div>
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Estado</p>
+                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
+                                                            {STATUS_LABEL[a.status]}
+                                                        </span>
+                                                    </div>
+                                                    {a.completed_by && (
+                                                        <div>
+                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Completado por</p>
+                                                            <p className="text-sm text-foreground">{a.completed_by.name}</p>
+                                                        </div>
+                                                    )}
+                                                    {a.completed_at && (
+                                                        <div>
+                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha completado</p>
+                                                            <p className="text-sm text-foreground">{formatDateTime(a.completed_at)}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* Servicio */}
+                                                <div className="border-t border-border/60 pt-2">
+                                                    <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Servicio</p>
+                                                    <p className="text-sm text-foreground">{a.service}</p>
+                                                </div>
+                                                {/* Descripción */}
+                                                {a.completion_description && (
+                                                    <div className="border-t border-border/60 pt-2">
+                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Descripción del trabajo realizado</p>
+                                                        <p className="text-sm leading-relaxed text-foreground">{a.completion_description}</p>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
-                                    {a.status === 'completado' &&
-                                        a.completion_description && (
-                                            <div className="text-xs text-muted-foreground">
-                                                <span className="font-medium text-foreground">
-                                                    Descripción:
-                                                </span>{' '}
-                                                {a.completion_description}
-                                            </div>
-                                        )}
-                                </li>
-                            ))
+                                    </li>
+                                );
+                            })
                         )}
                     </ul>
 

@@ -85,10 +85,34 @@ export function AppSidebar() {
     }
 
     if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
+        const currentRole = url.includes('/users') ? new URLSearchParams(url.split('?')[1] ?? '').get('role') : null;
+
         mainNavItems.push({
-            title: 'Usuarios',
+            title: 'Personal',
             href: '/users',
             icon: Users,
+            items: [
+                {
+                    title: 'Administración',
+                    href: '/users?role=administrador',
+                    isActive: currentRole === 'administrador',
+                },
+                {
+                    title: 'Mecánicos',
+                    href: '/users?role=mecanico',
+                    isActive: currentRole === 'mecanico',
+                },
+                {
+                    title: 'Choferes',
+                    href: '/users?role=chofer',
+                    isActive: currentRole === 'chofer',
+                },
+                {
+                    title: 'Inversores',
+                    href: '/users?role=inversor',
+                    isActive: currentRole === 'inversor',
+                },
+            ],
         });
     }
 

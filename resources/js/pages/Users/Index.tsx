@@ -1,5 +1,5 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Plus, Search, Camera } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
@@ -52,7 +52,6 @@ interface MonedaOption {
 interface Props {
     users: User[];
     roles: RoleOption[];
-    filterRoles: RoleOption[];
     empresas: Empresa[];
     monedas: MonedaOption[];
 }
@@ -109,7 +108,7 @@ function AvatarDropzone({
     );
 }
 
-export default function UsersIndex({ users, roles, filterRoles, empresas, monedas }: Props) {
+export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [previewImage, setPreviewImage] = useState<{
@@ -276,6 +275,16 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
     const urlParams = new URLSearchParams(window.location.search);
     const filterRole = urlParams.get('role');
     const filterStatus = urlParams.get('status');
+
+    useEffect(() => {
+        if (!filterRole) {
+            router.get(
+                usersIndex.url(),
+                { role: 'chofer', status: 'activos' },
+                { preserveState: false, replace: true },
+            );
+        }
+    }, []);
     const pageTitle = filterRole
         ? `Usuarios - ${filterRole.charAt(0).toUpperCase() + filterRole.slice(1)}`
         : 'Gestión de Usuarios';
@@ -310,74 +319,39 @@ export default function UsersIndex({ users, roles, filterRoles, empresas, moneda
                             />
                         </div>
 
-                        {/* Filtros de Rol */}
-                        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-1.5">
-                            {filterRoles.map((r) => (
+                        {/* Filtro activos/inactivos — solo visible en choferes */}
+                        {filterRole === 'chofer' && (
+                            <div className="flex gap-1.5">
                                 <Button
-                                    key={r.value}
-                                    variant={
-                                        filterRole === r.value && !filterStatus
-                                            ? 'default'
-                                            : 'outline'
-                                    }
+                                    variant={filterStatus === 'activos' ? 'default' : 'outline'}
                                     size="sm"
-                                    className={cn(
-                                        'h-9 rounded-md px-4 text-xs font-medium transition-all',
-                                        filterRole === r.value && !filterStatus
-                                            ? 'shadow-sm'
-                                            : '',
-                                    )}
+                                    className="h-9 rounded-md px-4 text-xs font-medium"
                                     onClick={() =>
                                         router.get(
                                             usersIndex.url(),
-                                            { role: r.value },
+                                            { role: 'chofer', status: filterStatus === 'activos' ? undefined : 'activos' },
                                             { preserveState: false },
                                         )
                                     }
                                 >
-                                    {r.label}
+                                    Activos
                                 </Button>
-                            ))}
-                            {filterRole === 'chofer' && (
-                                <>
-                                    <div className="mx-1 hidden w-px bg-border sm:block" />
-                                    <Button
-                                        variant={filterStatus === 'activos' ? 'default' : 'outline'}
-                                        size="sm"
-                                        className={cn(
-                                            'h-9 rounded-md px-4 text-xs font-medium transition-all',
-                                            filterStatus === 'activos' ? 'shadow-sm' : '',
-                                        )}
-                                        onClick={() =>
-                                            router.get(
-                                                usersIndex.url(),
-                                                { role: 'chofer', status: filterStatus === 'activos' ? undefined : 'activos' },
-                                                { preserveState: false },
-                                            )
-                                        }
-                                    >
-                                        Activos
-                                    </Button>
-                                    <Button
-                                        variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
-                                        size="sm"
-                                        className={cn(
-                                            'h-9 rounded-md px-4 text-xs font-medium transition-all',
-                                            filterStatus === 'inactivos' ? 'shadow-sm' : '',
-                                        )}
-                                        onClick={() =>
-                                            router.get(
-                                                usersIndex.url(),
-                                                { role: 'chofer', status: filterStatus === 'inactivos' ? undefined : 'inactivos' },
-                                                { preserveState: false },
-                                            )
-                                        }
-                                    >
-                                        Inactivos
-                                    </Button>
-                                </>
-                            )}
-                        </div>
+                                <Button
+                                    variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
+                                    size="sm"
+                                    className="h-9 rounded-md px-4 text-xs font-medium"
+                                    onClick={() =>
+                                        router.get(
+                                            usersIndex.url(),
+                                            { role: 'chofer', status: filterStatus === 'inactivos' ? undefined : 'inactivos' },
+                                            { preserveState: false },
+                                        )
+                                    }
+                                >
+                                    Inactivos
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Botón Acción */}

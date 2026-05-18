@@ -3,6 +3,7 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     Check,
+    ChevronDown,
     FileDown,
     History,
     Pencil,
@@ -10,7 +11,7 @@ import {
     Search,
     X,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             onSuccess: () => cancelEditPrice(),
         });
     }
+
+    // ─── Expandable rows ────────────────────────────────────────────────────
+    const [expandedId, setExpandedId] = useState<number | null>(null);
 
     // ─── Buscador de artículos ───────────────────────────────────────────────
     const [itemSearch, setItemSearch] = useState('');
@@ -368,95 +372,164 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     </tr>
                                 ) : (
                                     filteredItems.map((item) => {
-                                        const lowStock =
-                                            item.stock <= item.min_stock;
+                                        const lowStock = item.stock <= item.min_stock;
+                                        const isExpanded = expandedId === item.id;
+                                        const pct = item.min_stock > 0
+                                            ? Math.min(100, Math.round((item.stock / (item.min_stock * 3)) * 100))
+                                            : item.stock > 0 ? 100 : 0;
+                                        const barColor = item.stock === 0
+                                            ? 'bg-red-500'
+                                            : lowStock
+                                                ? 'bg-orange-400'
+                                                : pct < 60
+                                                    ? 'bg-yellow-400'
+                                                    : 'bg-green-500';
+                                        const statusLabel = item.stock === 0
+                                            ? 'Sin stock'
+                                            : lowStock
+                                                ? 'Stock crítico'
+                                                : 'Normal';
+                                        const statusColor = item.stock === 0
+                                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                                            : lowStock
+                                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
+                                                : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
                                         return (
-                                            <tr
-                                                key={item.id}
-                                                className={cn(
-                                                    'transition-colors',
-                                                    lowStock
-                                                        ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
-                                                        : 'bg-card hover:bg-muted/40',
-                                                )}
-                                            >
-                                                <td
+                                            <Fragment key={item.id}>
+                                                <tr
                                                     className={cn(
-                                                        'px-4 py-3 font-medium whitespace-nowrap sm:px-6 sm:py-4',
+                                                        'cursor-pointer transition-colors',
                                                         lowStock
-                                                            ? 'text-red-800 dark:text-red-300'
-                                                            : 'text-foreground',
+                                                            ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
+                                                            : 'bg-card hover:bg-muted/40',
                                                     )}
+                                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                                 >
-                                                    {item.descripcion}
-                                                </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
-                                                    <span
-                                                        className={
+                                                    <td
+                                                        className={cn(
+                                                            'px-4 py-3 font-medium sm:px-6 sm:py-4',
                                                             lowStock
-                                                                ? 'font-semibold text-red-700 dark:text-red-400'
-                                                                : ''
-                                                        }
+                                                                ? 'text-red-800 dark:text-red-300'
+                                                                : 'text-foreground',
+                                                        )}
                                                     >
-                                                        {item.stock}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4" title={String(item.min_stock)}>
-                                                    {item.min_stock}
-                                                </td>
-                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                    {editingPriceId === item.id ? (
-                                                        <div className="flex items-center gap-1">
-                                                            <Input
-                                                                type="number"
-                                                                min="0"
-                                                                step="0.01"
-                                                                value={editingPriceValue}
-                                                                onChange={(e) => setEditingPriceValue(e.target.value)}
-                                                                onKeyDown={(e) => {
-                                                                    if (e.key === 'Enter') submitPrice(item);
-                                                                    if (e.key === 'Escape') cancelEditPrice();
-                                                                }}
-                                                                className="h-7 w-24 text-xs"
-                                                                autoFocus
-                                                            />
-                                                            <button type="button" onClick={() => submitPrice(item)} className="text-foreground hover:text-foreground/80">
-                                                                <Check className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
-                                                                <X className="h-3.5 w-3.5" />
-                                                            </button>
+                                                        <div className="flex items-center gap-2">
+                                                            <ChevronDown className={cn(
+                                                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                                                                isExpanded && 'rotate-180',
+                                                            )} />
+                                                            <span className="truncate">{item.descripcion}</span>
                                                         </div>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            className={cn(
-                                                                'inline-flex items-center gap-1 text-sm',
-                                                                isAdmin && 'cursor-pointer hover:underline',
-                                                            )}
-                                                            onClick={() => isAdmin && startEditPrice(item)}
-                                                            disabled={!isAdmin}
-                                                        >
-                                                            {formatARS(Number(item.precio))}
-                                                            {isAdmin && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                                                        </button>
-                                                    )}
-                                                </td>
-                                                {canWrite && (
-                                                    <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() =>
-                                                                openMovModal(item)
-                                                            }
-                                                        >
-                                                            <ArrowUpCircle className="h-4 w-4" />
-                                                            <span className="hidden sm:inline">Salida</span>
-                                                        </Button>
                                                     </td>
+                                                    <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                        <span className={lowStock ? 'font-semibold text-red-700 dark:text-red-400' : ''}>
+                                                            {item.stock}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                        {item.min_stock}
+                                                    </td>
+                                                    <td className="px-4 py-3 sm:px-6 sm:py-4" onClick={(e) => e.stopPropagation()}>
+                                                        {editingPriceId === item.id ? (
+                                                            <div className="flex items-center gap-1">
+                                                                <Input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    value={editingPriceValue}
+                                                                    onChange={(e) => setEditingPriceValue(e.target.value)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (e.key === 'Enter') submitPrice(item);
+                                                                        if (e.key === 'Escape') cancelEditPrice();
+                                                                    }}
+                                                                    className="h-7 w-24 text-xs"
+                                                                    autoFocus
+                                                                />
+                                                                <button type="button" onClick={() => submitPrice(item)} className="text-foreground hover:text-foreground/80">
+                                                                    <Check className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
+                                                                    <X className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                className={cn(
+                                                                    'inline-flex items-center gap-1 text-sm',
+                                                                    isAdmin && 'cursor-pointer hover:underline',
+                                                                )}
+                                                                onClick={() => isAdmin && startEditPrice(item)}
+                                                                disabled={!isAdmin}
+                                                            >
+                                                                {formatARS(Number(item.precio))}
+                                                                {isAdmin && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                                                            </button>
+                                                        )}
+                                                    </td>
+                                                    {canWrite && (
+                                                        <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4" onClick={(e) => e.stopPropagation()}>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => openMovModal(item)}
+                                                            >
+                                                                <ArrowUpCircle className="h-4 w-4" />
+                                                                <span className="hidden sm:inline">Salida</span>
+                                                            </Button>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="bg-muted/20">
+                                                        <td colSpan={canWrite ? 5 : 4} className="px-6 py-4">
+                                                            <div className="flex flex-col gap-3">
+                                                                {/* Barra de stock */}
+                                                                <div className="flex flex-col gap-1">
+                                                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                                        <span>Nivel de stock</span>
+                                                                        <span>{item.stock} / mín. {item.min_stock}</span>
+                                                                    </div>
+                                                                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                                                                        <div
+                                                                            className={cn('h-full rounded-full transition-all', barColor)}
+                                                                            style={{ width: `${pct}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                                {/* Info grid */}
+                                                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-muted-foreground">Estado:</span>
+                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColor)}>
+                                                                            {statusLabel}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-muted-foreground">Precio unitario:</span>
+                                                                        <span className="font-medium">{formatARS(Number(item.precio))}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-muted-foreground">Valor total en stock:</span>
+                                                                        <span className="font-medium">{formatARS(Number(item.precio) * item.stock)}</span>
+                                                                    </div>
+                                                                    {canWrite && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="ml-auto"
+                                                                            onClick={(e) => { e.stopPropagation(); openMovModal(item); }}
+                                                                        >
+                                                                            <ArrowUpCircle className="h-4 w-4" />
+                                                                            Registrar salida
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </tr>
+                                            </Fragment>
                                         );
                                     })
                                 )}
@@ -474,66 +547,103 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         ) : (
                             filteredItems.map((item) => {
                                 const lowStock = item.stock <= item.min_stock;
+                                const isExpanded = expandedId === item.id;
+                                const pct = item.min_stock > 0
+                                    ? Math.min(100, Math.round((item.stock / (item.min_stock * 3)) * 100))
+                                    : item.stock > 0 ? 100 : 0;
+                                const barColor = item.stock === 0
+                                    ? 'bg-red-500'
+                                    : lowStock ? 'bg-orange-400'
+                                    : pct < 60 ? 'bg-yellow-400'
+                                    : 'bg-green-500';
+                                const statusLabel = item.stock === 0
+                                    ? 'Sin stock'
+                                    : lowStock ? 'Stock crítico'
+                                    : 'Normal';
+                                const statusColor = item.stock === 0
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                                    : lowStock
+                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
+                                        : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
                                 return (
                                     <li
                                         key={item.id}
                                         className={cn(
-                                            'flex items-start justify-between gap-3 p-4',
-                                            lowStock &&
-                                                'bg-red-50 dark:bg-red-950/30',
+                                            'flex flex-col gap-0',
+                                            lowStock && 'bg-red-50 dark:bg-red-950/30',
                                         )}
                                     >
-                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                            <p
-                                                className={cn(
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-start justify-between gap-3 p-4 text-left"
+                                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
+                                        >
+                                            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                <p className={cn(
                                                     'line-clamp-2 text-sm font-semibold',
-                                                    lowStock
-                                                        ? 'text-red-800 dark:text-red-300'
-                                                        : 'text-foreground',
-                                                )}
-                                            >
-                                                {item.descripcion}
-                                            </p>
-                                            <div className="flex items-baseline gap-4 text-xs">
-                                                <span>
-                                                    Stock:{' '}
-                                                    <span
-                                                        className={cn(
+                                                    lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
+                                                )}>
+                                                    {item.descripcion}
+                                                </p>
+                                                <div className="flex items-baseline gap-4 text-xs">
+                                                    <span>
+                                                        Stock:{' '}
+                                                        <span className={cn(
                                                             'text-base font-semibold',
-                                                            lowStock
-                                                                ? 'text-red-700 dark:text-red-400'
-                                                                : 'text-foreground',
-                                                        )}
-                                                    >
-                                                        {item.stock}
+                                                            lowStock ? 'text-red-700 dark:text-red-400' : 'text-foreground',
+                                                        )}>
+                                                            {item.stock}
+                                                        </span>
                                                     </span>
-                                                </span>
-                                                <span className="text-muted-foreground">
-                                                    Mín:{' '}
-                                                    <span className="font-medium">
-                                                        {item.min_stock}
+                                                    <span className="text-muted-foreground">
+                                                        Mín: <span className="font-medium">{item.min_stock}</span>
                                                     </span>
-                                                </span>
-                                                <span className="text-muted-foreground">
-                                                    Precio:{' '}
-                                                    <span className="font-medium">
-                                                        {formatARS(Number(item.precio))}
+                                                    <span className="text-muted-foreground">
+                                                        Precio: <span className="font-medium">{formatARS(Number(item.precio))}</span>
                                                     </span>
-                                                </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                        {canWrite && (
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    openMovModal(item)
-                                                }
-                                                className="shrink-0"
-                                            >
-                                                <ArrowUpCircle className="h-4 w-4" />
-                                                Salida
-                                            </Button>
+                                            <ChevronDown className={cn(
+                                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 mt-0.5',
+                                                isExpanded && 'rotate-180',
+                                            )} />
+                                        </button>
+                                        {isExpanded && (
+                                            <div className="border-t border-border bg-muted/20 px-4 pb-4 pt-3">
+                                                <div className="flex flex-col gap-3">
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                            <span>Nivel de stock</span>
+                                                            <span>{item.stock} / mín. {item.min_stock}</span>
+                                                        </div>
+                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className={cn('h-full rounded-full transition-all', barColor)}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColor)}>
+                                                            {statusLabel}
+                                                        </span>
+                                                        <span className="text-muted-foreground text-xs">
+                                                            Valor total: <span className="font-medium text-foreground">{formatARS(Number(item.precio) * item.stock)}</span>
+                                                        </span>
+                                                        {canWrite && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="ml-auto"
+                                                                onClick={(e) => { e.stopPropagation(); openMovModal(item); }}
+                                                            >
+                                                                <ArrowUpCircle className="h-4 w-4" />
+                                                                Salida
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
                                     </li>
                                 );
