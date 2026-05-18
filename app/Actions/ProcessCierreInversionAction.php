@@ -39,7 +39,7 @@ class ProcessCierreInversionAction
             // 1. Cargar todas las inversiones (orden natural determina el ranking)
             $inversiones = Inversion::with([
                 'inversores' => fn ($q) => $q->orderBy('users.name'),
-            ])->orderByRaw('nombre + 0, nombre')->get();
+            ])->orderByRaw('LENGTH(nombre), nombre')->get();
 
             // 2. Validar que recaudaciones cubre TODAS las inversiones
             $inversionIds = $inversiones->pluck('id')->all();
