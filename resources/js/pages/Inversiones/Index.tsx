@@ -97,6 +97,16 @@ export default function InversionesIndex({
         [inversiones, maxInversores],
     );
 
+    const deudas = useMemo(
+        () =>
+            inversiones.flatMap((inv) =>
+                inv.inversores
+                    .filter((u) => u.tiene_deuda)
+                    .map((u) => ({ inversion: inv, usuario: u })),
+            ),
+        [inversiones],
+    );
+
     return (
         <>
             <Head title="Inversiones" />
@@ -266,6 +276,33 @@ export default function InversionesIndex({
                         </div>
                     </aside>
                 </div>
+
+                {/* Deudas pendientes */}
+                {deudas.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-base font-semibold text-foreground">
+                                Deudas pendientes
+                            </h2>
+                            <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                {deudas.length}
+                            </span>
+                        </div>
+                        <div className="overflow-hidden rounded-xl border border-red-500/20 bg-card shadow-sm">
+                            <ul className="divide-y divide-border">
+                                {deudas.map(({ inversion, usuario }) => (
+                                    <PagoRapidoRow
+                                        key={`${inversion.id}-${usuario.id}`}
+                                        inversionId={inversion.id}
+                                        inversionNombre={inversion.nombre}
+                                        usuario={usuario}
+                                        tasa={ultimoCierre?.tasa ?? null}
+                                    />
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {manageOpen && (
@@ -766,5 +803,95 @@ function DeudaPanel({
                 </p>
             )}
         </div>
+    );
+}
+
+// ─── Pago Rápido Row ──────────────────────────────────────────────────────
+
+function PagoRapidoRow({
+    inversionId,
+    inversionNombre,
+    usuario,
+    tasa,
+}: {
+    inversionId: number;
+    inversionNombre: string;
+    usuario: InversorAsignado;
+    tasa: number | null;
+}) {
+    const [pago, setPago] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [err, setErr] = useState<string | null>(null);
+    const [localSaldo, setLocalSaldo] = useState(usuario.saldo_deuda);
+
+    function submit() {
+        const monto = parseFloat(pago.replace(',', '.'));
+        if (!Number.isFinite(monto) || monto <= 0) {
+            setErr('Monto inválido.');
+            return;
+        }
+        setBusy(true);
+        setErr(null);
+        router.post(
+            `/inversiones/${inversionId}/inversores/${usuario.id}/deuda`,
+            { tipo: 'pago', monto, descripcion: null },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    setLocalSaldo((prev) => Math.max(0, prev - monto));
+                    setPago('');
+                },
+                onError: (errs) => {
+                    setErr(Object.values(errs).join(' ') || 'Error al registrar.');
+                },
+                onFinish: () => setBusy(false),
+            },
+        );
+    }
+
+    return (
+        <li className="flex flex-wrap items-center gap-4 px-5 py-3.5">
+            <span className="h-8 w-[3px] shrink-0 rounded-r-full bg-red-500/70" />
+            <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground">{usuario.name}</p>
+                <p className="text-[11px] text-muted-foreground">{inversionNombre}</p>
+            </div>
+            <div className="hidden flex-col items-end gap-0.5 shrink-0 sm:flex">
+                <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                    Saldo adeudado
+                </span>
+                <MoneyDual
+                    ars={localSaldo}
+                    tasa={tasa}
+                    orientation="stacked"
+                    size="md"
+                    className="items-end"
+                    arsClassName="text-red-500 dark:text-red-400"
+                />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Monto ARS"
+                    value={pago}
+                    onChange={(e) => setPago(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && submit()}
+                    className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+                <Button
+                    size="sm"
+                    disabled={busy || !pago || localSaldo <= 0}
+                    onClick={submit}
+                >
+                    {busy ? '...' : 'Aplicar pago'}
+                </Button>
+            </div>
+            {err && (
+                <p className="w-full text-[11px] text-red-700 dark:text-red-400">{err}</p>
+            )}
+        </li>
     );
 }

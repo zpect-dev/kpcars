@@ -67,6 +67,12 @@ export default function Dashboard({
     const { auth } = usePage<any>().props;
     const isInversor = auth?.user?.role === 'inversor';
 
+    useEffect(() => {
+        if (isInversor) {
+            router.replace('/mi-cuenta');
+        }
+    }, [isInversor]);
+
     const FILTERS_STORAGE_KEY = 'vehiculos:filters';
     const storedFilters = (() => {
         if (typeof window === 'undefined') return null;

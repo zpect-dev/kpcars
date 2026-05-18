@@ -36,7 +36,28 @@ export function AppSidebar() {
 
     const mainNavItems: NavItem[] = [];
 
-    if (auth.user.role !== 'mecanico') {
+    if (auth.user.role === 'inversor') {
+        // Inversores only see Mi Cuenta
+        mainNavItems.push({
+            title: 'Mi Cuenta',
+            href: '/mi-cuenta',
+            icon: Wallet,
+        });
+    } else if (auth.user.role === 'mecanico') {
+        mainNavItems.push(
+            {
+                title: 'Turnos',
+                href: '/appointments',
+                icon: CalendarClock,
+            },
+            {
+                title: 'Inventario',
+                href: articulosIndex.url(),
+                icon: Package,
+            },
+        );
+    } else {
+        // Admin / other roles — full nav
         mainNavItems.push({
             title: 'Vehículos',
             href: dashboard.url(),
@@ -49,7 +70,7 @@ export function AppSidebar() {
             icon: Package,
         });
 
-        if ((auth.user.role === 'administrador' && auth.user.absoluto) || auth.user.role === 'inversor') {
+        if (auth.user.role === 'administrador' && auth.user.absoluto) {
             mainNavItems.push({
                 title: 'Cobros',
                 href: cobrosIndex.url(),
@@ -68,23 +89,7 @@ export function AppSidebar() {
             href: '/revisiones',
             icon: ClipboardCheck,
         });
-    } else {
-        // Mechanic gets Turnos first, then Inventario
-        mainNavItems.push(
-            {
-                title: 'Turnos',
-                href: '/appointments',
-                icon: CalendarClock,
-            },
-            {
-                title: 'Inventario',
-                href: articulosIndex.url(),
-                icon: Package,
-            },
-        );
-    }
 
-    if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
         const currentRole = url.includes('/users') ? new URLSearchParams(url.split('?')[1] ?? '').get('role') : null;
 
         mainNavItems.push({
@@ -114,22 +119,14 @@ export function AppSidebar() {
                 },
             ],
         });
-    }
 
-    if (auth.user.role === 'administrador' && auth.user.absoluto) {
-        mainNavItems.push({
-            title: 'Inversiones',
-            href: '/inversiones',
-            icon: Wallet,
-        });
-    }
-
-    if (auth.user.role === 'inversor' && auth.user.tiene_inversiones) {
-        mainNavItems.push({
-            title: 'Mi Cuenta',
-            href: '/mi-cuenta',
-            icon: Wallet,
-        });
+        if (auth.user.absoluto) {
+            mainNavItems.push({
+                title: 'Inversiones',
+                href: '/inversiones',
+                icon: Wallet,
+            });
+        }
     }
 
     return (
@@ -138,8 +135,12 @@ export function AppSidebar() {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link 
-                                href={auth.user.role === 'mecanico' ? '/appointments' : dashboard.url()} 
+                            <Link
+                                href={
+                                    auth.user.role === 'mecanico' ? '/appointments' :
+                                    auth.user.role === 'inversor' ? '/mi-cuenta' :
+                                    dashboard.url()
+                                }
                                 prefetch
                             >
                                 <AppLogo />

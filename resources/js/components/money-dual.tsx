@@ -4,14 +4,16 @@ export function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
         currency: 'ARS',
+        currencyDisplay: 'code',
         minimumFractionDigits: 2,
     }).format(value);
 }
 
 export function formatUSD(value: number): string {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('es-AR', {
         style: 'currency',
         currency: 'USD',
+        currencyDisplay: 'code',
         minimumFractionDigits: 2,
     }).format(value);
 }

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(php artisan *)",
       "Bash(git stash *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "WebFetch(domain:api.anthropic.com)"
     ]
   }
 }

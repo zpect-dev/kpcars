@@ -57,7 +57,7 @@ class MiCuentaController extends Controller
 
         // Historial de cierres en los que cobró el inversor
         $pagosPorCierre = CierreInversionPago::with([
-            'cierre:id,periodo_inicio,periodo_fin,created_at',
+            'cierre:id,periodo_inicio,periodo_fin,tasa,created_at',
             'inversion:id,nombre',
         ])
             ->where('user_id', $user->id)
@@ -73,6 +73,7 @@ class MiCuentaController extends Controller
                 'periodo_inicio' => $cierre?->periodo_inicio?->toIso8601String(),
                 'periodo_fin' => $cierre?->periodo_fin?->toIso8601String(),
                 'total' => (float) $pagos->sum(fn ($p) => (float) $p->monto),
+                'tasa' => $cierre?->tasa ? (float) $cierre->tasa : null,
                 'detalles' => $pagos->map(fn ($p) => [
                     'inversion' => $p->inversion?->nombre,
                     'concepto' => $p->concepto,
@@ -81,20 +82,8 @@ class MiCuentaController extends Controller
             ];
         })->values();
 
-        // Tasa actual = la del último cierre (para mostrar todo en ARS + USD)
+        // Tasa actual = la del último cierre
         $tasaActual = CierreInversion::latest('periodo_fin')->value('tasa');
-
-        $cierresConTasa = CierreInversionPago::query()
-            ->whereIn('cierre_id', $pagosPorCierre->keys())
-            ->join('cierres_inversion', 'cierres_inversion_pagos.cierre_id', '=', 'cierres_inversion.id')
-            ->groupBy('cierre_id')
-            ->pluck('cierres_inversion.tasa', 'cierre_id');
-
-        // Re-mapear cierres con su tasa específica
-        $cierres = $cierres->map(function ($c) use ($cierresConTasa) {
-            $c['tasa'] = isset($cierresConTasa[$c['id']]) ? (float) $cierresConTasa[$c['id']] : null;
-            return $c;
-        });
 
         return Inertia::render('MiCuenta/Index', [
             'inversiones' => $inversiones,
