@@ -36,12 +36,10 @@ function formatARS(value: number | string): string {
 
 function formatDate(d: string | null): string {
     if (!d) return '—';
-    return new Date(d).toLocaleString('es-AR', {
+    return new Date(d).toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
     });
 }
 
@@ -80,16 +78,13 @@ export default function CierresIndex({ cierres }: Props) {
                                 <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                     <tr>
                                         <th className="px-4 py-3 font-medium tracking-wider sm:px-6">
-                                            Período
+                                            Cierre
                                         </th>
                                         <th className="px-4 py-3 font-medium tracking-wider sm:px-6">
                                             Ejecutado por
                                         </th>
                                         <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">
                                             Recaudado
-                                        </th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">
-                                            Distribuido
                                         </th>
                                         <th className="px-4 py-3 text-right sm:px-6"></th>
                                     </tr>
@@ -100,11 +95,9 @@ export default function CierresIndex({ cierres }: Props) {
                                             <td className="px-4 py-3 sm:px-6">
                                                 <div className="flex items-center gap-2">
                                                     <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    <div>
-                                                        <div className="text-xs">
-                                                            {formatDate(c.periodo_inicio)} → {formatDate(c.periodo_fin)}
-                                                        </div>
-                                                    </div>
+                                                    <span className="text-xs">
+                                                        {formatDate(c.periodo_fin)}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 sm:px-6">
@@ -119,15 +112,6 @@ export default function CierresIndex({ cierres }: Props) {
                                                     className="items-end"
                                                 />
                                             </td>
-                                            <td className="px-4 py-3 text-right font-medium sm:px-6">
-                                                <MoneyDual
-                                                    ars={Number(c.total_distribuido)}
-                                                    tasa={c.tasa ? Number(c.tasa) : null}
-                                                    orientation="stacked"
-                                                    size="md"
-                                                    className="items-end"
-                                                />
-                                            </td>
                                             <td className="px-4 py-3 text-right sm:px-6">
                                                 <Button
                                                     variant="outline"
@@ -136,7 +120,7 @@ export default function CierresIndex({ cierres }: Props) {
                                                         router.get(`/cierres-inversion/${c.id}`)
                                                     }
                                                 >
-                                                    Ver
+                                                    Detalles
                                                     <ArrowRight className="ml-1 h-3.5 w-3.5" />
                                                 </Button>
                                             </td>
@@ -155,7 +139,7 @@ export default function CierresIndex({ cierres }: Props) {
                                         </p>
                                         <div className="mt-0.5">
                                             <MoneyDual
-                                                ars={Number(c.total_distribuido)}
+                                                ars={Number(c.total_recaudado)}
                                                 tasa={c.tasa ? Number(c.tasa) : null}
                                                 orientation="stacked"
                                                 size="md"
@@ -170,7 +154,7 @@ export default function CierresIndex({ cierres }: Props) {
                                         size="sm"
                                         onClick={() => router.get(`/cierres-inversion/${c.id}`)}
                                     >
-                                        Ver
+                                        Detalles
                                     </Button>
                                 </li>
                             ))}

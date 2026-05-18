@@ -45,6 +45,10 @@ class HandleInertiaRequests extends Middleware
                     'dni' => $request->user()->dni,
                     'correo' => $request->user()->correo,
                     'role' => $request->user()->role,
+                    'absoluto' => (bool) $request->user()->absoluto,
+                    'tiene_inversiones' => $request->user()->isInversor()
+                        ? $request->user()->inversiones()->exists()
+                        : false,
                     'empresa_id' => $request->user()->empresa_id,
                     'profile_photo_url' => $request->user()->profile_photo_url,
                 ] : null,

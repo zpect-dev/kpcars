@@ -24,7 +24,7 @@ class InversionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         // Saldos por inversion+user (cargos - pagos)
         $saldos = DeudaMovimiento::query()
@@ -41,8 +41,9 @@ class InversionController extends Controller
             : collect();
 
         $inversiones = Inversion::with(['empresa:id,nombre', 'inversores:id,name,dni'])
-            ->orderBy('nombre')
             ->get()
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
             ->map(function (Inversion $inv) use ($saldos, $recaudacionUltimoCierre) {
                 return [
                     'id' => $inv->id,
@@ -77,7 +78,7 @@ class InversionController extends Controller
             'id' => $u->id,
             'name' => $u->name,
             'cobrado_ultimo_cierre' => (float) ($pagosUltimoCierre[$u->id] ?? 0),
-        ])->sortByDesc('cobrado_ultimo_cierre')->values();
+        ])->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)->values();
 
         return Inertia::render('Inversiones/Index', [
             'inversiones' => $inversiones,
@@ -98,7 +99,7 @@ class InversionController extends Controller
      */
     public function attachInversor(Request $request, Inversion $inversion): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -140,7 +141,7 @@ class InversionController extends Controller
      */
     public function updateInversor(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $validated = $request->validate([
             'tiene_deuda' => ['required', 'boolean'],
@@ -161,7 +162,7 @@ class InversionController extends Controller
      */
     public function detachInversor(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $inversion->inversores()->detach($user->id);
 
@@ -176,7 +177,7 @@ class InversionController extends Controller
      */
     public function syncInversores(Request $request, Inversion $inversion): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         $validated = $request->validate([
             'inversores' => ['present', 'array'],
@@ -226,7 +227,7 @@ class InversionController extends Controller
      */
     public function showDeuda(Request $request, Inversion $inversion, User $user): Response
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         abort_unless($inversion->inversores()->where('user_id', $user->id)->exists(), 404);
 
@@ -260,7 +261,7 @@ class InversionController extends Controller
      */
     public function storeDeudaMovimiento(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403);
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
 
         abort_unless($inversion->inversores()->where('user_id', $user->id)->exists(), 404);
 

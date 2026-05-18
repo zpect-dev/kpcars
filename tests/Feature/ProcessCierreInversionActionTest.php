@@ -276,7 +276,53 @@ it('redistribuye equitativamente entre multiples financiadores', function () {
     expect($redistB)->toBe(16.67);
 });
 
-it('orden alfabetico determina el ranking, no el orden de creacion', function () {
+it('nombres numericos usan orden natural, no lexicografico (7 < 10)', function () {
+    [$A, $B, $C, $D, $E, $F] = makeInversores(6);
+
+    // Crear inversiones con nombres numéricos que rompen el orden lexicográfico
+    $invs = [];
+    foreach (['7', '8', '9', '10'] as $n) {
+        $invs[$n] = makeInversionWith6($n, [$A, $B, $C, $D, $E, $F], [
+            0 => ['tiene_deuda' => true],
+            4 => ['es_financiador' => true],
+        ]);
+    }
+
+    $recaud = [];
+    foreach ($invs as $inv) {
+        $recaud[$inv->id] = 600;
+    }
+
+    $cierre = $this->action->execute($recaud, $this->admin);
+
+    // Orden natural: 7 (1ra), 8 (2da), 9 (3ra), 10 (4ta)
+    // A cobra mitad en 7 y 8, cero en 9 y 10
+    $a7 = (float) CierreInversionPago::where('cierre_id', $cierre->id)
+        ->where('user_id', $A->id)
+        ->where('inversion_id', $invs['7']->id)
+        ->value('monto');
+    expect($a7)->toBe(50.0);
+
+    $a8 = (float) CierreInversionPago::where('cierre_id', $cierre->id)
+        ->where('user_id', $A->id)
+        ->where('inversion_id', $invs['8']->id)
+        ->value('monto');
+    expect($a8)->toBe(50.0);
+
+    $a9 = (float) CierreInversionPago::where('cierre_id', $cierre->id)
+        ->where('user_id', $A->id)
+        ->where('inversion_id', $invs['9']->id)
+        ->value('monto');
+    expect($a9)->toBe(0.0);
+
+    $a10 = (float) CierreInversionPago::where('cierre_id', $cierre->id)
+        ->where('user_id', $A->id)
+        ->where('inversion_id', $invs['10']->id)
+        ->value('monto');
+    expect($a10)->toBe(0.0);
+});
+
+it('orden natural determina el ranking, no el orden de creacion', function () {
     [$A, $B, $C, $D, $E, $F] = makeInversores(6);
 
     // Crear primero "Zeta", luego "Alpha". Alpha es alfabéticamente primera.
@@ -293,7 +339,7 @@ it('orden alfabetico determina el ranking, no el orden de creacion', function ()
         4 => ['es_financiador' => true],
     ]);
 
-    // Ranking alfabético: Alpha (1ra), Beta (2da), Zeta (3ra)
+    // Ranking natural: Alpha (1ra), Beta (2da), Zeta (3ra)
     $cierre = $this->action->execute([
         $zeta->id => 600,
         $alpha->id => 600,

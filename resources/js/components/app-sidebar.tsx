@@ -49,7 +49,7 @@ export function AppSidebar() {
             icon: Package,
         });
 
-        if (auth.user.role === 'administrador' || auth.user.role === 'inversor') {
+        if ((auth.user.role === 'administrador' && auth.user.absoluto) || auth.user.role === 'inversor') {
             mainNavItems.push({
                 title: 'Cobros',
                 href: cobrosIndex.url(),
@@ -116,7 +116,7 @@ export function AppSidebar() {
         });
     }
 
-    if (auth.user.role === 'administrador') {
+    if (auth.user.role === 'administrador' && auth.user.absoluto) {
         mainNavItems.push({
             title: 'Inversiones',
             href: '/inversiones',
@@ -124,7 +124,7 @@ export function AppSidebar() {
         });
     }
 
-    if (auth.user.role === 'inversor') {
+    if (auth.user.role === 'inversor' && auth.user.tiene_inversiones) {
         mainNavItems.push({
             title: 'Mi Cuenta',
             href: '/mi-cuenta',

@@ -95,7 +95,10 @@ export interface CobroResumenInversion {
 }
 
 export interface CierreDetalle {
+    inversion_id: number;
+    empresa_id: number;
     inversion_nombre: string;
+    empresa_nombre: string;
     total: number;
 }
 
