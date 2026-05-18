@@ -22,7 +22,7 @@ class ProcessCierreInversionAction
      *  - Toda inversión con deudores debe tener ≥1 financiador.
      *  - Debe cargarse recaudación para TODAS las inversiones (cero permitido).
      *  - El ranking de deuda de cada inversor se computa sobre TODAS las inversiones donde
-     *    el inversor tiene tiene_deuda=true, ordenadas alfabéticamente por nombre.
+     *    el inversor tiene tiene_deuda=true, ordenadas por nombre (orden natural).
      *  - 1ra y 2da del ranking: deudor cobra parte/2; la otra mitad se redistribuye entre
      *    los financiadores de esa misma inversión.
      *  - 3ra+ del ranking: deudor cobra 0; la parte completa se redistribuye.
@@ -36,10 +36,10 @@ class ProcessCierreInversionAction
     public function execute(array $recaudaciones, User $admin, ?float $tasa = null): CierreInversion
     {
         return DB::transaction(function () use ($recaudaciones, $admin, $tasa) {
-            // 1. Cargar todas las inversiones (orden alfabético determina el ranking)
+            // 1. Cargar todas las inversiones (orden natural determina el ranking)
             $inversiones = Inversion::with([
                 'inversores' => fn ($q) => $q->orderBy('users.name'),
-            ])->orderBy('nombre')->get();
+            ])->orderByRaw('nombre + 0, nombre')->get();
 
             // 2. Validar que recaudaciones cubre TODAS las inversiones
             $inversionIds = $inversiones->pluck('id')->all();
