@@ -51,6 +51,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
     Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
     Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
+    Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
 
     Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
 
@@ -73,6 +74,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
 
     Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
+    Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
     Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
     Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 

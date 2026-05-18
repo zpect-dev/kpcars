@@ -2,7 +2,10 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     ArrowRight,
     Calendar,
+    ChevronDown,
+    ChevronRight,
     CircleDollarSign,
+    Car,
     Lock,
     Receipt,
     User,
@@ -18,8 +21,13 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { index, show, cierre } from '@/routes/cobros';
-import type { CierreHistorial, CobroResumenInversion } from '@/types';
+import { index, show, cierre, cierreDesglose } from '@/routes/cobros';
+import type {
+    CierreHistorial,
+    CobroDesglose,
+    CobroResumenInversion,
+    CobroTransaccion,
+} from '@/types';
 
 function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
@@ -67,6 +75,96 @@ export default function CobrosIndex({
     // ─── Historial Detail Modal ───────────────────────────────────────────
     const [selectedCierre, setSelectedCierre] =
         useState<CierreHistorial | null>(null);
+    const [expandedDetalles, setExpandedDetalles] = useState<Set<string>>(
+        new Set(),
+    );
+    const [desgloseCache, setDesgloseCache] = useState<
+        Record<
+            string,
+            {
+                loading: boolean;
+                data: CobroDesglose[] | null;
+                transacciones: CobroTransaccion[] | null;
+            }
+        >
+    >({});
+    const [expandedVehiculos, setExpandedVehiculos] = useState<Set<string>>(
+        new Set(),
+    );
+
+    function vehiculoKey(detalleK: string, vehiculoId: number): string {
+        return `${detalleK}::${vehiculoId}`;
+    }
+
+    function toggleVehiculo(detalleK: string, vehiculoId: number) {
+        const k = vehiculoKey(detalleK, vehiculoId);
+        setExpandedVehiculos((prev) => {
+            const next = new Set(prev);
+            if (next.has(k)) next.delete(k);
+            else next.add(k);
+            return next;
+        });
+    }
+
+    function detalleKey(
+        cierreId: number,
+        inversionId: number,
+        empresaId: number,
+    ): string {
+        return `${cierreId}-${inversionId}-${empresaId}`;
+    }
+
+    async function toggleDetalle(
+        cierreId: number,
+        inversionId: number,
+        empresaId: number,
+    ) {
+        const key = detalleKey(cierreId, inversionId, empresaId);
+        const isExpanded = expandedDetalles.has(key);
+
+        setExpandedDetalles((prev) => {
+            const next = new Set(prev);
+            if (isExpanded) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+
+        if (isExpanded || desgloseCache[key]?.data) return;
+
+        setDesgloseCache((prev) => ({
+            ...prev,
+            [key]: { loading: true, data: null, transacciones: null },
+        }));
+
+        try {
+            const res = await fetch(
+                cierreDesglose.url(cierreId, {
+                    query: {
+                        inversion_id: inversionId,
+                        empresa_id: empresaId,
+                    },
+                }),
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                },
+            );
+            const json = await res.json();
+            setDesgloseCache((prev) => ({
+                ...prev,
+                [key]: {
+                    loading: false,
+                    data: json.desglose ?? [],
+                    transacciones: json.transacciones ?? [],
+                },
+            }));
+        } catch {
+            setDesgloseCache((prev) => ({
+                ...prev,
+                [key]: { loading: false, data: [], transacciones: [] },
+            }));
+        }
+    }
 
     function handleCierre() {
         setProcessingCierre(true);
@@ -353,7 +451,11 @@ export default function CobrosIndex({
             <Dialog
                 open={!!selectedCierre}
                 onOpenChange={(open) => {
-                    if (!open) setSelectedCierre(null);
+                    if (!open) {
+                        setSelectedCierre(null);
+                        setExpandedDetalles(new Set());
+                        setExpandedVehiculos(new Set());
+                    }
                 }}
             >
                 <DialogContent>
@@ -366,20 +468,268 @@ export default function CobrosIndex({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-2">
-                        {selectedCierre?.detalles.map((d, idx) => (
-                            <div
-                                key={idx}
-                                className="flex items-center justify-between rounded-lg border border-border px-4 py-2.5"
-                            >
-                                <span className="text-sm font-medium text-foreground">
-                                    {d.inversion_nombre}
-                                </span>
-                                <span className="text-sm font-semibold text-foreground">
-                                    {formatARS(Number(d.total))}
-                                </span>
-                            </div>
-                        ))}
+                    <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+                        {(() => {
+                            if (!selectedCierre) return null;
+                            const grupos = selectedCierre.detalles.reduce(
+                                (acc, d) => {
+                                    const key = d.empresa_nombre ?? 'N/A';
+                                    if (!acc[key]) acc[key] = [];
+                                    acc[key].push(d);
+                                    return acc;
+                                },
+                                {} as Record<
+                                    string,
+                                    typeof selectedCierre.detalles
+                                >,
+                            );
+
+                            return Object.entries(grupos).map(
+                                ([empresa, detalles]) => {
+                                    const subtotal = detalles.reduce(
+                                        (s, d) => s + Number(d.total),
+                                        0,
+                                    );
+                                    return (
+                                        <div
+                                            key={empresa}
+                                            className="space-y-2"
+                                        >
+                                            {!isInversor && (
+                                                <div className="flex items-center justify-between border-b border-border pb-1">
+                                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                                        {empresa}
+                                                    </span>
+                                                    <span className="text-xs font-semibold text-muted-foreground">
+                                                        {formatARS(subtotal)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {detalles.map((d, idx) => {
+                                                const key = detalleKey(
+                                                    selectedCierre.id,
+                                                    d.inversion_id,
+                                                    d.empresa_id,
+                                                );
+                                                const isOpen =
+                                                    expandedDetalles.has(key);
+                                                const cached =
+                                                    desgloseCache[key];
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className="overflow-hidden rounded-lg border border-border"
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                toggleDetalle(
+                                                                    selectedCierre.id,
+                                                                    d.inversion_id,
+                                                                    d.empresa_id,
+                                                                )
+                                                            }
+                                                            className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
+                                                        >
+                                                            <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                                                {isOpen ? (
+                                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                                ) : (
+                                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                )}
+                                                                {
+                                                                    d.inversion_nombre
+                                                                }
+                                                            </span>
+                                                            <span className="text-sm font-semibold text-foreground">
+                                                                {formatARS(
+                                                                    Number(
+                                                                        d.total,
+                                                                    ),
+                                                                )}
+                                                            </span>
+                                                        </button>
+
+                                                        {isOpen && (
+                                                            <div className="border-t border-border bg-muted/20">
+                                                                {cached?.loading && (
+                                                                    <p className="px-4 py-3 text-xs text-muted-foreground">
+                                                                        Cargando
+                                                                        desglose...
+                                                                    </p>
+                                                                )}
+                                                                {!cached?.loading &&
+                                                                    cached?.data &&
+                                                                    cached.data
+                                                                        .length ===
+                                                                        0 && (
+                                                                        <p className="px-4 py-3 text-xs text-muted-foreground">
+                                                                            Sin
+                                                                            desglose
+                                                                            disponible.
+                                                                        </p>
+                                                                    )}
+                                                                {!cached?.loading &&
+                                                                    cached?.data &&
+                                                                    cached.data
+                                                                        .length >
+                                                                        0 && (
+                                                                        <ul className="divide-y divide-border">
+                                                                            {cached.data.map(
+                                                                                (
+                                                                                    v,
+                                                                                ) => {
+                                                                                    const vk =
+                                                                                        vehiculoKey(
+                                                                                            key,
+                                                                                            v.vehiculo_id,
+                                                                                        );
+                                                                                    const vOpen =
+                                                                                        expandedVehiculos.has(
+                                                                                            vk,
+                                                                                        );
+                                                                                    const tx =
+                                                                                        (cached.transacciones ??
+                                                                                            []).filter(
+                                                                                            (
+                                                                                                t,
+                                                                                            ) =>
+                                                                                                t.patente ===
+                                                                                                v.patente,
+                                                                                        );
+                                                                                    return (
+                                                                                        <li
+                                                                                            key={
+                                                                                                v.vehiculo_id
+                                                                                            }
+                                                                                        >
+                                                                                            <button
+                                                                                                type="button"
+                                                                                                onClick={() =>
+                                                                                                    toggleVehiculo(
+                                                                                                        key,
+                                                                                                        v.vehiculo_id,
+                                                                                                    )
+                                                                                                }
+                                                                                                className="flex w-full items-center justify-between px-4 py-2.5 text-left transition-colors hover:bg-muted/40"
+                                                                                            >
+                                                                                                <div className="flex items-center gap-2">
+                                                                                                    {vOpen ? (
+                                                                                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                                                                    ) : (
+                                                                                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                                                                    )}
+                                                                                                    <Car className="h-4 w-4 text-muted-foreground" />
+                                                                                                    <div>
+                                                                                                        <p className="text-sm font-medium text-foreground">
+                                                                                                            {
+                                                                                                                v.patente
+                                                                                                            }
+                                                                                                        </p>
+                                                                                                        <p className="text-xs text-muted-foreground">
+                                                                                                            {
+                                                                                                                v.marca
+                                                                                                            }{' '}
+                                                                                                            {
+                                                                                                                v.modelo
+                                                                                                            }
+                                                                                                        </p>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <span className="text-sm font-semibold text-foreground">
+                                                                                                    {formatARS(
+                                                                                                        Number(
+                                                                                                            v.subtotal,
+                                                                                                        ),
+                                                                                                    )}
+                                                                                                </span>
+                                                                                            </button>
+
+                                                                                            {vOpen && (
+                                                                                                <div className="border-t border-border bg-background">
+                                                                                                    {tx.length ===
+                                                                                                    0 ? (
+                                                                                                        <p className="px-4 py-3 text-xs text-muted-foreground">
+                                                                                                            Sin
+                                                                                                            transacciones.
+                                                                                                        </p>
+                                                                                                    ) : (
+                                                                                                        <table className="w-full text-left text-xs">
+                                                                                                            <thead className="bg-muted/30 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                                                                                <tr>
+                                                                                                                    <th className="px-4 py-2 font-medium">
+                                                                                                                        Artículo
+                                                                                                                    </th>
+                                                                                                                    <th className="px-2 py-2 text-right font-medium">
+                                                                                                                        Cant.
+                                                                                                                    </th>
+                                                                                                                    <th className="px-2 py-2 text-right font-medium">
+                                                                                                                        P.
+                                                                                                                        Unit.
+                                                                                                                    </th>
+                                                                                                                    <th className="px-4 py-2 text-right font-medium">
+                                                                                                                        Subtotal
+                                                                                                                    </th>
+                                                                                                                </tr>
+                                                                                                            </thead>
+                                                                                                            <tbody className="divide-y divide-border">
+                                                                                                                {tx.map(
+                                                                                                                    (
+                                                                                                                        t,
+                                                                                                                    ) => (
+                                                                                                                        <tr
+                                                                                                                            key={
+                                                                                                                                t.id
+                                                                                                                            }
+                                                                                                                        >
+                                                                                                                            <td className="px-4 py-2 font-medium text-foreground">
+                                                                                                                                {
+                                                                                                                                    t.articulo
+                                                                                                                                }
+                                                                                                                            </td>
+                                                                                                                            <td className="px-2 py-2 text-right text-muted-foreground">
+                                                                                                                                {
+                                                                                                                                    t.cantidad
+                                                                                                                                }
+                                                                                                                            </td>
+                                                                                                                            <td className="px-2 py-2 text-right text-muted-foreground">
+                                                                                                                                {formatARS(
+                                                                                                                                    Number(
+                                                                                                                                        t.precio_unitario,
+                                                                                                                                    ),
+                                                                                                                                )}
+                                                                                                                            </td>
+                                                                                                                            <td className="px-4 py-2 text-right font-semibold text-foreground">
+                                                                                                                                {formatARS(
+                                                                                                                                    Number(
+                                                                                                                                        t.subtotal,
+                                                                                                                                    ),
+                                                                                                                                )}
+                                                                                                                            </td>
+                                                                                                                        </tr>
+                                                                                                                    ),
+                                                                                                                )}
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </li>
+                                                                                    );
+                                                                                },
+                                                                            )}
+                                                                        </ul>
+                                                                    )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                },
+                            );
+                        })()}
                     </div>
 
                     <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
@@ -393,6 +743,20 @@ export default function CobrosIndex({
                     </div>
 
                     <DialogFooter>
+                        <Button
+                            variant="outline"
+                            disabled={!selectedCierre}
+                            onClick={() => {
+                                if (!selectedCierre) return;
+                                window.open(
+                                    `/pdf/cierres-caja/${selectedCierre.id}`,
+                                    '_blank',
+                                );
+                            }}
+                        >
+                            <Download className="mr-1.5 h-4 w-4" />
+                            Exportar PDF
+                        </Button>
                         <Button
                             variant="outline"
                             onClick={() => setSelectedCierre(null)}

@@ -56,7 +56,11 @@ class CobroController extends Controller
             ->first();
 
         // Historical cierres with their details
-        $historialCierres = CierreCaja::with(['user:id,name', 'detalles.inversion:id,nombre,empresa_id'])
+        $historialCierres = CierreCaja::with([
+            'user:id,name',
+            'detalles.inversion:id,nombre,empresa_id',
+            'detalles.empresa:id,nombre',
+        ])
             ->when($empresaId, function ($q) use ($empresaId) {
                 $q->whereHas('detalles', fn ($q2) => $q2->where('empresa_id', $empresaId));
             })
@@ -71,14 +75,23 @@ class CobroController extends Controller
                     $detalles = $detalles->filter(fn ($d) => $d->empresa_id === $empresaId);
                 }
 
+                $detallesOrdenados = $detalles
+                    ->map(fn ($d) => [
+                        'inversion_id' => $d->inversion_id,
+                        'empresa_id' => $d->empresa_id,
+                        'inversion_nombre' => $d->inversion?->nombre ?? 'N/A',
+                        'empresa_nombre' => $d->empresa?->nombre ?? 'N/A',
+                        'total' => $d->total,
+                    ])
+                    ->sortBy('inversion_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+                    ->sortBy('empresa_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+                    ->values();
+
                 return [
                     'id' => $cierre->id,
                     'user' => $cierre->user,
                     'total' => $detalles->sum('total'),
-                    'detalles' => $detalles->map(fn ($d) => [
-                        'inversion_nombre' => $d->inversion?->nombre ?? 'N/A',
-                        'total' => $d->total,
-                    ])->values(),
+                    'detalles' => $detallesOrdenados,
                     'created_at' => $cierre->created_at,
                 ];
             });
@@ -157,6 +170,72 @@ class CobroController extends Controller
             'desglose' => $desglose,
             'transacciones' => $transacciones,
             'totalInversion' => $totalInversion,
+        ]);
+    }
+
+    /**
+     * Return the vehicle breakdown for a specific inversion within a historical cierre.
+     */
+    public function cierreDesglose(Request $request, CierreCaja $cierre)
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isChofer(), 403);
+        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
+
+        $inversionId = $request->integer('inversion_id');
+        $empresaId = $request->integer('empresa_id');
+
+        abort_if($inversionId <= 0 || $empresaId <= 0, 422, 'Parámetros inválidos.');
+
+        // Inversor can only access details of their own empresa
+        if ($request->user()->isInversor()) {
+            abort_unless($empresaId === $request->user()->empresa_id, 403);
+        }
+
+        // Determine the date range: cobros created between previous cierre and this cierre
+        $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
+            ->latest()
+            ->value('created_at');
+
+        $baseQuery = Cobro::query()
+            ->where('cobros.inversion_id', $inversionId)
+            ->where('cobros.empresa_id', $empresaId)
+            ->where('cobros.created_at', '<=', $cierre->created_at)
+            ->when($previousCierreDate, fn ($q) => $q->where('cobros.created_at', '>', $previousCierreDate));
+
+        $desglose = (clone $baseQuery)
+            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
+            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
+            ->selectRaw('
+                vehiculos.id as vehiculo_id,
+                vehiculos.patente,
+                vehiculos.marca,
+                vehiculos.modelo,
+                SUM(articulos.precio * transacciones.cantidad) as subtotal
+            ')
+            ->groupBy('vehiculos.id', 'vehiculos.patente', 'vehiculos.marca', 'vehiculos.modelo')
+            ->orderBy('vehiculos.patente')
+            ->get();
+
+        $transacciones = (clone $baseQuery)
+            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
+            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
+            ->select([
+                'transacciones.id',
+                'vehiculos.patente',
+                'articulos.descripcion as articulo',
+                'transacciones.cantidad',
+                'articulos.precio as precio_unitario',
+            ])
+            ->selectRaw('articulos.precio * transacciones.cantidad as subtotal')
+            ->orderByDesc('transacciones.created_at')
+            ->get();
+
+        return response()->json([
+            'desglose' => $desglose,
+            'transacciones' => $transacciones,
         ]);
     }
 
