@@ -20,6 +20,10 @@ class DashboardController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
 
+        if ($request->user()->isInversor()) {
+            return redirect()->route('mi-cuenta.index');
+        }
+
         $filters = $request->only(['empresa_id', 'inversion_id']);
 
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])

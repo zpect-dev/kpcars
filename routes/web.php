@@ -6,6 +6,7 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
@@ -19,6 +20,10 @@ Route::get('/', function () {
     if (auth()->check()) {
         if (auth()->user()->isMechanic()) {
             return redirect()->route('appointments.index');
+        }
+
+        if (auth()->user()->isInversor()) {
+            return redirect()->route('mi-cuenta.index');
         }
 
         return redirect()->route('dashboard');
@@ -48,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
 
     Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
+    Route::get('pdf/top-salidas', [PdfController::class, 'topSalidas'])->name('pdf.top-salidas');
     Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
     Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
     Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
@@ -72,6 +78,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('revisiones/historial', [RevisionController::class, 'historial'])->name('revisiones.historial');
     Route::get('revisiones/historial/{cierre}', [RevisionController::class, 'historialShow'])->name('revisiones.historial.show');
     Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
+
+    Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
+    Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
+    Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
 
     Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
     Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');

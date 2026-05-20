@@ -32,6 +32,35 @@ class PdfController extends Controller
     }
 
     /**
+     * Generate PDF with the top-selling articles ranked by total output.
+     * Price is shown with a 15% discount applied.
+     */
+    public function topSalidas(Request $request): Response
+    {
+        abort_if($request->user()->isInversor(), 403);
+        abort_if($request->user()->isMechanic(), 403);
+
+        $articulos = Articulo::query()
+            ->select([
+                'articulos.id',
+                'articulos.descripcion',
+                'articulos.precio',
+                'articulos.stock',
+            ])
+            ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
+            ->join('transacciones', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->groupBy('articulos.id', 'articulos.descripcion', 'articulos.precio', 'articulos.stock')
+            ->havingRaw('SUM(transacciones.cantidad) > 0')
+            ->orderByDesc('total_salida')
+            ->get();
+
+        $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('top-salidas-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
      * Generate PDF with transaction history, respecting current filters.
      */
     public function transactions(Request $request): Response

@@ -21,6 +21,10 @@ class LoginResponse implements LoginResponseContract
             return redirect()->route('appointments.index');
         }
 
+        if ($user && $user->isInversor()) {
+            return redirect()->route('mi-cuenta.index');
+        }
+
         return redirect()->intended(config('fortify.home'));
     }
 }

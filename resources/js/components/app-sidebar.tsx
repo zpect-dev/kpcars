@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet, HandCoins } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -18,6 +18,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as articulosIndex } from '@/routes/articulos';
 import { index as cobrosIndex } from '@/routes/cobros';
+import { index as gastosIndex } from '@/routes/gastos';
 import type { NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [];
@@ -37,11 +38,16 @@ export function AppSidebar() {
     const mainNavItems: NavItem[] = [];
 
     if (auth.user.role === 'inversor') {
-        // Inversores only see Mi Cuenta
+        // Inversores only see Mi Cuenta + Gastos
         mainNavItems.push({
             title: 'Mi Cuenta',
             href: '/mi-cuenta',
             icon: Wallet,
+        });
+        mainNavItems.push({
+            title: 'Gastos',
+            href: gastosIndex.url(),
+            icon: HandCoins,
         });
     } else if (auth.user.role === 'mecanico') {
         mainNavItems.push(
@@ -75,6 +81,11 @@ export function AppSidebar() {
                 title: 'Cobros',
                 href: cobrosIndex.url(),
                 icon: Receipt,
+            });
+            mainNavItems.push({
+                title: 'Gastos',
+                href: gastosIndex.url(),
+                icon: HandCoins,
             });
         }
 

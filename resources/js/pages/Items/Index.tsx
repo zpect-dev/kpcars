@@ -6,6 +6,7 @@ import {
     ChevronDown,
     FileDown,
     History,
+    TrendingUp,
     Pencil,
     Plus,
     Search,
@@ -299,6 +300,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             >
                                 <FileDown className="h-4 w-4" />
                                 <span className="hidden sm:inline">Exportar PDF</span>
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => window.open('/pdf/top-salidas', '_blank')}
+                            >
+                                <TrendingUp className="h-4 w-4" />
+                                <span className="hidden sm:inline">Top salidas</span>
                             </Button>
                             <Button
                                 variant="outline"
