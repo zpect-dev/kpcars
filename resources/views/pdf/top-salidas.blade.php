@@ -243,7 +243,7 @@
                     <th style="width:51%">Descripción</th>
                     <th class="numeric" style="width:14%">Cant. Vendida</th>
                     <th class="numeric" style="width:13%">Stock Actual</th>
-                    <th class="numeric" style="width:16%">Precio (con 15% desc)</th>
+                    <th class="numeric" style="width:16%">Precio</th>
                 </tr>
             </thead>
             <tbody>
