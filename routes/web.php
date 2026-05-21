@@ -89,6 +89,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
     Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
+    Route::post('articulos/{articulo}/imagen', [ArticuloController::class, 'uploadImage'])->name('articulos.upload-image');
+    Route::delete('articulos/{articulo}/imagen', [ArticuloController::class, 'deleteImage'])->name('articulos.delete-image');
 
     // Panel admin: inversiones e inversores asignados + deuda
     Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');

@@ -6,10 +6,13 @@ import {
     ChevronDown,
     FileDown,
     History,
+    Image as ImageIcon,
     TrendingUp,
     Pencil,
     Plus,
     Search,
+    Trash2,
+    Upload,
     X,
 } from 'lucide-react';
 import { Fragment, useMemo, useRef, useState } from 'react';
@@ -27,7 +30,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { index, movimiento, store, updatePrecio } from '@/routes/articulos';
+import {
+    index,
+    movimiento,
+    store,
+    updatePrecio,
+    uploadImage,
+    deleteImage,
+} from '@/routes/articulos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -78,6 +88,35 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
     // ─── Expandable rows ────────────────────────────────────────────────────
     const [expandedId, setExpandedId] = useState<number | null>(null);
+
+    // ─── Imagen del artículo ────────────────────────────────────────────────
+    const [viewingImage, setViewingImage] = useState<Articulo | null>(null);
+    const [uploadingId, setUploadingId] = useState<number | null>(null);
+    const imageInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+
+    function handleImageUpload(item: Articulo, file: File) {
+        setUploadingId(item.id);
+        const formData = new FormData();
+        formData.append('imagen', file);
+
+        router.post(uploadImage.url(item.id), formData, {
+            preserveScroll: true,
+            preserveState: true,
+            forceFormData: true,
+            onFinish: () => setUploadingId(null),
+        });
+    }
+
+    function handleImageDelete(item: Articulo) {
+        router.delete(deleteImage.url(item.id), {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    }
+
+    function triggerImageInput(itemId: number) {
+        imageInputRefs.current[itemId]?.click();
+    }
 
     // ─── Buscador de artículos ───────────────────────────────────────────────
     const [itemSearch, setItemSearch] = useState('');
@@ -160,6 +199,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
     const createForm = useForm({
         descripcion: '',
+        codigo: '',
+        repuestos: false as boolean,
         stock: '0',
         min_stock: '0',
         precio: '0',
@@ -207,6 +248,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setHighlightedIndex(-1);
         createForm.setData({
             descripcion: '',
+            codigo: '',
+            repuestos: false,
             stock: '0',
             min_stock: '0',
             precio: '0',
@@ -258,8 +301,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setMatchedItem(item);
         createForm.setData({
             descripcion: item.descripcion,
+            codigo: item.codigo ?? '',
+            repuestos: Boolean(item.repuestos),
             stock: '0',
             min_stock: String(item.min_stock),
+            precio: String(item.precio ?? 0),
         });
         setShowSuggestions(false);
         // Pasar el foco al input de cantidad
@@ -336,32 +382,44 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="w-[36%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[28%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Código
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Rep.
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Actual
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Mínimo
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Precio
                                     </th>
                                     {canWrite && (
                                         <th
                                             scope="col"
-                                            className="w-[18%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                            className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
                                             Acciones
                                         </th>
@@ -372,7 +430,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 {filteredItems.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isMechanic ? 3 : 4}
+                                            colSpan={canWrite ? 7 : 6}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay artículos registrados o no
@@ -427,8 +485,42 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                 'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
                                                                 isExpanded && 'rotate-180',
                                                             )} />
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (item.imagen_url) setViewingImage(item);
+                                                                }}
+                                                                className={cn(
+                                                                    'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
+                                                                    item.imagen_url ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default',
+                                                                )}
+                                                                aria-label={item.imagen_url ? 'Ver imagen' : 'Sin imagen'}
+                                                            >
+                                                                {item.imagen_url ? (
+                                                                    <img
+                                                                        src={item.imagen_url}
+                                                                        alt={item.descripcion}
+                                                                        className="h-full w-full object-cover"
+                                                                    />
+                                                                ) : (
+                                                                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                                                                )}
+                                                            </button>
                                                             <span className="truncate">{item.descripcion}</span>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 truncate text-xs text-muted-foreground sm:px-6 sm:py-4">
+                                                        {item.codigo || '—'}
+                                                    </td>
+                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                        {item.repuestos ? (
+                                                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                                Sí
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">—</span>
+                                                        )}
                                                     </td>
                                                     <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
                                                         <span className={lowStock ? 'font-semibold text-red-700 dark:text-red-400' : ''}>
@@ -491,7 +583,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr className="bg-muted/20">
-                                                        <td colSpan={canWrite ? 5 : 4} className="px-6 py-4">
+                                                        <td colSpan={canWrite ? 7 : 6} className="px-6 py-4">
                                                             <div className="flex flex-col gap-3">
                                                                 {/* Barra de stock */}
                                                                 <div className="flex flex-col gap-1">
@@ -534,6 +626,58 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                         </Button>
                                                                     )}
                                                                 </div>
+
+                                                                {canWrite && (
+                                                                    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                                                        <span className="text-xs text-muted-foreground">
+                                                                            Imagen del artículo:
+                                                                        </span>
+                                                                        <input
+                                                                            ref={(el) => {
+                                                                                imageInputRefs.current[item.id] = el;
+                                                                            }}
+                                                                            type="file"
+                                                                            accept="image/jpeg,image/png,image/webp"
+                                                                            className="hidden"
+                                                                            onChange={(e) => {
+                                                                                const file = e.target.files?.[0];
+                                                                                if (file) handleImageUpload(item, file);
+                                                                                e.target.value = '';
+                                                                            }}
+                                                                        />
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                triggerImageInput(item.id);
+                                                                            }}
+                                                                            disabled={uploadingId === item.id}
+                                                                        >
+                                                                            <Upload className="h-4 w-4" />
+                                                                            {item.imagen_url ? 'Cambiar imagen' : 'Subir imagen'}
+                                                                        </Button>
+                                                                        {item.imagen_url && (
+                                                                            <Button
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                className="text-destructive hover:text-destructive"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    handleImageDelete(item);
+                                                                                }}
+                                                                            >
+                                                                                <Trash2 className="h-4 w-4" />
+                                                                                Eliminar
+                                                                            </Button>
+                                                                        )}
+                                                                        {uploadingId === item.id && (
+                                                                            <span className="text-xs text-muted-foreground">
+                                                                                Subiendo...
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -587,6 +731,28 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                             className="flex w-full items-start justify-between gap-3 p-4 text-left"
                                             onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                         >
+                                            <div
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (item.imagen_url) setViewingImage(item);
+                                                }}
+                                                className={cn(
+                                                    'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
+                                                    item.imagen_url && 'cursor-pointer',
+                                                )}
+                                            >
+                                                {item.imagen_url ? (
+                                                    <img
+                                                        src={item.imagen_url}
+                                                        alt={item.descripcion}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                                )}
+                                            </div>
                                             <div className="flex min-w-0 flex-1 flex-col gap-1">
                                                 <p className={cn(
                                                     'line-clamp-2 text-sm font-semibold',
@@ -594,6 +760,18 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 )}>
                                                     {item.descripcion}
                                                 </p>
+                                                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                                    {item.codigo && (
+                                                        <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
+                                                            {item.codigo}
+                                                        </span>
+                                                    )}
+                                                    {item.repuestos && (
+                                                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                            Repuesto
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <div className="flex items-baseline gap-4 text-xs">
                                                     <span>
                                                         Stock:{' '}
@@ -651,6 +829,57 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             </Button>
                                                         )}
                                                     </div>
+
+                                                    {canWrite && (
+                                                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Imagen:
+                                                            </span>
+                                                            <input
+                                                                ref={(el) => {
+                                                                    imageInputRefs.current[item.id] = el;
+                                                                }}
+                                                                type="file"
+                                                                accept="image/jpeg,image/png,image/webp"
+                                                                className="hidden"
+                                                                onChange={(e) => {
+                                                                    const file = e.target.files?.[0];
+                                                                    if (file) handleImageUpload(item, file);
+                                                                    e.target.value = '';
+                                                                }}
+                                                            />
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    triggerImageInput(item.id);
+                                                                }}
+                                                                disabled={uploadingId === item.id}
+                                                            >
+                                                                <Upload className="h-4 w-4" />
+                                                                {item.imagen_url ? 'Cambiar' : 'Subir'}
+                                                            </Button>
+                                                            {item.imagen_url && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="text-destructive hover:text-destructive"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleImageDelete(item);
+                                                                    }}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
+                                                            {uploadingId === item.id && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Subiendo...
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
@@ -902,6 +1131,53 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="grid gap-2">
+                                <Label htmlFor="codigo">Código</Label>
+                                <Input
+                                    id="codigo"
+                                    type="text"
+                                    value={createForm.data.codigo}
+                                    onChange={(e) =>
+                                        createForm.setData(
+                                            'codigo',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Código del artículo"
+                                />
+                                <InputError
+                                    message={createForm.errors.codigo}
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label
+                                    htmlFor="repuestos"
+                                    className="flex items-center gap-2"
+                                >
+                                    <input
+                                        id="repuestos"
+                                        type="checkbox"
+                                        checked={createForm.data.repuestos}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'repuestos',
+                                                e.target.checked,
+                                            )
+                                        }
+                                        className="h-4 w-4 rounded border-border"
+                                    />
+                                    Es repuesto
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Marcar si el artículo es un repuesto.
+                                </p>
+                                <InputError
+                                    message={createForm.errors.repuestos}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="grid gap-2">
                                 <Label htmlFor="stock">
                                     {isRestock
                                         ? 'Cantidad a ingresar'
@@ -998,6 +1274,31 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </div>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ─── Modal Visor de Imagen ────────────────────────────────────── */}
+            <Dialog
+                open={viewingImage !== null}
+                onOpenChange={(open) => {
+                    if (!open) setViewingImage(null);
+                }}
+            >
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle className="truncate">
+                            {viewingImage?.descripcion}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {viewingImage?.imagen_url && (
+                        <div className="flex max-h-[70vh] items-center justify-center overflow-hidden rounded-lg bg-muted">
+                            <img
+                                src={viewingImage.imagen_url}
+                                alt={viewingImage.descripcion}
+                                className="max-h-[70vh] w-auto object-contain"
+                            />
+                        </div>
+                    )}
                 </DialogContent>
             </Dialog>
         </>
