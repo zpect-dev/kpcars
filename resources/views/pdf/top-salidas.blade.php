@@ -205,36 +205,45 @@
         }
 
         .td-imagen {
-            width: 130px;
+            width: 200px;
             text-align: center;
-            padding: 8px;
+            padding: 10px;
             vertical-align: middle;
         }
 
         .td-imagen .image-frame {
             display: inline-block;
-            width: 120px;
-            height: 90px;
-            line-height: 90px;
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
-            border-radius: 4px;
+            width: 190px;
+            height: 140px;
+            line-height: 140px;
+            background: #fff7ed;
+            border: 1px dashed #fdba74;
+            border-radius: 6px;
             text-align: center;
             overflow: hidden;
         }
 
+        .td-imagen .image-frame.has-image {
+            background: #ffffff;
+            border-style: solid;
+            border-color: #e5e7eb;
+        }
+
         .td-imagen img {
-            max-width: 116px;
-            max-height: 86px;
+            max-width: 184px;
+            max-height: 134px;
             vertical-align: middle;
         }
 
         .td-imagen .no-image {
-            color: #9ca3af;
-            font-size: 9px;
-            font-weight: 600;
+            display: inline-block;
+            line-height: 1.2;
+            vertical-align: middle;
+            color: #F48E00;
+            font-size: 10px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.6px;
         }
 
         /* ───── Pie ───── */
@@ -281,10 +290,10 @@
             <thead>
                 <tr>
                     <th style="width:4%">#</th>
-                    <th style="width:13%">Imagen</th>
-                    <th style="width:40%">Descripción</th>
+                    <th style="width:20%">Imagen</th>
+                    <th style="width:34%">Descripción</th>
                     <th style="width:14%">Código</th>
-                    <th class="numeric" style="width:14%">Salida</th>
+                    <th class="numeric" style="width:13%">Salida</th>
                     <th class="numeric" style="width:15%">Precio</th>
                 </tr>
             </thead>
@@ -297,13 +306,15 @@
                 <tr>
                     <td class="td-rank">{{ $loop->iteration }}</td>
                     <td class="td-imagen">
-                        <span class="image-frame">
-                            @if(! empty($articulo->imagen_data))
+                        @if(! empty($articulo->imagen_data))
+                            <span class="image-frame has-image">
                                 <img src="{{ $articulo->imagen_data }}" alt="">
-                            @else
+                            </span>
+                        @else
+                            <span class="image-frame">
                                 <span class="no-image">Sin imagen</span>
-                            @endif
-                        </span>
+                            </span>
+                        @endif
                     </td>
                     <td class="td-descripcion">{{ $articulo->descripcion }}</td>
                     <td class="td-codigo">{{ $articulo->codigo ?: '—' }}</td>

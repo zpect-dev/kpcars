@@ -50,6 +50,7 @@ class PdfController extends Controller
                 'articulos.imagen',
             ])
             ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
+            ->where('articulos.repuestos', true)
             ->join('transacciones', function ($join) {
                 $join->on('transacciones.articulo_id', '=', 'articulos.id')
                     ->where('transacciones.tipo', '=', 'OUT')
