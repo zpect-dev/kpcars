@@ -58,7 +58,12 @@ class PdfController extends Controller
             ->orderByDesc('total_salida')
             ->get();
 
-        $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos'))
+        $ventasTotales = $articulos->sum(
+            fn ($a) => (float) $a->total_salida * round((float) $a->precio * 0.85, 2),
+        );
+        $stockTotal = (int) Articulo::sum('stock');
+
+        $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos', 'ventasTotales', 'stockTotal'))
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('top-salidas-'.now()->format('Y-m-d').'.pdf');
