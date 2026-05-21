@@ -219,16 +219,7 @@
 <body>
     <div class="header">
         <div class="header-left">
-            @php
-                $logoPath = public_path('logo.png');
-                $logoData = file_exists($logoPath)
-                    ? 'data:image/png;base64,'.base64_encode(file_get_contents($logoPath))
-                    : null;
-            @endphp
             <div class="brand">
-                @if($logoData)
-                    <img src="{{ $logoData }}" alt="KP Cars" class="brand-logo">
-                @endif
                 <span class="brand-text">
                     KP CARS
                     <span class="brand-sub">SISTEMA DE INVENTARIO</span>
