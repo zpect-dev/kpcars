@@ -9,6 +9,7 @@ use App\Models\Articulo;
 use App\Models\CierreCaja;
 use App\Models\Cobro;
 use App\Models\Transaccion;
+use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -129,7 +130,7 @@ class PdfController extends Controller
         }
 
         $pdf = Pdf::loadView('pdf.transactions', $viewData)
-            ->setPaper('a4', 'portrait');
+            ->setPaper('a4', 'landscape');
 
         return $pdf->download('transacciones-'.now()->format('Y-m-d').'.pdf');
     }
@@ -201,6 +202,44 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cobros-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Generate a plain spreadsheet-like PDF with the vehicles list, respecting filters.
+     */
+    public function vehiculos(Request $request): Response
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isInversor(), 403);
+
+        $filters = $request->only(['empresa_id', 'inversion_id', 'search', 'asignacion']);
+        $search = trim((string) ($filters['search'] ?? ''));
+        $asignacion = $filters['asignacion'] ?? null; // 'con' | 'sin' | null
+
+        $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
+            ->visibleTo($request->user())
+            ->where('patente', '!=', 'EXTERNO')
+            ->when(! empty($filters['empresa_id']), fn ($q) => $q->where('empresa_id', $filters['empresa_id']))
+            ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
+            ->when($search !== '', function ($q) use ($search) {
+                $escaped = addcslashes($search, '%_\\');
+                $q->where(function ($q2) use ($escaped) {
+                    $q2->where('patente', 'like', "%{$escaped}%")
+                        ->orWhereHas('user', fn ($q3) => $q3->where('name', 'like', "%{$escaped}%"));
+                });
+            })
+            ->when($asignacion === 'con', fn ($q) => $q->whereNotNull('user_id'))
+            ->when($asignacion === 'sin', fn ($q) => $q->whereNull('user_id'))
+            ->get()
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy(fn ($v) => $v->inversion?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy(fn ($v) => $v->empresa?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $pdf = Pdf::loadView('pdf.vehiculos', compact('vehiculos'))
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('vehiculos-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**

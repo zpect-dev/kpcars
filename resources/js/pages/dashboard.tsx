@@ -1,5 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    FileDown,
     FileUp,
     History,
     LayoutList,
@@ -433,18 +434,44 @@ export default function Dashboard({
                     </div>
                     {!isInversor && (
                         <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const params = new URLSearchParams();
+                                    if (empresaId) params.set('empresa_id', empresaId);
+                                    if (inversionId) params.set('inversion_id', inversionId);
+                                    if (search.trim()) params.set('search', search.trim());
+                                    if (asignacionFiltro === 'con' || asignacionFiltro === 'sin') {
+                                        params.set('asignacion', asignacionFiltro);
+                                    }
+                                    const qs = params.toString();
+                                    window.open(
+                                        `/pdf/vehiculos${qs ? `?${qs}` : ''}`,
+                                        '_blank',
+                                    );
+                                }}
+                            >
+                                <FileDown className="h-4 w-4" />
+                                <span className="ml-2 hidden sm:inline">
+                                    Exportar PDF
+                                </span>
+                            </Button>
                             <Dialog
                                 open={isImportOpen}
                                 onOpenChange={setIsImportOpen}
                             >
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <FileUp className="h-4 w-4" />
-                                        <span className="ml-2 hidden sm:inline">
-                                            Importar Asignaciones
-                                        </span>
-                                    </Button>
-                                </DialogTrigger>
+                                {/* Botón "Importar Asignaciones" oculto */}
+                                {false && (
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <FileUp className="h-4 w-4" />
+                                            <span className="ml-2 hidden sm:inline">
+                                                Importar Asignaciones
+                                            </span>
+                                        </Button>
+                                    </DialogTrigger>
+                                )}
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
                                         <DialogTitle>
