@@ -48,7 +48,11 @@ class PdfController extends Controller
                 'articulos.stock',
             ])
             ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
-            ->join('transacciones', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('transacciones', function ($join) {
+                $join->on('transacciones.articulo_id', '=', 'articulos.id')
+                    ->where('transacciones.tipo', '=', 'OUT')
+                    ->where('transacciones.inactiva', '=', false);
+            })
             ->groupBy('articulos.id', 'articulos.descripcion', 'articulos.precio', 'articulos.stock')
             ->havingRaw('SUM(transacciones.cantidad) > 0')
             ->orderByDesc('total_salida')

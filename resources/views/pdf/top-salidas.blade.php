@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Artículos con más salida</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
             font-family: 'DejaVu Sans', Arial, sans-serif;
@@ -121,6 +126,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <h1>Artículos con más salida</h1>
@@ -131,10 +137,6 @@
     </div>
 
     <div class="body">
-        <div class="note">
-            Los precios indicados ya tienen aplicado el descuento del 15% sobre el precio actual de cada artículo.
-        </div>
-
         <table>
             <thead>
                 <tr>
@@ -147,19 +149,19 @@
             </thead>
             <tbody>
                 @foreach($articulos as $articulo)
-                    @php
-                        $precio = (float) $articulo->precio;
-                        $precioConDescuento = round($precio * 0.85, 2);
-                    @endphp
-                    <tr>
-                        <td class="td-rank">{{ $loop->iteration }}</td>
-                        <td class="td-descripcion">{{ $articulo->descripcion }}</td>
-                        <td class="td-numeric">{{ number_format((float) $articulo->total_salida, 0, ',', '.') }}</td>
-                        <td class="td-numeric">{{ number_format((float) $articulo->stock, 0, ',', '.') }}</td>
-                        <td class="td-numeric">
-                            <span class="price-discount">${{ number_format($precioConDescuento, 2, ',', '.') }}</span>
-                        </td>
-                    </tr>
+                @php
+                $precio = (float) $articulo->precio;
+                $precioConDescuento = round($precio * 0.85, 2);
+                @endphp
+                <tr>
+                    <td class="td-rank">{{ $loop->iteration }}</td>
+                    <td class="td-descripcion">{{ $articulo->descripcion }}</td>
+                    <td class="td-numeric">{{ number_format((float) $articulo->total_salida, 0, ',', '.') }}</td>
+                    <td class="td-numeric">{{ number_format((float) $articulo->stock, 0, ',', '.') }}</td>
+                    <td class="td-numeric">
+                        <span class="price-discount">${{ number_format($precioConDescuento, 2, ',', '.') }}</span>
+                    </td>
+                </tr>
                 @endforeach
             </tbody>
         </table>
@@ -170,4 +172,5 @@
         </div>
     </div>
 </body>
+
 </html>
