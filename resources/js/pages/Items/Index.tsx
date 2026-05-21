@@ -382,44 +382,38 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="w-[28%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[32%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Código
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Rep.
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Actual
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Stock Mínimo
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[16%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Precio
                                     </th>
                                     {canWrite && (
                                         <th
                                             scope="col"
-                                            className="w-[14%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
+                                            className="w-[16%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
                                             Acciones
                                         </th>
@@ -430,7 +424,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 {filteredItems.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={canWrite ? 7 : 6}
+                                            colSpan={canWrite ? 6 : 5}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay artículos registrados o no
@@ -513,15 +507,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     <td className="px-4 py-3 truncate text-xs text-muted-foreground sm:px-6 sm:py-4">
                                                         {item.codigo || '—'}
                                                     </td>
-                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                        {item.repuestos ? (
-                                                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                                Sí
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-xs text-muted-foreground">—</span>
-                                                        )}
-                                                    </td>
                                                     <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
                                                         <span className={lowStock ? 'font-semibold text-red-700 dark:text-red-400' : ''}>
                                                             {item.stock}
@@ -583,7 +568,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 </tr>
                                                 {isExpanded && (
                                                     <tr className="bg-muted/20">
-                                                        <td colSpan={canWrite ? 7 : 6} className="px-6 py-4">
+                                                        <td colSpan={canWrite ? 6 : 5} className="px-6 py-4">
                                                             <div className="flex flex-col gap-3">
                                                                 {/* Barra de stock */}
                                                                 <div className="flex flex-col gap-1">

@@ -195,6 +195,48 @@
             color: #F48E00;
         }
 
+        .td-codigo {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            color: #374151;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .td-imagen {
+            width: 130px;
+            text-align: center;
+            padding: 8px;
+            vertical-align: middle;
+        }
+
+        .td-imagen .image-frame {
+            display: inline-block;
+            width: 120px;
+            height: 90px;
+            line-height: 90px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .td-imagen img {
+            max-width: 116px;
+            max-height: 86px;
+            vertical-align: middle;
+        }
+
+        .td-imagen .no-image {
+            color: #9ca3af;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
         /* ───── Pie ───── */
         .footer {
             margin: 18px 32px 0;
@@ -238,11 +280,12 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width:6%">#</th>
-                    <th style="width:51%">Descripción</th>
+                    <th style="width:4%">#</th>
+                    <th style="width:13%">Imagen</th>
+                    <th style="width:40%">Descripción</th>
+                    <th style="width:14%">Código</th>
                     <th class="numeric" style="width:14%">Salida</th>
-                    <th class="numeric" style="width:13%">Stock Actual</th>
-                    <th class="numeric" style="width:16%">Precio</th>
+                    <th class="numeric" style="width:15%">Precio</th>
                 </tr>
             </thead>
             <tbody>
@@ -253,9 +296,18 @@
                 @endphp
                 <tr>
                     <td class="td-rank">{{ $loop->iteration }}</td>
+                    <td class="td-imagen">
+                        <span class="image-frame">
+                            @if(! empty($articulo->imagen_data))
+                                <img src="{{ $articulo->imagen_data }}" alt="">
+                            @else
+                                <span class="no-image">Sin imagen</span>
+                            @endif
+                        </span>
+                    </td>
                     <td class="td-descripcion">{{ $articulo->descripcion }}</td>
+                    <td class="td-codigo">{{ $articulo->codigo ?: '—' }}</td>
                     <td class="td-numeric">{{ number_format((float) $articulo->total_salida, 0, ',', '.') }}</td>
-                    <td class="td-numeric">{{ number_format((float) $articulo->stock, 0, ',', '.') }}</td>
                     <td class="td-precio">${{ number_format($precioConDescuento, 0, ',', '.') }}</td>
                 </tr>
                 @endforeach

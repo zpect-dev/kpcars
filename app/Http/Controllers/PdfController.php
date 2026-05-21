@@ -44,8 +44,10 @@ class PdfController extends Controller
             ->select([
                 'articulos.id',
                 'articulos.descripcion',
+                'articulos.codigo',
                 'articulos.precio',
                 'articulos.stock',
+                'articulos.imagen',
             ])
             ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
             ->join('transacciones', function ($join) {
@@ -53,10 +55,35 @@ class PdfController extends Controller
                     ->where('transacciones.tipo', '=', 'OUT')
                     ->where('transacciones.inactiva', '=', false);
             })
-            ->groupBy('articulos.id', 'articulos.descripcion', 'articulos.precio', 'articulos.stock')
+            ->groupBy(
+                'articulos.id',
+                'articulos.descripcion',
+                'articulos.codigo',
+                'articulos.precio',
+                'articulos.stock',
+                'articulos.imagen',
+            )
             ->havingRaw('SUM(transacciones.cantidad) > 0')
             ->orderByDesc('total_salida')
             ->get();
+
+        // Embed images as base64 to avoid DomPDF chroot/path issues in production.
+        $articulos->each(function ($a) {
+            $a->imagen_data = null;
+            if ($a->imagen) {
+                $path = storage_path('app/public/'.$a->imagen);
+                if (file_exists($path)) {
+                    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                    $mime = match ($ext) {
+                        'jpg', 'jpeg' => 'image/jpeg',
+                        'png' => 'image/png',
+                        'webp' => 'image/webp',
+                        default => 'image/png',
+                    };
+                    $a->imagen_data = 'data:'.$mime.';base64,'.base64_encode(file_get_contents($path));
+                }
+            }
+        });
 
         $ventasTotales = $articulos->sum(
             fn ($a) => (float) $a->total_salida * round((float) $a->precio * 0.85, 2),
@@ -64,7 +91,7 @@ class PdfController extends Controller
         $stockTotal = (int) Articulo::sum('stock');
 
         $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos', 'ventasTotales', 'stockTotal'))
-            ->setPaper('a4', 'portrait');
+            ->setPaper('a4', 'landscape');
 
         return $pdf->download('top-salidas-'.now()->format('Y-m-d').'.pdf');
     }
