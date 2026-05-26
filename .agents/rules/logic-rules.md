@@ -3,6 +3,7 @@ trigger: always_on
 ---
 
 ## Reglas de Negocio Estrictas (Dominio: Inventario Interno Rent a Car)
+
 Naturaleza del Sistema: Es un software de control operativo interno. NO se manejan precios, facturación, impuestos ni pasarelas de pago. El único propósito es la trazabilidad física de repuestos y consumibles.
 
 Inmutabilidad y Trazabilidad (Event-Driven Stock): - Las cantidades de stock no se editan directamente. Toda alteración del current_stock en la tabla items DEBE estar justificada por un registro simultáneo en la tabla transactions.
