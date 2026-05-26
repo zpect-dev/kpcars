@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'absoluto', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'absoluto', 'empresa_acceso', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -37,6 +37,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'inactivo' => 'boolean',
             'absoluto' => 'boolean',
+            'empresa_acceso' => 'integer',
             'must_change_password' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
@@ -67,6 +68,27 @@ class User extends Authenticatable
     public function isAdminAbsoluto(): bool
     {
         return $this->isAdmin() && (bool) $this->absoluto;
+    }
+
+    /**
+     * ID de empresa al que el usuario está restringido a ver, o null si no hay restricción.
+     *
+     * - Inversor: su empresa_id.
+     * - Admin con empresa_acceso = 1 o 2: ese id de empresa.
+     * - Admin con empresa_acceso = 0 (ambas) o null: sin restricción.
+     * - Resto de roles: sin restricción.
+     */
+    public function restrictedEmpresaId(): ?int
+    {
+        if ($this->isInversor()) {
+            return $this->empresa_id ? (int) $this->empresa_id : null;
+        }
+
+        if ($this->isAdmin() && in_array((int) $this->empresa_acceso, [1, 2], true)) {
+            return (int) $this->empresa_acceso;
+        }
+
+        return null;
     }
 
     public function isMechanic(): bool

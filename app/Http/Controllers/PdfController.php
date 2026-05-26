@@ -12,6 +12,7 @@ use App\Models\CierreInversionPago;
 use App\Models\Cobro;
 use App\Models\DeudaMovimiento;
 use App\Models\Transaccion;
+use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,6 +36,72 @@ class PdfController extends Controller
     }
 
     /**
+     * Generate PDF with the top-selling articles ranked by total output.
+     * Price is shown with a 15% discount applied.
+     */
+    public function topSalidas(Request $request): Response
+    {
+        abort_if($request->user()->isInversor(), 403);
+        abort_if($request->user()->isMechanic(), 403);
+
+        $articulos = Articulo::query()
+            ->select([
+                'articulos.id',
+                'articulos.descripcion',
+                'articulos.codigo',
+                'articulos.precio',
+                'articulos.stock',
+                'articulos.imagen',
+            ])
+            ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
+            ->where('articulos.repuestos', true)
+            ->join('transacciones', function ($join) {
+                $join->on('transacciones.articulo_id', '=', 'articulos.id')
+                    ->where('transacciones.tipo', '=', 'OUT')
+                    ->where('transacciones.inactiva', '=', false);
+            })
+            ->groupBy(
+                'articulos.id',
+                'articulos.descripcion',
+                'articulos.codigo',
+                'articulos.precio',
+                'articulos.stock',
+                'articulos.imagen',
+            )
+            ->havingRaw('SUM(transacciones.cantidad) > 0')
+            ->orderByDesc('total_salida')
+            ->get();
+
+        // Embed images as base64 to avoid DomPDF chroot/path issues in production.
+        $articulos->each(function ($a) {
+            $a->imagen_data = null;
+            if ($a->imagen) {
+                $path = storage_path('app/public/'.$a->imagen);
+                if (file_exists($path)) {
+                    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                    $mime = match ($ext) {
+                        'jpg', 'jpeg' => 'image/jpeg',
+                        'png' => 'image/png',
+                        'webp' => 'image/webp',
+                        default => 'image/png',
+                    };
+                    $a->imagen_data = 'data:'.$mime.';base64,'.base64_encode(file_get_contents($path));
+                }
+            }
+        });
+
+        $ventasTotales = $articulos->sum(
+            fn ($a) => (float) $a->total_salida * round((float) $a->precio * 0.85, 2),
+        );
+        $stockTotal = (int) Articulo::sum('stock');
+
+        $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos', 'ventasTotales', 'stockTotal'))
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('top-salidas-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
      * Generate PDF with transaction history, respecting current filters.
      */
     public function transactions(Request $request): Response
@@ -44,14 +111,14 @@ class PdfController extends Controller
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
-        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($inversorEmpresaId, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $inversorEmpresaId)))
+            ->when($empresaRestringida, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $empresaRestringida)))
             ->latest()
             ->get();
 
@@ -66,7 +133,7 @@ class PdfController extends Controller
         }
 
         $pdf = Pdf::loadView('pdf.transactions', $viewData)
-            ->setPaper('a4', 'portrait');
+            ->setPaper('a4', 'landscape');
 
         return $pdf->download('transacciones-'.now()->format('Y-m-d').'.pdf');
     }
@@ -110,7 +177,7 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaId = $request->user()->restrictedEmpresaId();
 
         // Fetch all pending cobros with relations
         $cobros = \App\Models\Cobro::query()
@@ -141,6 +208,7 @@ class PdfController extends Controller
     }
 
     /**
+<<<<<<< HEAD
      * Generate PDF for a cierre de inversión.
      */
     public function cierreInversion(Request $request, CierreInversion $cierreInversion): Response
@@ -239,6 +307,43 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('mi-cuenta-'.now()->format('Y-m-d').'.pdf');
+=======
+     * Generate a plain spreadsheet-like PDF with the vehicles list, respecting filters.
+     */
+    public function vehiculos(Request $request): Response
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isInversor(), 403);
+
+        $filters = $request->only(['empresa_id', 'inversion_id', 'search', 'asignacion']);
+        $search = trim((string) ($filters['search'] ?? ''));
+        $asignacion = $filters['asignacion'] ?? null; // 'con' | 'sin' | null
+
+        $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
+            ->visibleTo($request->user())
+            ->where('patente', '!=', 'EXTERNO')
+            ->when(! empty($filters['empresa_id']), fn ($q) => $q->where('empresa_id', $filters['empresa_id']))
+            ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
+            ->when($search !== '', function ($q) use ($search) {
+                $escaped = addcslashes($search, '%_\\');
+                $q->where(function ($q2) use ($escaped) {
+                    $q2->where('patente', 'like', "%{$escaped}%")
+                        ->orWhereHas('user', fn ($q3) => $q3->where('name', 'like', "%{$escaped}%"));
+                });
+            })
+            ->when($asignacion === 'con', fn ($q) => $q->whereNotNull('user_id'))
+            ->when($asignacion === 'sin', fn ($q) => $q->whereNull('user_id'))
+            ->get()
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy(fn ($v) => $v->inversion?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy(fn ($v) => $v->empresa?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $pdf = Pdf::loadView('pdf.vehiculos', compact('vehiculos'))
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('vehiculos-'.now()->format('Y-m-d').'.pdf');
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
     }
 
     /**
@@ -250,7 +355,7 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaId = $request->user()->restrictedEmpresaId();
 
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()

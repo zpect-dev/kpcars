@@ -46,6 +46,8 @@ class HandleInertiaRequests extends Middleware
                     'correo' => $request->user()->correo,
                     'role' => $request->user()->role,
                     'absoluto' => (bool) $request->user()->absoluto,
+                    'empresa_acceso' => $request->user()->empresa_acceso !== null ? (int) $request->user()->empresa_acceso : null,
+                    'empresa_restringida_id' => $request->user()->restrictedEmpresaId(),
                     'tiene_inversiones' => $request->user()->isInversor()
                         ? $request->user()->inversiones()->exists()
                         : false,

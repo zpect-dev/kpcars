@@ -11,6 +11,7 @@ use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
@@ -43,6 +44,8 @@ class ArticuloController extends Controller
         abort_if($request->user()->isInversor(), 403);
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
+            'codigo' => ['nullable', 'string', 'max:255'],
+            'repuestos' => ['nullable', 'boolean'],
             'stock' => ['required', 'integer', 'min:0'],
             'min_stock' => ['required', 'integer', 'min:0'],
             'precio' => ['nullable', 'numeric', 'min:0'],
@@ -56,14 +59,25 @@ class ArticuloController extends Controller
             $articulo = Articulo::whereRaw('LOWER(descripcion) = ?', [strtolower($descripcion)])->first();
 
             if ($articulo) {
-                // Update min_stock if changed
+                $updateData = [];
                 if ((int) $articulo->min_stock !== (int) $validated['min_stock']) {
-                    $articulo->update(['min_stock' => $validated['min_stock']]);
+                    $updateData['min_stock'] = $validated['min_stock'];
+                }
+                if (array_key_exists('codigo', $validated) && $validated['codigo'] !== $articulo->codigo) {
+                    $updateData['codigo'] = $validated['codigo'];
+                }
+                if (array_key_exists('repuestos', $validated) && (bool) $validated['repuestos'] !== (bool) $articulo->repuestos) {
+                    $updateData['repuestos'] = (bool) $validated['repuestos'];
+                }
+                if (! empty($updateData)) {
+                    $articulo->update($updateData);
                 }
             } else {
                 // Create item with stock 0 initially
                 $articulo = Articulo::create([
                     'descripcion' => $descripcion,
+                    'codigo' => $validated['codigo'] ?? null,
+                    'repuestos' => (bool) ($validated['repuestos'] ?? false),
                     'stock' => 0,
                     'min_stock' => $validated['min_stock'],
                     'precio' => $validated['precio'] ?? 0,
@@ -125,6 +139,47 @@ class ArticuloController extends Controller
         }
 
         return redirect()->back()->with('success', 'Movimiento registrado correctamente.');
+    }
+
+    /**
+     * Upload (or replace) the image of an article.
+     */
+    public function uploadImage(Request $request, Articulo $articulo): RedirectResponse
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isInversor(), 403);
+
+        $request->validate([
+            'imagen' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+        ]);
+
+        // Remove previous image if exists
+        if ($articulo->imagen && Storage::disk('public')->exists($articulo->imagen)) {
+            Storage::disk('public')->delete($articulo->imagen);
+        }
+
+        $path = $request->file('imagen')->store('articulos', 'public');
+
+        $articulo->update(['imagen' => $path]);
+
+        return redirect()->back()->with('success', 'Imagen actualizada correctamente.');
+    }
+
+    /**
+     * Delete the image of an article.
+     */
+    public function deleteImage(Request $request, Articulo $articulo): RedirectResponse
+    {
+        abort_if($request->user()->isMechanic(), 403);
+        abort_if($request->user()->isInversor(), 403);
+
+        if ($articulo->imagen && Storage::disk('public')->exists($articulo->imagen)) {
+            Storage::disk('public')->delete($articulo->imagen);
+        }
+
+        $articulo->update(['imagen' => null]);
+
+        return redirect()->back()->with('success', 'Imagen eliminada correctamente.');
     }
 
     /**

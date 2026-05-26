@@ -6,7 +6,11 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
+<<<<<<< HEAD
 use App\Http\Controllers\ExcelController;
+=======
+use App\Http\Controllers\GastoController;
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
@@ -20,6 +24,10 @@ Route::get('/', function () {
     if (auth()->check()) {
         if (auth()->user()->isMechanic()) {
             return redirect()->route('appointments.index');
+        }
+
+        if (auth()->user()->isInversor()) {
+            return redirect()->route('mi-cuenta.index');
         }
 
         return redirect()->route('dashboard');
@@ -49,6 +57,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
 
     Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
+    Route::get('pdf/top-salidas', [PdfController::class, 'topSalidas'])->name('pdf.top-salidas');
+    Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');
     Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
     Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
     Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
@@ -71,6 +81,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
     Route::patch('users/{user}/toggle-absoluto', [UserController::class, 'toggleAbsoluto'])->name('users.toggle-absoluto');
+    Route::patch('users/{user}/empresa-acceso', [UserController::class, 'updateEmpresaAcceso'])->name('users.empresa-acceso');
     Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
     Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 
@@ -80,12 +91,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('revisiones/historial/{cierre}', [RevisionController::class, 'historialShow'])->name('revisiones.historial.show');
     Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
 
+    Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
+    Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
+    Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
+
     Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
     Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
     Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
     Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
     Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
+    Route::post('articulos/{articulo}/imagen', [ArticuloController::class, 'uploadImage'])->name('articulos.upload-image');
+    Route::delete('articulos/{articulo}/imagen', [ArticuloController::class, 'deleteImage'])->name('articulos.delete-image');
 
     // Panel admin: inversiones e inversores asignados + deuda
     Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');

@@ -40,7 +40,9 @@ class InversionController extends Controller
                 ->pluck('monto', 'inversion_id')
             : collect();
 
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
         $inversiones = Inversion::with(['empresa:id,nombre', 'inversores:id,name,dni'])
+            ->when($empresaRestringida, fn ($q) => $q->where('empresa_id', $empresaRestringida))
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()

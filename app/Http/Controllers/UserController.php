@@ -34,12 +34,23 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'empresa_acceso' => ['nullable', 'integer', Rule::in([0, 1, 2])],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
 
         if ($validated['role'] !== UserRole::INVERSOR->value) {
             $validated['empresa_id'] = null;
+        } else {
+            $empresaRestringida = $request->user()->restrictedEmpresaId();
+            if ($empresaRestringida) {
+                $validated['empresa_id'] = $empresaRestringida;
+            }
+        }
+
+        // empresa_acceso solo aplica para administradores
+        if ($validated['role'] !== UserRole::ADMINISTRADOR->value) {
+            $validated['empresa_acceso'] = null;
         }
 
         $photoPath = null;
@@ -61,6 +72,7 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
             'empresa_id' => $validated['empresa_id'] ?? null,
+            'empresa_acceso' => $validated['empresa_acceso'] ?? null,
             'deposito' => $validated['deposito'] ?? null,
             'deposito_moneda' => isset($validated['deposito']) ? ($validated['deposito_moneda'] ?? null) : null,
         ]);
@@ -96,6 +108,7 @@ class UserController extends Controller
                 } elseif ($status === 'inactivos') {
                     $query->where('inactivo', true);
                 }
+<<<<<<< HEAD
             });
 
         if ($isChoferFilter) {
@@ -104,6 +117,10 @@ class UserController extends Controller
 
         $users = $query
             ->get(['id', 'name', 'dni', 'role', 'absoluto', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
+=======
+            })
+            ->get(['id', 'name', 'dni', 'role', 'absoluto', 'empresa_acceso', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
             ->append('profile_photo_url');
 
         if ($isChoferFilter) {
@@ -227,6 +244,23 @@ class UserController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
+    public function updateEmpresaAcceso(Request $request, User $user)
+    {
+        Gate::authorize('manage-users');
+
+        if (! $user->isAdmin()) {
+            return redirect()->back()->with('error', 'Solo los administradores pueden tener acceso por empresa.');
+        }
+
+        $validated = $request->validate([
+            'empresa_acceso' => ['nullable', 'integer', Rule::in([0, 1, 2])],
+        ]);
+
+        $user->update(['empresa_acceso' => $validated['empresa_acceso'] ?? null]);
+
+        return redirect()->back()->with('success', 'Acceso por empresa actualizado.');
+    }
+
     public function update(Request $request, User $user)
     {
         Gate::authorize('manage-users');
@@ -239,12 +273,22 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'empresa_acceso' => ['nullable', 'integer', Rule::in([0, 1, 2])],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
 
         if (! $user->isInversor()) {
             unset($validated['empresa_id']);
+        } else {
+            $empresaRestringida = $request->user()->restrictedEmpresaId();
+            if ($empresaRestringida) {
+                $validated['empresa_id'] = $empresaRestringida;
+            }
+        }
+
+        if (! $user->isAdmin()) {
+            unset($validated['empresa_acceso']);
         }
 
         // Limpiar moneda si no hay depósito

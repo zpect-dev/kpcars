@@ -36,9 +36,13 @@ export interface Vehiculo {
 export interface Articulo {
     id: number;
     descripcion: string;
+    codigo: string | null;
+    repuestos: boolean;
     stock: number;
     min_stock: number;
     precio: number;
+    imagen: string | null;
+    imagen_url: string | null;
     created_at?: string;
     updated_at?: string;
 }

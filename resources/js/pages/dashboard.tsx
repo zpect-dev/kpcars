@@ -1,5 +1,6 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    FileDown,
     FileUp,
     History,
     LayoutList,
@@ -66,6 +67,8 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<any>().props;
     const isInversor = auth?.user?.role === 'inversor';
+    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
+    const hideEmpresa = isInversor || empresaRestringidaId != null;
 
     useEffect(() => {
         if (isInversor) {
@@ -433,18 +436,44 @@ export default function Dashboard({
                     </div>
                     {!isInversor && (
                         <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    const params = new URLSearchParams();
+                                    if (empresaId) params.set('empresa_id', empresaId);
+                                    if (inversionId) params.set('inversion_id', inversionId);
+                                    if (search.trim()) params.set('search', search.trim());
+                                    if (asignacionFiltro === 'con' || asignacionFiltro === 'sin') {
+                                        params.set('asignacion', asignacionFiltro);
+                                    }
+                                    const qs = params.toString();
+                                    window.open(
+                                        `/pdf/vehiculos${qs ? `?${qs}` : ''}`,
+                                        '_blank',
+                                    );
+                                }}
+                            >
+                                <FileDown className="h-4 w-4" />
+                                <span className="ml-2 hidden sm:inline">
+                                    Exportar PDF
+                                </span>
+                            </Button>
                             <Dialog
                                 open={isImportOpen}
                                 onOpenChange={setIsImportOpen}
                             >
-                                <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <FileUp className="h-4 w-4" />
-                                        <span className="ml-2 hidden sm:inline">
-                                            Importar Asignaciones
-                                        </span>
-                                    </Button>
-                                </DialogTrigger>
+                                {/* Botón "Importar Asignaciones" oculto */}
+                                {false && (
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <FileUp className="h-4 w-4" />
+                                            <span className="ml-2 hidden sm:inline">
+                                                Importar Asignaciones
+                                            </span>
+                                        </Button>
+                                    </DialogTrigger>
+                                )}
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
                                         <DialogTitle>
@@ -602,7 +631,7 @@ export default function Dashboard({
                         </div>
 
                         {/* Empresa */}
-                        {!isInversor && (
+                        {!hideEmpresa && (
                             <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                                 <Label htmlFor="empresa_filter">Empresa</Label>
                                 <Select
@@ -744,7 +773,7 @@ export default function Dashboard({
                                     <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Vehículo
                                     </th>
-                                    {!isInversor && (
+                                    {!hideEmpresa && (
                                         <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                             Empresa
                                         </th>
@@ -770,7 +799,7 @@ export default function Dashboard({
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isInversor ? 7 : 8}
+                                            colSpan={hideEmpresa ? 7 : 8}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -800,7 +829,7 @@ export default function Dashboard({
                                                     </span>
                                                 </div>
                                             </td>
-                                            {!isInversor && (
+                                            {!hideEmpresa && (
                                                 <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
                                                     {vehiculo.empresa?.nombre ? (
                                                         <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
@@ -1050,7 +1079,7 @@ export default function Dashboard({
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {!isInversor &&
+                                        {!hideEmpresa &&
                                             (vehiculo.empresa?.nombre ? (
                                                 <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
                                                     {vehiculo.empresa.nombre}
@@ -1426,17 +1455,19 @@ function VehiculoForm({
                 <InputError message={form.errors.inversion_id} />
             </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="empresa_id">Empresa</Label>
-                <Combobox
-                    id="empresa_id"
-                    placeholder="Buscar empresa..."
-                    options={empresaOptions}
-                    value={form.data.empresa_id}
-                    onSelect={(o) => form.setData('empresa_id', o.value)}
-                />
-                <InputError message={form.errors.empresa_id} />
-            </div>
+            {empresaOptions.length > 0 && (
+                <div className="grid gap-2">
+                    <Label htmlFor="empresa_id">Empresa</Label>
+                    <Combobox
+                        id="empresa_id"
+                        placeholder="Buscar empresa..."
+                        options={empresaOptions}
+                        value={form.data.empresa_id}
+                        onSelect={(o) => form.setData('empresa_id', o.value)}
+                    />
+                    <InputError message={form.errors.empresa_id} />
+                </div>
+            )}
 
             <div className="grid gap-2">
                 <Label htmlFor="user_id">Conductor Asignado</Label>

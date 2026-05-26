@@ -75,8 +75,13 @@ class Vehiculo extends Model
 
     public function scopeVisibleTo($query, ?User $user)
     {
-        if ($user && $user->empresa_id) {
-            $query->where('empresa_id', $user->empresa_id);
+        if (! $user) {
+            return $query;
+        }
+
+        $empresaId = $user->restrictedEmpresaId();
+        if ($empresaId) {
+            $query->where('empresa_id', $empresaId);
         }
 
         return $query;

@@ -24,7 +24,7 @@ class CobroController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaId = $request->user()->restrictedEmpresaId();
 
         // Get totals per inversion+empresa for the current period
         $resumen = Cobro::query()
@@ -113,7 +113,7 @@ class CobroController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : $request->integer('empresa_id');
+        $empresaId = $request->user()->restrictedEmpresaId() ?? $request->integer('empresa_id');
 
         // Inversor can only see inversions of their empresa
         if ($request->user()->isInversor() && $empresaId) {
@@ -187,9 +187,10 @@ class CobroController extends Controller
 
         abort_if($inversionId <= 0 || $empresaId <= 0, 422, 'Parámetros inválidos.');
 
-        // Inversor can only access details of their own empresa
-        if ($request->user()->isInversor()) {
-            abort_unless($empresaId === $request->user()->empresa_id, 403);
+        // Restringir al empresa accesible (inversor o admin restringido)
+        $restricted = $request->user()->restrictedEmpresaId();
+        if ($restricted !== null) {
+            abort_unless($empresaId === $restricted, 403);
         }
 
         // Determine the date range: cobros created between previous cierre and this cierre

@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet, HandCoins } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain, type NavGroup } from '@/components/nav-main';
@@ -18,6 +18,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as articulosIndex } from '@/routes/articulos';
 import { index as cobrosIndex } from '@/routes/cobros';
+import { index as gastosIndex } from '@/routes/gastos';
 import type { NavItem } from '@/types';
 
 const footerNavItems: NavItem[] = [];
@@ -34,11 +35,25 @@ export function AppSidebar() {
     let groups: NavGroup[] = [];
 
     if (auth.user.role === 'inversor') {
+<<<<<<< HEAD
         groups = [
             {
                 items: [{ title: 'Mi Cuenta', href: '/mi-cuenta', icon: Wallet }],
             },
         ];
+=======
+        // Inversores only see Mi Cuenta + Gastos
+        mainNavItems.push({
+            title: 'Mi Cuenta',
+            href: '/mi-cuenta',
+            icon: Wallet,
+        });
+        mainNavItems.push({
+            title: 'Gastos',
+            href: gastosIndex.url(),
+            icon: HandCoins,
+        });
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
     } else if (auth.user.role === 'mecanico') {
         groups = [
             {
@@ -62,7 +77,20 @@ export function AppSidebar() {
         const gestionItems: NavItem[] = [];
 
         if (auth.user.role === 'administrador' && auth.user.absoluto) {
+<<<<<<< HEAD
             gestionItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
+=======
+            mainNavItems.push({
+                title: 'Cobros',
+                href: cobrosIndex.url(),
+                icon: Receipt,
+            });
+            mainNavItems.push({
+                title: 'Gastos',
+                href: gastosIndex.url(),
+                icon: HandCoins,
+            });
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
         }
 
         gestionItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });

@@ -61,7 +61,7 @@ class AsignacionController extends Controller
 
     private function ensureVehiculoVisible(Request $request, Vehiculo $vehiculo): void
     {
-        $empresaId = $request->user()->empresa_id;
+        $empresaId = $request->user()->restrictedEmpresaId();
         if ($empresaId && $vehiculo->empresa_id !== $empresaId) {
             abort(403);
         }

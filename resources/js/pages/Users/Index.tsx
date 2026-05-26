@@ -26,6 +26,7 @@ interface User {
     role: string;
     inactivo: boolean;
     absoluto: boolean;
+    empresa_acceso?: number | null;
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
@@ -184,6 +185,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         );
     }
 
+    function changeEmpresaAcceso(user: User, value: string) {
+        if (user.role !== 'administrador') return;
+        const parsed = value === '' ? null : Number(value);
+        router.patch(
+            `/users/${user.id}/empresa-acceso`,
+            { empresa_acceso: parsed },
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    }
+
     const [showCreateModal, setShowCreateModal] = useState(false);
     const createForm = useForm({
         name: '',
@@ -334,6 +348,16 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
+<<<<<<< HEAD
+=======
+    const empresaRestringidaId =
+        (auth?.user?.empresa_restringida_id as number | null | undefined) ??
+        null;
+    const hideEmpresa = empresaRestringidaId != null;
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterRole = urlParams.get('role');
+    const filterStatus = urlParams.get('status');
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
 
     useEffect(() => {
         if (!filterRole || (filterRole === 'chofer' && !filterStatus)) {
@@ -387,6 +411,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             )}
                         </div>
 
+<<<<<<< HEAD
                         {/* Filter bar */}
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="relative min-w-[180px] flex-1 max-w-xs">
@@ -430,6 +455,56 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             ? 'bg-background text-foreground shadow-sm'
                                             : 'text-muted-foreground hover:text-foreground',
                                     )}
+=======
+                        {/* Filtro activos/inactivos — solo visible en choferes */}
+                        {filterRole === 'chofer' && (
+                            <div className="flex gap-1.5">
+                                <Button
+                                    variant={
+                                        filterStatus === 'activos'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    size="sm"
+                                    className="h-9 rounded-md px-4 text-xs font-medium"
+                                    onClick={() =>
+                                        router.get(
+                                            usersIndex.url(),
+                                            {
+                                                role: 'chofer',
+                                                status:
+                                                    filterStatus === 'activos'
+                                                        ? undefined
+                                                        : 'activos',
+                                            },
+                                            { preserveState: false },
+                                        )
+                                    }
+                                >
+                                    Activos
+                                </Button>
+                                <Button
+                                    variant={
+                                        filterStatus === 'inactivos'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
+                                    size="sm"
+                                    className="h-9 rounded-md px-4 text-xs font-medium"
+                                    onClick={() =>
+                                        router.get(
+                                            usersIndex.url(),
+                                            {
+                                                role: 'chofer',
+                                                status:
+                                                    filterStatus === 'inactivos'
+                                                        ? undefined
+                                                        : 'inactivos',
+                                            },
+                                            { preserveState: false },
+                                        )
+                                    }
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                 >
                                     Inactivos
                                     <span className={cn(
@@ -603,10 +678,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     filteredUsers.map((user) => (
                                         <tr
                                             key={user.id}
-                                            onClick={() => !isInversor && openEditModal(user)}
+                                            onClick={() =>
+                                                !isInversor &&
+                                                openEditModal(user)
+                                            }
                                             className={cn(
                                                 'bg-card transition-colors',
-                                                !isInversor && 'cursor-pointer hover:bg-muted/40',
+                                                !isInversor &&
+                                                    'cursor-pointer hover:bg-muted/40',
                                             )}
                                         >
                                             <td className="px-4 py-3 sm:px-6 sm:py-4">
@@ -619,10 +698,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                             alt={user.name}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setPreviewImage({
-                                                                    url: user.profile_photo_url!,
-                                                                    name: user.name,
-                                                                });
+                                                                setPreviewImage(
+                                                                    {
+                                                                        url: user.profile_photo_url!,
+                                                                        name: user.name,
+                                                                    },
+                                                                );
                                                             }}
                                                             className="h-8 w-8 shrink-0 cursor-zoom-in rounded-full border border-border bg-muted object-cover transition hover:opacity-80"
                                                         />
@@ -695,6 +776,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         if (isInversor) return;
                                                         confirmToggleStatus(user);
                                                     }}
+<<<<<<< HEAD
                                                     disabled={user.id === auth.user.id || isInversor}
                                                     className={cn(
                                                         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
@@ -705,11 +787,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                             ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
                                                             : 'cursor-default',
                                                     )}
+=======
+                                                    disabled={
+                                                        user.id ===
+                                                            auth.user.id ||
+                                                        isInversor
+                                                    }
+                                                    className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                                 >
                                                     <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
                                                     {user.inactivo ? 'Inactivo' : 'Activo'}
                                                 </button>
                                             </td>
+<<<<<<< HEAD
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
                                                     {user.deposito ? (
@@ -771,6 +862,75 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         )}
                                                     </div>
                                                 )}
+=======
+                                            <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
+                                                {user.deposito ? (
+                                                    <span className="font-medium text-foreground">
+                                                        {formatDeposito(user)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        —
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
+                                                <div className="flex flex-col gap-1.5">
+                                                    {user.id ===
+                                                    auth.user.id ? (
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                            {roles.find(
+                                                                (r) =>
+                                                                    r.value ===
+                                                                    user.role,
+                                                            )?.label ||
+                                                                user.role}{' '}
+                                                            (Tú)
+                                                        </span>
+                                                    ) : isInversor ? (
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                            {roles.find(
+                                                                (r) =>
+                                                                    r.value ===
+                                                                    user.role,
+                                                            )?.label ||
+                                                                user.role}
+                                                        </span>
+                                                    ) : (
+                                                        <select
+                                                            onClick={(e) =>
+                                                                e.stopPropagation()
+                                                            }
+                                                            value={user.role}
+                                                            onChange={(e) =>
+                                                                handleRoleChange(
+                                                                    user.id,
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            {roles.map(
+                                                                (role) => (
+                                                                    <option
+                                                                        key={
+                                                                            role.value
+                                                                        }
+                                                                        value={
+                                                                            role.value
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            role.label
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
+                                                        </select>
+                                                    )}
+                                                </div>
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                             </td>
                                         </tr>
                                     ))
@@ -792,7 +952,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     key={user.id}
                                     role={isInversor ? undefined : 'button'}
                                     tabIndex={isInversor ? -1 : 0}
-                                    onClick={() => !isInversor && openEditModal(user)}
+                                    onClick={() =>
+                                        !isInversor && openEditModal(user)
+                                    }
                                     onKeyDown={(e) => {
                                         if (isInversor) return;
                                         if (
@@ -805,7 +967,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     }}
                                     className={cn(
                                         'flex flex-col gap-3 p-4 transition-colors focus:outline-none',
-                                        !isInversor && 'cursor-pointer hover:bg-muted/40 focus:bg-muted/40',
+                                        !isInversor &&
+                                            'cursor-pointer hover:bg-muted/40 focus:bg-muted/40',
                                     )}
                                 >
                                     <div className="flex items-start justify-between gap-3">
@@ -841,6 +1004,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         ? ' (Tú)'
                                                         : ''}
                                                 </p>
+<<<<<<< HEAD
                                                 {user.role === 'administrador' && !isInversor && (
                                                     <button
                                                         type="button"
@@ -854,6 +1018,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
                                                     </button>
                                                 )}
+=======
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                             </div>
                                         </div>
                                         <button
@@ -862,6 +1028,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 if (isInversor) return;
                                                 confirmToggleStatus(user);
                                             }}
+<<<<<<< HEAD
                                             disabled={user.id === auth.user.id || isInversor}
                                             className={cn(
                                                 'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
@@ -872,6 +1039,13 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
                                                     : 'cursor-default',
                                             )}
+=======
+                                            disabled={
+                                                user.id === auth.user.id ||
+                                                isInversor
+                                            }
+                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+>>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                         >
                                             <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
                                             {user.inactivo ? 'Inactivo' : 'Activo'}
@@ -1065,36 +1239,42 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
-                        {createForm.data.role === 'inversor' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="empresa_id">Empresa</Label>
-                                <select
-                                    id="empresa_id"
-                                    value={createForm.data.empresa_id}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'empresa_id',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
-                                    {empresas.map((e) => (
+                        {createForm.data.role === 'inversor' &&
+                            !hideEmpresa && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="empresa_id">Empresa</Label>
+                                    <select
+                                        id="empresa_id"
+                                        value={createForm.data.empresa_id}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'empresa_id',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
                                         <option
-                                            key={e.id}
-                                            value={e.id}
+                                            value=""
                                             className="bg-background text-foreground"
                                         >
-                                            {e.nombre}
+                                            Sin empresa
                                         </option>
-                                    ))}
-                                </select>
-                                <InputError
-                                    message={createForm.errors.empresa_id}
-                                />
-                            </div>
-                        )}
+                                        {empresas.map((e) => (
+                                            <option
+                                                key={e.id}
+                                                value={e.id}
+                                                className="bg-background text-foreground"
+                                            >
+                                                {e.nombre}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError
+                                        message={createForm.errors.empresa_id}
+                                    />
+                                </div>
+                            )}
 
                         {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
@@ -1167,7 +1347,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="deposito">Depósito (Garantía)</Label>
+                                <Label htmlFor="deposito">
+                                    Depósito (Garantía)
+                                </Label>
                                 <Input
                                     id="deposito"
                                     type="number"
@@ -1211,9 +1393,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     ))}
                                 </select>
                                 <InputError
-                                    message={
-                                        createForm.errors.deposito_moneda
-                                    }
+                                    message={createForm.errors.deposito_moneda}
                                 />
                             </div>
                         </div>
@@ -1326,7 +1506,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <InputError message={editForm.errors.correo} />
                         </div>
 
-                        {userToEdit?.role === 'inversor' && (
+                        {userToEdit?.role === 'inversor' && !hideEmpresa && (
                             <div className="grid gap-2">
                                 <Label htmlFor="edit-empresa_id">Empresa</Label>
                                 <select
@@ -1340,7 +1520,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     }
                                     className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
+                                    <option
+                                        value=""
+                                        className="bg-background text-foreground"
+                                    >
+                                        Sin empresa
+                                    </option>
                                     {empresas.map((e) => (
                                         <option
                                             key={e.id}
@@ -1404,7 +1589,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito">Depósito (Garantía)</Label>
+                                <Label htmlFor="edit-deposito">
+                                    Depósito (Garantía)
+                                </Label>
                                 <Input
                                     id="edit-deposito"
                                     type="number"
@@ -1425,7 +1612,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito_moneda">Moneda</Label>
+                                <Label htmlFor="edit-deposito_moneda">
+                                    Moneda
+                                </Label>
                                 <select
                                     id="edit-deposito_moneda"
                                     value={editForm.data.deposito_moneda}
@@ -1448,9 +1637,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     ))}
                                 </select>
                                 <InputError
-                                    message={
-                                        editForm.errors.deposito_moneda
-                                    }
+                                    message={editForm.errors.deposito_moneda}
                                 />
                             </div>
                         </div>
@@ -1460,13 +1647,17 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 <Button
                                     type="button"
                                     variant="secondary"
-                                    onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)}
+                                    onClick={() =>
+                                        router.get(
+                                            `/users/${userToEdit.id}/asignaciones`,
+                                        )
+                                    }
                                     className="mb-2 sm:mb-0"
                                 >
                                     Ver Asignaciones
                                 </Button>
                             )}
-                            <div className="flex flex-col-reverse sm:flex-row gap-2">
+                            <div className="flex flex-col-reverse gap-2 sm:flex-row">
                                 <Button
                                     type="button"
                                     variant="outline"

@@ -20,7 +20,12 @@ class DashboardController extends Controller
     {
         abort_if($request->user()->isMechanic(), 403);
 
+        if ($request->user()->isInversor()) {
+            return redirect()->route('mi-cuenta.index');
+        }
+
         $filters = $request->only(['empresa_id', 'inversion_id']);
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
             ->visibleTo($request->user())
@@ -30,10 +35,13 @@ class DashboardController extends Controller
             ->orderBy('patente')
             ->get();
 
-        $empresas = $request->user()->isInversor()
+        // Si el admin está restringido o es inversor, no exponemos la lista de empresas
+        // para que la UI no muestre el filtro ni el selector.
+        $empresas = ($request->user()->isInversor() || $empresaRestringida)
             ? collect()
             : Empresa::orderBy('nombre')->get(['id', 'nombre']);
-        $inversiones = Inversion::orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
+        $inversiones = Inversion::when($empresaRestringida, fn ($q) => $q->where('empresa_id', $empresaRestringida))
+            ->orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
         $users = User::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('dashboard', [
