@@ -22,16 +22,23 @@ class GastoController extends Controller
 
         $isInversor = $request->user()->isInversor();
         $userId = $request->user()->id;
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
         $gastosQuery = Gasto::query()
             ->with([
                 'user:id,name',
-                'vehiculo:id,patente,marca,modelo,inversion_id',
+                'vehiculo:id,patente,marca,modelo,inversion_id,empresa_id',
                 'vehiculo.inversion:id,nombre',
                 'distribuciones.user:id,name',
             ])
             ->when($isInversor, function ($q) use ($userId) {
                 $q->whereHas('distribuciones', fn ($q2) => $q2->where('user_id', $userId));
+            })
+            ->when(! $isInversor && $empresaRestringida, function ($q) use ($empresaRestringida) {
+                $q->where(function ($q2) use ($empresaRestringida) {
+                    $q2->whereNull('vehiculo_id')
+                        ->orWhereHas('vehiculo', fn ($q3) => $q3->where('empresa_id', $empresaRestringida));
+                });
             })
             ->latest('fecha')
             ->latest('id');

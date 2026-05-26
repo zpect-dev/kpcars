@@ -67,6 +67,8 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<any>().props;
     const isInversor = auth?.user?.role === 'inversor';
+    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
+    const hideEmpresa = isInversor || empresaRestringidaId != null;
 
     useEffect(() => {
         if (isInversor) {
@@ -629,7 +631,7 @@ export default function Dashboard({
                         </div>
 
                         {/* Empresa */}
-                        {!isInversor && (
+                        {!hideEmpresa && (
                             <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                                 <Label htmlFor="empresa_filter">Empresa</Label>
                                 <Select
@@ -771,7 +773,7 @@ export default function Dashboard({
                                     <th className="w-[22%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Vehículo
                                     </th>
-                                    {!isInversor && (
+                                    {!hideEmpresa && (
                                         <th className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                             Empresa
                                         </th>
@@ -797,7 +799,7 @@ export default function Dashboard({
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isInversor ? 7 : 8}
+                                            colSpan={hideEmpresa ? 7 : 8}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -827,7 +829,7 @@ export default function Dashboard({
                                                     </span>
                                                 </div>
                                             </td>
-                                            {!isInversor && (
+                                            {!hideEmpresa && (
                                                 <td className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4">
                                                     {vehiculo.empresa?.nombre ? (
                                                         <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
@@ -1077,7 +1079,7 @@ export default function Dashboard({
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
-                                        {!isInversor &&
+                                        {!hideEmpresa &&
                                             (vehiculo.empresa?.nombre ? (
                                                 <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
                                                     {vehiculo.empresa.nombre}
@@ -1454,17 +1456,19 @@ function VehiculoForm({
                 <InputError message={form.errors.inversion_id} />
             </div>
 
-            <div className="grid gap-2">
-                <Label htmlFor="empresa_id">Empresa</Label>
-                <Combobox
-                    id="empresa_id"
-                    placeholder="Buscar empresa..."
-                    options={empresaOptions}
-                    value={form.data.empresa_id}
-                    onSelect={(o) => form.setData('empresa_id', o.value)}
-                />
-                <InputError message={form.errors.empresa_id} />
-            </div>
+            {empresaOptions.length > 0 && (
+                <div className="grid gap-2">
+                    <Label htmlFor="empresa_id">Empresa</Label>
+                    <Combobox
+                        id="empresa_id"
+                        placeholder="Buscar empresa..."
+                        options={empresaOptions}
+                        value={form.data.empresa_id}
+                        onSelect={(o) => form.setData('empresa_id', o.value)}
+                    />
+                    <InputError message={form.errors.empresa_id} />
+                </div>
+            )}
 
             <div className="grid gap-2">
                 <Label htmlFor="user_id">Conductor Asignado</Label>

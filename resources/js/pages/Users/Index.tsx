@@ -25,6 +25,7 @@ interface User {
     role: string;
     inactivo: boolean;
     absoluto: boolean;
+    empresa_acceso?: number | null;
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
@@ -151,6 +152,19 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
         router.patch(
             `/users/${user.id}/toggle-absoluto`,
             {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
+    }
+
+    function changeEmpresaAcceso(user: User, value: string) {
+        if (user.role !== 'administrador') return;
+        const parsed = value === '' ? null : Number(value);
+        router.patch(
+            `/users/${user.id}/empresa-acceso`,
+            { empresa_acceso: parsed },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -286,6 +300,10 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
 
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
+    const empresaRestringidaId =
+        (auth?.user?.empresa_restringida_id as number | null | undefined) ??
+        null;
+    const hideEmpresa = empresaRestringidaId != null;
     const urlParams = new URLSearchParams(window.location.search);
     const filterRole = urlParams.get('role');
     const filterStatus = urlParams.get('status');
@@ -337,13 +355,23 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                         {filterRole === 'chofer' && (
                             <div className="flex gap-1.5">
                                 <Button
-                                    variant={filterStatus === 'activos' ? 'default' : 'outline'}
+                                    variant={
+                                        filterStatus === 'activos'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     size="sm"
                                     className="h-9 rounded-md px-4 text-xs font-medium"
                                     onClick={() =>
                                         router.get(
                                             usersIndex.url(),
-                                            { role: 'chofer', status: filterStatus === 'activos' ? undefined : 'activos' },
+                                            {
+                                                role: 'chofer',
+                                                status:
+                                                    filterStatus === 'activos'
+                                                        ? undefined
+                                                        : 'activos',
+                                            },
                                             { preserveState: false },
                                         )
                                     }
@@ -351,13 +379,23 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     Activos
                                 </Button>
                                 <Button
-                                    variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
+                                    variant={
+                                        filterStatus === 'inactivos'
+                                            ? 'default'
+                                            : 'outline'
+                                    }
                                     size="sm"
                                     className="h-9 rounded-md px-4 text-xs font-medium"
                                     onClick={() =>
                                         router.get(
                                             usersIndex.url(),
-                                            { role: 'chofer', status: filterStatus === 'inactivos' ? undefined : 'inactivos' },
+                                            {
+                                                role: 'chofer',
+                                                status:
+                                                    filterStatus === 'inactivos'
+                                                        ? undefined
+                                                        : 'inactivos',
+                                            },
                                             { preserveState: false },
                                         )
                                     }
@@ -447,10 +485,14 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     filteredUsers.map((user) => (
                                         <tr
                                             key={user.id}
-                                            onClick={() => !isInversor && openEditModal(user)}
+                                            onClick={() =>
+                                                !isInversor &&
+                                                openEditModal(user)
+                                            }
                                             className={cn(
                                                 'bg-card transition-colors',
-                                                !isInversor && 'cursor-pointer hover:bg-muted/40',
+                                                !isInversor &&
+                                                    'cursor-pointer hover:bg-muted/40',
                                             )}
                                         >
                                             <td className="px-4 py-3 sm:px-6 sm:py-4">
@@ -463,10 +505,12 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                             alt={user.name}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                setPreviewImage({
-                                                                    url: user.profile_photo_url!,
-                                                                    name: user.name,
-                                                                });
+                                                                setPreviewImage(
+                                                                    {
+                                                                        url: user.profile_photo_url!,
+                                                                        name: user.name,
+                                                                    },
+                                                                );
                                                             }}
                                                             className="h-8 w-8 shrink-0 cursor-zoom-in rounded-full border border-border bg-muted object-cover transition hover:opacity-80"
                                                         />
@@ -549,7 +593,9 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                         );
                                                     }}
                                                     disabled={
-                                                        user.id === auth.user.id || isInversor
+                                                        user.id ===
+                                                            auth.user.id ||
+                                                        isInversor
                                                     }
                                                     className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                                                 >
@@ -571,7 +617,8 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                             </td>
                                             <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex flex-col gap-1.5">
-                                                    {user.id === auth.user.id ? (
+                                                    {user.id ===
+                                                    auth.user.id ? (
                                                         <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
                                                             {roles.find(
                                                                 (r) =>
@@ -583,7 +630,12 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                         </span>
                                                     ) : isInversor ? (
                                                         <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                            {roles.find((r) => r.value === user.role)?.label || user.role}
+                                                            {roles.find(
+                                                                (r) =>
+                                                                    r.value ===
+                                                                    user.role,
+                                                            )?.label ||
+                                                                user.role}
                                                         </span>
                                                     ) : (
                                                         <select
@@ -594,36 +646,29 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                             onChange={(e) =>
                                                                 handleRoleChange(
                                                                     user.id,
-                                                                    e.target.value,
+                                                                    e.target
+                                                                        .value,
                                                                 )
                                                             }
                                                             className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
-                                                            {roles.map((role) => (
-                                                                <option
-                                                                    key={role.value}
-                                                                    value={
-                                                                        role.value
-                                                                    }
-                                                                >
-                                                                    {role.label}
-                                                                </option>
-                                                            ))}
+                                                            {roles.map(
+                                                                (role) => (
+                                                                    <option
+                                                                        key={
+                                                                            role.value
+                                                                        }
+                                                                        value={
+                                                                            role.value
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            role.label
+                                                                        }
+                                                                    </option>
+                                                                ),
+                                                            )}
                                                         </select>
-                                                    )}
-                                                    {user.role === 'administrador' && !isInversor && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleAbsoluto(user);
-                                                            }}
-                                                            disabled={user.id === auth.user.id}
-                                                            title={user.absoluto ? 'Acceso absoluto activado — clic para revocar' : 'Sin acceso absoluto — clic para otorgar'}
-                                                            className={`inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
-                                                        >
-                                                            {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
-                                                        </button>
                                                     )}
                                                 </div>
                                             </td>
@@ -647,7 +692,9 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     key={user.id}
                                     role={isInversor ? undefined : 'button'}
                                     tabIndex={isInversor ? -1 : 0}
-                                    onClick={() => !isInversor && openEditModal(user)}
+                                    onClick={() =>
+                                        !isInversor && openEditModal(user)
+                                    }
                                     onKeyDown={(e) => {
                                         if (isInversor) return;
                                         if (
@@ -660,7 +707,8 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     }}
                                     className={cn(
                                         'flex flex-col gap-3 p-4 transition-colors focus:outline-none',
-                                        !isInversor && 'cursor-pointer hover:bg-muted/40 focus:bg-muted/40',
+                                        !isInversor &&
+                                            'cursor-pointer hover:bg-muted/40 focus:bg-muted/40',
                                     )}
                                 >
                                     <div className="flex items-start justify-between gap-3">
@@ -696,19 +744,6 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                         ? ' (Tú)'
                                                         : ''}
                                                 </p>
-                                                {user.role === 'administrador' && !isInversor && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            toggleAbsoluto(user);
-                                                        }}
-                                                        disabled={user.id === auth.user.id}
-                                                        className={`mt-1 inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
-                                                    >
-                                                        {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                         <button
@@ -717,7 +752,10 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                 if (isInversor) return;
                                                 confirmToggleStatus(user);
                                             }}
-                                            disabled={user.id === auth.user.id || isInversor}
+                                            disabled={
+                                                user.id === auth.user.id ||
+                                                isInversor
+                                            }
                                             className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                                         >
                                             {user.inactivo
@@ -893,36 +931,42 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                             </div>
                         </div>
 
-                        {createForm.data.role === 'inversor' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="empresa_id">Empresa</Label>
-                                <select
-                                    id="empresa_id"
-                                    value={createForm.data.empresa_id}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'empresa_id',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
-                                    {empresas.map((e) => (
+                        {createForm.data.role === 'inversor' &&
+                            !hideEmpresa && (
+                                <div className="grid gap-2">
+                                    <Label htmlFor="empresa_id">Empresa</Label>
+                                    <select
+                                        id="empresa_id"
+                                        value={createForm.data.empresa_id}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'empresa_id',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
                                         <option
-                                            key={e.id}
-                                            value={e.id}
+                                            value=""
                                             className="bg-background text-foreground"
                                         >
-                                            {e.nombre}
+                                            Sin empresa
                                         </option>
-                                    ))}
-                                </select>
-                                <InputError
-                                    message={createForm.errors.empresa_id}
-                                />
-                            </div>
-                        )}
+                                        {empresas.map((e) => (
+                                            <option
+                                                key={e.id}
+                                                value={e.id}
+                                                className="bg-background text-foreground"
+                                            >
+                                                {e.nombre}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError
+                                        message={createForm.errors.empresa_id}
+                                    />
+                                </div>
+                            )}
 
                         {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
@@ -995,7 +1039,9 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="deposito">Depósito (Garantía)</Label>
+                                <Label htmlFor="deposito">
+                                    Depósito (Garantía)
+                                </Label>
                                 <Input
                                     id="deposito"
                                     type="number"
@@ -1039,9 +1085,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     ))}
                                 </select>
                                 <InputError
-                                    message={
-                                        createForm.errors.deposito_moneda
-                                    }
+                                    message={createForm.errors.deposito_moneda}
                                 />
                             </div>
                         </div>
@@ -1154,7 +1198,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                             <InputError message={editForm.errors.correo} />
                         </div>
 
-                        {userToEdit?.role === 'inversor' && (
+                        {userToEdit?.role === 'inversor' && !hideEmpresa && (
                             <div className="grid gap-2">
                                 <Label htmlFor="edit-empresa_id">Empresa</Label>
                                 <select
@@ -1168,7 +1212,12 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     }
                                     className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    <option value="" className="bg-background text-foreground">Sin empresa</option>
+                                    <option
+                                        value=""
+                                        className="bg-background text-foreground"
+                                    >
+                                        Sin empresa
+                                    </option>
                                     {empresas.map((e) => (
                                         <option
                                             key={e.id}
@@ -1232,7 +1281,9 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito">Depósito (Garantía)</Label>
+                                <Label htmlFor="edit-deposito">
+                                    Depósito (Garantía)
+                                </Label>
                                 <Input
                                     id="edit-deposito"
                                     type="number"
@@ -1253,7 +1304,9 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito_moneda">Moneda</Label>
+                                <Label htmlFor="edit-deposito_moneda">
+                                    Moneda
+                                </Label>
                                 <select
                                     id="edit-deposito_moneda"
                                     value={editForm.data.deposito_moneda}
@@ -1276,9 +1329,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     ))}
                                 </select>
                                 <InputError
-                                    message={
-                                        editForm.errors.deposito_moneda
-                                    }
+                                    message={editForm.errors.deposito_moneda}
                                 />
                             </div>
                         </div>
@@ -1288,13 +1339,17 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                 <Button
                                     type="button"
                                     variant="secondary"
-                                    onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)}
+                                    onClick={() =>
+                                        router.get(
+                                            `/users/${userToEdit.id}/asignaciones`,
+                                        )
+                                    }
                                     className="mb-2 sm:mb-0"
                                 >
                                     Ver Asignaciones
                                 </Button>
                             )}
-                            <div className="flex flex-col-reverse sm:flex-row gap-2">
+                            <div className="flex flex-col-reverse gap-2 sm:flex-row">
                                 <Button
                                     type="button"
                                     variant="outline"

@@ -403,9 +403,6 @@ function PositionRow({ inv, status, lastEntry, tasaActual, isLast }: {
                         </span>
                     )}
                 </div>
-                {inv.empresa && (
-                    <span className="text-xs text-muted-foreground">{inv.empresa.nombre}</span>
-                )}
             </div>
 
             {/* Último cierre */}

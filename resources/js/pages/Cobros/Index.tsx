@@ -67,6 +67,8 @@ export default function CobrosIndex({
     const { auth } = usePage<any>().props;
     const isAdmin = auth.user.role === 'administrador';
     const isInversor = auth.user.role === 'inversor';
+    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
+    const hideEmpresa = isInversor || empresaRestringidaId != null;
 
     // ─── Cierre de Caja Modal ─────────────────────────────────────────────
     const [showCierreModal, setShowCierreModal] = useState(false);
@@ -277,7 +279,7 @@ export default function CobrosIndex({
                                     <p className="truncate text-sm font-semibold text-foreground">
                                         {inv.inversion_nombre}
                                     </p>
-                                    {!isInversor && (
+                                    {!hideEmpresa && (
                                         <p className="text-xs text-muted-foreground">
                                             {inv.empresa_nombre}
                                         </p>
@@ -495,7 +497,7 @@ export default function CobrosIndex({
                                             key={empresa}
                                             className="space-y-2"
                                         >
-                                            {!isInversor && (
+                                            {!hideEmpresa && (
                                                 <div className="flex items-center justify-between border-b border-border pb-1">
                                                     <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                                         {empresa}

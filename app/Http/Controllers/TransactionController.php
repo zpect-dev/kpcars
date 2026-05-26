@@ -25,14 +25,14 @@ class TransactionController extends Controller
 
         $articleId = $filters['article'] ?? null;
 
-        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($inversorEmpresaId, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $inversorEmpresaId)))
+            ->when($empresaRestringida, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $empresaRestringida)))
             ->latest()
             ->paginate(60)
             ->withQueryString();

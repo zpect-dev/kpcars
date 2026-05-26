@@ -108,14 +108,14 @@ class PdfController extends Controller
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
-        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($inversorEmpresaId, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $inversorEmpresaId)))
+            ->when($empresaRestringida, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $empresaRestringida)))
             ->latest()
             ->get();
 
@@ -174,7 +174,7 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaId = $request->user()->restrictedEmpresaId();
 
         // Fetch all pending cobros with relations
         $cobros = \App\Models\Cobro::query()
@@ -251,7 +251,7 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $empresaId = $request->user()->restrictedEmpresaId();
 
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()

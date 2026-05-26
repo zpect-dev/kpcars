@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { AlertCircle, HandCoins, Lock, Plus, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -332,13 +332,16 @@ function InversionRow({
     tasa: number | null;
     onManage: () => void;
 }) {
+    const { auth } = usePage<any>().props;
+    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
+    const hideEmpresa = empresaRestringidaId != null;
     return (
         <li className="flex items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-muted/30">
             <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground">
                     {inv.nombre}
                 </p>
-                {inv.empresa?.nombre && (
+                {!hideEmpresa && inv.empresa?.nombre && (
                     <p className="truncate text-[11px] text-muted-foreground">
                         {inv.empresa.nombre}
                     </p>
