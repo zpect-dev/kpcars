@@ -1,0 +1,234 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\UserRole;
+use App\Models\Cobro;
+use App\Models\Empresa;
+use App\Models\Gasto;
+use App\Models\Inversion;
+use App\Models\Scopes\GastoTenantScope;
+use App\Models\Scopes\TenantScope;
+use App\Models\Transaccion;
+use App\Models\User;
+use App\Models\Vehiculo;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->empresaA = Empresa::create(['nombre' => 'Empresa A']);
+    $this->empresaB = Empresa::create(['nombre' => 'Empresa B']);
+
+    $this->invA = Inversion::create(['nombre' => 'Inv A', 'empresa_id' => $this->empresaA->id]);
+    $this->invB = Inversion::create(['nombre' => 'Inv B', 'empresa_id' => $this->empresaB->id]);
+
+    $this->vehA = Vehiculo::create([
+        'patente' => 'AAA111',
+        'marca' => 'Toyota',
+        'modelo' => 'Etios',
+        'anio' => '2020',
+        'inversion_id' => $this->invA->id,
+        'empresa_id' => $this->empresaA->id,
+    ]);
+    $this->vehB = Vehiculo::create([
+        'patente' => 'BBB222',
+        'marca' => 'Renault',
+        'modelo' => 'Kwid',
+        'anio' => '2021',
+        'inversion_id' => $this->invB->id,
+        'empresa_id' => $this->empresaB->id,
+    ]);
+});
+
+it('Vehiculo: filtra automáticamente por la empresa activa en sesión', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000001',
+        'empresa_default_id' => $this->empresaA->id,
+    ]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $vehiculos = Vehiculo::all();
+    expect($vehiculos)->toHaveCount(1)
+        ->and($vehiculos->first()->id)->toBe($this->vehA->id);
+});
+
+it('Vehiculo: cambiar la empresa activa cambia los resultados sin recargar el modelo', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000002',
+    ]);
+
+    $this->actingAs($admin);
+
+    session(['active_company_id' => $this->empresaA->id]);
+    expect(Vehiculo::pluck('patente')->all())->toBe(['AAA111']);
+
+    session(['active_company_id' => $this->empresaB->id]);
+    expect(Vehiculo::pluck('patente')->all())->toBe(['BBB222']);
+});
+
+it('Vehiculo: withoutGlobalScope(TenantScope) devuelve cross-tenant', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000003',
+    ]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $todos = Vehiculo::withoutGlobalScope(TenantScope::class)->get();
+    expect($todos)->toHaveCount(2);
+});
+
+it('Inversion: filtra por empresa activa', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000004',
+    ]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaB->id]);
+
+    $inversiones = Inversion::all();
+    expect($inversiones)->toHaveCount(1)
+        ->and($inversiones->first()->id)->toBe($this->invB->id);
+});
+
+it('Cobro: filtra por empresa activa', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000005',
+    ]);
+
+    $articulo = \App\Models\Articulo::create([
+        'descripcion' => 'Aceite',
+        'stock' => 10,
+        'min_stock' => 1,
+        'precio' => 100,
+    ]);
+
+    $txA = Transaccion::create([
+        'articulo_id' => $articulo->id,
+        'tipo' => 'OUT',
+        'cantidad' => 1,
+        'license_plate' => 'AAA111',
+        'vehiculo_id' => $this->vehA->id,
+        'user_id' => $admin->id,
+    ]);
+    $txB = Transaccion::create([
+        'articulo_id' => $articulo->id,
+        'tipo' => 'OUT',
+        'cantidad' => 1,
+        'license_plate' => 'BBB222',
+        'vehiculo_id' => $this->vehB->id,
+        'user_id' => $admin->id,
+    ]);
+
+    Cobro::create(['inversion_id' => $this->invA->id, 'transaccion_id' => $txA->id, 'empresa_id' => $this->empresaA->id]);
+    Cobro::create(['inversion_id' => $this->invB->id, 'transaccion_id' => $txB->id, 'empresa_id' => $this->empresaB->id]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    expect(Cobro::count())->toBe(1)
+        ->and(Cobro::first()->empresa_id)->toBe($this->empresaA->id);
+});
+
+it('Gasto: incluye gastos sin vehiculo (globales) Y los del vehículo de la empresa activa', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000006',
+    ]);
+
+    $gastoGlobal = Gasto::create([
+        'fecha' => now()->toDateString(),
+        'monto' => 50000,
+        'recibio' => 'Juan',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'galpon',
+        'user_id' => $admin->id,
+    ]);
+    $gastoVehA = Gasto::create([
+        'fecha' => now()->toDateString(),
+        'monto' => 30000,
+        'recibio' => 'Juan',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'vehiculo',
+        'vehiculo_id' => $this->vehA->id,
+        'user_id' => $admin->id,
+    ]);
+    $gastoVehB = Gasto::create([
+        'fecha' => now()->toDateString(),
+        'monto' => 20000,
+        'recibio' => 'Juan',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'vehiculo',
+        'vehiculo_id' => $this->vehB->id,
+        'user_id' => $admin->id,
+    ]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $gastos = Gasto::pluck('id')->sort()->values()->all();
+    expect($gastos)->toBe([$gastoGlobal->id, $gastoVehA->id]);
+});
+
+it('Gasto: withoutGlobalScope devuelve todos los gastos cross-tenant', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000007',
+    ]);
+
+    Gasto::create([
+        'fecha' => now()->toDateString(),
+        'monto' => 100,
+        'recibio' => 'X',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'vehiculo',
+        'vehiculo_id' => $this->vehA->id,
+        'user_id' => $admin->id,
+    ]);
+    Gasto::create([
+        'fecha' => now()->toDateString(),
+        'monto' => 200,
+        'recibio' => 'Y',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'vehiculo',
+        'vehiculo_id' => $this->vehB->id,
+        'user_id' => $admin->id,
+    ]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    expect(Gasto::count())->toBe(1)
+        ->and(Gasto::withoutGlobalScope(GastoTenantScope::class)->count())->toBe(2);
+});
+
+it('TenantScope: no-op cuando no hay sesión (CLI/queue context)', function () {
+    // Sin acting-as ni session: el scope no aplica.
+    expect(Vehiculo::count())->toBe(2)
+        ->and(Inversion::count())->toBe(2);
+});
+
+it('Inversor: solo ve datos de su empresa porque SetActiveCompany lo fuerza', function () {
+    $inversor = User::factory()->create([
+        'role' => UserRole::INVERSOR,
+        'dni' => '20000008',
+        'empresa_id' => $this->empresaB->id,
+        'empresa_default_id' => $this->empresaB->id,
+    ]);
+
+    $this->actingAs($inversor);
+
+    // Aunque maliciosamente intente setear la otra empresa, el middleware la reemplaza
+    // en la siguiente request. En este test simulamos directamente la sesión post-middleware.
+    session(['active_company_id' => $inversor->empresa_id]);
+
+    expect(Vehiculo::pluck('patente')->all())->toBe(['BBB222']);
+});

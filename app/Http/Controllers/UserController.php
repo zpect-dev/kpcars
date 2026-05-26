@@ -42,9 +42,9 @@ class UserController extends Controller
         if ($validated['role'] !== UserRole::INVERSOR->value) {
             $validated['empresa_id'] = null;
         } else {
-            $empresaRestringida = $request->user()->restrictedEmpresaId();
-            if ($empresaRestringida) {
-                $validated['empresa_id'] = $empresaRestringida;
+            $empresaActiva = session('active_company_id');
+            if ($empresaActiva) {
+                $validated['empresa_id'] = (int) $empresaActiva;
             }
         }
 
@@ -279,9 +279,9 @@ class UserController extends Controller
         if (! $user->isInversor()) {
             unset($validated['empresa_id']);
         } else {
-            $empresaRestringida = $request->user()->restrictedEmpresaId();
-            if ($empresaRestringida) {
-                $validated['empresa_id'] = $empresaRestringida;
+            $empresaActiva = session('active_company_id');
+            if ($empresaActiva) {
+                $validated['empresa_id'] = (int) $empresaActiva;
             }
         }
 

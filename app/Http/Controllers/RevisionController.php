@@ -21,7 +21,6 @@ class RevisionController extends Controller
     public function index(Request $request): Response
     {
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
-            ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
             ->whereNotNull('user_id')
             ->orderBy('patente')

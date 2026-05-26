@@ -24,7 +24,7 @@ class ArticuloController extends Controller
     public function index(Request $request): Response
     {
         $articulos = Articulo::orderBy('descripcion')->get();
-        $vehiculos = Vehiculo::visibleTo($request->user())
+        $vehiculos = Vehiculo::query()
             ->orderBy('patente')
             ->select('id', 'patente', 'marca', 'modelo')
             ->get();

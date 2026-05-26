@@ -24,24 +24,22 @@ class DashboardController extends Controller
             return redirect()->route('mi-cuenta.index');
         }
 
-        $filters = $request->only(['empresa_id', 'inversion_id']);
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
+        $filters = $request->only(['inversion_id']);
 
+        // Vehiculo + Inversion ya están auto-scopeados por la empresa activa
+        // de la sesión vía App\Models\Scopes\TenantScope.
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
-            ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
-            ->when(! empty($filters['empresa_id']), fn ($q) => $q->where('empresa_id', $filters['empresa_id']))
             ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
             ->orderBy('patente')
             ->get();
 
-        // Si el admin está restringido o es inversor, no exponemos la lista de empresas
-        // para que la UI no muestre el filtro ni el selector.
-        $empresas = ($request->user()->isInversor() || $empresaRestringida)
-            ? collect()
-            : Empresa::orderBy('nombre')->get(['id', 'nombre']);
-        $inversiones = Inversion::when($empresaRestringida, fn ($q) => $q->where('empresa_id', $empresaRestringida))
-            ->orderBy('nombre')->get(['id', 'nombre'])->sortBy('nombre', SORT_NATURAL)->values();
+        $inversiones = Inversion::orderBy('nombre')
+            ->get(['id', 'nombre'])
+            ->sortBy('nombre', SORT_NATURAL)
+            ->values();
+
+        $empresas = collect();
         $users = User::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('dashboard', [

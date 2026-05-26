@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
+#[ScopedBy([TenantScope::class])]
 class Vehiculo extends Model
 {
     use HasFactory;
@@ -71,19 +74,5 @@ class Vehiculo extends Model
     public function latestRevision(): HasOne
     {
         return $this->hasOne(Revision::class)->latestOfMany();
-    }
-
-    public function scopeVisibleTo($query, ?User $user)
-    {
-        if (! $user) {
-            return $query;
-        }
-
-        $empresaId = $user->restrictedEmpresaId();
-        if ($empresaId) {
-            $query->where('empresa_id', $empresaId);
-        }
-
-        return $query;
     }
 }

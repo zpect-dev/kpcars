@@ -125,11 +125,9 @@ class ExcelController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
-
+        // Cobro auto-scopea por empresa activa vía TenantScope.
         $cobros = Cobro::query()
             ->pendientes()
-            ->forEmpresa($empresaId)
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
             ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')

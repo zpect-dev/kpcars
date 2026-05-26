@@ -39,9 +39,9 @@ class VehiculoController extends Controller
             $validated['fecha_vencimiento_gnc'] .= '-01';
         }
 
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
-        if ($empresaRestringida) {
-            $validated['empresa_id'] = $empresaRestringida;
+        $empresaActiva = session('active_company_id');
+        if ($empresaActiva) {
+            $validated['empresa_id'] = (int) $empresaActiva;
         }
 
         DB::transaction(function () use ($validated, $request) {
@@ -99,11 +99,12 @@ class VehiculoController extends Controller
             $validated['fecha_vencimiento_gnc'] .= '-01';
         }
 
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
-        if ($empresaRestringida) {
-            $validated['empresa_id'] = $empresaRestringida;
-            abort_if($vehiculo->empresa_id && $vehiculo->empresa_id !== $empresaRestringida, 403);
+        $empresaActiva = session('active_company_id');
+        if ($empresaActiva) {
+            $validated['empresa_id'] = (int) $empresaActiva;
         }
+        // Si el vehículo no pertenece a la empresa activa, el TenantScope ya lo
+        // habría filtrado y la inyección de ruta devolvería 404 antes de llegar aquí.
 
         DB::transaction(function () use ($validated, $vehiculo, $request) {
             $conductorAnterior = $vehiculo->user_id;

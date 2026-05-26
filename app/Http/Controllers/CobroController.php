@@ -24,12 +24,9 @@ class CobroController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->restrictedEmpresaId();
-
-        // Get totals per inversion+empresa for the current period
+        // Cobro auto-scopea por empresa activa vía TenantScope.
         $resumen = Cobro::query()
             ->pendientes()
-            ->forEmpresa($empresaId)
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
             ->join('inversiones', 'cobros.inversion_id', '=', 'inversiones.id')
@@ -55,24 +52,25 @@ class CobroController extends Controller
             ->latest()
             ->first();
 
-        // Historical cierres with their details
+        $empresaActiva = session('active_company_id');
+
+        // Historical cierres con sus detalles, filtrados por la empresa activa.
         $historialCierres = CierreCaja::with([
             'user:id,name',
             'detalles.inversion:id,nombre,empresa_id',
             'detalles.empresa:id,nombre',
         ])
-            ->when($empresaId, function ($q) use ($empresaId) {
-                $q->whereHas('detalles', fn ($q2) => $q2->where('empresa_id', $empresaId));
+            ->when($empresaActiva, function ($q) use ($empresaActiva) {
+                $q->whereHas('detalles', fn ($q2) => $q2->where('empresa_id', $empresaActiva));
             })
             ->latest()
             ->limit(20)
             ->get()
-            ->map(function (CierreCaja $cierre) use ($empresaId) {
+            ->map(function (CierreCaja $cierre) use ($empresaActiva) {
                 $detalles = $cierre->detalles;
 
-                // Filter detalles by empresa if inversor
-                if ($empresaId) {
-                    $detalles = $detalles->filter(fn ($d) => $d->empresa_id === $empresaId);
+                if ($empresaActiva) {
+                    $detalles = $detalles->filter(fn ($d) => $d->empresa_id === (int) $empresaActiva);
                 }
 
                 $detallesOrdenados = $detalles
@@ -113,23 +111,12 @@ class CobroController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->restrictedEmpresaId() ?? $request->integer('empresa_id');
-
-        // Inversor can only see inversions of their empresa
-        if ($request->user()->isInversor() && $empresaId) {
-            // Verify this inversion has cobros for the inversor's empresa
-            $hasCobros = Cobro::query()
-                ->where('inversion_id', $inversion->id)
-                ->where('empresa_id', $empresaId)
-                ->exists();
-            abort_unless($hasCobros, 403);
-        }
-
-        // Build base query scoped to inversion + empresa
+        // Cobro auto-scopea por empresa activa. La route model binding de
+        // {inversion} también respeta el scope; si la inversión no está en la
+        // empresa activa, devuelve 404 antes de entrar al método.
         $baseQuery = Cobro::query()
             ->pendientes()
-            ->where('cobros.inversion_id', $inversion->id)
-            ->when($empresaId, fn ($q) => $q->where('cobros.empresa_id', $empresaId));
+            ->where('cobros.inversion_id', $inversion->id);
 
         // Get breakdown by vehicle for this inversion
         $desglose = (clone $baseQuery)
@@ -187,17 +174,19 @@ class CobroController extends Controller
 
         abort_if($inversionId <= 0 || $empresaId <= 0, 422, 'Parámetros inválidos.');
 
-        // Restringir al empresa accesible (inversor o admin restringido)
-        $restricted = $request->user()->restrictedEmpresaId();
-        if ($restricted !== null) {
-            abort_unless($empresaId === $restricted, 403);
+        // El payload incluye empresa_id porque el endpoint es invocado desde el
+        // historial (que muestra empresas mezcladas). Validamos contra la empresa
+        // activa de la sesión.
+        $empresaActiva = session('active_company_id');
+        if ($empresaActiva !== null) {
+            abort_unless($empresaId === (int) $empresaActiva, 403);
         }
 
-        // Determine the date range: cobros created between previous cierre and this cierre
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()
             ->value('created_at');
 
+        // Cobro auto-scopea por empresa activa; el where adicional es por seguridad explícita.
         $baseQuery = Cobro::query()
             ->where('cobros.inversion_id', $inversionId)
             ->where('cobros.empresa_id', $empresaId)

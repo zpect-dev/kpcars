@@ -25,14 +25,16 @@ class TransactionController extends Controller
 
         $articleId = $filters['article'] ?? null;
 
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
+        $empresaActiva = session('active_company_id');
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($empresaRestringida, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $empresaRestringida)))
+            ->when($empresaActiva, fn ($q) => $q->where(function ($q2) {
+                $q2->whereNull('vehiculo_id')->orWhereHas('vehiculo');
+            }))
             ->latest()
             ->paginate(60)
             ->withQueryString();
@@ -41,7 +43,7 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'filters' => $filters,
             'items' => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
-            'vehiculos' => Vehiculo::visibleTo($request->user())->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
+            'vehiculos' => Vehiculo::query()->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
         ]);
     }
 

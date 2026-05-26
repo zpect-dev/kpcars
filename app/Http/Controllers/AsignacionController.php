@@ -16,8 +16,8 @@ class AsignacionController extends Controller
 {
     public function index(Request $request, Vehiculo $vehiculo): Response
     {
-        $this->ensureVehiculoVisible($request, $vehiculo);
-
+        // TenantScope en Vehiculo: el route model binding ya devuelve 404 si el
+        // vehículo no pertenece a la empresa activa.
         $asignaciones = $vehiculo->asignaciones()
             ->with(['conductor:id,name,dni', 'asignadoPor:id,name'])
             ->get()
@@ -47,8 +47,6 @@ class AsignacionController extends Controller
 
     public function pdf(Request $request, Vehiculo $vehiculo): \Illuminate\Http\Response
     {
-        $this->ensureVehiculoVisible($request, $vehiculo);
-
         $asignaciones = $vehiculo->asignaciones()
             ->with(['conductor:id,name,dni', 'asignadoPor:id,name'])
             ->get();
@@ -57,14 +55,6 @@ class AsignacionController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download("asignaciones-{$vehiculo->patente}-".now()->format('Y-m-d').'.pdf');
-    }
-
-    private function ensureVehiculoVisible(Request $request, Vehiculo $vehiculo): void
-    {
-        $empresaId = $request->user()->restrictedEmpresaId();
-        if ($empresaId && $vehiculo->empresa_id !== $empresaId) {
-            abort(403);
-        }
     }
 
     public function import(Request $request, ImportAsignacionesAction $action): RedirectResponse

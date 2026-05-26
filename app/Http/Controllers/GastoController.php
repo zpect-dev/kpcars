@@ -22,8 +22,10 @@ class GastoController extends Controller
 
         $isInversor = $request->user()->isInversor();
         $userId = $request->user()->id;
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
 
+        // GastoTenantScope ya filtra por empresa activa (gastos globales sin vehiculo +
+        // gastos cuyo vehículo pertenece a la empresa activa). El branch del inversor
+        // se mantiene como filtro adicional por distribuciones suyas.
         $gastosQuery = Gasto::query()
             ->with([
                 'user:id,name',
@@ -33,12 +35,6 @@ class GastoController extends Controller
             ])
             ->when($isInversor, function ($q) use ($userId) {
                 $q->whereHas('distribuciones', fn ($q2) => $q2->where('user_id', $userId));
-            })
-            ->when(! $isInversor && $empresaRestringida, function ($q) use ($empresaRestringida) {
-                $q->where(function ($q2) use ($empresaRestringida) {
-                    $q2->whereNull('vehiculo_id')
-                        ->orWhereHas('vehiculo', fn ($q3) => $q3->where('empresa_id', $empresaRestringida));
-                });
             })
             ->latest('fecha')
             ->latest('id');

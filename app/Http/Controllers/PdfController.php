@@ -111,14 +111,16 @@ class PdfController extends Controller
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
-        $empresaRestringida = $request->user()->restrictedEmpresaId();
+        $empresaActiva = session('active_company_id');
 
         $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($empresaRestringida, fn ($q) => $q->whereHas('vehiculo', fn ($q2) => $q2->where('empresa_id', $empresaRestringida)))
+            ->when($empresaActiva, fn ($q) => $q->where(function ($q2) {
+                $q2->whereNull('vehiculo_id')->orWhereHas('vehiculo');
+            }))
             ->latest()
             ->get();
 
@@ -177,12 +179,9 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->restrictedEmpresaId();
-
-        // Fetch all pending cobros with relations
+        // Cobro auto-scopea por empresa activa (TenantScope); no requiere filtro manual.
         $cobros = \App\Models\Cobro::query()
             ->pendientes()
-            ->forEmpresa($empresaId)
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
             ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
@@ -316,14 +315,12 @@ class PdfController extends Controller
         abort_if($request->user()->isMechanic(), 403);
         abort_if($request->user()->isInversor(), 403);
 
-        $filters = $request->only(['empresa_id', 'inversion_id', 'search', 'asignacion']);
+        $filters = $request->only(['inversion_id', 'search', 'asignacion']);
         $search = trim((string) ($filters['search'] ?? ''));
         $asignacion = $filters['asignacion'] ?? null;
 
         $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
-            ->visibleTo($request->user())
             ->where('patente', '!=', 'EXTERNO')
-            ->when(! empty($filters['empresa_id']), fn ($q) => $q->where('empresa_id', $filters['empresa_id']))
             ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
             ->when($search !== '', function ($q) use ($search) {
                 $escaped = addcslashes($search, '%_\\');
@@ -355,16 +352,14 @@ class PdfController extends Controller
         abort_if($request->user()->isChofer(), 403);
         abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
 
-        $empresaId = $request->user()->restrictedEmpresaId();
-
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()
             ->value('created_at');
 
+        // Cobro auto-scopea por empresa activa vía TenantScope.
         $cobros = Cobro::query()
             ->where('cobros.created_at', '<=', $cierre->created_at)
             ->when($previousCierreDate, fn ($q) => $q->where('cobros.created_at', '>', $previousCierreDate))
-            ->when($empresaId, fn ($q) => $q->where('cobros.empresa_id', $empresaId))
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
             ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
