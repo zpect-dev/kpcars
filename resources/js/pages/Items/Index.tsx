@@ -6,6 +6,7 @@ import {
     ChevronDown,
     FileDown,
     History,
+    Loader2,
     Pencil,
     Plus,
     Search,
@@ -53,6 +54,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     // ─── Edición inline de precio ────────────────────────────────────────────
     const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
     const [editingPriceValue, setEditingPriceValue] = useState('');
+    const [savingPriceId, setSavingPriceId] = useState<number | null>(null);
 
     function startEditPrice(item: Articulo) {
         setEditingPriceId(item.id);
@@ -67,11 +69,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     function submitPrice(item: Articulo) {
         const precio = Number(editingPriceValue);
         if (isNaN(precio) || precio < 0) return;
-
+        setSavingPriceId(item.id);
         router.patch(updatePrecio.url(item.id), { precio }, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => cancelEditPrice(),
+            onFinish: () => setSavingPriceId(null),
         });
     }
 
@@ -445,8 +448,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                     className="h-7 w-24 text-xs"
                                                                     autoFocus
                                                                 />
-                                                                <button type="button" onClick={() => submitPrice(item)} className="text-foreground hover:text-foreground/80">
-                                                                    <Check className="h-3.5 w-3.5" />
+                                                                <button type="button" onClick={() => submitPrice(item)} disabled={savingPriceId === item.id} className="text-foreground hover:text-foreground/80 disabled:cursor-default">
+                                                                    {savingPriceId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                                                                 </button>
                                                                 <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
                                                                     <X className="h-3.5 w-3.5" />
@@ -481,22 +484,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     )}
                                                 </tr>
                                                 {isExpanded && (
-                                                    <tr className="bg-muted/20">
+                                                    <tr className="bg-muted/50">
                                                         <td colSpan={canWrite ? 5 : 4} className="px-6 py-4">
                                                             <div className="flex flex-col gap-3">
-                                                                {/* Barra de stock */}
-                                                                <div className="flex flex-col gap-1">
-                                                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                                                        <span>Nivel de stock</span>
-                                                                        <span>{item.stock} / mín. {item.min_stock}</span>
-                                                                    </div>
-                                                                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                                                        <div
-                                                                            className={cn('h-full rounded-full transition-all', barColor)}
-                                                                            style={{ width: `${pct}%` }}
-                                                                        />
-                                                                    </div>
-                                                                </div>
                                                                 {/* Info grid */}
                                                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                                                                     <div className="flex items-center gap-1.5">
@@ -609,20 +599,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                             )} />
                                         </button>
                                         {isExpanded && (
-                                            <div className="border-t border-border bg-muted/20 px-4 pb-4 pt-3">
+                                            <div className="border-t border-border bg-muted/50 px-4 pb-4 pt-3">
                                                 <div className="flex flex-col gap-3">
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                                            <span>Nivel de stock</span>
-                                                            <span>{item.stock} / mín. {item.min_stock}</span>
-                                                        </div>
-                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                                            <div
-                                                                className={cn('h-full rounded-full transition-all', barColor)}
-                                                                style={{ width: `${pct}%` }}
-                                                            />
-                                                        </div>
-                                                    </div>
                                                     <div className="flex flex-wrap items-center gap-2 text-sm">
                                                         <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColor)}>
                                                             {statusLabel}

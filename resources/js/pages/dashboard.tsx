@@ -328,13 +328,13 @@ export default function Dashboard({
 
         switch (status) {
             case 'ok':
-                return 'text-green-700 dark:text-green-400';
+                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
             case 'warning':
-                return 'text-yellow-600 dark:text-yellow-400';
+                return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
             case 'expired':
-                return 'text-red-600 dark:text-red-400';
+                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
             default:
-                return 'text-muted-foreground/50 italic';
+                return '';
         }
     }
 
@@ -846,7 +846,7 @@ export default function Dashboard({
                                             <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
                                                 {vehiculo.fecha_vencimiento_vtv ? (
                                                     <span
-                                                        className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
+                                                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
                                                     >
                                                         {formatVtv(
                                                             vehiculo.fecha_vencimiento_vtv,
@@ -861,7 +861,7 @@ export default function Dashboard({
                                             <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
                                                 {vehiculo.fecha_vencimiento_gnc ? (
                                                     <span
-                                                        className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
+                                                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
                                                     >
                                                         {formatVtv(
                                                             vehiculo.fecha_vencimiento_gnc,
@@ -1086,7 +1086,7 @@ export default function Dashboard({
                                         VTV:{' '}
                                         {vehiculo.fecha_vencimiento_vtv ? (
                                             <span
-                                                className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
+                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
                                             >
                                                 {formatVtv(
                                                     vehiculo.fecha_vencimiento_vtv,
@@ -1100,7 +1100,7 @@ export default function Dashboard({
                                         GNC:{' '}
                                         {vehiculo.fecha_vencimiento_gnc ? (
                                             <span
-                                                className={`font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
+                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
                                             >
                                                 {formatVtv(
                                                     vehiculo.fecha_vencimiento_gnc,
@@ -1168,8 +1168,7 @@ export default function Dashboard({
                             Cancelar
                         </Button>
                         <Button
-                            variant="default"
-                            className="bg-gray-900 text-white hover:bg-gray-800"
+                            variant="destructive"
                             onClick={handleUnassign}
                         >
                             Desasignar

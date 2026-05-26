@@ -1,17 +1,16 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, Plus, ArrowRight, Lock } from 'lucide-react';
+import { Calendar, ChevronRight, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyDual } from '@/components/money-dual';
+import { cn } from '@/lib/utils';
 
 interface Cierre {
     id: number;
     periodo_inicio: string | null;
     periodo_fin: string;
     total_recaudado: string | number;
-    total_distribuido: string | number;
     tasa: string | number | null;
     ejecutado_por: { id: number; name: string } | null;
-    created_at: string;
 }
 
 interface Paginator {
@@ -26,15 +25,7 @@ interface Props {
     cierres: Paginator;
 }
 
-function formatARS(value: number | string): string {
-    return new Intl.NumberFormat('es-AR', {
-        style: 'currency',
-        currency: 'ARS',
-        minimumFractionDigits: 2,
-    }).format(Number(value));
-}
-
-function formatDate(d: string | null): string {
+function formatFecha(d: string | null): string {
     if (!d) return '—';
     return new Date(d).toLocaleDateString('es-AR', {
         day: '2-digit',
@@ -48,10 +39,12 @@ export default function CierresIndex({ cierres }: Props) {
         <>
             <Head title="Cierres de Inversión" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+
+                {/* Header */}
+                <div className="flex items-center justify-between gap-3">
                     <div>
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                             Cierres de Inversión
                         </h1>
                         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -64,101 +57,60 @@ export default function CierresIndex({ cierres }: Props) {
                     </Button>
                 </div>
 
+                {/* List */}
                 {cierres.data.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card p-12 text-center shadow-sm">
-                        <Lock className="mx-auto h-10 w-10 text-muted-foreground/50" />
-                        <p className="mt-3 text-sm text-muted-foreground">
-                            No hay cierres realizados todavía.
-                        </p>
+                    <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                            <Calendar className="h-6 w-6" />
+                        </div>
+                        <span className="text-base font-semibold text-foreground">Sin cierres</span>
+                        <span className="text-sm text-muted-foreground">No hay cierres realizados todavía.</span>
+                        <Button size="sm" onClick={() => router.get('/cierres-inversion/nuevo')}>
+                            <Plus className="mr-1 h-4 w-4" />
+                            Crear primer cierre
+                        </Button>
                     </div>
                 ) : (
-                    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                        <div className="hidden md:block">
-                            <table className="w-full text-left text-sm">
-                                <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
-                                    <tr>
-                                        <th className="px-4 py-3 font-medium tracking-wider sm:px-6">
-                                            Cierre
-                                        </th>
-                                        <th className="px-4 py-3 font-medium tracking-wider sm:px-6">
-                                            Ejecutado por
-                                        </th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">
-                                            Recaudado
-                                        </th>
-                                        <th className="px-4 py-3 text-right sm:px-6"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {cierres.data.map((c) => (
-                                        <tr key={c.id} className="hover:bg-muted/40">
-                                            <td className="px-4 py-3 sm:px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    <span className="text-xs">
-                                                        {formatDate(c.periodo_fin)}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 sm:px-6">
-                                                {c.ejecutado_por?.name ?? '—'}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium sm:px-6">
-                                                <MoneyDual
-                                                    ars={Number(c.total_recaudado)}
-                                                    tasa={c.tasa ? Number(c.tasa) : null}
-                                                    orientation="stacked"
-                                                    size="md"
-                                                    className="items-end"
-                                                />
-                                            </td>
-                                            <td className="px-4 py-3 text-right sm:px-6">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        router.get(`/cierres-inversion/${c.id}`)
-                                                    }
-                                                >
-                                                    Detalles
-                                                    <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <ul className="divide-y divide-border md:hidden">
-                            {cierres.data.map((c) => (
-                                <li key={c.id} className="flex items-center justify-between p-4">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatDate(c.periodo_fin)}
-                                        </p>
-                                        <div className="mt-0.5">
-                                            <MoneyDual
-                                                ars={Number(c.total_recaudado)}
-                                                tasa={c.tasa ? Number(c.tasa) : null}
-                                                orientation="stacked"
-                                                size="md"
-                                            />
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            por {c.ejecutado_por?.name ?? '—'}
-                                        </p>
+                    <div className="overflow-hidden rounded-2xl border border-border bg-card">
+                        {cierres.data.map((c, i, arr) => {
+                            const isLast = i === arr.length - 1;
+                            return (
+                                <button
+                                    key={c.id}
+                                    type="button"
+                                    onClick={() => router.get(`/cierres-inversion/${c.id}`)}
+                                    className={cn(
+                                        'flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/40',
+                                        !isLast && 'border-b border-border',
+                                    )}
+                                >
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <Calendar className="h-4 w-4" />
                                     </div>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => router.get(`/cierres-inversion/${c.id}`)}
-                                    >
-                                        Detalles
-                                    </Button>
-                                </li>
-                            ))}
-                        </ul>
+
+                                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                        <span className="text-sm font-semibold text-foreground">
+                                            Cierre #{c.id}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatFecha(c.periodo_fin)}
+                                            {c.ejecutado_por && ` · ${c.ejecutado_por.name}`}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex shrink-0 items-center gap-3">
+                                        <MoneyDual
+                                            ars={Number(c.total_recaudado)}
+                                            tasa={c.tasa ? Number(c.tasa) : null}
+                                            orientation="stacked"
+                                            size="sm"
+                                            className="items-end"
+                                        />
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                </button>
+                            );
+                        })}
                     </div>
                 )}
 
@@ -168,11 +120,12 @@ export default function CierresIndex({ cierres }: Props) {
                         <Link
                             href={cierres.prev_page_url ?? '#'}
                             preserveScroll
-                            className={
+                            className={cn(
+                                'text-sm',
                                 cierres.prev_page_url
-                                    ? 'text-sm text-foreground hover:underline'
-                                    : 'pointer-events-none text-sm text-muted-foreground/50'
-                            }
+                                    ? 'text-foreground hover:underline'
+                                    : 'pointer-events-none text-muted-foreground/50',
+                            )}
                         >
                             ← Anterior
                         </Link>
@@ -182,11 +135,12 @@ export default function CierresIndex({ cierres }: Props) {
                         <Link
                             href={cierres.next_page_url ?? '#'}
                             preserveScroll
-                            className={
+                            className={cn(
+                                'text-sm',
                                 cierres.next_page_url
-                                    ? 'text-sm text-foreground hover:underline'
-                                    : 'pointer-events-none text-sm text-muted-foreground/50'
-                            }
+                                    ? 'text-foreground hover:underline'
+                                    : 'pointer-events-none text-muted-foreground/50',
+                            )}
                         >
                             Siguiente →
                         </Link>

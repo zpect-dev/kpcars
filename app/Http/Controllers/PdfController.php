@@ -7,7 +7,10 @@ namespace App\Http\Controllers;
 use App\Models\Appointment;
 use App\Models\Articulo;
 use App\Models\CierreCaja;
+use App\Models\CierreInversion;
+use App\Models\CierreInversionPago;
 use App\Models\Cobro;
+use App\Models\DeudaMovimiento;
 use App\Models\Transaccion;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -135,6 +138,107 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cobros-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Generate PDF for a cierre de inversión.
+     */
+    public function cierreInversion(Request $request, CierreInversion $cierreInversion): Response
+    {
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
+
+        $cierreInversion->load([
+            'ejecutadoPor:id,name',
+            'recaudaciones.inversion:id,nombre',
+            'pagos.user:id,name,dni',
+            'pagos.inversion:id,nombre',
+        ]);
+
+        $recaudaciones = $cierreInversion->recaudaciones
+            ->sortBy(fn ($r) => (string) $r->inversion?->nombre, SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $porInversor = $cierreInversion->pagos
+            ->groupBy('user_id')
+            ->map(fn ($pagos) => [
+                'user' => $pagos->first()->user,
+                'pagos' => $pagos,
+            ])
+            ->sortBy(fn ($row) => mb_strtolower((string) $row['user']->name))
+            ->values();
+
+        $cierre = $cierreInversion;
+
+        $pdf = Pdf::loadView('pdf.cierre-inversion', compact('cierre', 'recaudaciones', 'porInversor'))
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('cierre-inversion-'.$cierre->id.'-'.$cierre->periodo_fin->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Generate PDF for the current user's Mi Cuenta.
+     */
+    public function miCuenta(Request $request): Response
+    {
+        abort_unless($request->user()->isInversor(), 403);
+
+        $user = $request->user();
+
+        abort_unless($user->inversiones()->exists(), 403);
+
+        $inversiones = $user->inversiones()
+            ->get()
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->map(function ($inv) use ($user) {
+                $movimientos = DeudaMovimiento::where('inversion_id', $inv->id)
+                    ->where('user_id', $user->id)
+                    ->get();
+
+                $saldo = (float) $movimientos->reduce(
+                    fn (float $carry, DeudaMovimiento $m) => $m->tipo === 'cargo'
+                        ? $carry + (float) $m->monto
+                        : $carry - (float) $m->monto,
+                    0.0,
+                );
+
+                return [
+                    'nombre' => $inv->nombre,
+                    'tiene_deuda' => (bool) $inv->pivot->tiene_deuda,
+                    'es_financiador' => (bool) $inv->pivot->es_financiador,
+                    'saldo' => $saldo,
+                ];
+            });
+
+        $pagosPorCierre = CierreInversionPago::with([
+            'cierre:id,periodo_inicio,periodo_fin,tasa',
+        ])
+            ->where('user_id', $user->id)
+            ->orderByDesc('cierre_id')
+            ->get()
+            ->groupBy('cierre_id');
+
+        $cierres = $pagosPorCierre->map(function ($pagos) {
+            $cierre = $pagos->first()->cierre;
+
+            return [
+                'id' => $cierre?->id,
+                'periodo_fin' => $cierre?->periodo_fin?->toIso8601String(),
+                'tasa' => $cierre?->tasa ? (float) $cierre->tasa : null,
+                'detalles' => $pagos->map(fn ($p) => [
+                    'concepto' => $p->concepto,
+                    'monto' => (float) $p->monto,
+                ])->values(),
+            ];
+        })->values();
+
+        $tasaActual = CierreInversion::latest('periodo_fin')->value('tasa');
+        $tasaActual = $tasaActual ? (float) $tasaActual : null;
+
+        $pdf = Pdf::loadView('pdf.mi-cuenta', compact('user', 'inversiones', 'cierres', 'tasaActual'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('mi-cuenta-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**

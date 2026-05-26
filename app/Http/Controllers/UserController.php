@@ -73,8 +73,19 @@ class UserController extends Controller
         abort_unless($request->user()->isAdmin() || $request->user()->isInversor(), 403);
 
         $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        $isChoferFilter = $request->query('role') === 'chofer';
 
-        $users = User::orderBy('name')
+        $choferCounts = null;
+        if ($isChoferFilter) {
+            $baseChofer = User::where('role', 'chofer')
+                ->when($inversorEmpresaId, fn ($q) => $q->where('empresa_id', $inversorEmpresaId));
+            $choferCounts = [
+                'activos'   => (clone $baseChofer)->where('inactivo', false)->count(),
+                'inactivos' => (clone $baseChofer)->where('inactivo', true)->count(),
+            ];
+        }
+
+        $query = User::orderBy('name')
             ->when($inversorEmpresaId, fn ($q) => $q->where('empresa_id', $inversorEmpresaId))
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
@@ -85,9 +96,36 @@ class UserController extends Controller
                 } elseif ($status === 'inactivos') {
                     $query->where('inactivo', true);
                 }
-            })
+            });
+
+        if ($isChoferFilter) {
+            $query->with(['asignacionActiva.vehiculo']);
+        }
+
+        $users = $query
             ->get(['id', 'name', 'dni', 'role', 'absoluto', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
+
+        if ($isChoferFilter) {
+            $today = now()->startOfDay();
+            $users = $users->map(function (User $user) use ($today) {
+                $arr = collect($user->toArray())->except(['asignacion_activa'])->all();
+                $vehiculo = $user->asignacionActiva?->vehiculo;
+                $vencimientoLicencia = $user->fecha_vencimiento_licencia;
+
+                $arr['vehiculo'] = $vehiculo ? [
+                    'patente' => $vehiculo->patente,
+                    'marca'   => $vehiculo->marca,
+                    'modelo'  => $vehiculo->modelo,
+                ] : null;
+                $arr['licencia_por_vencer'] = $vencimientoLicencia !== null
+                    && $vencimientoLicencia->gte($today)
+                    && $vencimientoLicencia->lte($today->copy()->addDays(30));
+                $arr['falta_foto'] = $user->profile_photo_path === null;
+
+                return $arr;
+            });
+        }
 
         $empresas = Empresa::orderBy('nombre')->get(['id', 'nombre']);
 
@@ -113,6 +151,7 @@ class UserController extends Controller
             'filterRoles' => $filterRoles,
             'empresas' => $empresas,
             'monedas' => $monedas,
+            'choferCounts' => $choferCounts,
         ]);
     }
 

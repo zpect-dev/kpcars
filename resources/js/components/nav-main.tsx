@@ -71,15 +71,20 @@ function CollapsibleNavItem({
     );
 }
 
-export function NavMain({ items = [] }: { items: NavItem[] }) {
-    const { isCurrentUrl } = useCurrentUrl();
+export interface NavGroup {
+    label?: string;
+    items: NavItem[];
+}
 
+function NavGroupSection({ group, isCurrentUrl }: { group: NavGroup; isCurrentUrl: (href: NavItem['href']) => boolean }) {
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
+            {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
             <SidebarMenu>
-                {items.map((item) => {
-                    const isActive = isCurrentUrl(item.href) || !!item.items?.some((subItem) => subItem.isActive ?? isCurrentUrl(subItem.href));
+                {group.items.map((item) => {
+                    const isActive =
+                        isCurrentUrl(item.href) ||
+                        !!item.items?.some((sub) => sub.isActive ?? isCurrentUrl(sub.href));
 
                     return item.items && item.items.length > 0 ? (
                         <CollapsibleNavItem
@@ -105,5 +110,17 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                 })}
             </SidebarMenu>
         </SidebarGroup>
+    );
+}
+
+export function NavMain({ groups }: { groups: NavGroup[] }) {
+    const { isCurrentUrl } = useCurrentUrl();
+
+    return (
+        <>
+            {groups.map((group, i) => (
+                <NavGroupSection key={group.label ?? i} group={group} isCurrentUrl={isCurrentUrl} />
+            ))}
+        </>
     );
 }

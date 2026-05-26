@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { AlertCircle, HandCoins, Lock, Plus, Wallet } from 'lucide-react';
+import { AlertCircle, HandCoins, Loader2, Lock, Plus, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -107,6 +107,23 @@ export default function InversionesIndex({
         [inversiones],
     );
 
+    const deudasPorSocio = useMemo(() => {
+        const map = new Map<number, {
+            usuario: InversorAsignado;
+            entradas: { inversionId: number; saldo: number }[];
+        }>();
+        deudas.forEach(({ inversion, usuario }) => {
+            if (!map.has(usuario.id)) {
+                map.set(usuario.id, { usuario, entradas: [] });
+            }
+            map.get(usuario.id)!.entradas.push({
+                inversionId: inversion.id,
+                saldo: usuario.saldo_deuda,
+            });
+        });
+        return Array.from(map.values());
+    }, [deudas]);
+
     return (
         <>
             <Head title="Inversiones" />
@@ -116,12 +133,13 @@ export default function InversionesIndex({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-                            Cierre{' '}
-                            {ultimoCierre?.periodo_fin
-                                ? `${formatCierreDate(ultimoCierre.periodo_fin)}`
-                                : 'NaN'}
+                            Inversiones
                         </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">{}</p>
+                        {ultimoCierre?.periodo_fin && (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                Último cierre: {formatCierreDate(ultimoCierre.periodo_fin)}
+                            </p>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
@@ -285,17 +303,16 @@ export default function InversionesIndex({
                                 Deudas pendientes
                             </h2>
                             <span className="rounded-full border border-red-500/25 bg-red-500/10 px-2.5 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
-                                {deudas.length}
+                                {deudasPorSocio.length}
                             </span>
                         </div>
                         <div className="overflow-hidden rounded-xl border border-red-500/20 bg-card shadow-sm">
                             <ul className="divide-y divide-border">
-                                {deudas.map(({ inversion, usuario }) => (
-                                    <PagoRapidoRow
-                                        key={`${inversion.id}-${usuario.id}`}
-                                        inversionId={inversion.id}
-                                        inversionNombre={inversion.nombre}
+                                {deudasPorSocio.map(({ usuario, entradas }) => (
+                                    <PagoRapidoCard
+                                        key={usuario.id}
                                         usuario={usuario}
+                                        entradas={entradas}
                                         tasa={ultimoCierre?.tasa ?? null}
                                     />
                                 ))}
@@ -767,6 +784,7 @@ function DeudaPanel({
                         placeholder="Agregar deuda"
                         value={cargo}
                         onChange={(e) => setCargo(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submit('cargo', cargo)}
                         className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                     />
                     <Button
@@ -775,7 +793,7 @@ function DeudaPanel({
                         disabled={busy !== null || !cargo}
                         onClick={() => submit('cargo', cargo)}
                     >
-                        {busy === 'cargo' ? '...' : 'Cargar'}
+                        {busy === 'cargo' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Cargar'}
                     </Button>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -786,6 +804,7 @@ function DeudaPanel({
                         placeholder="Pago recibido"
                         value={pago}
                         onChange={(e) => setPago(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submit('pago', pago)}
                         className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                     />
                     <Button
@@ -793,7 +812,7 @@ function DeudaPanel({
                         disabled={busy !== null || !pago || saldo <= 0}
                         onClick={() => submit('pago', pago)}
                     >
-                        {busy === 'pago' ? '...' : 'Pagar'}
+                        {busy === 'pago' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Pagar'}
                     </Button>
                 </div>
             </div>
@@ -806,35 +825,42 @@ function DeudaPanel({
     );
 }
 
-// ─── Pago Rápido Row ──────────────────────────────────────────────────────
+// ─── Pago Rápido Card (agrupado por socio, pago en cascada) ──────────────
 
-function PagoRapidoRow({
-    inversionId,
-    inversionNombre,
+function PagoRapidoCard({
     usuario,
+    entradas,
     tasa,
 }: {
-    inversionId: number;
-    inversionNombre: string;
     usuario: InversorAsignado;
+    entradas: { inversionId: number; saldo: number }[];
     tasa: number | null;
 }) {
+    const totalSaldo = entradas.reduce((a, e) => a + e.saldo, 0);
     const [pago, setPago] = useState('');
     const [busy, setBusy] = useState(false);
     const [err, setErr] = useState<string | null>(null);
-    const [localSaldo, setLocalSaldo] = useState(usuario.saldo_deuda);
+    const [localSaldo, setLocalSaldo] = useState(totalSaldo);
+    const [confirming, setConfirming] = useState<number | null>(null);
 
-    function submit() {
+    function requestConfirm() {
         const monto = parseFloat(pago.replace(',', '.'));
         if (!Number.isFinite(monto) || monto <= 0) {
             setErr('Monto inválido.');
             return;
         }
-        setBusy(true);
         setErr(null);
+        setConfirming(monto);
+    }
+
+    function confirmSubmit() {
+        if (confirming === null) return;
+        const monto = confirming;
+        setBusy(true);
+        setConfirming(null);
         router.post(
-            `/inversiones/${inversionId}/inversores/${usuario.id}/deuda`,
-            { tipo: 'pago', monto, descripcion: null },
+            `/inversores/${usuario.id}/pago-cascada`,
+            { monto },
             {
                 preserveScroll: true,
                 preserveState: true,
@@ -851,46 +877,64 @@ function PagoRapidoRow({
     }
 
     return (
-        <li className="flex flex-wrap items-center gap-4 px-5 py-3.5">
-            <span className="h-8 w-[3px] shrink-0 rounded-r-full bg-red-500/70" />
-            <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-foreground">{usuario.name}</p>
-                <p className="text-[11px] text-muted-foreground">{inversionNombre}</p>
+        <li className="flex flex-col gap-2 px-5 py-4">
+            <div className="flex items-center gap-4">
+                <span className="h-8 w-[3px] shrink-0 rounded-r-full bg-red-500/70" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground">{usuario.name}</p>
+                </div>
+                <div className="hidden flex-col items-end gap-0.5 shrink-0 sm:flex">
+                    <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                        Saldo adeudado
+                    </span>
+                    <MoneyDual
+                        ars={localSaldo}
+                        tasa={tasa}
+                        orientation="stacked"
+                        size="md"
+                        className="items-end"
+                        arsClassName="text-red-500 dark:text-red-400"
+                    />
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                    <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="Monto ARS"
+                        value={pago}
+                        onChange={(e) => { setPago(e.target.value); setConfirming(null); }}
+                        onKeyDown={(e) => e.key === 'Enter' && !confirming && requestConfirm()}
+                        className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <Button
+                        size="sm"
+                        disabled={busy || !pago || localSaldo <= 0}
+                        onClick={requestConfirm}
+                    >
+                        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Aplicar pago'}
+                    </Button>
+                </div>
             </div>
-            <div className="hidden flex-col items-end gap-0.5 shrink-0 sm:flex">
-                <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                    Saldo adeudado
-                </span>
-                <MoneyDual
-                    ars={localSaldo}
-                    tasa={tasa}
-                    orientation="stacked"
-                    size="md"
-                    className="items-end"
-                    arsClassName="text-red-500 dark:text-red-400"
-                />
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-                <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Monto ARS"
-                    value={pago}
-                    onChange={(e) => setPago(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && submit()}
-                    className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-                />
-                <Button
-                    size="sm"
-                    disabled={busy || !pago || localSaldo <= 0}
-                    onClick={submit}
-                >
-                    {busy ? '...' : 'Aplicar pago'}
-                </Button>
-            </div>
+
+            {confirming !== null && (
+                <div className="ml-4 flex items-center justify-between gap-3 rounded-md border border-amber-500/30 bg-amber-500/8 px-3 py-2">
+                    <p className="text-xs text-amber-900 dark:text-amber-200">
+                        Confirmar pago de <strong>{formatARS(confirming)}</strong> para <strong>{usuario.name}</strong>
+                    </p>
+                    <div className="flex gap-2 shrink-0">
+                        <Button size="sm" variant="outline" onClick={() => setConfirming(null)}>
+                            Cancelar
+                        </Button>
+                        <Button size="sm" onClick={confirmSubmit}>
+                            Confirmar
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {err && (
-                <p className="w-full text-[11px] text-red-700 dark:text-red-400">{err}</p>
+                <p className="ml-4 text-[11px] text-red-700 dark:text-red-400">{err}</p>
             )}
         </li>
     );

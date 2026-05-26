@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
 class Vehiculo extends Model
@@ -65,6 +66,11 @@ class Vehiculo extends Model
     public function revisiones(): HasMany
     {
         return $this->hasMany(Revision::class)->orderByDesc('created_at');
+    }
+
+    public function latestRevision(): HasOne
+    {
+        return $this->hasOne(Revision::class)->latestOfMany();
     }
 
     public function scopeVisibleTo($query, ?User $user)

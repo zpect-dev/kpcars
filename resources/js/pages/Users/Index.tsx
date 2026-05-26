@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Plus, Search, Camera } from 'lucide-react';
+import { Car, Check, Filter, Plus, Search, Camera } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,6 +17,7 @@ import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
 
 import { index as usersIndex, updateRole, store } from '@/routes/users';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface User {
     id: number;
@@ -32,6 +33,9 @@ interface User {
     empresa_id?: number | null;
     deposito?: string | null;
     deposito_moneda?: string | null;
+    vehiculo?: { patente: string; marca: string; modelo: string } | null;
+    licencia_por_vencer?: boolean;
+    falta_foto?: boolean;
 }
 
 interface RoleOption {
@@ -55,6 +59,7 @@ interface Props {
     roles: RoleOption[];
     empresas: Empresa[];
     monedas: MonedaOption[];
+    choferCounts?: { activos: number; inactivos: number } | null;
 }
 
 function AvatarDropzone({
@@ -109,23 +114,44 @@ function AvatarDropzone({
     );
 }
 
-export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
+export default function UsersIndex({ users, roles, empresas, monedas, choferCounts }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterAlert, setFilterAlert] = useState<'all' | 'licencia_por_vencer' | 'falta_foto'>('all');
     const [previewImage, setPreviewImage] = useState<{
         url: string;
         name: string;
     } | null>(null);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const filterRole = urlParams.get('role');
+    const filterStatus = urlParams.get('status');
+
     const filteredUsers = useMemo(() => {
-        if (!searchTerm) return users;
-        const q = searchTerm.toLowerCase();
-        return users.filter(
-            (u) =>
-                u.name.toLowerCase().includes(q) ||
-                u.dni.toLowerCase().includes(q),
-        );
-    }, [users, searchTerm]);
+        let result = users;
+        if (searchTerm) {
+            const q = searchTerm.toLowerCase();
+            result = result.filter(
+                (u) => u.name.toLowerCase().includes(q) || u.dni.toLowerCase().includes(q),
+            );
+        }
+        if (filterRole === 'chofer' && filterAlert !== 'all') {
+            result = result.filter((u) => {
+                if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
+                if (filterAlert === 'falta_foto') return u.falta_foto === true;
+                return true;
+            });
+        }
+        return result;
+    }, [users, searchTerm, filterAlert, filterRole]);
+
+    const alertCounts = useMemo(() => {
+        if (filterRole !== 'chofer') return { licencia_por_vencer: 0, falta_foto: 0 };
+        return {
+            licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
+            falta_foto: users.filter((u) => u.falta_foto).length,
+        };
+    }, [users, filterRole]);
 
     function confirmToggleStatus(user: User) {
         if (user.id === auth.user.id) return;
@@ -284,14 +310,33 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
         return `${symbol} ${Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
 
+    function parseLicenciaDate(fechaStr: string): Date {
+        const datePart = fechaStr.split('T')[0].split(' ')[0];
+        const [year, month, day] = datePart.split('-').map(Number);
+        return new Date(year, month - 1, day);
+    }
+
+    function formatLicenciaFecha(fechaStr: string): string {
+        return parseLicenciaDate(fechaStr).toLocaleDateString('es-AR', {
+            day: 'numeric', month: 'short', year: 'numeric',
+        });
+    }
+
+    function getLicenciaStatus(fechaStr: string | null | undefined) {
+        if (!fechaStr) return null;
+        const fecha = parseLicenciaDate(fechaStr);
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const diff = Math.floor((fecha.getTime() - today.getTime()) / 86400000);
+        if (diff < 0) return { label: 'Vencida', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
+        if (diff <= 30) return { label: 'Por vencer', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+        return { label: 'Vigente', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
+    }
+
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
-    const urlParams = new URLSearchParams(window.location.search);
-    const filterRole = urlParams.get('role');
-    const filterStatus = urlParams.get('status');
 
     useEffect(() => {
-        if (!filterRole) {
+        if (!filterRole || (filterRole === 'chofer' && !filterStatus)) {
             router.get(
                 usersIndex.url(),
                 { role: 'chofer', status: 'activos' },
@@ -319,69 +364,178 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
             <Head title={pageTitle} />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
-                        {/* Buscador */}
-                        <div className="relative w-full lg:max-w-xs">
-                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Buscar por nombre o DNI..."
-                                className="bg-card pl-9 shadow-sm"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                {filterRole === 'chofer' ? (
+                    <div className="flex flex-col gap-4">
+                        {/* Page header */}
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2.5">
+                                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Choferes</h1>
+                                    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-foreground">
+                                        {(choferCounts?.activos ?? 0) + (choferCounts?.inactivos ?? 0)}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Gestión de conductores asignados a la flota
+                                </p>
+                            </div>
+                            {!isInversor && (
+                                <Button onClick={openCreateModal} className="shrink-0">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Nuevo chofer
+                                </Button>
+                            )}
                         </div>
 
-                        {/* Filtro activos/inactivos — solo visible en choferes */}
-                        {filterRole === 'chofer' && (
-                            <div className="flex gap-1.5">
-                                <Button
-                                    variant={filterStatus === 'activos' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-9 rounded-md px-4 text-xs font-medium"
-                                    onClick={() =>
-                                        router.get(
-                                            usersIndex.url(),
-                                            { role: 'chofer', status: filterStatus === 'activos' ? undefined : 'activos' },
-                                            { preserveState: false },
-                                        )
-                                    }
+                        {/* Filter bar */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="relative min-w-[180px] flex-1 max-w-xs">
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Buscar por nombre o DNI..."
+                                    className="bg-card pl-9 shadow-sm"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 p-0.5">
+                                <button
+                                    type="button"
+                                    onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                                        filterStatus === 'activos'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground',
+                                    )}
                                 >
                                     Activos
-                                </Button>
-                                <Button
-                                    variant={filterStatus === 'inactivos' ? 'default' : 'outline'}
-                                    size="sm"
-                                    className="h-9 rounded-md px-4 text-xs font-medium"
-                                    onClick={() =>
-                                        router.get(
-                                            usersIndex.url(),
-                                            { role: 'chofer', status: filterStatus === 'inactivos' ? undefined : 'inactivos' },
-                                            { preserveState: false },
-                                        )
-                                    }
+                                    <span className={cn(
+                                        'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                                        filterStatus === 'activos'
+                                            ? 'bg-green-500 text-white'
+                                            : 'bg-muted-foreground/20 text-muted-foreground',
+                                    )}>
+                                        {choferCounts?.activos ?? 0}
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                                        filterStatus === 'inactivos'
+                                            ? 'bg-background text-foreground shadow-sm'
+                                            : 'text-muted-foreground hover:text-foreground',
+                                    )}
                                 >
                                     Inactivos
+                                    <span className={cn(
+                                        'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
+                                        filterStatus === 'inactivos'
+                                            ? 'bg-red-500 text-white'
+                                            : 'bg-muted-foreground/20 text-muted-foreground',
+                                    )}>
+                                        {choferCounts?.inactivos ?? 0}
+                                    </span>
+                                </button>
+                            </div>
+
+                            {filterStatus === 'activos' && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className={cn(
+                                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                                                filterAlert !== 'all'
+                                                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                    : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
+                                            )}
+                                        >
+                                            <Filter className="h-3.5 w-3.5" />
+                                            Filtros
+                                            {filterAlert !== 'all' && (
+                                                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+                                                    1
+                                                </span>
+                                            )}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-60 p-0">
+                                        <div className="p-3">
+                                            <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                                Filtrar por
+                                            </p>
+                                            <div className="flex flex-col gap-0.5">
+                                                {(
+                                                    [
+                                                        { val: 'all' as const, label: 'Todos los choferes', count: users.length, dot: null },
+                                                        { val: 'licencia_por_vencer' as const, label: 'Licencia por vencer', count: alertCounts.licencia_por_vencer, dot: 'amber' },
+                                                        { val: 'falta_foto' as const, label: 'Falta foto', count: alertCounts.falta_foto, dot: 'blue' },
+                                                    ]
+                                                ).map((item) => (
+                                                    <button
+                                                        key={item.val}
+                                                        type="button"
+                                                        onClick={() => setFilterAlert(item.val)}
+                                                        className={cn(
+                                                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                                                            filterAlert === item.val
+                                                                ? 'bg-muted text-foreground'
+                                                                : 'text-foreground hover:bg-muted/60',
+                                                        )}
+                                                    >
+                                                        {item.dot ? (
+                                                            <span className={cn(
+                                                                'h-2 w-2 shrink-0 rounded-full',
+                                                                item.dot === 'amber' ? 'bg-amber-500' : 'bg-blue-500',
+                                                            )} />
+                                                        ) : (
+                                                            <span className="h-2 w-2 shrink-0" />
+                                                        )}
+                                                        <span className={cn('flex-1 text-left', filterAlert === item.val && 'font-semibold')}>
+                                                            {item.label}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground">{item.count}</span>
+                                                        {filterAlert === item.val && (
+                                                            <Check className="h-3.5 w-3.5 shrink-0 text-foreground" />
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+                            <div className="relative w-full lg:max-w-xs">
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Buscar por nombre o DNI..."
+                                    className="bg-card pl-9 shadow-sm"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        {!isInversor && (
+                            <div className="flex w-full sm:w-auto">
+                                <Button className="w-full sm:w-auto" size="default" onClick={openCreateModal}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Nuevo Usuario
                                 </Button>
                             </div>
                         )}
                     </div>
-
-                    {/* Botón Acción */}
-                    {!isInversor && (
-                        <div className="flex w-full sm:w-auto">
-                            <Button
-                                className="w-full sm:w-auto"
-                                size="default"
-                                onClick={openCreateModal}
-                            >
-                                <Plus className="mr-2 h-4 w-4" />
-                                Nuevo Usuario
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                )}
 
                 <div className="w-full self-start overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                     <div className="hidden overflow-x-auto md:block">
@@ -418,17 +572,19 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                     >
                                         Estado
                                     </th>
+                                    {filterRole === 'chofer' && (
+                                        <th
+                                            scope="col"
+                                            className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        >
+                                            Depósito
+                                        </th>
+                                    )}
                                     <th
                                         scope="col"
                                         className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        Depósito
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Rol
+                                        {filterRole === 'chofer' ? 'Vehículo' : 'Rol'}
                                     </th>
                                 </tr>
                             </thead>
@@ -436,7 +592,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                 {filteredUsers.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={7}
+                                            colSpan={filterRole === 'chofer' ? 7 : 6}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No se encontraron usuarios que
@@ -515,117 +671,106 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
                                                 {user.fecha_vencimiento_licencia ? (
-                                                    <span
-                                                        className="text-muted-foreground"
-                                                        title="Vencimiento de Licencia"
-                                                    >
-                                                        {new Date(
-                                                            user.fecha_vencimiento_licencia,
-                                                        ).toLocaleDateString()}
-                                                    </span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-muted-foreground">
+                                                            {formatLicenciaFecha(user.fecha_vencimiento_licencia)}
+                                                        </span>
+                                                        {(() => {
+                                                            const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
+                                                            return s ? (
+                                                                <span className={cn('inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                                    {s.label}
+                                                                </span>
+                                                            ) : null;
+                                                        })()}
+                                                    </div>
                                                 ) : (
-                                                    <span
-                                                        className="text-muted-foreground/50 italic"
-                                                        title="No tiene licencia registrada"
-                                                    >
-                                                        N/A
-                                                    </span>
+                                                    <span className="text-muted-foreground/50 italic">N/A</span>
                                                 )}
                                             </td>
-                                            <td
-                                                className="truncate px-4 py-3 font-medium sm:px-6 sm:py-4"
-                                                title={
-                                                    user.inactivo
-                                                        ? 'Inactivo'
-                                                        : 'Activo'
-                                                }
-                                            >
+                                            <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (isInversor) return;
-                                                        confirmToggleStatus(
-                                                            user,
-                                                        );
+                                                        confirmToggleStatus(user);
                                                     }}
-                                                    disabled={
-                                                        user.id === auth.user.id || isInversor
-                                                    }
-                                                    className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                                    disabled={user.id === auth.user.id || isInversor}
+                                                    className={cn(
+                                                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
+                                                        user.inactivo
+                                                            ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                                            : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+                                                        !isInversor && user.id !== auth.user.id
+                                                            ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
+                                                            : 'cursor-default',
+                                                    )}
                                                 >
-                                                    {user.inactivo
-                                                        ? 'Inactivo'
-                                                        : 'Activo'}
+                                                    <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
+                                                    {user.inactivo ? 'Inactivo' : 'Activo'}
                                                 </button>
                                             </td>
-                                            <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
-                                                {user.deposito ? (
-                                                    <span className="font-medium text-foreground">
-                                                        {formatDeposito(user)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground/50 italic">
-                                                        —
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
-                                                <div className="flex flex-col gap-1.5">
-                                                    {user.id === auth.user.id ? (
-                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                            {roles.find(
-                                                                (r) =>
-                                                                    r.value ===
-                                                                    user.role,
-                                                            )?.label ||
-                                                                user.role}{' '}
-                                                            (Tú)
-                                                        </span>
-                                                    ) : isInversor ? (
-                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                            {roles.find((r) => r.value === user.role)?.label || user.role}
+                                            {filterRole === 'chofer' && (
+                                                <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
+                                                    {user.deposito ? (
+                                                        <span className="font-medium text-foreground">
+                                                            {formatDeposito(user)}
                                                         </span>
                                                     ) : (
-                                                        <select
-                                                            onClick={(e) =>
-                                                                e.stopPropagation()
-                                                            }
-                                                            value={user.role}
-                                                            onChange={(e) =>
-                                                                handleRoleChange(
-                                                                    user.id,
-                                                                    e.target.value,
-                                                                )
-                                                            }
-                                                            className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {roles.map((role) => (
-                                                                <option
-                                                                    key={role.value}
-                                                                    value={
-                                                                        role.value
-                                                                    }
-                                                                >
-                                                                    {role.label}
-                                                                </option>
-                                                            ))}
-                                                        </select>
+                                                        <span className="text-muted-foreground/50 italic">
+                                                            —
+                                                        </span>
                                                     )}
-                                                    {user.role === 'administrador' && !isInversor && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                toggleAbsoluto(user);
-                                                            }}
-                                                            disabled={user.id === auth.user.id}
-                                                            title={user.absoluto ? 'Acceso absoluto activado — clic para revocar' : 'Sin acceso absoluto — clic para otorgar'}
-                                                            className={`inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
-                                                        >
-                                                            {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                </td>
+                                            )}
+                                            <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                {filterRole === 'chofer' ? (
+                                                    <div className="flex flex-col gap-1">
+                                                        {user.vehiculo ? (
+                                                            <div className="flex items-center gap-1.5">
+                                                                <Car className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                                                <span className="font-mono text-xs font-bold text-foreground">{user.vehiculo.patente}</span>
+                                                                <span className="truncate text-xs text-muted-foreground">{user.vehiculo.marca} {user.vehiculo.modelo}</span>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col gap-1.5">
+                                                        {user.id === auth.user.id ? (
+                                                            <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                                {roles.find((r) => r.value === user.role)?.label || user.role}{' '}(Tú)
+                                                            </span>
+                                                        ) : isInversor ? (
+                                                            <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
+                                                                {roles.find((r) => r.value === user.role)?.label || user.role}
+                                                            </span>
+                                                        ) : (
+                                                            <select
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                value={user.role}
+                                                                onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                                                className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                            >
+                                                                {roles.map((role) => (
+                                                                    <option key={role.value} value={role.value}>{role.label}</option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                        {user.role === 'administrador' && !isInversor && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); toggleAbsoluto(user); }}
+                                                                disabled={user.id === auth.user.id}
+                                                                title={user.absoluto ? 'Acceso absoluto activado — clic para revocar' : 'Sin acceso absoluto — clic para otorgar'}
+                                                                className={`inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default' : 'cursor-pointer'}`}
+                                                            >
+                                                                {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                         </tr>
                                     ))
@@ -704,7 +849,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                             toggleAbsoluto(user);
                                                         }}
                                                         disabled={user.id === auth.user.id}
-                                                        className={`mt-1 inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                                        className={`mt-1 inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.absoluto ? 'bg-indigo-100 text-indigo-800 hover:bg-indigo-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${user.id === auth.user.id ? 'cursor-default' : 'cursor-pointer'}`}
                                                     >
                                                         {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
                                                     </button>
@@ -718,11 +863,18 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                 confirmToggleStatus(user);
                                             }}
                                             disabled={user.id === auth.user.id || isInversor}
-                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
+                                            className={cn(
+                                                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
+                                                user.inactivo
+                                                    ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                                    : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+                                                !isInversor && user.id !== auth.user.id
+                                                    ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
+                                                    : 'cursor-default',
+                                            )}
                                         >
-                                            {user.inactivo
-                                                ? 'Inactivo'
-                                                : 'Activo'}
+                                            <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
+                                            {user.inactivo ? 'Inactivo' : 'Activo'}
                                         </button>
                                     </div>
 
@@ -753,7 +905,7 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-3 gap-3 text-xs">
+                                    <div className={cn('grid gap-3 text-xs', filterRole === 'chofer' ? 'grid-cols-3' : 'grid-cols-2')}>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="tracking-wider text-muted-foreground uppercase">
                                                 DNI
@@ -767,35 +919,55 @@ export default function UsersIndex({ users, roles, empresas, monedas }: Props) {
                                                 Licencia
                                             </span>
                                             {user.fecha_vencimiento_licencia ? (
-                                                <span
-                                                    className="text-foreground"
-                                                    title="Vencimiento de Licencia"
-                                                >
-                                                    {new Date(
-                                                        user.fecha_vencimiento_licencia,
-                                                    ).toLocaleDateString()}
-                                                </span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="text-foreground">
+                                                        {formatLicenciaFecha(user.fecha_vencimiento_licencia)}
+                                                    </span>
+                                                    {(() => {
+                                                        const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
+                                                        return s ? (
+                                                            <span className={cn('inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                                {s.label}
+                                                            </span>
+                                                        ) : null;
+                                                    })()}
+                                                </div>
                                             ) : (
-                                                <span className="text-muted-foreground/50 italic">
-                                                    N/A
-                                                </span>
+                                                <span className="text-muted-foreground/50 italic">N/A</span>
                                             )}
                                         </div>
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="tracking-wider text-muted-foreground uppercase">
-                                                Depósito
-                                            </span>
-                                            {user.deposito ? (
-                                                <span className="font-medium text-foreground">
-                                                    {formatDeposito(user)}
+                                        {filterRole === 'chofer' && (
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="tracking-wider text-muted-foreground uppercase">
+                                                    Depósito
                                                 </span>
-                                            ) : (
-                                                <span className="text-muted-foreground/50 italic">
-                                                    —
-                                                </span>
-                                            )}
-                                        </div>
+                                                {user.deposito ? (
+                                                    <span className="font-medium text-foreground">
+                                                        {formatDeposito(user)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        —
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {filterRole === 'chofer' && (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] tracking-wider text-muted-foreground uppercase">Vehículo</span>
+                                            {user.vehiculo ? (
+                                                <div className="flex items-center gap-1.5">
+                                                    <Car className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                                    <span className="font-mono text-sm font-bold text-foreground">{user.vehiculo.patente}</span>
+                                                    <span className="text-xs text-muted-foreground">{user.vehiculo.marca} {user.vehiculo.modelo}</span>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
+                                            )}
+                                        </div>
+                                    )}
                                 </li>
                             ))
                         )}

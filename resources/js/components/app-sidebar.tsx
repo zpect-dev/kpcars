@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 import { CalendarClock, CarFront, ClipboardCheck, Package, Receipt, Users, Wallet } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
-import { NavMain } from '@/components/nav-main';
+import { NavMain, type NavGroup } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
     Sidebar,
@@ -27,104 +27,67 @@ export function AppSidebar() {
     const { url } = usePage();
     const { setOpenMobile, isMobile } = useSidebar();
 
-    // Close the mobile sidebar when the URL changes (navigation)
     useEffect(() => {
-        if (isMobile) {
-            setOpenMobile(false);
-        }
+        if (isMobile) setOpenMobile(false);
     }, [url, isMobile, setOpenMobile]);
 
-    const mainNavItems: NavItem[] = [];
+    let groups: NavGroup[] = [];
 
     if (auth.user.role === 'inversor') {
-        // Inversores only see Mi Cuenta
-        mainNavItems.push({
-            title: 'Mi Cuenta',
-            href: '/mi-cuenta',
-            icon: Wallet,
-        });
+        groups = [
+            {
+                items: [{ title: 'Mi Cuenta', href: '/mi-cuenta', icon: Wallet }],
+            },
+        ];
     } else if (auth.user.role === 'mecanico') {
-        mainNavItems.push(
+        groups = [
             {
-                title: 'Turnos',
-                href: '/appointments',
-                icon: CalendarClock,
+                items: [
+                    { title: 'Turnos', href: '/appointments', icon: CalendarClock },
+                    { title: 'Inventario', href: articulosIndex.url(), icon: Package },
+                ],
             },
-            {
-                title: 'Inventario',
-                href: articulosIndex.url(),
-                icon: Package,
-            },
-        );
+        ];
     } else {
-        // Admin / other roles — full nav
-        mainNavItems.push({
-            title: 'Vehículos',
-            href: dashboard.url(),
-            icon: CarFront,
-        });
+        const currentRole = url.includes('/users')
+            ? new URLSearchParams(url.split('?')[1] ?? '').get('role')
+            : null;
 
-        mainNavItems.push({
-            title: 'Inventario',
-            href: articulosIndex.url(),
-            icon: Package,
-        });
+        const tallerItems: NavItem[] = [
+            { title: 'Vehículos', href: dashboard.url(), icon: CarFront },
+            { title: 'Turnos', href: '/appointments', icon: CalendarClock },
+            { title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck },
+        ];
+
+        const gestionItems: NavItem[] = [];
 
         if (auth.user.role === 'administrador' && auth.user.absoluto) {
-            mainNavItems.push({
-                title: 'Cobros',
-                href: cobrosIndex.url(),
-                icon: Receipt,
-            });
+            gestionItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
         }
 
-        mainNavItems.push({
-            title: 'Turnos',
-            href: '/appointments',
-            icon: CalendarClock,
-        });
+        gestionItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });
 
-        mainNavItems.push({
-            title: 'Revisiones',
-            href: '/revisiones',
-            icon: ClipboardCheck,
-        });
-
-        const currentRole = url.includes('/users') ? new URLSearchParams(url.split('?')[1] ?? '').get('role') : null;
-
-        mainNavItems.push({
+        gestionItems.push({
             title: 'Personal',
             href: '/users',
             icon: Users,
             items: [
-                {
-                    title: 'Administración',
-                    href: '/users?role=administrador',
-                    isActive: currentRole === 'administrador',
-                },
-                {
-                    title: 'Mecánicos',
-                    href: '/users?role=mecanico',
-                    isActive: currentRole === 'mecanico',
-                },
-                {
-                    title: 'Choferes',
-                    href: '/users?role=chofer',
-                    isActive: currentRole === 'chofer',
-                },
-                {
-                    title: 'Inversores',
-                    href: '/users?role=inversor',
-                    isActive: currentRole === 'inversor',
-                },
+                { title: 'Administración', href: '/users?role=administrador', isActive: currentRole === 'administrador' },
+                { title: 'Mecánicos',       href: '/users?role=mecanico',      isActive: currentRole === 'mecanico'      },
+                { title: 'Choferes',        href: '/users?role=chofer&status=activos', isActive: currentRole === 'chofer' },
+                { title: 'Inversores',      href: '/users?role=inversor',      isActive: currentRole === 'inversor'      },
             ],
         });
 
+        groups = [
+            { label: 'Taller',   items: tallerItems  },
+            { label: 'Gestión',  items: gestionItems },
+        ];
+
         if (auth.user.absoluto) {
-            mainNavItems.push({
-                title: 'Inversiones',
-                href: '/inversiones',
-                icon: Wallet,
+            groups.push({
+                label: 'Inversiones',
+                items: [{ title: 'Inversiones', href: '/inversiones', icon: Wallet }],
             });
         }
     }
@@ -151,7 +114,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain groups={groups} />
             </SidebarContent>
 
             <SidebarFooter>

@@ -257,6 +257,55 @@ class InversionController extends Controller
     }
 
     /**
+     * Aplicar un pago en cascada: se descuenta de la inversión más antigua primero
+     * (orden natural por nombre) hasta agotar el monto, luego continúa con la siguiente.
+     */
+    public function pagoEnCascada(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->isAdminAbsoluto(), 403);
+
+        $validated = $request->validate([
+            'monto' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
+        ]);
+
+        $montoPendiente = (float) $validated['monto'];
+
+        // Mismo orden que el cierre: LENGTH(nombre), nombre — garantiza ranking consistente
+        $inversiones = Inversion::whereHas('inversores', fn ($q) =>
+            $q->where('user_id', $user->id)->where('tiene_deuda', true)
+        )->orderByRaw('LENGTH(nombre), nombre')->get();
+
+        DB::transaction(function () use ($inversiones, $user, $montoPendiente, $request) {
+            foreach ($inversiones as $inversion) {
+                if ($montoPendiente <= 0) break;
+
+                // Saldo actual de esta inversión para este usuario
+                $saldo = (float) DeudaMovimiento::where('inversion_id', $inversion->id)
+                    ->where('user_id', $user->id)
+                    ->selectRaw("SUM(CASE WHEN tipo = 'cargo' THEN monto ELSE -monto END) as saldo")
+                    ->value('saldo') ?? 0.0;
+
+                if ($saldo <= 0) continue;
+
+                $aplicar = min($montoPendiente, $saldo);
+
+                DeudaMovimiento::create([
+                    'inversion_id' => $inversion->id,
+                    'user_id'      => $user->id,
+                    'tipo'         => 'pago',
+                    'monto'        => $aplicar,
+                    'descripcion'  => null,
+                    'registrado_por' => $request->user()->id,
+                ]);
+
+                $montoPendiente -= $aplicar;
+            }
+        });
+
+        return back()->with('success', 'Pago aplicado correctamente.');
+    }
+
+    /**
      * Registrar un nuevo movimiento de deuda (cargo o pago).
      */
     public function storeDeudaMovimiento(Request $request, Inversion $inversion, User $user): RedirectResponse
@@ -270,6 +319,18 @@ class InversionController extends Controller
             'monto' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
             'descripcion' => ['nullable', 'string', 'max:500'],
         ]);
+
+        // Un pago no puede superar el saldo de deuda actual
+        if ($validated['tipo'] === 'pago') {
+            $saldo = (float) DeudaMovimiento::where('inversion_id', $inversion->id)
+                ->where('user_id', $user->id)
+                ->selectRaw("SUM(CASE WHEN tipo = 'cargo' THEN monto ELSE -monto END) as saldo")
+                ->value('saldo') ?? 0.0;
+
+            if ((float) $validated['monto'] > $saldo + 0.005) {
+                return back()->withErrors(['monto' => 'El pago ($'.number_format($validated['monto'], 2).') supera el saldo adeudado ($'.number_format($saldo, 2).').']);
+            }
+        }
 
         DeudaMovimiento::create([
             'inversion_id' => $inversion->id,

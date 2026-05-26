@@ -6,6 +6,7 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
@@ -52,6 +53,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
     Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
     Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
+    Route::get('pdf/cierres-inversion/{cierreInversion}', [PdfController::class, 'cierreInversion'])->name('pdf.cierre-inversion');
+    Route::get('pdf/mi-cuenta', [PdfController::class, 'miCuenta'])->name('pdf.mi-cuenta');
+
+    Route::get('excel/cierres-inversion/{cierreInversion}', [ExcelController::class, 'cierreInversion'])->name('excel.cierre-inversion');
+    Route::get('excel/mi-cuenta', [ExcelController::class, 'miCuenta'])->name('excel.mi-cuenta');
+    Route::get('excel/cobros', [ExcelController::class, 'cobros'])->name('excel.cobros');
 
     Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
 
@@ -88,6 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'detachInversor'])->name('inversiones.inversores.detach');
     Route::get('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'showDeuda'])->name('inversiones.deuda.show');
     Route::post('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'storeDeudaMovimiento'])->name('inversiones.deuda.store');
+    Route::post('inversores/{user}/pago-cascada', [InversionController::class, 'pagoEnCascada'])->name('inversiones.deuda.cascada');
 
     // Cierres semanales de inversión (admin)
     Route::get('cierres-inversion', [CierreInversionController::class, 'index'])->name('cierres-inversion.index');

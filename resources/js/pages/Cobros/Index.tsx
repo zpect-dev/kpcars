@@ -6,10 +6,11 @@ import {
     ChevronRight,
     CircleDollarSign,
     Car,
+    Download,
+    FileSpreadsheet,
     Lock,
     Receipt,
     User,
-    Download,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -211,12 +212,19 @@ export default function CobrosIndex({
                             variant="outline"
                             size="sm"
                             disabled={resumen.length === 0}
-                            onClick={() => {
-                                window.open('/pdf/cobros', '_blank');
-                            }}
+                            onClick={() => window.open('/pdf/cobros', '_blank')}
                         >
-                            <Download className="mr-1.5 h-4 w-4" />
-                            Exportar PDF
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resumen.length === 0}
+                            onClick={() => window.open('/excel/cobros', '_blank')}
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span className="hidden sm:inline">Excel</span>
                         </Button>
                         {isAdmin && (
                             <Button

@@ -307,10 +307,10 @@ export default function Revisiones({ vehiculos }: Props) {
                                             'flex h-full flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] lg:flex-none',
                                             filterStatus === val
                                                 ? val === 'revisado'
-                                                    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
+                                                    ? 'border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400'
                                                     : val === 'pendiente'
-                                                      ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
-                                                      : 'border-primary/30 bg-primary/10 text-primary'
+                                                      ? 'border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400'
+                                                      : 'border-primary/50 bg-primary/10 text-primary'
                                                 : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                         )}
                                     >
@@ -362,9 +362,9 @@ export default function Revisiones({ vehiculos }: Props) {
                                 }}
                                 className={cn(
                                     "flex cursor-pointer flex-col justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                                    row.revision_semanal 
-                                        ? "border-green-500/30 hover:border-green-500/60 dark:border-green-900/30" 
-                                        : "border-red-500/30 hover:border-red-500/60 dark:border-red-900/30"
+                                    row.revision_semanal
+                                        ? "border-green-500/50 hover:border-green-500/80 dark:border-green-900/50"
+                                        : "border-red-500/50 hover:border-red-500/80 dark:border-red-900/50"
                                 )}
                             >
                                 <div className="flex items-start justify-between gap-4">

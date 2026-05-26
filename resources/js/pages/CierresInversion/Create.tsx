@@ -3,6 +3,7 @@ import { ArrowLeft, AlertCircle, Calculator, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import InputError from '@/components/input-error';
 import { useMemo } from 'react';
 
@@ -153,7 +154,8 @@ export default function CierresCreate({
                     {/* Tasa de cambio del cierre */}
                     <div className="mb-5 grid gap-1.5 border-b border-border pb-4 sm:max-w-xs">
                         <Label htmlFor="tasa">
-                            Tasa de cambio (ARS por 1 USD)
+                            Tasa de cambio (ARS por 1 USD){' '}
+                            <span className="text-red-500">*</span>
                         </Label>
                         <div className="relative">
                             <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[11px] font-semibold text-muted-foreground">
@@ -199,28 +201,39 @@ export default function CierresCreate({
                                         <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
                                     )}
                                 </Label>
-                                <div className="relative">
-                                    <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[11px] font-semibold text-muted-foreground">
-                                        $
-                                    </span>
-                                    <Input
-                                        id={`monto-${inv.id}`}
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="0.00"
-                                        className="pl-6"
-                                        value={
-                                            form.data.recaudaciones[
-                                                String(inv.id)
-                                            ] ?? ''
-                                        }
-                                        onChange={(e) =>
-                                            setMonto(inv.id, e.target.value)
-                                        }
-                                        disabled={!inv.puede_procesar}
-                                    />
-                                </div>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="relative">
+                                            <span className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[11px] font-semibold text-muted-foreground">
+                                                $
+                                            </span>
+                                            <Input
+                                                id={`monto-${inv.id}`}
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                placeholder="0.00"
+                                                className="pl-6"
+                                                value={
+                                                    form.data.recaudaciones[
+                                                        String(inv.id)
+                                                    ] ?? ''
+                                                }
+                                                onChange={(e) =>
+                                                    setMonto(inv.id, e.target.value)
+                                                }
+                                                disabled={!inv.puede_procesar}
+                                            />
+                                        </div>
+                                    </TooltipTrigger>
+                                    {!inv.puede_procesar && (
+                                        <TooltipContent side="right">
+                                            {inv.inversores_count !== maxInversores
+                                                ? `Faltan ${maxInversores - inv.inversores_count} inversor(es)`
+                                                : 'Tiene deudores pero sin financiador'}
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
                                 <p className="text-[11px] text-muted-foreground">
                                     {inv.deudores} deudor
                                     {inv.deudores === 1 ? '' : 'es'} ·{' '}
@@ -281,19 +294,34 @@ export default function CierresCreate({
                                 }).format(totalRecaudadoUsd)}
                             </span>
                         </div>
-                        <Button
-                            type="submit"
-                            disabled={
-                                form.processing ||
-                                !todosListos ||
-                                !todosCargados ||
-                                tasaNum <= 0
-                            }
-                        >
-                            {form.processing
-                                ? 'Procesando...'
-                                : 'Ejecutar cierre'}
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span>
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            form.processing ||
+                                            !todosListos ||
+                                            !todosCargados ||
+                                            tasaNum <= 0
+                                        }
+                                    >
+                                        {form.processing
+                                            ? 'Procesando...'
+                                            : 'Ejecutar cierre'}
+                                    </Button>
+                                </span>
+                            </TooltipTrigger>
+                            {(!todosListos || !todosCargados || tasaNum <= 0) && !form.processing && (
+                                <TooltipContent>
+                                    {tasaNum <= 0
+                                        ? 'Ingresá la tasa de cambio primero'
+                                        : !todosListos
+                                          ? 'Hay inversiones que no pueden procesarse'
+                                          : 'Completá todos los montos'}
+                                </TooltipContent>
+                            )}
+                        </Tooltip>
                     </div>
                 </form>
             </div>

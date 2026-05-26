@@ -113,6 +113,9 @@ class ProcessCierreInversionAction
                     continue; // Nada que distribuir
                 }
 
+                // Todo lo recaudado se distribuye íntegro
+                $totalDistribuido += $monto;
+
                 $parte = $monto / Inversion::MAX_INVERSORES;
 
                 $financiadores = $inv->inversores
@@ -121,24 +124,22 @@ class ProcessCierreInversionAction
                 $financiadoresCount = $financiadores->count();
 
                 $totalCedidoEnInversion = 0.0;
+                $pagosInversion = []; // Pagos de esta inversión (sin redondear aún)
 
                 // Calcular pagos a deudores y no-deudores
                 foreach ($inv->inversores as $u) {
                     $tieneDeuda = (bool) $u->pivot->tiene_deuda;
 
                     if (! $tieneDeuda) {
-                        // Cobra parte completa
-                        $pagos[] = [
+                        $pagosInversion[] = [
                             'cierre_id' => $cierre->id,
                             'user_id' => $u->id,
                             'inversion_id' => $inv->id,
                             'concepto' => CierreInversionPago::CONCEPTO_PARTE_COMPLETA,
-                            'monto' => round($parte, 2),
+                            'monto' => $parte,
                             'created_at' => $periodoFin,
                             'updated_at' => $periodoFin,
                         ];
-                        $totalDistribuido += $parte;
-
                         continue;
                     }
 
@@ -149,20 +150,19 @@ class ProcessCierreInversionAction
                     if ($pos === 0 || $pos === 1) {
                         // 1ra o 2da: mitad al deudor, mitad cedida
                         $mitad = $parte / 2;
-                        $pagos[] = [
+                        $pagosInversion[] = [
                             'cierre_id' => $cierre->id,
                             'user_id' => $u->id,
                             'inversion_id' => $inv->id,
                             'concepto' => CierreInversionPago::CONCEPTO_MEDIA_PARTE_DEUDOR,
-                            'monto' => round($mitad, 2),
+                            'monto' => $mitad,
                             'created_at' => $periodoFin,
                             'updated_at' => $periodoFin,
                         ];
-                        $totalDistribuido += $mitad;
                         $totalCedidoEnInversion += $mitad;
                     } else {
                         // 3ra+: deudor cobra 0; parte completa va a financiadores
-                        $pagos[] = [
+                        $pagosInversion[] = [
                             'cierre_id' => $cierre->id,
                             'user_id' => $u->id,
                             'inversion_id' => $inv->id,
@@ -179,18 +179,41 @@ class ProcessCierreInversionAction
                 if ($totalCedidoEnInversion > 0 && $financiadoresCount > 0) {
                     $porFinanciador = $totalCedidoEnInversion / $financiadoresCount;
                     foreach ($financiadores as $f) {
-                        $pagos[] = [
+                        $pagosInversion[] = [
                             'cierre_id' => $cierre->id,
                             'user_id' => $f->id,
                             'inversion_id' => $inv->id,
                             'concepto' => CierreInversionPago::CONCEPTO_REDISTRIBUCION,
-                            'monto' => round($porFinanciador, 2),
+                            'monto' => $porFinanciador,
                             'created_at' => $periodoFin,
                             'updated_at' => $periodoFin,
                         ];
-                        $totalDistribuido += $porFinanciador;
                     }
                 }
+
+                // Penny shaving: redondear cada pago y ajustar el último no-cero
+                // para que la suma exacta coincida con round($monto, 2).
+                $objetivo = round($monto, 2);
+                $sumaRedondeada = (float) array_sum(
+                    array_map(fn ($p) => round($p['monto'], 2), $pagosInversion)
+                );
+                $diferencia = round($objetivo - $sumaRedondeada, 2);
+
+                if ($diferencia != 0.0) {
+                    for ($i = count($pagosInversion) - 1; $i >= 0; $i--) {
+                        if ($pagosInversion[$i]['monto'] > 0) {
+                            $pagosInversion[$i]['monto'] += $diferencia;
+                            break;
+                        }
+                    }
+                }
+
+                foreach ($pagosInversion as &$p) {
+                    $p['monto'] = round($p['monto'], 2);
+                }
+                unset($p);
+
+                $pagos = array_merge($pagos, $pagosInversion);
             }
 
             if (! empty($pagos)) {

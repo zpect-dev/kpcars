@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MoneyDual } from '@/components/money-dual';
+import { CONCEPTO_LABEL, CONCEPTO_COLOR } from '@/lib/concepto';
 
 interface CierreRef {
     id: number;
@@ -39,19 +40,6 @@ interface Props {
     totalHistorico: number;
 }
 
-const CONCEPTO_LABEL: Record<string, string> = {
-    parte_completa: 'Parte completa',
-    media_parte_deudor: 'Media parte (deudor)',
-    cero_deudor: 'Cero (deudor 3ra+)',
-    redistribucion_financiador: 'Redistribución (financiador)',
-};
-
-const CONCEPTO_COLOR: Record<string, string> = {
-    parte_completa: 'text-foreground',
-    media_parte_deudor: 'text-amber-700 dark:text-amber-400',
-    cero_deudor: 'text-muted-foreground',
-    redistribucion_financiador: 'text-emerald-700 dark:text-emerald-400',
-};
 
 function formatDate(d: string | null): string {
     if (!d) return '—';

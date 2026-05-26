@@ -4,12 +4,16 @@ import {
     ChevronDown,
     Clock,
     Coins,
+    Download,
+    FileSpreadsheet,
     TrendingUp,
     Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { formatARS, formatUSD } from '@/components/money-dual';
 import { cn } from '@/lib/utils';
+import { getConceptoDisplay, FLOTA_CONCEPTOS, CONCEPTO_LABEL } from '@/lib/concepto';
 
 interface Movimiento {
     id: number;
@@ -51,12 +55,6 @@ interface Props {
     tasaActual: number | null;
 }
 
-const CONCEPTO_LABEL: Record<string, string> = {
-    parte_completa: 'Parte completa',
-    media_parte_deudor: 'Media parte (deudor)',
-    cero_deudor: 'Cero (deudor 3ra+)',
-    redistribucion_financiador: 'Redistribución como financiador',
-};
 
 function toUSD(ars: number, tasa: number | null): number | null {
     return tasa && tasa > 0 ? ars / tasa : null;
@@ -81,17 +79,6 @@ function getStatus(inv: InversionRow) {
     return 'al-dia' as const;
 }
 
-const FLOTA_CONCEPTOS = new Set(['parte_completa', 'media_parte_deudor', 'cero_deudor']);
-
-function getConceptoDisplay(concepto: string): { label: string; cls: string } {
-    switch (concepto) {
-        case 'parte_completa':             return { label: 'Sueldo flota',           cls: 'text-emerald-600 dark:text-emerald-400' };
-        case 'redistribucion_financiador': return { label: 'Sueldo financista',       cls: 'text-violet-500 dark:text-violet-400' };
-        case 'media_parte_deudor':         return { label: 'Media parte · deudor',    cls: 'text-amber-500 dark:text-amber-400' };
-        case 'cero_deudor':                return { label: 'Sin cobro · 3ra+ falta',  cls: 'text-muted-foreground' };
-        default:                           return { label: concepto,                  cls: 'text-muted-foreground' };
-    }
-}
 
 function getRecentPago(movimientos: Movimiento[]): Movimiento | null {
     const pagos = movimientos.filter((m) => m.tipo === 'pago');
@@ -142,6 +129,29 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
             <Head title="Mi Cuenta" />
 
             <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+
+                {/* ── Page header ────────────────────────────────────────── */}
+                <div className="flex items-center justify-between gap-3">
+                    <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Mi Cuenta</h1>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open('/pdf/mi-cuenta', '_blank')}
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open('/excel/mi-cuenta', '_blank')}
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span className="hidden sm:inline">Excel</span>
+                        </Button>
+                    </div>
+                </div>
 
                 {/* ── Hero strip ─────────────────────────────────────────── */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
