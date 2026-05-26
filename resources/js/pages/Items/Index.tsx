@@ -6,12 +6,9 @@ import {
     ChevronDown,
     FileDown,
     History,
-<<<<<<< HEAD
-    Loader2,
-=======
     Image as ImageIcon,
+    Loader2,
     TrendingUp,
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
     Pencil,
     Plus,
     Search,
@@ -573,13 +570,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     )}
                                                 </tr>
                                                 {isExpanded && (
-<<<<<<< HEAD
                                                     <tr className="bg-muted/50">
-                                                        <td colSpan={canWrite ? 5 : 4} className="px-6 py-4">
-=======
-                                                    <tr className="bg-muted/20">
                                                         <td colSpan={canWrite ? 6 : 5} className="px-6 py-4">
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                                             <div className="flex flex-col gap-3">
                                                                 {/* Info grid */}
                                                                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">

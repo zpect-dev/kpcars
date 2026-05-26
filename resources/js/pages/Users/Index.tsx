@@ -348,16 +348,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
-<<<<<<< HEAD
-=======
-    const empresaRestringidaId =
-        (auth?.user?.empresa_restringida_id as number | null | undefined) ??
-        null;
+    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
     const hideEmpresa = empresaRestringidaId != null;
-    const urlParams = new URLSearchParams(window.location.search);
-    const filterRole = urlParams.get('role');
-    const filterStatus = urlParams.get('status');
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
 
     useEffect(() => {
         if (!filterRole || (filterRole === 'chofer' && !filterStatus)) {
@@ -411,7 +403,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             )}
                         </div>
 
-<<<<<<< HEAD
                         {/* Filter bar */}
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="relative min-w-[180px] flex-1 max-w-xs">
@@ -455,56 +446,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             ? 'bg-background text-foreground shadow-sm'
                                             : 'text-muted-foreground hover:text-foreground',
                                     )}
-=======
-                        {/* Filtro activos/inactivos — solo visible en choferes */}
-                        {filterRole === 'chofer' && (
-                            <div className="flex gap-1.5">
-                                <Button
-                                    variant={
-                                        filterStatus === 'activos'
-                                            ? 'default'
-                                            : 'outline'
-                                    }
-                                    size="sm"
-                                    className="h-9 rounded-md px-4 text-xs font-medium"
-                                    onClick={() =>
-                                        router.get(
-                                            usersIndex.url(),
-                                            {
-                                                role: 'chofer',
-                                                status:
-                                                    filterStatus === 'activos'
-                                                        ? undefined
-                                                        : 'activos',
-                                            },
-                                            { preserveState: false },
-                                        )
-                                    }
-                                >
-                                    Activos
-                                </Button>
-                                <Button
-                                    variant={
-                                        filterStatus === 'inactivos'
-                                            ? 'default'
-                                            : 'outline'
-                                    }
-                                    size="sm"
-                                    className="h-9 rounded-md px-4 text-xs font-medium"
-                                    onClick={() =>
-                                        router.get(
-                                            usersIndex.url(),
-                                            {
-                                                role: 'chofer',
-                                                status:
-                                                    filterStatus === 'inactivos'
-                                                        ? undefined
-                                                        : 'inactivos',
-                                            },
-                                            { preserveState: false },
-                                        )
-                                    }
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                 >
                                     Inactivos
                                     <span className={cn(
@@ -776,7 +717,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         if (isInversor) return;
                                                         confirmToggleStatus(user);
                                                     }}
-<<<<<<< HEAD
                                                     disabled={user.id === auth.user.id || isInversor}
                                                     className={cn(
                                                         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
@@ -787,20 +727,11 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                             ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
                                                             : 'cursor-default',
                                                     )}
-=======
-                                                    disabled={
-                                                        user.id ===
-                                                            auth.user.id ||
-                                                        isInversor
-                                                    }
-                                                    className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                                 >
                                                     <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
                                                     {user.inactivo ? 'Inactivo' : 'Activo'}
                                                 </button>
                                             </td>
-<<<<<<< HEAD
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
                                                     {user.deposito ? (
@@ -862,75 +793,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         )}
                                                     </div>
                                                 )}
-=======
-                                            <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
-                                                {user.deposito ? (
-                                                    <span className="font-medium text-foreground">
-                                                        {formatDeposito(user)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground/50 italic">
-                                                        —
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
-                                                <div className="flex flex-col gap-1.5">
-                                                    {user.id ===
-                                                    auth.user.id ? (
-                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                            {roles.find(
-                                                                (r) =>
-                                                                    r.value ===
-                                                                    user.role,
-                                                            )?.label ||
-                                                                user.role}{' '}
-                                                            (Tú)
-                                                        </span>
-                                                    ) : isInversor ? (
-                                                        <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                            {roles.find(
-                                                                (r) =>
-                                                                    r.value ===
-                                                                    user.role,
-                                                            )?.label ||
-                                                                user.role}
-                                                        </span>
-                                                    ) : (
-                                                        <select
-                                                            onClick={(e) =>
-                                                                e.stopPropagation()
-                                                            }
-                                                            value={user.role}
-                                                            onChange={(e) =>
-                                                                handleRoleChange(
-                                                                    user.id,
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                                        >
-                                                            {roles.map(
-                                                                (role) => (
-                                                                    <option
-                                                                        key={
-                                                                            role.value
-                                                                        }
-                                                                        value={
-                                                                            role.value
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            role.label
-                                                                        }
-                                                                    </option>
-                                                                ),
-                                                            )}
-                                                        </select>
-                                                    )}
-                                                </div>
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                             </td>
                                         </tr>
                                     ))
@@ -1004,7 +866,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         ? ' (Tú)'
                                                         : ''}
                                                 </p>
-<<<<<<< HEAD
                                                 {user.role === 'administrador' && !isInversor && (
                                                     <button
                                                         type="button"
@@ -1018,8 +879,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         {user.absoluto ? 'Absoluto: ON' : 'Absoluto: OFF'}
                                                     </button>
                                                 )}
-=======
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                             </div>
                                         </div>
                                         <button
@@ -1028,7 +887,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 if (isInversor) return;
                                                 confirmToggleStatus(user);
                                             }}
-<<<<<<< HEAD
                                             disabled={user.id === auth.user.id || isInversor}
                                             className={cn(
                                                 'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
@@ -1039,13 +897,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
                                                     : 'cursor-default',
                                             )}
-=======
-                                            disabled={
-                                                user.id === auth.user.id ||
-                                                isInversor
-                                            }
-                                            className={`inline-flex shrink-0 rounded-md px-2 py-1 text-xs font-semibold transition-colors focus:ring-2 focus:ring-gray-950 focus:ring-offset-1 focus:outline-none ${user.inactivo ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'} ${!isInversor && (user.inactivo ? 'hover:bg-red-200' : 'hover:bg-green-200')} ${user.id === auth.user.id || isInversor ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
                                         >
                                             <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
                                             {user.inactivo ? 'Inactivo' : 'Activo'}

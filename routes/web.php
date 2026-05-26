@@ -6,11 +6,8 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
-<<<<<<< HEAD
 use App\Http\Controllers\ExcelController;
-=======
 use App\Http\Controllers\GastoController;
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;

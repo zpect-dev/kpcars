@@ -108,7 +108,6 @@ class UserController extends Controller
                 } elseif ($status === 'inactivos') {
                     $query->where('inactivo', true);
                 }
-<<<<<<< HEAD
             });
 
         if ($isChoferFilter) {
@@ -116,11 +115,7 @@ class UserController extends Controller
         }
 
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'absoluto', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
-=======
-            })
             ->get(['id', 'name', 'dni', 'role', 'absoluto', 'empresa_acceso', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
             ->append('profile_photo_url');
 
         if ($isChoferFilter) {

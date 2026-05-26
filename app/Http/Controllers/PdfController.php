@@ -208,7 +208,6 @@ class PdfController extends Controller
     }
 
     /**
-<<<<<<< HEAD
      * Generate PDF for a cierre de inversión.
      */
     public function cierreInversion(Request $request, CierreInversion $cierreInversion): Response
@@ -307,7 +306,9 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('mi-cuenta-'.now()->format('Y-m-d').'.pdf');
-=======
+    }
+
+    /**
      * Generate a plain spreadsheet-like PDF with the vehicles list, respecting filters.
      */
     public function vehiculos(Request $request): Response
@@ -317,7 +318,7 @@ class PdfController extends Controller
 
         $filters = $request->only(['empresa_id', 'inversion_id', 'search', 'asignacion']);
         $search = trim((string) ($filters['search'] ?? ''));
-        $asignacion = $filters['asignacion'] ?? null; // 'con' | 'sin' | null
+        $asignacion = $filters['asignacion'] ?? null;
 
         $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
             ->visibleTo($request->user())
@@ -343,7 +344,6 @@ class PdfController extends Controller
             ->setPaper('a4', 'landscape');
 
         return $pdf->download('vehiculos-'.now()->format('Y-m-d').'.pdf');
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
     }
 
     /**

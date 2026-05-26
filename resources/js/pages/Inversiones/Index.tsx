@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-import { Head, router } from '@inertiajs/react';
-import { AlertCircle, HandCoins, Loader2, Lock, Plus, Wallet } from 'lucide-react';
-=======
 import { Head, router, usePage } from '@inertiajs/react';
-import { AlertCircle, HandCoins, Lock, Plus, Wallet } from 'lucide-react';
->>>>>>> a510d7cb9332b2ec01fd013791fba308b02471db
+import { AlertCircle, HandCoins, Loader2, Lock, Plus, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
