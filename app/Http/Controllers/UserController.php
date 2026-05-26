@@ -82,7 +82,10 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless($request->user()->isAdmin() || $request->user()->isInversor(), 403);
+        abort_unless(
+            $request->user()->isAdminOrAdministrativo() || $request->user()->isInversor(),
+            403,
+        );
 
         $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
         $isChoferFilter = $request->query('role') === 'chofer';

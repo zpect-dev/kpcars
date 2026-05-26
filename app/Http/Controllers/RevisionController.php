@@ -96,7 +96,11 @@ class RevisionController extends Controller
     }
     public function cerrar(Request $request, \App\Actions\CerrarRevisionesAction $action): RedirectResponse
     {
-        abort_if(!$request->user()->isAdmin(), 403, 'Solo administradores pueden cerrar revisiones.');
+        abort_unless(
+            $request->user()->isAdminOrAdministrativo(),
+            403,
+            'Solo administradores y administrativos pueden cerrar revisiones.',
+        );
 
         $action->execute($request->user());
 

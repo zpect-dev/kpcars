@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'absoluto', 'empresa_acceso', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'absoluto', 'empresa_acceso', 'empresa_default_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -38,6 +38,7 @@ class User extends Authenticatable
             'inactivo' => 'boolean',
             'absoluto' => 'boolean',
             'empresa_acceso' => 'integer',
+            'empresa_default_id' => 'integer',
             'must_change_password' => 'boolean',
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
@@ -65,18 +66,37 @@ class User extends Authenticatable
         return $this->role === UserRole::ADMINISTRADOR;
     }
 
-    public function isAdminAbsoluto(): bool
+    public function isAdministrativo(): bool
     {
-        return $this->isAdmin() && (bool) $this->absoluto;
+        return $this->role === UserRole::ADMINISTRATIVO;
     }
 
     /**
-     * ID de empresa al que el usuario está restringido a ver, o null si no hay restricción.
+     * Administrador o Administrativo: ambos pueden cambiar de empresa y comparten
+     * varios privilegios de gestión (vehículos, inventario, turnos, revisiones, personal).
+     */
+    public function isAdminOrAdministrativo(): bool
+    {
+        return $this->isAdmin() || $this->isAdministrativo();
+    }
+
+    /**
+     * Alias de isAdmin(): el flag absoluto desaparece como discriminador.
+     * Tras la migración de datos, ser ADMINISTRADOR equivale a acceso total.
      *
-     * - Inversor: su empresa_id.
-     * - Admin con empresa_acceso = 1 o 2: ese id de empresa.
-     * - Admin con empresa_acceso = 0 (ambas) o null: sin restricción.
-     * - Resto de roles: sin restricción.
+     * @deprecated 2026-05 — usar isAdmin(). Se removerá en la limpieza final.
+     */
+    public function isAdminAbsoluto(): bool
+    {
+        return $this->isAdmin();
+    }
+
+    /**
+     * Empresa por defecto al iniciar sesión / contexto inicial.
+     *
+     * Durante la transición, también actúa como filtro permanente para queries
+     * que aún no consumen `session('active_company_id')`. Será reemplazado por
+     * TenantScope en una fase posterior.
      */
     public function restrictedEmpresaId(): ?int
     {
@@ -84,11 +104,7 @@ class User extends Authenticatable
             return $this->empresa_id ? (int) $this->empresa_id : null;
         }
 
-        if ($this->isAdmin() && in_array((int) $this->empresa_acceso, [1, 2], true)) {
-            return (int) $this->empresa_acceso;
-        }
-
-        return null;
+        return $this->empresa_default_id ? (int) $this->empresa_default_id : null;
     }
 
     public function isMechanic(): bool

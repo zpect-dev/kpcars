@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
-        Gate::define('manage-users', fn (User $user) => $user->isAdmin());
+        Gate::define('manage-users', fn (User $user) => $user->isAdminOrAdministrativo());
     }
 
     /**
