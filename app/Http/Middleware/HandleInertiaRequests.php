@@ -52,8 +52,10 @@ class HandleInertiaRequests extends Middleware
                         ? $request->user()->inversiones()->exists()
                         : false,
                     'empresa_id' => $request->user()->empresa_id,
+                    'empresa_default_id' => $request->user()->empresa_default_id,
                     'profile_photo_url' => $request->user()->profile_photo_url,
                 ] : null,
+                'active_company_id' => $request->session()->get('active_company_id'),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

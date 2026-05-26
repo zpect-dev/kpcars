@@ -6,6 +6,7 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
@@ -35,6 +36,9 @@ Route::get('/', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    // Cambio de empresa activa (controlado por Gate switch-empresa).
+    Route::post('empresa/switch', [EmpresaController::class, 'switch'])->name('empresa.switch');
 
     Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
     Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->name('vehiculos.update');
