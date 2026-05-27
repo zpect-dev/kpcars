@@ -244,7 +244,9 @@ class PdfController extends Controller
 
         $user = $request->user();
 
+        // Vista cross-empresa para el inversor (idem MiCuentaController).
         $inversiones = $user->inversiones()
+            ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
@@ -269,7 +271,8 @@ class PdfController extends Controller
             });
 
         $pagosPorCierre = CierreInversionPago::with([
-            'cierre:id,periodo_inicio,periodo_fin,tasa',
+            'cierre' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa'),
         ])
             ->where('user_id', $user->id)
             ->orderByDesc('cierre_id')
@@ -290,7 +293,9 @@ class PdfController extends Controller
             ];
         })->values();
 
-        $tasaActual = CierreInversion::latest('periodo_fin')->value('tasa');
+        $tasaActual = CierreInversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            ->latest('periodo_fin')
+            ->value('tasa');
         $tasaActual = $tasaActual ? (float) $tasaActual : null;
 
         $pdf = Pdf::loadView('pdf.mi-cuenta', compact('user', 'inversiones', 'cierres', 'tasaActual'))

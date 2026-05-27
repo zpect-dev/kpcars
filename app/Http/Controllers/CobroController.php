@@ -8,6 +8,7 @@ use App\Actions\ProcessCierreCajaAction;
 use App\Models\CierreCaja;
 use App\Models\Cobro;
 use App\Models\Inversion;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -103,16 +104,19 @@ class CobroController extends Controller
     /**
      * Display the detail breakdown for a specific inversion.
      */
-    public function show(Request $request, Inversion $inversion): Response
+    public function show(Request $request, int $inversion): Response
     {
         $this->authorize('viewAny', Cobro::class);
 
-        // Cobro auto-scopea por empresa activa. La route model binding de
-        // {inversion} también respeta el scope; si la inversión no está en la
-        // empresa activa, devuelve 404 antes de entrar al método.
+        // Se resuelve la inversión sin TenantScope porque una inversión de
+        // empresa A puede tener cobros en empresa B. La seguridad la garantiza
+        // el TenantScope de Cobro: sólo se muestran cobros de la empresa activa.
+        $inversionModel = Inversion::withoutGlobalScope(TenantScope::class)
+            ->findOrFail($inversion);
+
         $baseQuery = Cobro::query()
             ->pendientes()
-            ->where('cobros.inversion_id', $inversion->id);
+            ->where('cobros.inversion_id', $inversionModel->id);
 
         // Get breakdown by vehicle for this inversion
         $desglose = (clone $baseQuery)
@@ -149,7 +153,7 @@ class CobroController extends Controller
         $totalInversion = $desglose->sum('subtotal');
 
         return Inertia::render('Cobros/Show', [
-            'inversion' => $inversion->only('id', 'nombre'),
+            'inversion' => $inversionModel->only('id', 'nombre'),
             'desglose' => $desglose,
             'transacciones' => $transacciones,
             'totalInversion' => $totalInversion,

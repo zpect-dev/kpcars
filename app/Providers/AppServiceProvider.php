@@ -41,8 +41,18 @@ class AppServiceProvider extends ServiceProvider
      */
     private function defineGates(): void
     {
-        // Cambio de empresa (administrador + administrativo).
-        Gate::define('switch-empresa', fn (User $user) => $user->isAdminOrAdministrativo());
+        // Cambio de empresa: admin/administrativo siempre. Inversor sólo si pertenece a >=2 empresas.
+        Gate::define('switch-empresa', function (User $user) {
+            if ($user->isAdminOrAdministrativo()) {
+                return true;
+            }
+
+            if ($user->isInversor()) {
+                return count($user->empresaIds()) >= 2;
+            }
+
+            return false;
+        });
 
         // Vehículos: dashboard operativo de flota.
         Gate::define('view-vehiculos', fn (User $user) => $user->isAdminOrAdministrativo());
@@ -77,8 +87,13 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('annul-transactions', fn (User $user) => $user->isAdmin());
         Gate::define('import-asignaciones', fn (User $user) => $user->isAdmin());
 
-        // Vista del inversor.
-        Gate::define('view-mi-cuenta', fn (User $user) => $user->isInversor() && $user->inversiones()->exists());
+        // Vista del inversor. Es cross-empresa: chequeamos sus inversiones sin
+        // aplicar TenantScope (puede tener inversiones sólo en una empresa
+        // distinta a la activa de la sesión y aun así corresponde mostrarle Mi Cuenta).
+        Gate::define('view-mi-cuenta', fn (User $user) => $user->isInversor()
+            && $user->inversiones()
+                ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->exists());
     }
 
     /**

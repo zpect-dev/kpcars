@@ -33,19 +33,11 @@ class UserController extends Controller
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
-            'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'empresas' => ['nullable', 'array'],
+            'empresas.*' => ['integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
-
-        if ($validated['role'] !== UserRole::INVERSOR->value) {
-            $validated['empresa_id'] = null;
-        } else {
-            $empresaActiva = session('active_company_id');
-            if ($empresaActiva) {
-                $validated['empresa_id'] = (int) $empresaActiva;
-            }
-        }
 
         $photoPath = null;
         if ($request->hasFile('profile_photo')) {
@@ -55,7 +47,7 @@ class UserController extends Controller
         // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
         $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)).$validated['dni'];
 
-        User::create([
+        $user = User::create([
             'name' => $validated['name'],
             'dni' => $validated['dni'],
             'role' => $validated['role'],
@@ -65,10 +57,23 @@ class UserController extends Controller
             'telefono' => $validated['telefono'] ?? null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
-            'empresa_id' => $validated['empresa_id'] ?? null,
             'deposito' => $validated['deposito'] ?? null,
             'deposito_moneda' => isset($validated['deposito']) ? ($validated['deposito_moneda'] ?? null) : null,
         ]);
+
+        // Pivot empresa_user: sólo aplica al rol inversor.
+        if ($validated['role'] === UserRole::INVERSOR->value) {
+            $empresaIds = $validated['empresas'] ?? [];
+            // Default si el form no envió nada: la empresa activa de la sesión.
+            if (empty($empresaIds) && session('active_company_id')) {
+                $empresaIds = [(int) session('active_company_id')];
+            }
+            if (! empty($empresaIds)) {
+                $user->empresas()->sync($empresaIds);
+                // Setea empresa_default_id para que el próximo login arranque ahí.
+                $user->forceFill(['empresa_default_id' => (int) $empresaIds[0]])->save();
+            }
+        }
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
     }
@@ -77,15 +82,13 @@ class UserController extends Controller
     {
         $this->authorize('viewAny', User::class);
 
-        // El middleware `role:administrador,administrativo` ya bloqueó a inversor.
-        // Esta variable queda en false para preservar la forma del query.
-        $inversorEmpresaId = null;
         $isChoferFilter = $request->query('role') === 'chofer';
+        $isInversorFilter = $request->query('role') === 'inversor';
+        $empresaActiva = session('active_company_id');
 
         $choferCounts = null;
         if ($isChoferFilter) {
-            $baseChofer = User::where('role', 'chofer')
-                ->when($inversorEmpresaId, fn ($q) => $q->where('empresa_id', $inversorEmpresaId));
+            $baseChofer = User::where('role', 'chofer');
             $choferCounts = [
                 'activos'   => (clone $baseChofer)->where('inactivo', false)->count(),
                 'inactivos' => (clone $baseChofer)->where('inactivo', true)->count(),
@@ -93,9 +96,13 @@ class UserController extends Controller
         }
 
         $query = User::orderBy('name')
-            ->when($inversorEmpresaId, fn ($q) => $q->where('empresa_id', $inversorEmpresaId))
             ->when($request->query('role'), function ($query, $role) {
                 $query->where('role', $role);
+            })
+            // Cuando se listan inversores, sólo aparecen los que pertenecen a la
+            // empresa activa (via pivot empresa_user).
+            ->when($isInversorFilter && $empresaActiva, function ($query) use ($empresaActiva) {
+                $query->whereHas('empresas', fn ($q) => $q->where('empresas.id', $empresaActiva));
             })
             ->when($request->query('status'), function ($query, $status) {
                 if ($status === 'activos') {
@@ -109,8 +116,12 @@ class UserController extends Controller
             $query->with(['asignacionActiva.vehiculo']);
         }
 
+        if ($isInversorFilter) {
+            $query->with(['empresas:id,nombre']);
+        }
+
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'empresa_default_id', 'deposito', 'deposito_moneda'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
 
         if ($isChoferFilter) {
@@ -220,19 +231,11 @@ class UserController extends Controller
             'telefono' => ['nullable', 'string', 'max:50'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
-            'empresa_id' => ['nullable', 'exists:empresas,id'],
+            'empresas' => ['nullable', 'array'],
+            'empresas.*' => ['integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
-
-        if (! $user->isInversor()) {
-            unset($validated['empresa_id']);
-        } else {
-            $empresaActiva = session('active_company_id');
-            if ($empresaActiva) {
-                $validated['empresa_id'] = (int) $empresaActiva;
-            }
-        }
 
         // Limpiar moneda si no hay depósito
         if (empty($validated['deposito'])) {
@@ -247,7 +250,23 @@ class UserController extends Controller
             $validated['profile_photo_path'] = $request->file('profile_photo')->store('profile-photos', 'public');
         }
 
+        // El campo empresas no se persiste directamente en el modelo.
+        $empresaIds = $validated['empresas'] ?? null;
+        unset($validated['empresas']);
+
         $user->update($validated);
+
+        // Sincroniza pivot empresa_user para inversor (no aplica a otros roles).
+        if ($user->isInversor() && $empresaIds !== null) {
+            $user->empresas()->sync($empresaIds);
+
+            // Si empresa_default_id ya no está dentro del nuevo set, lo realineamos.
+            if (! in_array((int) $user->empresa_default_id, array_map('intval', $empresaIds), true)) {
+                $user->forceFill([
+                    'empresa_default_id' => ! empty($empresaIds) ? (int) $empresaIds[0] : null,
+                ])->save();
+            }
+        }
 
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
     }

@@ -220,15 +220,15 @@ it('Inversor: solo ve datos de su empresa porque SetActiveCompany lo fuerza', fu
     $inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '20000008',
-        'empresa_id' => $this->empresaB->id,
         'empresa_default_id' => $this->empresaB->id,
     ]);
+    $inversor->empresas()->sync([$this->empresaB->id]);
 
     $this->actingAs($inversor);
 
     // Aunque maliciosamente intente setear la otra empresa, el middleware la reemplaza
     // en la siguiente request. En este test simulamos directamente la sesión post-middleware.
-    session(['active_company_id' => $inversor->empresa_id]);
+    session(['active_company_id' => $this->empresaB->id]);
 
     expect(Vehiculo::pluck('patente')->all())->toBe(['BBB222']);
 });
@@ -333,8 +333,8 @@ it('ProcessCierreInversionAction acepta menos de 6 inversores y divide por la ca
         $u = User::factory()->create([
             'role' => UserRole::INVERSOR,
             'dni' => '21000'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
-            'empresa_id' => $this->empresaA->id,
         ]);
+        $u->empresas()->sync([$this->empresaA->id]);
         $inv->inversores()->attach($u->id, ['tiene_deuda' => false, 'es_financiador' => false]);
         $inversores[] = $u;
     }
@@ -393,14 +393,12 @@ it('ProcessCierreInversionAction sigue rechazando más de 6 inversores en una in
     // testeamos defense-in-depth.
     $inv = $this->invA;
     for ($i = 0; $i < 7; $i++) {
-        $inv->inversores()->attach(
-            User::factory()->create([
-                'role' => UserRole::INVERSOR,
-                'dni' => '21500'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
-                'empresa_id' => $this->empresaA->id,
-            ])->id,
-            ['tiene_deuda' => false, 'es_financiador' => false],
-        );
+        $u = User::factory()->create([
+            'role' => UserRole::INVERSOR,
+            'dni' => '21500'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+        ]);
+        $u->empresas()->sync([$this->empresaA->id]);
+        $inv->inversores()->attach($u->id, ['tiene_deuda' => false, 'es_financiador' => false]);
     }
 
     $this->actingAs($admin);

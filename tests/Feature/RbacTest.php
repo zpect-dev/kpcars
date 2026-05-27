@@ -34,8 +34,8 @@ beforeEach(function () {
     $this->inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '30000004',
-        'empresa_id' => $this->empresa->id,
     ]);
+    $this->inversor->empresas()->sync([$this->empresa->id]);
     $this->chofer = User::factory()->create([
         'role' => UserRole::CHOFER,
         'dni' => '30000005',

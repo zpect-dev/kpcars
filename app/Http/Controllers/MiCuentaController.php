@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
 use App\Models\DeudaMovimiento;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -24,7 +25,10 @@ class MiCuentaController extends Controller
 
         $user = $request->user();
 
+        // Mi Cuenta es vista cross-empresa para el inversor: muestra TODAS sus
+        // inversiones, no sólo las de la empresa activa. Bypasseamos TenantScope.
         $inversiones = $user->inversiones()
+            ->withoutGlobalScope(TenantScope::class)
             ->with('empresa:id,nombre')
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
@@ -55,10 +59,14 @@ class MiCuentaController extends Controller
                 ];
             });
 
-        // Historial de cierres en los que cobró el inversor
+        // Historial de cierres en los que cobró el inversor (cross-empresa).
+        // El eager-loading respeta global scopes por default; forzamos el bypass
+        // para no perder cierres de otras empresas en las que también participa.
         $pagosPorCierre = CierreInversionPago::with([
-            'cierre:id,periodo_inicio,periodo_fin,tasa,created_at',
-            'inversion:id,nombre',
+            'cierre' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa', 'created_at'),
+            'inversion' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'nombre'),
         ])
             ->where('user_id', $user->id)
             ->orderByDesc('cierre_id')
@@ -82,8 +90,12 @@ class MiCuentaController extends Controller
             ];
         })->values();
 
-        // Tasa actual = la del último cierre
-        $tasaActual = CierreInversion::latest('periodo_fin')->value('tasa');
+        // Tasa actual = la del último cierre globalmente (no scoped a empresa,
+        // porque el inversor puede ver cierres de varias empresas y la "tasa"
+        // del último es una referencia comercial).
+        $tasaActual = CierreInversion::withoutGlobalScope(TenantScope::class)
+            ->latest('periodo_fin')
+            ->value('tasa');
 
         return Inertia::render('MiCuenta/Index', [
             'inversiones' => $inversiones,

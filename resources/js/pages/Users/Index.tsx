@@ -29,7 +29,8 @@ interface User {
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
     profile_photo_url?: string | null;
-    empresa_id?: number | null;
+    empresa_default_id?: number | null;
+    empresas?: { id: number; nombre: string }[];
     deposito?: string | null;
     deposito_moneda?: string | null;
     vehiculo?: { patente: string; marca: string; modelo: string } | null;
@@ -179,7 +180,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         telefono: '+54 ',
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
-        empresa_id: '' as string,
+        empresas: [] as number[],
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
     });
@@ -193,7 +194,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         telefono: '',
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
-        empresa_id: '' as string,
+        empresas: [] as number[],
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
     });
@@ -217,7 +218,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             telefono: user.telefono || '+54 ',
             fecha_vencimiento_licencia: formattedDate,
             profile_photo: null,
-            empresa_id: user.empresa_id ? String(user.empresa_id) : '',
+            empresas: (user.empresas ?? []).map((e) => e.id),
             deposito: user.deposito ?? '',
             deposito_moneda: user.deposito_moneda || 'USD',
         });
@@ -1038,42 +1039,39 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
-                        {createForm.data.role === 'inversor' &&
-                            !hideEmpresa && (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="empresa_id">Empresa</Label>
-                                    <select
-                                        id="empresa_id"
-                                        value={createForm.data.empresa_id}
-                                        onChange={(e) =>
-                                            createForm.setData(
-                                                'empresa_id',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        <option
-                                            value=""
-                                            className="bg-background text-foreground"
-                                        >
-                                            Sin empresa
-                                        </option>
-                                        {empresas.map((e) => (
-                                            <option
+                        {createForm.data.role === 'inversor' && empresas.length > 0 && (
+                            <div className="grid gap-2">
+                                <Label>Empresas a las que pertenece</Label>
+                                <div className="flex flex-col gap-1.5 rounded-md border border-input p-3">
+                                    {empresas.map((e) => {
+                                        const checked = createForm.data.empresas.includes(e.id);
+                                        return (
+                                            <label
                                                 key={e.id}
-                                                value={e.id}
-                                                className="bg-background text-foreground"
+                                                className="flex cursor-pointer items-center gap-2 text-sm"
                                             >
-                                                {e.nombre}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <InputError
-                                        message={createForm.errors.empresa_id}
-                                    />
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => {
+                                                        const next = checked
+                                                            ? createForm.data.empresas.filter((id) => id !== e.id)
+                                                            : [...createForm.data.empresas, e.id];
+                                                        createForm.setData('empresas', next);
+                                                    }}
+                                                    className="h-4 w-4 rounded border-input"
+                                                />
+                                                <span>{e.nombre}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
-                            )}
+                                <p className="text-xs text-muted-foreground">
+                                    El inversor verá las inversiones de todas las empresas que selecciones.
+                                </p>
+                                <InputError message={createForm.errors.empresas as string | undefined} />
+                            </div>
+                        )}
 
                         {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
@@ -1305,39 +1303,34 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <InputError message={editForm.errors.correo} />
                         </div>
 
-                        {userToEdit?.role === 'inversor' && !hideEmpresa && (
+                        {userToEdit?.role === 'inversor' && empresas.length > 0 && (
                             <div className="grid gap-2">
-                                <Label htmlFor="edit-empresa_id">Empresa</Label>
-                                <select
-                                    id="edit-empresa_id"
-                                    value={editForm.data.empresa_id}
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            'empresa_id',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    <option
-                                        value=""
-                                        className="bg-background text-foreground"
-                                    >
-                                        Sin empresa
-                                    </option>
-                                    {empresas.map((e) => (
-                                        <option
-                                            key={e.id}
-                                            value={e.id}
-                                            className="bg-background text-foreground"
-                                        >
-                                            {e.nombre}
-                                        </option>
-                                    ))}
-                                </select>
-                                <InputError
-                                    message={editForm.errors.empresa_id}
-                                />
+                                <Label>Empresas a las que pertenece</Label>
+                                <div className="flex flex-col gap-1.5 rounded-md border border-input p-3">
+                                    {empresas.map((e) => {
+                                        const checked = editForm.data.empresas.includes(e.id);
+                                        return (
+                                            <label
+                                                key={e.id}
+                                                className="flex cursor-pointer items-center gap-2 text-sm"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={() => {
+                                                        const next = checked
+                                                            ? editForm.data.empresas.filter((id) => id !== e.id)
+                                                            : [...editForm.data.empresas, e.id];
+                                                        editForm.setData('empresas', next);
+                                                    }}
+                                                    className="h-4 w-4 rounded border-input"
+                                                />
+                                                <span>{e.nombre}</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                                <InputError message={editForm.errors.empresas as string | undefined} />
                             </div>
                         )}
 

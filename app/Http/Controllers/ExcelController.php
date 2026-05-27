@@ -87,8 +87,10 @@ class ExcelController extends Controller
 
         $flotaConceptos = ['parte_completa', 'media_parte_deudor', 'cero_deudor'];
 
+        // Cross-empresa: el inversor puede tener cierres en varias empresas.
         $pagosPorCierre = CierreInversionPago::with([
-            'cierre:id,periodo_inicio,periodo_fin,tasa',
+            'cierre' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa'),
         ])
             ->where('user_id', $user->id)
             ->orderByDesc('cierre_id')

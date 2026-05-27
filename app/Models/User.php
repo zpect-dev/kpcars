@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'empresa_default_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_id', 'deposito', 'deposito_moneda'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'empresa_default_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'deposito', 'deposito_moneda'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -102,11 +102,28 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the current active vehicle assignment for the User (conductor).
+     * Empresas a las que el usuario pertenece (pivot empresa_user).
+     *
+     * Aplica principalmente a inversores: declaran a qué empresas participan.
+     * Para admin/administrativo la pivot no se usa — ellos pueden ver todas
+     * las empresas y switchear vía el Gate switch-empresa.
      */
-    public function empresa(): BelongsTo
+    public function empresas(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
-        return $this->belongsTo(Empresa::class);
+        return $this->belongsToMany(Empresa::class, 'empresa_user')->withTimestamps();
+    }
+
+    /**
+     * IDs de las empresas a las que el usuario pertenece, cacheado en memoria
+     * para evitar repetir la query en el mismo request.
+     *
+     * @return array<int, int>
+     */
+    public function empresaIds(): array
+    {
+        return $this->relationLoaded('empresas')
+            ? $this->empresas->pluck('id')->all()
+            : $this->empresas()->pluck('empresas.id')->all();
     }
 
     public function asignacionActiva(): HasOne

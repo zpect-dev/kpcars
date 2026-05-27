@@ -94,7 +94,6 @@ class HandleInertiaRequests extends Middleware
             'dni' => $user->dni,
             'correo' => $user->correo,
             'role' => $user->role,
-            'empresa_id' => $user->empresa_id,
             'empresa_default_id' => $user->empresa_default_id,
             'profile_photo_url' => $user->profile_photo_url,
         ];
@@ -118,8 +117,11 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Lista de empresas entre las que el usuario puede cambiar (vacía si no
-     * tiene el Gate switch-empresa).
+     * Lista de empresas entre las que el usuario puede cambiar.
+     *
+     *  - Admin/Administrativo: TODAS las empresas (pueden saltar a cualquiera).
+     *  - Inversor: SOLO las empresas a las que pertenece (pivot empresa_user).
+     *  - Mecánico/Chofer y anónimos: vacía.
      *
      * @return array<int, array{id:int, nombre:string}>
      */
@@ -129,8 +131,12 @@ class HandleInertiaRequests extends Middleware
             return [];
         }
 
-        return Empresa::orderBy('nombre')
-            ->get(['id', 'nombre'])
+        $query = $user->isInversor()
+            ? $user->empresas()->orderBy('nombre')
+            : Empresa::orderBy('nombre');
+
+        return $query
+            ->get(['empresas.id', 'empresas.nombre'])
             ->map(fn (Empresa $e) => ['id' => $e->id, 'nombre' => $e->nombre])
             ->all();
     }

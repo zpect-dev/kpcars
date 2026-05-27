@@ -62,12 +62,15 @@ class InversionController extends Controller
                 ];
             });
 
-        // Socios e inversores disponibles: filtrados por la empresa activa.
-        // Cada inversor tiene su empresa_id fija (modelo 1 inversor = 1 empresa).
+        // Socios e inversores disponibles: filtrados por la empresa activa via
+        // la pivot empresa_user (un inversor puede pertenecer a varias empresas).
         $empresaActiva = session('active_company_id');
         $inversoresDisponibles = User::where('role', UserRole::INVERSOR)
             ->where('inactivo', false)
-            ->when($empresaActiva, fn ($q) => $q->where('empresa_id', $empresaActiva))
+            ->when($empresaActiva, fn ($q) => $q->whereHas(
+                'empresas',
+                fn ($q2) => $q2->where('empresas.id', $empresaActiva),
+            ))
             ->orderBy('name')
             ->get(['id', 'name', 'dni']);
 

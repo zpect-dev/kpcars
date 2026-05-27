@@ -14,10 +14,12 @@ class EmpresaController extends Controller
     /**
      * Cambiar la empresa activa en la sesión del usuario.
      *
-     * Solo administradores y administrativos pueden ejecutar este switch
-     * (controlado por el Gate 'switch-empresa'). También persiste la empresa
-     * elegida como `empresa_default_id` para que el siguiente login arranque
-     * en el mismo contexto.
+     * Controlado por el Gate 'switch-empresa':
+     *  - Admin/Administrativo: pueden saltar a cualquier empresa.
+     *  - Inversor: sólo a las empresas a las que pertenece (pivot empresa_user).
+     *
+     * Persiste la empresa elegida como `empresa_default_id` para que el
+     * siguiente login arranque en el mismo contexto.
      */
     public function switch(Request $request): RedirectResponse
     {
@@ -28,10 +30,16 @@ class EmpresaController extends Controller
         ]);
 
         $empresaId = (int) $validated['empresa_id'];
+        $user = $request->user();
+
+        // Inversor sólo puede saltar a sus empresas.
+        if ($user->isInversor() && ! in_array($empresaId, $user->empresaIds(), true)) {
+            abort(403, 'No pertenecés a esa empresa.');
+        }
 
         $request->session()->put('active_company_id', $empresaId);
 
-        $request->user()->forceFill(['empresa_default_id' => $empresaId])->save();
+        $user->forceFill(['empresa_default_id' => $empresaId])->save();
 
         $nombre = Empresa::whereKey($empresaId)->value('nombre');
 

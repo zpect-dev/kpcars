@@ -41,7 +41,20 @@ class LoginResponse implements LoginResponseContract
     private function primeActiveCompany(Request $request, $user): void
     {
         if ($user->isInversor()) {
-            $request->session()->put('active_company_id', $user->empresa_id);
+            $empresaIds = $user->empresaIds();
+
+            if (empty($empresaIds)) {
+                $request->session()->forget('active_company_id');
+
+                return;
+            }
+
+            // Prefiere su default si está en la pivot, sino la primera del pivot.
+            $resolved = ($user->empresa_default_id !== null && in_array((int) $user->empresa_default_id, $empresaIds, true))
+                ? (int) $user->empresa_default_id
+                : (int) $empresaIds[0];
+
+            $request->session()->put('active_company_id', $resolved);
 
             return;
         }

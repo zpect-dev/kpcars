@@ -91,9 +91,9 @@ it('share: inversor con inversiones tiene can_view_mi_cuenta=true', function () 
     $inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '40000004',
-        'empresa_id' => $this->empresaA->id,
         'empresa_default_id' => $this->empresaA->id,
     ]);
+    $inversor->empresas()->sync([$this->empresaA->id]);
     $inv = Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
         ->create(['nombre' => 'Inv X', 'empresa_id' => $this->empresaA->id]);
     $inv->inversores()->attach($inversor->id, ['tiene_deuda' => false, 'es_financiador' => false]);
@@ -107,12 +107,31 @@ it('share: inversor con inversiones tiene can_view_mi_cuenta=true', function () 
     );
 });
 
+it('share: inversor con DOS empresas recibe ambas en empresas_disponibles y can_switch_empresa=true', function () {
+    $inversor = User::factory()->create([
+        'role' => UserRole::INVERSOR,
+        'dni' => '40000044',
+        'empresa_default_id' => $this->empresaA->id,
+    ]);
+    $inversor->empresas()->sync([$this->empresaA->id, $this->empresaB->id]);
+
+    // Inversión en A para que can_view_mi_cuenta sea true.
+    $inv = Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        ->create(['nombre' => 'Inv Y', 'empresa_id' => $this->empresaA->id]);
+    $inv->inversores()->attach($inversor->id, ['tiene_deuda' => false, 'es_financiador' => false]);
+
+    $this->actingAs($inversor)->get('/mi-cuenta')->assertInertia(fn ($p) => $p
+        ->where('auth.permissions.can_switch_empresa', true)
+        ->has('auth.empresas_disponibles', 2)
+    );
+});
+
 it('share: inversor sin inversiones tiene can_view_mi_cuenta=false', function () {
     $inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '40000005',
-        'empresa_id' => $this->empresaA->id,
     ]);
+    $inversor->empresas()->sync([$this->empresaA->id]);
 
     // Endpoint público que respeta middleware web pero no requiere auth gate.
     $this->actingAs($inversor)->get('/')->assertInertia(fn ($p) => $p
@@ -164,5 +183,6 @@ it('share: campos legacy removidos en Fase 8 NO están en el payload', function 
         ->not->toHaveKey('absoluto')
         ->not->toHaveKey('empresa_acceso')
         ->not->toHaveKey('empresa_restringida_id')
-        ->not->toHaveKey('tiene_inversiones');
+        ->not->toHaveKey('tiene_inversiones')
+        ->not->toHaveKey('empresa_id'); // Removido junto con la pivot empresa_user
 });

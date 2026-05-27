@@ -52,14 +52,15 @@ it('resetea active_company_id si la empresa de sesión ya no existe', function (
     expect(session('active_company_id'))->toBe($this->empresaA->id);
 });
 
-it('fuerza active_company_id al empresa_id del inversor en cada request', function () {
+it('fuerza active_company_id a una de las empresas del inversor en cada request', function () {
     $inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '10000004',
-        'empresa_id' => $this->empresaB->id,
         'empresa_default_id' => $this->empresaB->id,
     ]);
+    $inversor->empresas()->sync([$this->empresaB->id]);
 
+    // La sesión apunta a una empresa que NO está en el pivot → middleware corrige.
     $this->actingAs($inversor)
         ->withSession(['active_company_id' => $this->empresaA->id])
         ->get('/mi-cuenta');
@@ -110,15 +111,44 @@ it('administrativo también puede cambiar de empresa', function () {
     expect(session('active_company_id'))->toBe($this->empresaB->id);
 });
 
-it('inversor NO puede usar /empresa/switch (gate switch-empresa)', function () {
+it('inversor con UNA sola empresa NO puede usar /empresa/switch', function () {
     $inversor = User::factory()->create([
         'role' => UserRole::INVERSOR,
         'dni' => '10000008',
-        'empresa_id' => $this->empresaA->id,
     ]);
+    $inversor->empresas()->sync([$this->empresaA->id]);
 
     $this->actingAs($inversor)
         ->post('/empresa/switch', ['empresa_id' => $this->empresaB->id])
+        ->assertForbidden();
+});
+
+it('inversor con DOS empresas SÍ puede usar /empresa/switch entre las suyas', function () {
+    $inversor = User::factory()->create([
+        'role' => UserRole::INVERSOR,
+        'dni' => '10000088',
+        'empresa_default_id' => $this->empresaA->id,
+    ]);
+    $inversor->empresas()->sync([$this->empresaA->id, $this->empresaB->id]);
+
+    $this->actingAs($inversor)
+        ->from('/mi-cuenta')
+        ->post('/empresa/switch', ['empresa_id' => $this->empresaB->id])
+        ->assertRedirect();
+
+    expect(session('active_company_id'))->toBe($this->empresaB->id);
+});
+
+it('inversor NO puede saltar a una empresa fuera de su pivot', function () {
+    $empresaC = Empresa::create(['nombre' => 'Empresa C']);
+    $inversor = User::factory()->create([
+        'role' => UserRole::INVERSOR,
+        'dni' => '10000089',
+    ]);
+    $inversor->empresas()->sync([$this->empresaA->id, $this->empresaB->id]);
+
+    $this->actingAs($inversor)
+        ->post('/empresa/switch', ['empresa_id' => $empresaC->id])
         ->assertForbidden();
 });
 
