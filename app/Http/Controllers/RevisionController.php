@@ -75,6 +75,7 @@ class RevisionController extends Controller
             'rueda_auxiliar' => ['required', 'boolean'],
             'kit_seguridad' => ['required', 'boolean'],
             'sticker' => ['required', 'boolean'],
+            'posee_fundas' => ['required', 'boolean'],
             'observaciones' => ['nullable', 'string', 'max:1000'],
         ]);
 

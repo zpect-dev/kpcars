@@ -140,6 +140,8 @@ it('puede enviar una revisión completa vía HTTP', function () {
         'kilometraje' => 55000,
         'rueda_auxiliar' => true,
         'kit_seguridad' => true,
+        'sticker' => true,
+        'posee_fundas' => true,
         'observaciones' => 'Sin novedades',
     ]);
 
@@ -153,6 +155,8 @@ it('puede enviar una revisión completa vía HTTP', function () {
         ->and($revision->kilometraje)->toBe(55000)
         ->and($revision->rueda_auxiliar)->toBeTrue()
         ->and($revision->kit_seguridad)->toBeTrue()
+        ->and($revision->sticker)->toBeTrue()
+        ->and($revision->posee_fundas)->toBeTrue()
         ->and($revision->observaciones)->toBe('Sin novedades');
 
     // VTV/GNC should also be updated on the vehicle

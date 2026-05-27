@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'rueda_auxiliar',
     'kit_seguridad',
     'sticker',
+    'posee_fundas',
     'observaciones',
     'cierre_revision_id',
 ])]
@@ -40,6 +41,7 @@ class Revision extends Model
             'rueda_auxiliar' => 'boolean',
             'kit_seguridad' => 'boolean',
             'sticker' => 'boolean',
+            'posee_fundas' => 'boolean',
         ];
     }
 

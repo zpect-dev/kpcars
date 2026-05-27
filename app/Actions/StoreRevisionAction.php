@@ -32,6 +32,7 @@ class StoreRevisionAction
                 'rueda_auxiliar' => (bool) ($data['rueda_auxiliar'] ?? false),
                 'kit_seguridad' => (bool) ($data['kit_seguridad'] ?? false),
                 'sticker' => (bool) ($data['sticker'] ?? false),
+                'posee_fundas' => (bool) ($data['posee_fundas'] ?? false),
                 'observaciones' => $data['observaciones'] ?? null,
             ]);
 

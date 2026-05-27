@@ -80,6 +80,7 @@ export interface Revision {
     rueda_auxiliar: boolean;
     kit_seguridad: boolean;
     sticker: boolean;
+    posee_fundas: boolean;
     observaciones?: string | null;
     vehiculo?: Vehiculo | null;
     revisor?: { id: number; name: string } | null;

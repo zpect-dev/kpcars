@@ -154,6 +154,7 @@ export default function Revisiones({ vehiculos }: Props) {
         rueda_auxiliar: false,
         kit_seguridad: false,
         sticker: false,
+        posee_fundas: false,
         observaciones: '',
     });
 
@@ -175,6 +176,7 @@ export default function Revisiones({ vehiculos }: Props) {
             rueda_auxiliar: false,
             kit_seguridad: false,
             sticker: false,
+            posee_fundas: false,
             observaciones: '',
         });
         setWizardOpen(true);
@@ -530,6 +532,12 @@ export default function Revisiones({ vehiculos }: Props) {
                                     checked={form.data.sticker}
                                     onChange={(v) => form.setData('sticker', v)}
                                 />
+                                <ToggleSwitch
+                                    id="posee_fundas"
+                                    label="¿Posee fundas?"
+                                    checked={form.data.posee_fundas}
+                                    onChange={(v) => form.setData('posee_fundas', v)}
+                                />
                             </div>
                         )}
 
@@ -627,6 +635,10 @@ export default function Revisiones({ vehiculos }: Props) {
                                 <div className="space-y-1">
                                     <span className="text-xs text-muted-foreground">Sticker</span>
                                     <p className="font-medium">{selectedRow.revision_semanal.sticker ? 'Sí' : 'No'}</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-muted-foreground">Fundas</span>
+                                    <p className="font-medium">{selectedRow.revision_semanal.posee_fundas ? 'Sí' : 'No'}</p>
                                 </div>
                             </div>
                             {selectedRow.revision_semanal.observaciones && (
