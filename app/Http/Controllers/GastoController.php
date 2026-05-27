@@ -95,7 +95,7 @@ class GastoController extends Controller
             'gastos' => $gastos,
             'patentes' => $patentes,
             'totalGeneral' => $totalGeneral,
-            'canManage' => $request->user()->isAdminAbsoluto(),
+            'canManage' => $request->user()->isAdmin(),
         ]);
     }
 

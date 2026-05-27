@@ -14,12 +14,6 @@ export type User = {
     created_at?: string;
     updated_at?: string;
 
-    // ── Legacy (Fase 8 los elimina del backend) ──────────────────────────
-    absoluto?: boolean;
-    empresa_acceso?: number | null;
-    empresa_restringida_id?: number | null;
-    tiene_inversiones?: boolean;
-
     [key: string]: unknown;
 };
 

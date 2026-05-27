@@ -151,10 +151,9 @@ it('ArticuloPolicy: mecánico puede ver/movimentar inventario, sólo admin toca 
         ->and($this->admin->can('updatePrecio', $articulo))->toBeTrue();
 });
 
-it('UserPolicy: nadie puede modificar su propio rol/estado/absoluto', function () {
+it('UserPolicy: nadie puede modificar su propio rol o estado', function () {
     expect($this->admin->can('updateRole', $this->admin))->toBeFalse()
         ->and($this->admin->can('toggleStatus', $this->admin))->toBeFalse()
-        ->and($this->admin->can('toggleAbsoluto', $this->admin))->toBeFalse()
         ->and($this->admin->can('updateRole', $this->administrativo))->toBeTrue();
 });
 

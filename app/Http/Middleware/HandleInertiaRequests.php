@@ -82,9 +82,9 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Payload del usuario autenticado. Incluye campos legacy (absoluto,
-     * empresa_acceso, empresa_restringida_id, tiene_inversiones) que el
-     * frontend dejará de consumir en Fase 7 y se removerán en Fase 8.
+     * Payload del usuario autenticado para el frontend. El frontend ya no
+     * lee campos derivados de role (`isInversor`, `tiene_inversiones`, etc.)
+     * — esa información vive en `auth.permissions`.
      */
     private function userPayload(User $user): array
     {
@@ -97,12 +97,6 @@ class HandleInertiaRequests extends Middleware
             'empresa_id' => $user->empresa_id,
             'empresa_default_id' => $user->empresa_default_id,
             'profile_photo_url' => $user->profile_photo_url,
-
-            // ── Legacy (Fase 8 los elimina) ────────────────────────────
-            'absoluto' => (bool) $user->absoluto,
-            'empresa_acceso' => $user->empresa_acceso !== null ? (int) $user->empresa_acceso : null,
-            'empresa_restringida_id' => $user->restrictedEmpresaId(),
-            'tiene_inversiones' => $user->isInversor() ? $user->inversiones()->exists() : false,
         ];
     }
 

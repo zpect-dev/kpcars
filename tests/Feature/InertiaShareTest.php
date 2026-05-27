@@ -148,3 +148,21 @@ it('share: usuario no autenticado expone auth.user=null y permissions=[]', funct
         ->where('auth.empresas_disponibles', [])
     );
 });
+
+it('share: campos legacy removidos en Fase 8 NO están en el payload', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '49999999',
+        'empresa_default_id' => $this->empresaA->id,
+    ]);
+
+    $response = $this->actingAs($admin)->get('/dashboard');
+
+    $user = $response->inertiaProps('auth.user');
+
+    expect($user)
+        ->not->toHaveKey('absoluto')
+        ->not->toHaveKey('empresa_acceso')
+        ->not->toHaveKey('empresa_restringida_id')
+        ->not->toHaveKey('tiene_inversiones');
+});

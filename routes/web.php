@@ -87,8 +87,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
         Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
-        Route::patch('users/{user}/toggle-absoluto', [UserController::class, 'toggleAbsoluto'])->name('users.toggle-absoluto');
-        Route::patch('users/{user}/empresa-acceso', [UserController::class, 'updateEmpresaAcceso'])->name('users.empresa-acceso');
         Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
         Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 
