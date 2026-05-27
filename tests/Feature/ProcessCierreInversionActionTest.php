@@ -58,15 +58,32 @@ function makeInversionWith6(string $nombre, array $inversores, array $flags = []
 
 // ─── Pre-condiciones ───────────────────────────────────────────────────────
 
-it('rechaza el cierre si una inversion tiene menos de 6 inversores', function () {
-    $invs = makeInversores(5);
+it('acepta menos de 6 inversores y divide por la cantidad real', function () {
+    $invs = makeInversores(4);
     $inv = Inversion::create(['nombre' => 'Test']);
     foreach ($invs as $u) {
         $inv->inversores()->attach($u->id, ['tiene_deuda' => false, 'es_financiador' => false]);
     }
 
+    $cierre = $this->action->execute([$inv->id => 800], $this->admin);
+
+    // 4 inversores reciben 800/4 = 200 cada uno (no 800/6 ≈ 133).
+    $pagos = \App\Models\CierreInversionPago::where('cierre_id', $cierre->id)->get();
+    expect($pagos)->toHaveCount(4);
+    foreach ($pagos as $p) {
+        expect((float) $p->monto)->toBe(200.0);
+    }
+});
+
+it('rechaza el cierre si una inversion supera MAX_INVERSORES', function () {
+    $invs = makeInversores(7);
+    $inv = Inversion::create(['nombre' => 'Excedida']);
+    foreach ($invs as $u) {
+        $inv->inversores()->attach($u->id, ['tiene_deuda' => false, 'es_financiador' => false]);
+    }
+
     expect(fn () => $this->action->execute([$inv->id => 600], $this->admin))
-        ->toThrow(RuntimeException::class, 'inversores');
+        ->toThrow(RuntimeException::class, 'el máximo permitido es '.Inversion::MAX_INVERSORES);
 });
 
 it('rechaza el cierre si una inversion tiene deudores pero no financiadores', function () {

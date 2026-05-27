@@ -49,13 +49,17 @@ class CierreInversionController extends Controller
             $deudores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->tiene_deuda)->count();
             $financiadores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->es_financiador)->count();
 
+            $count = $inv->inversores->count();
+
             return [
                 'id' => $inv->id,
                 'nombre' => $inv->nombre,
-                'inversores_count' => $inv->inversores->count(),
+                'inversores_count' => $count,
                 'deudores' => $deudores,
                 'financiadores' => $financiadores,
-                'puede_procesar' => $inv->inversores->count() === Inversion::MAX_INVERSORES
+                // El mínimo es 0 (se saltea). El máximo es MAX_INVERSORES.
+                // Si hay deudores, debe haber al menos un financiador.
+                'puede_procesar' => $count <= Inversion::MAX_INVERSORES
                     && ($deudores === 0 || $financiadores > 0),
             ];
         });

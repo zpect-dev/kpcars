@@ -135,9 +135,8 @@ export default function CierresCreate({
                                         .map((i) => (
                                             <li key={i.id}>
                                                 <strong>{i.nombre}</strong>:{' '}
-                                                {i.inversores_count !==
-                                                maxInversores
-                                                    ? `tiene ${i.inversores_count}/${maxInversores} inversores`
+                                                {i.inversores_count > maxInversores
+                                                    ? `tiene ${i.inversores_count} inversores (máximo ${maxInversores})`
                                                     : 'tiene deudores pero sin financiador'}
                                             </li>
                                         ))}
@@ -228,8 +227,8 @@ export default function CierresCreate({
                                     </TooltipTrigger>
                                     {!inv.puede_procesar && (
                                         <TooltipContent side="right">
-                                            {inv.inversores_count !== maxInversores
-                                                ? `Faltan ${maxInversores - inv.inversores_count} inversor(es)`
+                                            {inv.inversores_count > maxInversores
+                                                ? `Excede el máximo de ${maxInversores} inversores`
                                                 : 'Tiene deudores pero sin financiador'}
                                         </TooltipContent>
                                     )}

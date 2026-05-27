@@ -319,3 +319,95 @@ it('ProcessCierreInversionAction asigna empresa_id desde la sesión', function (
 
     expect($cierre->empresa_id)->toBe($this->empresaB->id);
 });
+
+it('ProcessCierreInversionAction acepta menos de 6 inversores y divide por la cantidad real', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '21000001',
+    ]);
+
+    // Inversión con sólo 3 inversores (sin deudores).
+    $inv = $this->invA;
+    $inversores = [];
+    for ($i = 1; $i <= 3; $i++) {
+        $u = User::factory()->create([
+            'role' => UserRole::INVERSOR,
+            'dni' => '21000'.str_pad((string) ($i + 1), 3, '0', STR_PAD_LEFT),
+            'empresa_id' => $this->empresaA->id,
+        ]);
+        $inv->inversores()->attach($u->id, ['tiene_deuda' => false, 'es_financiador' => false]);
+        $inversores[] = $u;
+    }
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $action = new \App\Actions\ProcessCierreInversionAction;
+    $cierre = $action->execute([$inv->id => 1200], $admin, null);
+
+    // Cada uno recibe 1200 / 3 = 400 (no 1200 / 6 = 200).
+    $pagos = \App\Models\CierreInversionPago::where('cierre_id', $cierre->id)->get();
+    expect($pagos)->toHaveCount(3);
+    foreach ($pagos as $p) {
+        expect((float) $p->monto)->toBe(400.0);
+    }
+
+    expect((float) $cierre->total_recaudado)->toBe(1200.0)
+        ->and((float) $cierre->total_distribuido)->toBe(1200.0);
+});
+
+it('ProcessCierreInversionAction saltea inversiones sin inversores (registra recaudación, no genera pagos)', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '21000099',
+    ]);
+
+    $invSinInversores = $this->invA;
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $action = new \App\Actions\ProcessCierreInversionAction;
+    $cierre = $action->execute([$invSinInversores->id => 500], $admin, null);
+
+    // La recaudación queda registrada.
+    $recaudaciones = \App\Models\CierreInversionRecaudacion::where('cierre_id', $cierre->id)->get();
+    expect($recaudaciones)->toHaveCount(1)
+        ->and((float) $recaudaciones->first()->monto)->toBe(500.0);
+
+    // Pero no se generan pagos.
+    expect(\App\Models\CierreInversionPago::where('cierre_id', $cierre->id)->count())->toBe(0);
+
+    // El total_recaudado refleja la recaudación, pero total_distribuido es 0.
+    expect((float) $cierre->total_recaudado)->toBe(500.0)
+        ->and((float) $cierre->total_distribuido)->toBe(0.0);
+});
+
+it('ProcessCierreInversionAction sigue rechazando más de 6 inversores en una inversión', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '21000100',
+    ]);
+
+    // Esto no debería ocurrir normalmente (attachInversor lo bloquea), pero
+    // testeamos defense-in-depth.
+    $inv = $this->invA;
+    for ($i = 0; $i < 7; $i++) {
+        $inv->inversores()->attach(
+            User::factory()->create([
+                'role' => UserRole::INVERSOR,
+                'dni' => '21500'.str_pad((string) $i, 3, '0', STR_PAD_LEFT),
+                'empresa_id' => $this->empresaA->id,
+            ])->id,
+            ['tiene_deuda' => false, 'es_financiador' => false],
+        );
+    }
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $action = new \App\Actions\ProcessCierreInversionAction;
+
+    expect(fn () => $action->execute([$inv->id => 600], $admin, null))
+        ->toThrow(\RuntimeException::class, 'el máximo permitido es 6');
+});

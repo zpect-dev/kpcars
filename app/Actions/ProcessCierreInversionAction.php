@@ -18,7 +18,11 @@ class ProcessCierreInversionAction
      * Ejecuta el cierre semanal de inversiones.
      *
      * Reglas:
-     *  - Toda inversión debe tener exactamente MAX_INVERSORES (6) inversores asignados.
+     *  - El máximo de inversores por inversión es MAX_INVERSORES (6).
+     *  - Una inversión con menos de 6 inversores SÍ se procesa: la parte se calcula
+     *    como `monto / count(inversores actuales)` (divide entre los que hay, no entre 6).
+     *  - Una inversión con 0 inversores se saltea: queda registrada la recaudación pero
+     *    no se generan pagos (no hay a quién distribuirle).
      *  - Toda inversión con deudores debe tener ≥1 financiador.
      *  - Debe cargarse recaudación para TODAS las inversiones (cero permitido).
      *  - El ranking de deuda de cada inversor se computa sobre TODAS las inversiones donde
@@ -51,11 +55,13 @@ class ProcessCierreInversionAction
             }
 
             // 3. Validar pre-condiciones por inversión
+            //    - Máximo MAX_INVERSORES (6); el mínimo es 0 (se saltea silenciosamente).
+            //    - Si hay deudores en una inversión, debe haber al menos un financiador.
             foreach ($inversiones as $inv) {
                 $count = $inv->inversores->count();
-                if ($count !== Inversion::MAX_INVERSORES) {
+                if ($count > Inversion::MAX_INVERSORES) {
                     throw new RuntimeException(
-                        "La inversión \"{$inv->nombre}\" tiene {$count} inversores; se requieren ".Inversion::MAX_INVERSORES.'.'
+                        "La inversión \"{$inv->nombre}\" tiene {$count} inversores; el máximo permitido es ".Inversion::MAX_INVERSORES.'.'
                     );
                 }
 
@@ -114,10 +120,17 @@ class ProcessCierreInversionAction
                     continue; // Nada que distribuir
                 }
 
+                // Inversión sin inversores: la recaudación se registra pero no hay a quién distribuirle.
+                $cantidadInversores = $inv->inversores->count();
+                if ($cantidadInversores === 0) {
+                    continue;
+                }
+
                 // Todo lo recaudado se distribuye íntegro
                 $totalDistribuido += $monto;
 
-                $parte = $monto / Inversion::MAX_INVERSORES;
+                // La parte se calcula sobre los inversores actuales (no fijo en 6).
+                $parte = $monto / $cantidadInversores;
 
                 $financiadores = $inv->inversores
                     ->filter(fn (User $u) => (bool) $u->pivot->es_financiador)
