@@ -64,7 +64,7 @@ class RevisionController extends Controller
      */
     public function store(Request $request, Vehiculo $vehiculo, StoreRevisionAction $action): RedirectResponse
     {
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('create', \App\Models\Revision::class);
 
         $validated = $request->validate([
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
@@ -95,11 +95,7 @@ class RevisionController extends Controller
     }
     public function cerrar(Request $request, \App\Actions\CerrarRevisionesAction $action): RedirectResponse
     {
-        abort_unless(
-            $request->user()->isAdminOrAdministrativo(),
-            403,
-            'Solo administradores y administrativos pueden cerrar revisiones.',
-        );
+        $this->authorize('cerrar', \App\Models\Revision::class);
 
         $action->execute($request->user());
 

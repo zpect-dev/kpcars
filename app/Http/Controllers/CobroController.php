@@ -20,9 +20,7 @@ class CobroController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewAny', Cobro::class);
 
         // Cobro auto-scopea por empresa activa vía TenantScope.
         $resumen = Cobro::query()
@@ -107,9 +105,7 @@ class CobroController extends Controller
      */
     public function show(Request $request, Inversion $inversion): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewAny', Cobro::class);
 
         // Cobro auto-scopea por empresa activa. La route model binding de
         // {inversion} también respeta el scope; si la inversión no está en la
@@ -165,9 +161,7 @@ class CobroController extends Controller
      */
     public function cierreDesglose(Request $request, CierreCaja $cierre)
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewAny', Cobro::class);
 
         $inversionId = $request->integer('inversion_id');
         $empresaId = $request->integer('empresa_id');
@@ -234,7 +228,7 @@ class CobroController extends Controller
      */
     public function cierreCaja(Request $request, ProcessCierreCajaAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403, 'Solo los administradores con acceso absoluto pueden ejecutar el cierre de caja.');
+        $this->authorize('cierreCaja', Cobro::class);
 
         // Check there are pending cobros
         $pendingCount = Cobro::query()->pendientes()->count();

@@ -22,7 +22,7 @@ class CierreInversionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewAny', CierreInversion::class);
 
         $cierres = CierreInversion::with('ejecutadoPor:id,name')
             ->orderByDesc('periodo_fin')
@@ -38,7 +38,7 @@ class CierreInversionController extends Controller
      */
     public function create(Request $request): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('create', CierreInversion::class);
 
         $inversiones = Inversion::with([
             'inversores:id,name',
@@ -77,7 +77,7 @@ class CierreInversionController extends Controller
      */
     public function store(Request $request, ProcessCierreInversionAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('create', CierreInversion::class);
 
         $validated = $request->validate([
             'recaudaciones' => ['required', 'array'],
@@ -106,7 +106,7 @@ class CierreInversionController extends Controller
      */
     public function show(Request $request, CierreInversion $cierreInversion): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('view', $cierreInversion);
 
         $cierreInversion->load([
             'ejecutadoPor:id,name',
@@ -165,7 +165,7 @@ class CierreInversionController extends Controller
      */
     public function showInversor(Request $request, CierreInversion $cierreInversion, User $user): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('view', $cierreInversion);
 
         // Pagos del cierre actual
         $pagosCierre = CierreInversionPago::with('inversion:id,nombre')

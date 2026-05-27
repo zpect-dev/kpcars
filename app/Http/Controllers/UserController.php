@@ -23,7 +23,7 @@ class UserController extends Controller
 {
     public function store(Request $request)
     {
-        Gate::authorize('manage-users');
+        $this->authorize('create', User::class);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -82,12 +82,11 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
-        abort_unless(
-            $request->user()->isAdminOrAdministrativo() || $request->user()->isInversor(),
-            403,
-        );
+        $this->authorize('viewAny', User::class);
 
-        $inversorEmpresaId = $request->user()->isInversor() ? $request->user()->empresa_id : null;
+        // El middleware `role:administrador,administrativo` ya bloqueó a inversor.
+        // Esta variable queda en false para preservar la forma del query.
+        $inversorEmpresaId = null;
         $isChoferFilter = $request->query('role') === 'chofer';
 
         $choferCounts = null;
@@ -172,15 +171,12 @@ class UserController extends Controller
 
     public function updateRole(Request $request, User $user)
     {
-        Gate::authorize('manage-users');
+        // UserPolicy::updateRole bloquea self-edit (mismo id).
+        $this->authorize('updateRole', $user);
 
         $validated = $request->validate([
             'role' => ['required', Rule::enum(UserRole::class)],
         ]);
-
-        if ($user->id === auth()->id()) {
-            return redirect()->back()->with('error', 'No puedes cambiar tu propio rol.');
-        }
 
         $payload = ['role' => $validated['role']];
         if ($validated['role'] !== UserRole::INVERSOR->value) {
@@ -194,11 +190,8 @@ class UserController extends Controller
 
     public function toggleStatus(User $user)
     {
-        Gate::authorize('manage-users');
-
-        if ($user->id === auth()->id()) {
-            return redirect()->back()->with('error', 'No puedes cambiar tu propio estado.');
-        }
+        // UserPolicy::toggleStatus bloquea self-edit.
+        $this->authorize('toggleStatus', $user);
 
         $newInactivoStatus = ! $user->inactivo;
 
@@ -225,15 +218,8 @@ class UserController extends Controller
 
     public function toggleAbsoluto(User $user)
     {
-        Gate::authorize('manage-users');
-
-        if ($user->id === auth()->id()) {
-            return redirect()->back()->with('error', 'No puedes cambiar tu propia bandera de acceso absoluto.');
-        }
-
-        if (! $user->isAdmin()) {
-            return redirect()->back()->with('error', 'Solo los administradores pueden tener acceso absoluto.');
-        }
+        // UserPolicy::toggleAbsoluto bloquea self-edit y exige que el target sea admin.
+        $this->authorize('toggleAbsoluto', $user);
 
         $user->update(['absoluto' => ! $user->absoluto]);
 
@@ -244,11 +230,8 @@ class UserController extends Controller
 
     public function updateEmpresaAcceso(Request $request, User $user)
     {
-        Gate::authorize('manage-users');
-
-        if (! $user->isAdmin()) {
-            return redirect()->back()->with('error', 'Solo los administradores pueden tener acceso por empresa.');
-        }
+        // UserPolicy::updateEmpresaAcceso exige que el target sea admin.
+        $this->authorize('updateEmpresaAcceso', $user);
 
         $validated = $request->validate([
             'empresa_acceso' => ['nullable', 'integer', Rule::in([0, 1, 2])],
@@ -261,7 +244,7 @@ class UserController extends Controller
 
     public function update(Request $request, User $user)
     {
-        Gate::authorize('manage-users');
+        $this->authorize('update', $user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -309,7 +292,7 @@ class UserController extends Controller
 
     public function asignaciones(User $user): Response
     {
-        Gate::authorize('manage-users');
+        $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
             ->with(['vehiculo', 'asignadoPor:id,name'])
@@ -342,7 +325,7 @@ class UserController extends Controller
 
     public function asignacionesPdf(User $user): \Illuminate\Http\Response
     {
-        Gate::authorize('manage-users');
+        $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
             ->with(['vehiculo', 'asignadoPor:id,name'])

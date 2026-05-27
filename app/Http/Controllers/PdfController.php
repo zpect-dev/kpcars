@@ -25,8 +25,7 @@ class PdfController extends Controller
      */
     public function stock(Request $request): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-
+        // Acceso: middleware role:administrador,administrativo,mecanico.
         $articulos = Articulo::orderBy('descripcion')->get();
 
         $pdf = Pdf::loadView('pdf.stock', compact('articulos'))
@@ -41,9 +40,7 @@ class PdfController extends Controller
      */
     public function topSalidas(Request $request): Response
     {
-        abort_if($request->user()->isInversor(), 403);
-        abort_if($request->user()->isMechanic(), 403);
-
+        // Acceso: middleware role:administrador,administrativo.
         $articulos = Articulo::query()
             ->select([
                 'articulos.id',
@@ -106,8 +103,7 @@ class PdfController extends Controller
      */
     public function transactions(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-
+        // Acceso: middleware role:administrador,administrativo.
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
@@ -175,10 +171,7 @@ class PdfController extends Controller
      */
     public function cobros(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
-
+        // Acceso: middleware role:administrador.
         // Cobro auto-scopea por empresa activa (TenantScope); no requiere filtro manual.
         $cobros = \App\Models\Cobro::query()
             ->pendientes()
@@ -211,7 +204,7 @@ class PdfController extends Controller
      */
     public function cierreInversion(Request $request, CierreInversion $cierreInversion): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        // Acceso: middleware role:administrador.
 
         $cierreInversion->load([
             'ejecutadoPor:id,name',
@@ -246,11 +239,10 @@ class PdfController extends Controller
      */
     public function miCuenta(Request $request): Response
     {
-        abort_unless($request->user()->isInversor(), 403);
+        // Acceso: middleware role:inversor. El Gate valida que tenga inversiones.
+        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
-
-        abort_unless($user->inversiones()->exists(), 403);
 
         $inversiones = $user->inversiones()
             ->get()
@@ -312,9 +304,7 @@ class PdfController extends Controller
      */
     public function vehiculos(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
-
+        // Acceso: middleware role:administrador,administrativo.
         $filters = $request->only(['inversion_id', 'search', 'asignacion']);
         $search = trim((string) ($filters['search'] ?? ''));
         $asignacion = $filters['asignacion'] ?? null;
@@ -348,9 +338,7 @@ class PdfController extends Controller
      */
     public function cierreCaja(Request $request, CierreCaja $cierre): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
+        // Acceso: middleware role:administrador.
 
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()

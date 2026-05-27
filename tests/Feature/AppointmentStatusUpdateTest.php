@@ -7,9 +7,11 @@ use App\Models\Appointment;
 use App\Models\User;
 
 beforeEach(function () {
+    // El actor del flujo de turnos es un admin (puede tocar cualquier status).
     $this->user = User::factory()->create([
         'dni' => '11111111',
         'password' => bcrypt('password'),
+        'role' => UserRole::ADMINISTRADOR,
     ]);
     $this->actingAs($this->user);
 });

@@ -18,11 +18,11 @@ class MiCuentaController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->isInversor(), 403);
+        // El middleware `role:inversor` ya filtró el rol. El Gate adicional valida
+        // que el inversor tenga al menos una inversión asignada.
+        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
-
-        abort_unless($user->inversiones()->exists(), 403);
 
         $inversiones = $user->inversiones()
             ->with('empresa:id,nombre')

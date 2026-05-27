@@ -88,8 +88,7 @@ class AppointmentController extends Controller
      */
     public function store(Request $request, ScheduleAppointmentAction $action): RedirectResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('create', Appointment::class);
 
         $validated = $request->validate([
             'service' => ['required', 'string', 'max:255'],
@@ -127,8 +126,6 @@ class AppointmentController extends Controller
      */
     public function updateStatus(Request $request, Appointment $appointment): RedirectResponse
     {
-        abort_if($request->user()->isInversor(), 403);
-
         $validated = $request->validate([
             'status' => ['required', 'in:agendado,en_proceso,completado,cancelado'],
             'completed_by_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -138,13 +135,10 @@ class AppointmentController extends Controller
         $newStatus = $validated['status'];
         $oldStatus = $appointment->status;
 
-        if ($oldStatus === 'completado' && $request->user()->isMechanic()) {
-            abort(403, 'Los turnos completados solo pueden ser modificados por un administrador.');
-        }
-
-        if ($newStatus === 'cancelado') {
-            abort_if($request->user()->isMechanic(), 403, 'Los mecánicos no pueden cancelar turnos.');
-        }
+        // AppointmentPolicy::updateStatus encapsula las reglas matizadas:
+        // - Inversor: jamás puede modificar turnos.
+        // - Mecánico: no reabre completados ni cancela.
+        $this->authorize('updateStatus', [$appointment, $newStatus]);
 
         if ($newStatus === 'completado') {
             if (empty($validated['completed_by_id'])) {

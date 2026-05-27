@@ -17,10 +17,12 @@ class GastoController extends Controller
 {
     public function index(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
+        $this->authorize('viewAny', Gasto::class);
 
-        $isInversor = $request->user()->isInversor();
+        // El branch de inversor queda como código legado: la ruta sólo admite
+        // role:administrador, así que isInversor siempre será false. Se elimina
+        // junto con la vista vieja en Fase 8.
+        $isInversor = false;
         $userId = $request->user()->id;
 
         // GastoTenantScope ya filtra por empresa activa (gastos globales sin vehiculo +
@@ -99,7 +101,7 @@ class GastoController extends Controller
 
     public function store(Request $request, CreateGastoAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('create', Gasto::class);
 
         $validated = $request->validate([
             'fecha' => ['required', 'date'],
@@ -122,7 +124,7 @@ class GastoController extends Controller
 
     public function destroy(Request $request, Gasto $gasto): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('delete', $gasto);
 
         $gasto->delete();
 

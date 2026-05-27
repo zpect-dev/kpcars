@@ -9,6 +9,7 @@ use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,7 +60,7 @@ class AsignacionController extends Controller
 
     public function import(Request $request, ImportAsignacionesAction $action): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403, 'Solo los administradores pueden importar asignaciones.');
+        Gate::authorize('import-asignaciones');
 
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:5120'],

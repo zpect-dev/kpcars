@@ -40,8 +40,8 @@ class ArticuloController extends Controller
      */
     public function store(Request $request, ProcessStockMovementAction $action): RedirectResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('create', Articulo::class);
+
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
             'codigo' => ['nullable', 'string', 'max:255'],
@@ -105,8 +105,8 @@ class ArticuloController extends Controller
      */
     public function storeMovement(Request $request, Articulo $articulo, ProcessStockMovementAction $action): RedirectResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('storeMovement', Articulo::class);
+
         $validated = $request->validate([
             'tipo' => ['required', 'in:IN,OUT'],
             'cantidad' => ['required', 'numeric', 'min:1'],
@@ -146,8 +146,7 @@ class ArticuloController extends Controller
      */
     public function uploadImage(Request $request, Articulo $articulo): RedirectResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('uploadImage', $articulo);
 
         $request->validate([
             'imagen' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
@@ -170,8 +169,7 @@ class ArticuloController extends Controller
      */
     public function deleteImage(Request $request, Articulo $articulo): RedirectResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isInversor(), 403);
+        $this->authorize('deleteImage', $articulo);
 
         if ($articulo->imagen && Storage::disk('public')->exists($articulo->imagen)) {
             Storage::disk('public')->delete($articulo->imagen);
@@ -187,7 +185,7 @@ class ArticuloController extends Controller
      */
     public function updatePrecio(Request $request, Articulo $articulo): RedirectResponse
     {
-        abort_unless($request->user()->isAdmin(), 403, 'Solo los administradores pueden modificar precios.');
+        $this->authorize('updatePrecio', $articulo);
 
         $validated = $request->validate([
             'precio' => ['required', 'numeric', 'min:0'],

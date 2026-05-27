@@ -19,7 +19,7 @@ class TransactionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_if($request->user()->isMechanic(), 403);
+        $this->authorize('viewAny', Transaccion::class);
 
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
 
@@ -52,7 +52,7 @@ class TransactionController extends Controller
      */
     public function annul(Transaccion $transaccion, AnnulTransactionAction $annulAction)
     {
-        abort_unless(auth()->user()->isAdmin(), 403, 'Solo los administradores pueden anular transacciones.');
+        $this->authorize('annul', $transaccion);
 
         $annulAction->execute($transaccion);
 

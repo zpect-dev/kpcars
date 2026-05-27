@@ -24,7 +24,7 @@ class InversionController extends Controller
      */
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewAny', Inversion::class);
 
         // Saldos por inversion+user (cargos - pagos)
         $saldos = DeudaMovimiento::query()
@@ -100,7 +100,7 @@ class InversionController extends Controller
      */
     public function attachInversor(Request $request, Inversion $inversion): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('manageInversores', $inversion);
 
         $validated = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -142,7 +142,7 @@ class InversionController extends Controller
      */
     public function updateInversor(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('manageInversores', $inversion);
 
         $validated = $request->validate([
             'tiene_deuda' => ['required', 'boolean'],
@@ -163,7 +163,7 @@ class InversionController extends Controller
      */
     public function detachInversor(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('manageInversores', $inversion);
 
         $inversion->inversores()->detach($user->id);
 
@@ -178,7 +178,7 @@ class InversionController extends Controller
      */
     public function syncInversores(Request $request, Inversion $inversion): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('manageInversores', $inversion);
 
         $validated = $request->validate([
             'inversores' => ['present', 'array'],
@@ -228,7 +228,7 @@ class InversionController extends Controller
      */
     public function showDeuda(Request $request, Inversion $inversion, User $user): Response
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('viewDeuda', [$inversion, $user]);
 
         abort_unless($inversion->inversores()->where('user_id', $user->id)->exists(), 404);
 
@@ -263,7 +263,7 @@ class InversionController extends Controller
      */
     public function pagoEnCascada(Request $request, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('pagoCascada', [Inversion::class, $user]);
 
         $validated = $request->validate([
             'monto' => ['required', 'numeric', 'min:0.01', 'max:9999999999.99'],
@@ -311,7 +311,7 @@ class InversionController extends Controller
      */
     public function storeDeudaMovimiento(Request $request, Inversion $inversion, User $user): RedirectResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        $this->authorize('storeDeudaMovimiento', [$inversion, $user]);
 
         abort_unless($inversion->inversores()->where('user_id', $user->id)->exists(), 404);
 

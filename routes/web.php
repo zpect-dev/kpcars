@@ -35,95 +35,132 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    // Cambio de empresa activa (controlado por Gate switch-empresa).
+    // ── Cambio de empresa activa (admin + administrativo vía Gate) ──────
     Route::post('empresa/switch', [EmpresaController::class, 'switch'])->name('empresa.switch');
 
-    Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
-    Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->name('vehiculos.update');
-    Route::patch('vehiculos/{vehiculo}/desasignar', [VehiculoController::class, 'desasignar'])->name('vehiculos.desasignar');
-    Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
+    // ─────────────────────────────────────────────────────────────────────
+    // Administrador + Administrativo + Mecánico
+    // Áreas globales: Inventario y Turnos.
+    // ─────────────────────────────────────────────────────────────────────
+    Route::middleware('role:administrador,administrativo,mecanico')->group(function () {
+        // Inventario
+        Route::get('articulos', [ArticuloController::class, 'index'])->name('articulos.index');
+        Route::post('articulos', [ArticuloController::class, 'store'])->name('articulos.store');
+        Route::post('articulos/{articulo}/movimiento', [ArticuloController::class, 'storeMovement'])->name('articulos.movimiento');
 
-    Route::get('articulos', [ArticuloController::class, 'index'])->name('articulos.index');
-    Route::post('articulos', [ArticuloController::class, 'store'])->name('articulos.store');
-    Route::post('articulos/{articulo}/movimiento', [ArticuloController::class, 'storeMovement'])->name('articulos.movimiento');
+        // Turnos (mecánico puede ver y cambiar status; create lo limita la Policy).
+        Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
+        Route::post('appointments', [AppointmentController::class, 'store'])->name('appointments.store');
+        Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])->name('appointments.status');
 
-    Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
-    Route::post('transactions/{transaccion}/annul', [TransactionController::class, 'annul'])->name('transactions.annul');
+        // PDFs de inventario/turnos
+        Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
+        Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
+    });
 
-    Route::get('vehiculos/{vehiculo}/asignaciones', [AsignacionController::class, 'index'])->name('vehiculos.asignaciones');
-    Route::get('vehiculos/{vehiculo}/asignaciones/pdf', [AsignacionController::class, 'pdf'])->name('vehiculos.asignaciones.pdf');
+    // ─────────────────────────────────────────────────────────────────────
+    // Administrador + Administrativo
+    // Vehículos, Revisiones, Personal, Transacciones (vista).
+    // ─────────────────────────────────────────────────────────────────────
+    Route::middleware('role:administrador,administrativo')->group(function () {
+        Route::get('dashboard', DashboardController::class)->name('dashboard');
 
-    Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
+        // Vehículos
+        Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
+        Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->name('vehiculos.update');
+        Route::patch('vehiculos/{vehiculo}/desasignar', [VehiculoController::class, 'desasignar'])->name('vehiculos.desasignar');
+        Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
+        Route::get('vehiculos/{vehiculo}/asignaciones', [AsignacionController::class, 'index'])->name('vehiculos.asignaciones');
+        Route::get('vehiculos/{vehiculo}/asignaciones/pdf', [AsignacionController::class, 'pdf'])->name('vehiculos.asignaciones.pdf');
 
-    Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
-    Route::get('pdf/top-salidas', [PdfController::class, 'topSalidas'])->name('pdf.top-salidas');
-    Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');
-    Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
-    Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
-    Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
-    Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
-    Route::get('pdf/cierres-inversion/{cierreInversion}', [PdfController::class, 'cierreInversion'])->name('pdf.cierre-inversion');
-    Route::get('pdf/mi-cuenta', [PdfController::class, 'miCuenta'])->name('pdf.mi-cuenta');
+        // Revisiones
+        Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
+        Route::post('revisiones/cierre', [RevisionController::class, 'cerrar'])->name('revisiones.cerrar');
+        Route::get('revisiones/historial', [RevisionController::class, 'historial'])->name('revisiones.historial');
+        Route::get('revisiones/historial/{cierre}', [RevisionController::class, 'historialShow'])->name('revisiones.historial.show');
+        Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
 
-    Route::get('excel/cierres-inversion/{cierreInversion}', [ExcelController::class, 'cierreInversion'])->name('excel.cierre-inversion');
-    Route::get('excel/mi-cuenta', [ExcelController::class, 'miCuenta'])->name('excel.mi-cuenta');
-    Route::get('excel/cobros', [ExcelController::class, 'cobros'])->name('excel.cobros');
+        // Personal
+        Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
+        Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
+        Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+        Route::patch('users/{user}/toggle-absoluto', [UserController::class, 'toggleAbsoluto'])->name('users.toggle-absoluto');
+        Route::patch('users/{user}/empresa-acceso', [UserController::class, 'updateEmpresaAcceso'])->name('users.empresa-acceso');
+        Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
+        Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 
-    Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
+        // Transacciones (vista)
+        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
 
-    Route::post('appointments', [AppointmentController::class, 'store'])->name('appointments.store');
-    Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])->name('appointments.status');
+        // PDFs operativos
+        Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');
+        Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
+        Route::get('pdf/top-salidas', [PdfController::class, 'topSalidas'])->name('pdf.top-salidas');
+    });
 
-    Route::get('users', [UserController::class, 'index'])->name('users.index');
-    Route::post('users', [UserController::class, 'store'])->name('users.store');
-    Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
-    Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
-    Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
-    Route::patch('users/{user}/toggle-absoluto', [UserController::class, 'toggleAbsoluto'])->name('users.toggle-absoluto');
-    Route::patch('users/{user}/empresa-acceso', [UserController::class, 'updateEmpresaAcceso'])->name('users.empresa-acceso');
-    Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
-    Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
+    // ─────────────────────────────────────────────────────────────────────
+    // Sólo Administrador
+    // Cobros, Gastos, Inversiones, Cierres-Inversión, anulaciones, precios.
+    // ─────────────────────────────────────────────────────────────────────
+    Route::middleware('role:administrador')->group(function () {
+        // Cobros
+        Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
+        Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
+        Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
+        Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
-    Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
-    Route::post('revisiones/cierre', [RevisionController::class, 'cerrar'])->name('revisiones.cerrar');
-    Route::get('revisiones/historial', [RevisionController::class, 'historial'])->name('revisiones.historial');
-    Route::get('revisiones/historial/{cierre}', [RevisionController::class, 'historialShow'])->name('revisiones.historial.show');
-    Route::post('revisiones/{vehiculo}', [RevisionController::class, 'store'])->name('revisiones.store');
+        // Gastos
+        Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
+        Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
+        Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
 
-    Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
-    Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
-    Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
+        // Inversiones
+        Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');
+        Route::post('inversiones/{inversion}/inversores', [InversionController::class, 'attachInversor'])->name('inversiones.inversores.attach');
+        Route::put('inversiones/{inversion}/inversores/sync', [InversionController::class, 'syncInversores'])->name('inversiones.inversores.sync');
+        Route::patch('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'updateInversor'])->name('inversiones.inversores.update');
+        Route::delete('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'detachInversor'])->name('inversiones.inversores.detach');
+        Route::get('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'showDeuda'])->name('inversiones.deuda.show');
+        Route::post('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'storeDeudaMovimiento'])->name('inversiones.deuda.store');
+        Route::post('inversores/{user}/pago-cascada', [InversionController::class, 'pagoEnCascada'])->name('inversiones.deuda.cascada');
 
-    Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
-    Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
-    Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
-    Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
+        // Cierres semanales de inversión
+        Route::get('cierres-inversion', [CierreInversionController::class, 'index'])->name('cierres-inversion.index');
+        Route::get('cierres-inversion/nuevo', [CierreInversionController::class, 'create'])->name('cierres-inversion.create');
+        Route::post('cierres-inversion', [CierreInversionController::class, 'store'])->name('cierres-inversion.store');
+        Route::get('cierres-inversion/{cierreInversion}', [CierreInversionController::class, 'show'])->name('cierres-inversion.show');
+        Route::get('cierres-inversion/{cierreInversion}/inversor/{user}', [CierreInversionController::class, 'showInversor'])->name('cierres-inversion.inversor');
 
-    Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
-    Route::post('articulos/{articulo}/imagen', [ArticuloController::class, 'uploadImage'])->name('articulos.upload-image');
-    Route::delete('articulos/{articulo}/imagen', [ArticuloController::class, 'deleteImage'])->name('articulos.delete-image');
+        // Anulación de transacciones (auditoría sensible)
+        Route::post('transactions/{transaccion}/annul', [TransactionController::class, 'annul'])->name('transactions.annul');
 
-    // Panel admin: inversiones e inversores asignados + deuda
-    Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');
-    Route::post('inversiones/{inversion}/inversores', [InversionController::class, 'attachInversor'])->name('inversiones.inversores.attach');
-    Route::put('inversiones/{inversion}/inversores/sync', [InversionController::class, 'syncInversores'])->name('inversiones.inversores.sync');
-    Route::patch('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'updateInversor'])->name('inversiones.inversores.update');
-    Route::delete('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'detachInversor'])->name('inversiones.inversores.detach');
-    Route::get('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'showDeuda'])->name('inversiones.deuda.show');
-    Route::post('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'storeDeudaMovimiento'])->name('inversiones.deuda.store');
-    Route::post('inversores/{user}/pago-cascada', [InversionController::class, 'pagoEnCascada'])->name('inversiones.deuda.cascada');
+        // Importación de asignaciones (operación masiva)
+        Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
 
-    // Cierres semanales de inversión (admin)
-    Route::get('cierres-inversion', [CierreInversionController::class, 'index'])->name('cierres-inversion.index');
-    Route::get('cierres-inversion/nuevo', [CierreInversionController::class, 'create'])->name('cierres-inversion.create');
-    Route::post('cierres-inversion', [CierreInversionController::class, 'store'])->name('cierres-inversion.store');
-    Route::get('cierres-inversion/{cierreInversion}', [CierreInversionController::class, 'show'])->name('cierres-inversion.show');
-    Route::get('cierres-inversion/{cierreInversion}/inversor/{user}', [CierreInversionController::class, 'showInversor'])->name('cierres-inversion.inversor');
+        // Precios e imágenes de inventario (decisión comercial)
+        Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
+        Route::post('articulos/{articulo}/imagen', [ArticuloController::class, 'uploadImage'])->name('articulos.upload-image');
+        Route::delete('articulos/{articulo}/imagen', [ArticuloController::class, 'deleteImage'])->name('articulos.delete-image');
 
-    // Vista del inversor
-    Route::get('mi-cuenta', [MiCuentaController::class, 'index'])->name('mi-cuenta.index');
+        // PDFs/Excels financieros y de cierres
+        Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
+        Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
+        Route::get('pdf/cierres-inversion/{cierreInversion}', [PdfController::class, 'cierreInversion'])->name('pdf.cierre-inversion');
+        Route::get('excel/cierres-inversion/{cierreInversion}', [ExcelController::class, 'cierreInversion'])->name('excel.cierre-inversion');
+        Route::get('excel/cobros', [ExcelController::class, 'cobros'])->name('excel.cobros');
+    });
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Sólo Inversor
+    // ─────────────────────────────────────────────────────────────────────
+    Route::middleware('role:inversor')->group(function () {
+        Route::get('mi-cuenta', [MiCuentaController::class, 'index'])->name('mi-cuenta.index');
+        Route::get('pdf/mi-cuenta', [PdfController::class, 'miCuenta'])->name('pdf.mi-cuenta');
+        Route::get('excel/mi-cuenta', [ExcelController::class, 'miCuenta'])->name('excel.mi-cuenta');
+    });
 });
 
 require __DIR__.'/settings.php';

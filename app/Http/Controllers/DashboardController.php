@@ -18,12 +18,9 @@ class DashboardController extends Controller
      */
     public function __invoke(Request $request)
     {
-        abort_if($request->user()->isMechanic(), 403);
-
-        if ($request->user()->isInversor()) {
-            return redirect()->route('mi-cuenta.index');
-        }
-
+        // El middleware `role:administrador,administrativo` ya rechazó a
+        // mecánico, chofer e inversor. La redirección a Mi Cuenta para
+        // inversor vive en la ruta home (`/`).
         $filters = $request->only(['inversion_id']);
 
         // Vehiculo + Inversion ya están auto-scopeados por la empresa activa

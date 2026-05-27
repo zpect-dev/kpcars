@@ -19,7 +19,7 @@ class ExcelController extends Controller
      */
     public function cierreInversion(Request $request, CierreInversion $cierreInversion): StreamedResponse
     {
-        abort_unless($request->user()->isAdminAbsoluto(), 403);
+        // Acceso: middleware role:administrador.
 
         $cierreInversion->load([
             'pagos.user:id,name,dni',
@@ -80,10 +80,10 @@ class ExcelController extends Controller
      */
     public function miCuenta(Request $request): StreamedResponse
     {
-        abort_unless($request->user()->isInversor(), 403);
+        // Acceso: middleware role:inversor. El Gate valida que tenga inversiones.
+        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
-        abort_unless($user->inversiones()->exists(), 403);
 
         $flotaConceptos = ['parte_completa', 'media_parte_deudor', 'cero_deudor'];
 
@@ -121,10 +121,7 @@ class ExcelController extends Controller
      */
     public function cobros(Request $request): StreamedResponse
     {
-        abort_if($request->user()->isMechanic(), 403);
-        abort_if($request->user()->isChofer(), 403);
-        abort_if($request->user()->isAdmin() && ! $request->user()->isAdminAbsoluto(), 403);
-
+        // Acceso: middleware role:administrador.
         // Cobro auto-scopea por empresa activa vía TenantScope.
         $cobros = Cobro::query()
             ->pendientes()
