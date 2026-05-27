@@ -1,5 +1,5 @@
-import { Link, router } from '@inertiajs/react';
-import { Check, LogOut, Monitor, Moon, Sun, Palette } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { Building2, Check, LogOut, Monitor, Moon, Palette, Sun } from 'lucide-react';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -13,7 +13,8 @@ import { UserInfo } from '@/components/user-info';
 import { useAppearance } from '@/hooks/use-appearance';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { logout } from '@/routes';
-import type { User } from '@/types';
+import empresaRoutes from '@/routes/empresa';
+import type { Auth, User } from '@/types';
 
 type Props = {
     user: User;
@@ -28,10 +29,24 @@ const themes = [
 export function UserMenuContent({ user }: Props) {
     const cleanup = useMobileNavigation();
     const { appearance, updateAppearance } = useAppearance();
+    const { auth } = usePage<{ auth: Auth }>().props;
 
     const handleLogout = () => {
         cleanup();
         router.flushAll();
+    };
+
+    const canSwitchEmpresa = auth.permissions?.can_switch_empresa ?? false;
+    const empresas = auth.empresas_disponibles ?? [];
+    const activeCompanyId = auth.active_company?.id ?? null;
+
+    const switchEmpresa = (empresaId: number) => {
+        if (empresaId === activeCompanyId) return;
+        router.post(
+            empresaRoutes.switch.url(),
+            { empresa_id: empresaId },
+            { preserveScroll: true, preserveState: false },
+        );
     };
 
     return (
@@ -42,6 +57,43 @@ export function UserMenuContent({ user }: Props) {
                 </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+
+            {canSwitchEmpresa && empresas.length > 1 && (
+                <>
+                    <DropdownMenuGroup>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger className="cursor-pointer">
+                                <Building2 className="mr-2 h-4 w-4" />
+                                <div className="flex flex-col">
+                                    <span>Empresa</span>
+                                    {auth.active_company && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {auth.active_company.nombre}
+                                        </span>
+                                    )}
+                                </div>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                                {empresas.map((empresa) => (
+                                    <DropdownMenuItem
+                                        key={empresa.id}
+                                        onClick={() => switchEmpresa(empresa.id)}
+                                        className="cursor-pointer"
+                                    >
+                                        <Building2 className="mr-2 h-4 w-4" />
+                                        {empresa.nombre}
+                                        {empresa.id === activeCompanyId && (
+                                            <Check className="ml-auto h-4 w-4 text-primary" />
+                                        )}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                    </DropdownMenuGroup>
+                    <DropdownMenuSeparator />
+                </>
+            )}
+
             <DropdownMenuGroup>
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer">

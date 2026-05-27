@@ -68,8 +68,9 @@ export default function CobrosIndex({
     const { auth } = usePage<any>().props;
     const isAdmin = auth.user.role === 'administrador';
     const isInversor = auth.user.role === 'inversor';
-    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
-    const hideEmpresa = isInversor || empresaRestringidaId != null;
+    // /cobros sólo es accesible a admin; TenantScope ya filtra por empresa activa.
+    // La columna empresa se oculta porque el usuario opera en un sólo contexto a la vez.
+    const hideEmpresa = true;
 
     // ─── Cierre de Caja Modal ─────────────────────────────────────────────
     const [showCierreModal, setShowCierreModal] = useState(false);

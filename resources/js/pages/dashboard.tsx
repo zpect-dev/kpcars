@@ -67,8 +67,10 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<any>().props;
     const isInversor = auth?.user?.role === 'inversor';
-    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
-    const hideEmpresa = isInversor || empresaRestringidaId != null;
+    // El selector de empresa se reemplazó por el switcher del dropdown de usuario.
+    // El filtro por empresa en el dashboard queda obsoleto: TenantScope ya filtra
+    // las queries por la empresa activa.
+    const hideEmpresa = true;
 
     useEffect(() => {
         if (isInversor) {

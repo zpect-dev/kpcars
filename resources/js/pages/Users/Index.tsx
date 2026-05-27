@@ -348,8 +348,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
-    const empresaRestringidaId = (auth?.user?.empresa_restringida_id as number | null | undefined) ?? null;
-    const hideEmpresa = empresaRestringidaId != null;
+    // El operador trabaja en una sola empresa por vez (sesión); ocultamos la columna.
+    const hideEmpresa = true;
 
     useEffect(() => {
         if (!filterRole || (filterRole === 'chofer' && !filterStatus)) {

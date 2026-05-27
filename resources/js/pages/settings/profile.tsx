@@ -43,7 +43,7 @@ export default function Profile({
                                 <Input
                                     id="name"
                                     className="mt-1 block w-full"
-                                    defaultValue={auth.user.name}
+                                    defaultValue={auth.user?.name ?? ''}
                                     name="name"
                                     required
                                     autoComplete="name"
@@ -63,7 +63,7 @@ export default function Profile({
                                     id="dni"
                                     type="text"
                                     className="mt-1 block w-full"
-                                    defaultValue={auth.user.dni}
+                                    defaultValue={auth.user?.dni ?? ''}
                                     name="dni"
                                     required
                                     placeholder="DNI"
