@@ -23,6 +23,7 @@ class CerrarRevisionesAction
             $periodoFin = Carbon::today();
 
             $cierre = CierreRevision::create([
+                'empresa_id' => session('active_company_id'),
                 'user_id' => $admin->id,
                 'periodo_inicio' => $periodoInicio,
                 'periodo_fin' => $periodoFin,

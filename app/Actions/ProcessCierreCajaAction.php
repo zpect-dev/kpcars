@@ -36,6 +36,7 @@ class ProcessCierreCajaAction
 
             // Create the cierre record
             $cierre = CierreCaja::create([
+                'empresa_id' => session('active_company_id'),
                 'user_id' => auth()->id(),
             ]);
 

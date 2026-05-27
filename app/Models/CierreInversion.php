@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Scopes\TenantScope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+#[ScopedBy([TenantScope::class])]
 class CierreInversion extends Model
 {
     protected $table = 'cierres_inversion';
 
     protected $fillable = [
+        'empresa_id',
         'ejecutado_por',
         'periodo_inicio',
         'periodo_fin',

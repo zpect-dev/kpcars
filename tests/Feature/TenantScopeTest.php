@@ -232,3 +232,90 @@ it('Inversor: solo ve datos de su empresa porque SetActiveCompany lo fuerza', fu
 
     expect(Vehiculo::pluck('patente')->all())->toBe(['BBB222']);
 });
+
+it('Cierres (Inversion/Caja/Revision): filtran por empresa activa y aislan cálculos', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000099',
+    ]);
+
+    // Cierre en empresa A.
+    $cierreInvA = \App\Models\CierreInversion::create([
+        'empresa_id' => $this->empresaA->id,
+        'ejecutado_por' => $admin->id,
+        'periodo_inicio' => now()->subWeek(),
+        'periodo_fin' => now(),
+        'total_recaudado' => 1000,
+        'total_distribuido' => 1000,
+    ]);
+
+    // Cierre en empresa B.
+    $cierreInvB = \App\Models\CierreInversion::create([
+        'empresa_id' => $this->empresaB->id,
+        'ejecutado_por' => $admin->id,
+        'periodo_inicio' => now()->subWeek(),
+        'periodo_fin' => now(),
+        'total_recaudado' => 2000,
+        'total_distribuido' => 2000,
+    ]);
+
+    \App\Models\CierreCaja::create(['empresa_id' => $this->empresaA->id, 'user_id' => $admin->id]);
+    \App\Models\CierreCaja::create(['empresa_id' => $this->empresaB->id, 'user_id' => $admin->id]);
+
+    \App\Models\CierreRevision::create([
+        'empresa_id' => $this->empresaA->id,
+        'user_id' => $admin->id,
+        'periodo_inicio' => now()->subWeek(),
+        'periodo_fin' => now(),
+    ]);
+    \App\Models\CierreRevision::create([
+        'empresa_id' => $this->empresaB->id,
+        'user_id' => $admin->id,
+        'periodo_inicio' => now()->subWeek(),
+        'periodo_fin' => now(),
+    ]);
+
+    $this->actingAs($admin);
+
+    // En empresa A: sólo veo los cierres de A.
+    session(['active_company_id' => $this->empresaA->id]);
+    expect(\App\Models\CierreInversion::count())->toBe(1)
+        ->and(\App\Models\CierreInversion::first()->id)->toBe($cierreInvA->id)
+        ->and(\App\Models\CierreCaja::count())->toBe(1)
+        ->and(\App\Models\CierreRevision::count())->toBe(1);
+
+    // En empresa B: sólo veo los de B. El "último cierre" cambia.
+    session(['active_company_id' => $this->empresaB->id]);
+    expect(\App\Models\CierreInversion::count())->toBe(1)
+        ->and(\App\Models\CierreInversion::latest('periodo_fin')->first()->id)->toBe($cierreInvB->id);
+
+    // withoutGlobalScope expone ambos.
+    expect(\App\Models\CierreInversion::withoutGlobalScope(TenantScope::class)->count())->toBe(2);
+});
+
+it('ProcessCierreInversionAction asigna empresa_id desde la sesión', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '20000098',
+    ]);
+
+    // Construyo 1 inversión con 6 inversores en empresa B.
+    $inv = $this->invB;
+    for ($i = 1; $i <= 6; $i++) {
+        $inv->inversores()->attach(
+            User::factory()->create([
+                'role' => UserRole::INVERSOR,
+                'dni' => '209000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+            ])->id,
+            ['tiene_deuda' => false, 'es_financiador' => false],
+        );
+    }
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaB->id]);
+
+    $action = new \App\Actions\ProcessCierreInversionAction;
+    $cierre = $action->execute([$inv->id => 1200], $admin, 100.0);
+
+    expect($cierre->empresa_id)->toBe($this->empresaB->id);
+});

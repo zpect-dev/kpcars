@@ -89,6 +89,7 @@ class ProcessCierreInversionAction
             $totalDistribuido = 0.0;
 
             $cierre = CierreInversion::create([
+                'empresa_id' => session('active_company_id'),
                 'ejecutado_por' => $admin->id,
                 'periodo_inicio' => $periodoInicio,
                 'periodo_fin' => $periodoFin,
