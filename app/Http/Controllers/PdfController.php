@@ -35,50 +35,6 @@ class PdfController extends Controller
     }
 
     /**
-     * Generate PDF with the top-selling articles ranked by total output.
-     * Price is shown with a 15% discount applied.
-     */
-    public function topSalidas(Request $request): Response
-    {
-        // Acceso: middleware role:administrador,administrativo.
-        $articulos = Articulo::query()
-            ->select([
-                'articulos.id',
-                'articulos.descripcion',
-                'articulos.codigo',
-                'articulos.precio',
-                'articulos.stock',
-            ])
-            ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
-            ->where('articulos.repuestos', true)
-            ->join('transacciones', function ($join) {
-                $join->on('transacciones.articulo_id', '=', 'articulos.id')
-                    ->where('transacciones.tipo', '=', 'OUT')
-                    ->where('transacciones.inactiva', '=', false);
-            })
-            ->groupBy(
-                'articulos.id',
-                'articulos.descripcion',
-                'articulos.codigo',
-                'articulos.precio',
-                'articulos.stock',
-            )
-            ->havingRaw('SUM(transacciones.cantidad) > 0')
-            ->orderByDesc('total_salida')
-            ->get();
-
-        $ventasTotales = $articulos->sum(
-            fn ($a) => (float) $a->total_salida * round((float) $a->precio * 0.85, 2),
-        );
-        $stockTotal = (int) Articulo::sum('stock');
-
-        $pdf = Pdf::loadView('pdf.top-salidas', compact('articulos', 'ventasTotales', 'stockTotal'))
-            ->setPaper('a4', 'landscape');
-
-        return $pdf->download('top-salidas-'.now()->format('Y-m-d').'.pdf');
-    }
-
-    /**
      * Generate PDF with transaction history, respecting current filters.
      */
     public function transactions(Request $request): Response

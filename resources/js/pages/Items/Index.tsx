@@ -8,7 +8,6 @@ import {
     Loader2,
     Pencil,
     Search,
-    TrendingUp,
     Trash2,
     X,
 } from 'lucide-react';
@@ -36,6 +35,11 @@ interface Props {
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
 }
 
+interface OrderLine {
+    articulo_id: number;
+    cantidad: string;
+}
+
 function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
@@ -50,6 +54,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     const isAdmin = auth.user.role === 'administrador';
     const isInversor = auth.user.role === 'inversor';
     const canWrite = !isMechanic && !isInversor;
+
+    const itemsById = useMemo(() => {
+        const map = new Map<number, Articulo>();
+        items.forEach((i) => map.set(i.id, i));
+        return map;
+    }, [items]);
 
     // ─── Edición inline de precio ────────────────────────────────────────────
     const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
@@ -89,39 +99,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         );
     }, [items, itemSearch]);
 
-    // ─── Selección múltiple para salida ──────────────────────────────────────
-    const [selectedIds, setSelectedIds] = useState<number[]>([]);
-
-    const selectedItems = useMemo(
-        () => items.filter((i) => selectedIds.includes(i.id)),
-        [items, selectedIds],
-    );
-
-    function toggleSelect(id: number) {
-        setSelectedIds((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-        );
-    }
-
-    const allFilteredSelected =
-        filteredItems.length > 0 &&
-        filteredItems.every((i) => selectedIds.includes(i.id));
-
-    function toggleSelectAll() {
-        if (allFilteredSelected) {
-            const filteredIds = filteredItems.map((i) => i.id);
-            setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
-        } else {
-            setSelectedIds((prev) => [
-                ...new Set([...prev, ...filteredItems.map((i) => i.id)]),
-            ]);
-        }
-    }
-
-    // ─── Modal Salida múltiple (OUT) ─────────────────────────────────────────
+    // ─── Modal Egreso (OUT múltiple) ─────────────────────────────────────────
     const [showSalidaModal, setShowSalidaModal] = useState(false);
-    // Cantidades por artículo (id -> string).
-    const [cantidades, setCantidades] = useState<Record<number, string>>({});
+    const [orderLines, setOrderLines] = useState<OrderLine[]>([]);
+    // Key para forzar el reseteo del combobox de artículos tras cada selección.
+    const [comboKey, setComboKey] = useState(0);
     const salidaForm = useForm({
         patente: '' as string,
         solicitante: '' as string,
@@ -138,13 +120,21 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         [vehiculos],
     );
 
+    // Artículos disponibles para agregar: con stock y aún no en el pedido.
+    const articuloOptions: ComboboxOption[] = useMemo(() => {
+        const inOrder = new Set(orderLines.map((l) => l.articulo_id));
+        return items
+            .filter((i) => i.stock > 0 && !inOrder.has(i.id))
+            .map((i) => ({
+                value: String(i.id),
+                label: i.descripcion,
+                sub: `Stock: ${i.stock}`,
+            }));
+    }, [items, orderLines]);
+
     function openSalidaModal() {
-        if (selectedItems.length === 0) return;
-        const init: Record<number, string> = {};
-        selectedItems.forEach((i) => {
-            init[i.id] = '1';
-        });
-        setCantidades(init);
+        setOrderLines([]);
+        setComboKey((k) => k + 1);
         salidaForm.reset();
         salidaForm.clearErrors();
         setShowSalidaModal(true);
@@ -152,35 +142,51 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
     function closeSalidaModal() {
         setShowSalidaModal(false);
+        setOrderLines([]);
         salidaForm.reset();
         salidaForm.clearErrors();
     }
 
-    function removeFromSalida(id: number) {
-        setSelectedIds((prev) => prev.filter((x) => x !== id));
-        setCantidades((prev) => {
-            const next = { ...prev };
-            delete next[id];
-            return next;
-        });
+    function addArticulo(articuloId: number) {
+        setOrderLines((prev) =>
+            prev.some((l) => l.articulo_id === articuloId)
+                ? prev
+                : [...prev, { articulo_id: articuloId, cantidad: '1' }],
+        );
+        setComboKey((k) => k + 1); // limpia el combobox para el siguiente
     }
 
-    // ¿Alguna línea supera el stock disponible?
+    function updateCantidad(articuloId: number, value: string) {
+        setOrderLines((prev) =>
+            prev.map((l) =>
+                l.articulo_id === articuloId ? { ...l, cantidad: value } : l,
+            ),
+        );
+    }
+
+    function removeLine(articuloId: number) {
+        setOrderLines((prev) => prev.filter((l) => l.articulo_id !== articuloId));
+    }
+
+    // Errores por línea (cantidad inválida o supera stock).
     const lineErrors = useMemo(() => {
         const errs: Record<number, string> = {};
-        selectedItems.forEach((i) => {
-            const c = Number(cantidades[i.id] ?? '0');
-            if (!c || c < 1) {
-                errs[i.id] = 'Cantidad inválida';
-            } else if (c > i.stock) {
-                errs[i.id] = `Máx: ${i.stock}`;
+        orderLines.forEach((l) => {
+            const item = itemsById.get(l.articulo_id);
+            const c = Number(l.cantidad);
+            if (!item) {
+                errs[l.articulo_id] = 'Artículo inválido';
+            } else if (!c || c < 1) {
+                errs[l.articulo_id] = 'Cantidad inválida';
+            } else if (c > item.stock) {
+                errs[l.articulo_id] = `Máx: ${item.stock}`;
             }
         });
         return errs;
-    }, [selectedItems, cantidades]);
+    }, [orderLines, itemsById]);
 
     const salidaValida =
-        selectedItems.length > 0 &&
+        orderLines.length > 0 &&
         Object.keys(lineErrors).length === 0 &&
         !!salidaForm.data.patente;
 
@@ -188,9 +194,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         e.preventDefault();
         if (!salidaValida) return;
 
-        const lineas = selectedItems.map((i) => ({
-            articulo_id: i.id,
-            cantidad: Number(cantidades[i.id]),
+        const lineas = orderLines.map((l) => ({
+            articulo_id: l.articulo_id,
+            cantidad: Number(l.cantidad),
         }));
 
         router.post(
@@ -204,11 +210,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
-                    closeSalidaModal();
-                    setSelectedIds([]);
-                    setCantidades({});
-                },
+                onSuccess: () => closeSalidaModal(),
             },
         );
     }
@@ -333,8 +335,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         });
     }
 
-    const colSpan = canWrite ? 6 : 5;
-
     return (
         <>
             <Head title="Inventario" />
@@ -365,24 +365,22 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => window.open('/pdf/top-salidas', '_blank')}
-                            >
-                                <TrendingUp className="h-4 w-4" />
-                                <span className="hidden sm:inline">Top salidas</span>
-                            </Button>
-                            <Button
-                                variant="outline"
-                                size="sm"
                                 onClick={() => router.get(transactionsIndex.url())}
                             >
                                 <History className="h-4 w-4" />
                                 <span className="hidden sm:inline">Historial</span>
                             </Button>
                             {canWrite && (
-                                <Button size="sm" onClick={openCreateModal}>
-                                    <ArrowDownCircle className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Ingreso</span>
-                                </Button>
+                                <>
+                                    <Button variant="outline" size="sm" onClick={openSalidaModal}>
+                                        <ArrowUpCircle className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Egreso</span>
+                                    </Button>
+                                    <Button size="sm" onClick={openCreateModal}>
+                                        <ArrowDownCircle className="h-4 w-4" />
+                                        <span className="hidden sm:inline">Ingreso</span>
+                                    </Button>
+                                </>
                             )}
                         </div>
                     )}
@@ -395,18 +393,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
-                                    {canWrite && (
-                                        <th scope="col" className="w-[5%] px-4 py-3 sm:px-6 sm:py-4">
-                                            <input
-                                                type="checkbox"
-                                                aria-label="Seleccionar todos"
-                                                checked={allFilteredSelected}
-                                                onChange={toggleSelectAll}
-                                                className="h-4 w-4 rounded border-border"
-                                            />
-                                        </th>
-                                    )}
-                                    <th scope="col" className="w-[35%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th scope="col" className="w-[38%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Descripción
                                     </th>
                                     <th scope="col" className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
@@ -418,7 +405,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     <th scope="col" className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Stock Mínimo
                                     </th>
-                                    <th scope="col" className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                    <th scope="col" className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         Precio
                                     </th>
                                 </tr>
@@ -426,38 +413,23 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <tbody className="divide-y divide-border">
                                 {filteredItems.length === 0 ? (
                                     <tr>
-                                        <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground">
+                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                             No hay artículos registrados o no coinciden con la búsqueda.
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredItems.map((item) => {
                                         const lowStock = item.stock <= item.min_stock;
-                                        const selected = selectedIds.includes(item.id);
                                         return (
                                             <tr
                                                 key={item.id}
                                                 className={cn(
                                                     'transition-colors',
-                                                    selected
-                                                        ? 'bg-primary/5'
-                                                        : lowStock
-                                                            ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
-                                                            : 'bg-card hover:bg-muted/40',
+                                                    lowStock
+                                                        ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
+                                                        : 'bg-card hover:bg-muted/40',
                                                 )}
                                             >
-                                                {canWrite && (
-                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                        <input
-                                                            type="checkbox"
-                                                            aria-label={`Seleccionar ${item.descripcion}`}
-                                                            checked={selected}
-                                                            disabled={item.stock < 1}
-                                                            onChange={() => toggleSelect(item.id)}
-                                                            className="h-4 w-4 rounded border-border disabled:opacity-40"
-                                                        />
-                                                    </td>
-                                                )}
                                                 <td
                                                     className={cn(
                                                         'px-4 py-3 font-medium sm:px-6 sm:py-4',
@@ -537,63 +509,48 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         ) : (
                             filteredItems.map((item) => {
                                 const lowStock = item.stock <= item.min_stock;
-                                const selected = selectedIds.includes(item.id);
                                 return (
                                     <li
                                         key={item.id}
                                         className={cn(
-                                            'flex items-start gap-3 p-4',
-                                            selected
-                                                ? 'bg-primary/5'
-                                                : lowStock && 'bg-red-50 dark:bg-red-950/30',
+                                            'flex flex-col gap-1 p-4',
+                                            lowStock && 'bg-red-50 dark:bg-red-950/30',
                                         )}
                                     >
-                                        {canWrite && (
-                                            <input
-                                                type="checkbox"
-                                                aria-label={`Seleccionar ${item.descripcion}`}
-                                                checked={selected}
-                                                disabled={item.stock < 1}
-                                                onChange={() => toggleSelect(item.id)}
-                                                className="mt-1 h-4 w-4 shrink-0 rounded border-border disabled:opacity-40"
-                                            />
-                                        )}
-                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                            <p className={cn(
-                                                'line-clamp-2 text-sm font-semibold',
-                                                lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
-                                            )}>
-                                                {item.descripcion}
-                                            </p>
-                                            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                                {item.codigo && (
-                                                    <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
-                                                        {item.codigo}
-                                                    </span>
-                                                )}
-                                                {item.repuestos && (
-                                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                        Repuesto
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-baseline gap-4 text-xs">
-                                                <span>
-                                                    Stock:{' '}
-                                                    <span className={cn(
-                                                        'text-base font-semibold',
-                                                        lowStock ? 'text-red-700 dark:text-red-400' : 'text-foreground',
-                                                    )}>
-                                                        {item.stock}
-                                                    </span>
+                                        <p className={cn(
+                                            'line-clamp-2 text-sm font-semibold',
+                                            lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
+                                        )}>
+                                            {item.descripcion}
+                                        </p>
+                                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                            {item.codigo && (
+                                                <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
+                                                    {item.codigo}
                                                 </span>
-                                                <span className="text-muted-foreground">
-                                                    Mín: <span className="font-medium">{item.min_stock}</span>
+                                            )}
+                                            {item.repuestos && (
+                                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                    Repuesto
                                                 </span>
-                                                <span className="text-muted-foreground">
-                                                    Precio: <span className="font-medium">{formatARS(Number(item.precio))}</span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-baseline gap-4 text-xs">
+                                            <span>
+                                                Stock:{' '}
+                                                <span className={cn(
+                                                    'text-base font-semibold',
+                                                    lowStock ? 'text-red-700 dark:text-red-400' : 'text-foreground',
+                                                )}>
+                                                    {item.stock}
                                                 </span>
-                                            </div>
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                Mín: <span className="font-medium">{item.min_stock}</span>
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                Precio: <span className="font-medium">{formatARS(Number(item.precio))}</span>
+                                            </span>
                                         </div>
                                     </li>
                                 );
@@ -603,21 +560,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 </div>
             </div>
 
-            {/* ─── Botón flotante: Registrar salida (N) ───────────────────────── */}
-            {canWrite && selectedIds.length > 0 && (
-                <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
-                    <Button
-                        size="lg"
-                        className="shadow-lg"
-                        onClick={openSalidaModal}
-                    >
-                        <ArrowUpCircle className="h-5 w-5" />
-                        Registrar salida ({selectedIds.length})
-                    </Button>
-                </div>
-            )}
-
-            {/* ─── Modal Salida múltiple ──────────────────────────────────────── */}
+            {/* ─── Modal Egreso (OUT múltiple) ────────────────────────────────── */}
             <Dialog
                 open={showSalidaModal}
                 onOpenChange={(open) => {
@@ -626,66 +569,84 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             >
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Registrar Salida</DialogTitle>
+                        <DialogTitle>Registrar Egreso</DialogTitle>
                         <DialogDescription>
-                            {selectedItems.length} artículo(s) en este pedido. Todo se despacha al mismo vehículo.
+                            Agregá los artículos del pedido. Todo se despacha al mismo vehículo.
                         </DialogDescription>
                     </DialogHeader>
 
                     <form onSubmit={handleSalidaSubmit} className="grid gap-4">
-                        {/* Líneas del pedido */}
-                        <div className="max-h-64 overflow-y-auto rounded-md border border-border">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted/40 text-xs text-muted-foreground uppercase">
-                                    <tr>
-                                        <th className="px-3 py-2 text-left font-medium">Artículo</th>
-                                        <th className="w-24 px-3 py-2 text-left font-medium">Cantidad</th>
-                                        <th className="w-8 px-2 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {selectedItems.map((item) => (
-                                        <tr key={item.id}>
-                                            <td className="px-3 py-2">
-                                                <p className="font-medium text-foreground">{item.descripcion}</p>
-                                                <p className="text-[11px] text-muted-foreground">Disponible: {item.stock}</p>
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <Input
-                                                    type="number"
-                                                    min="1"
-                                                    max={item.stock}
-                                                    value={cantidades[item.id] ?? ''}
-                                                    onChange={(e) =>
-                                                        setCantidades((prev) => ({
-                                                            ...prev,
-                                                            [item.id]: e.target.value,
-                                                        }))
-                                                    }
-                                                    className={cn(
-                                                        'h-8 w-20 text-sm',
-                                                        lineErrors[item.id] && 'border-destructive',
-                                                    )}
-                                                />
-                                                {lineErrors[item.id] && (
-                                                    <p className="mt-0.5 text-[10px] text-destructive">{lineErrors[item.id]}</p>
-                                                )}
-                                            </td>
-                                            <td className="px-2 py-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeFromSalida(item.id)}
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                    aria-label="Quitar del pedido"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        {/* Selector de artículos */}
+                        <div className="grid gap-2">
+                            <Label>Agregar artículo</Label>
+                            <Combobox
+                                key={comboKey}
+                                placeholder="Buscar artículo por nombre..."
+                                options={articuloOptions}
+                                value=""
+                                onSelect={(o) => addArticulo(Number(o.value))}
+                                emptyText="Sin artículos disponibles"
+                            />
                         </div>
+
+                        {/* Líneas del pedido */}
+                        {orderLines.length > 0 ? (
+                            <div className="max-h-64 overflow-y-auto rounded-md border border-border">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/40 text-xs text-muted-foreground uppercase">
+                                        <tr>
+                                            <th className="px-3 py-2 text-left font-medium">Artículo</th>
+                                            <th className="w-24 px-3 py-2 text-left font-medium">Cantidad</th>
+                                            <th className="w-8 px-2 py-2"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {orderLines.map((line) => {
+                                            const item = itemsById.get(line.articulo_id);
+                                            if (!item) return null;
+                                            return (
+                                                <tr key={line.articulo_id}>
+                                                    <td className="px-3 py-2">
+                                                        <p className="font-medium text-foreground">{item.descripcion}</p>
+                                                        <p className="text-[11px] text-muted-foreground">Disponible: {item.stock}</p>
+                                                    </td>
+                                                    <td className="px-3 py-2">
+                                                        <Input
+                                                            type="number"
+                                                            min="1"
+                                                            max={item.stock}
+                                                            value={line.cantidad}
+                                                            onChange={(e) => updateCantidad(line.articulo_id, e.target.value)}
+                                                            className={cn(
+                                                                'h-8 w-20 text-sm',
+                                                                lineErrors[line.articulo_id] && 'border-destructive',
+                                                            )}
+                                                        />
+                                                        {lineErrors[line.articulo_id] && (
+                                                            <p className="mt-0.5 text-[10px] text-destructive">{lineErrors[line.articulo_id]}</p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 py-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeLine(line.articulo_id)}
+                                                            className="text-muted-foreground hover:text-destructive"
+                                                            aria-label="Quitar del pedido"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                                Todavía no agregaste artículos al pedido.
+                            </p>
+                        )}
 
                         <div className="grid gap-2">
                             <Label htmlFor="patente">Patente del Vehículo</Label>
@@ -732,7 +693,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 Cancelar
                             </Button>
                             <Button type="submit" disabled={salidaForm.processing || !salidaValida}>
-                                {salidaForm.processing ? 'Procesando...' : 'Confirmar salida'}
+                                {salidaForm.processing ? 'Procesando...' : 'Confirmar egreso'}
                             </Button>
                         </DialogFooter>
                     </form>

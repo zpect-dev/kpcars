@@ -97,7 +97,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // PDFs operativos
         Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');
         Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
-        Route::get('pdf/top-salidas', [PdfController::class, 'topSalidas'])->name('pdf.top-salidas');
     });
 
     // ─────────────────────────────────────────────────────────────────────
