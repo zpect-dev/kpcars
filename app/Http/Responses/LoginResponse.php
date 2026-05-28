@@ -63,6 +63,13 @@ class LoginResponse implements LoginResponseContract
             return;
         }
 
+        // Si está fijado a una empresa, ese es el contexto.
+        if ($user->empresa_restringida_id !== null) {
+            $request->session()->put('active_company_id', (int) $user->empresa_restringida_id);
+
+            return;
+        }
+
         $resolved = $user->empresa_default_id
             ?? Empresa::orderBy('nombre')->value('id');
 

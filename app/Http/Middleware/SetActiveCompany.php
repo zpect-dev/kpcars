@@ -44,6 +44,14 @@ class SetActiveCompany
             return $next($request);
         }
 
+        // Restricción opcional: si el usuario está fijado a una empresa, se
+        // fuerza ese contexto y no puede cambiarlo.
+        if ($user->empresa_restringida_id !== null) {
+            $request->session()->put('active_company_id', (int) $user->empresa_restringida_id);
+
+            return $next($request);
+        }
+
         $current = $request->session()->get('active_company_id');
 
         if ($current !== null && Empresa::whereKey($current)->exists()) {

@@ -35,6 +35,7 @@ class UserController extends Controller
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
+            'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
@@ -43,6 +44,9 @@ class UserController extends Controller
         if ($request->hasFile('profile_photo')) {
             $photoPath = $request->file('profile_photo')->store('profile-photos', 'public');
         }
+
+        // La restricción de empresa sólo aplica a admin/administrativo.
+        $esGestor = in_array($validated['role'], [UserRole::ADMINISTRADOR->value, UserRole::ADMINISTRATIVO->value], true);
 
         // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
         $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)).$validated['dni'];
@@ -57,6 +61,7 @@ class UserController extends Controller
             'telefono' => $validated['telefono'] ?? null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
+            'empresa_restringida_id' => $esGestor ? ($validated['empresa_restringida_id'] ?? null) : null,
             'deposito' => $validated['deposito'] ?? null,
             'deposito_moneda' => isset($validated['deposito']) ? ($validated['deposito_moneda'] ?? null) : null,
         ]);
@@ -126,7 +131,7 @@ class UserController extends Controller
         }
 
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'deposito', 'deposito_moneda'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'deposito', 'deposito_moneda'])
             ->append('profile_photo_url');
 
         if ($isChoferFilter) {
@@ -238,6 +243,7 @@ class UserController extends Controller
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
+            'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
         ]);
@@ -258,6 +264,11 @@ class UserController extends Controller
         // El campo empresas no se persiste directamente en el modelo.
         $empresaIds = $validated['empresas'] ?? null;
         unset($validated['empresas']);
+
+        // La restricción de empresa sólo aplica a admin/administrativo.
+        if (! $user->isAdminOrAdministrativo()) {
+            $validated['empresa_restringida_id'] = null;
+        }
 
         $user->update($validated);
 

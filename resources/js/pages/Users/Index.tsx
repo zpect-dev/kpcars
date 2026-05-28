@@ -30,6 +30,7 @@ interface User {
     fecha_vencimiento_licencia?: string | null;
     profile_photo_url?: string | null;
     empresa_default_id?: number | null;
+    empresa_restringida_id?: number | null;
     empresas?: { id: number; nombre: string }[];
     deposito?: string | null;
     deposito_moneda?: string | null;
@@ -181,6 +182,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
         empresas: [] as number[],
+        empresa_restringida_id: '' as string,
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
     });
@@ -195,6 +197,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
         empresas: [] as number[],
+        empresa_restringida_id: '' as string,
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
     });
@@ -219,6 +222,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             fecha_vencimiento_licencia: formattedDate,
             profile_photo: null,
             empresas: (user.empresas ?? []).map((e) => e.id),
+            empresa_restringida_id: user.empresa_restringida_id ? String(user.empresa_restringida_id) : '',
             deposito: user.deposito ?? '',
             deposito_moneda: user.deposito_moneda || 'USD',
         });
@@ -1073,6 +1077,31 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         )}
 
+                        {(createForm.data.role === 'administrativo' || createForm.data.role === 'administrador') && empresas.length > 0 && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="create-empresa-restringida">Acceso a empresa</Label>
+                                <select
+                                    id="create-empresa-restringida"
+                                    value={createForm.data.empresa_restringida_id}
+                                    onChange={(e) => createForm.setData('empresa_restringida_id', e.target.value)}
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                >
+                                    <option value="" className="bg-background text-foreground">
+                                        Todas (puede cambiar de empresa)
+                                    </option>
+                                    {empresas.map((e) => (
+                                        <option key={e.id} value={e.id} className="bg-background text-foreground">
+                                            Sólo {e.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    Si elegís una empresa, el usuario quedará fijado a ella y no podrá cambiar de contexto.
+                                </p>
+                                <InputError message={createForm.errors.empresa_restringida_id} />
+                            </div>
+                        )}
+
                         {createForm.data.role === 'chofer' && (
                             <div className="grid gap-2">
                                 <Label htmlFor="correo">Correo</Label>
@@ -1331,6 +1360,31 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     })}
                                 </div>
                                 <InputError message={editForm.errors.empresas as string | undefined} />
+                            </div>
+                        )}
+
+                        {(userToEdit?.role === 'administrativo' || userToEdit?.role === 'administrador') && empresas.length > 0 && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="edit-empresa-restringida">Acceso a empresa</Label>
+                                <select
+                                    id="edit-empresa-restringida"
+                                    value={editForm.data.empresa_restringida_id}
+                                    onChange={(e) => editForm.setData('empresa_restringida_id', e.target.value)}
+                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                >
+                                    <option value="" className="bg-background text-foreground">
+                                        Todas (puede cambiar de empresa)
+                                    </option>
+                                    {empresas.map((e) => (
+                                        <option key={e.id} value={e.id} className="bg-background text-foreground">
+                                            Sólo {e.nombre}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-muted-foreground">
+                                    Si elegís una empresa, el usuario quedará fijado a ella y no podrá cambiar de contexto.
+                                </p>
+                                <InputError message={editForm.errors.empresa_restringida_id} />
                             </div>
                         )}
 

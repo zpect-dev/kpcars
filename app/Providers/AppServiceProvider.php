@@ -41,10 +41,13 @@ class AppServiceProvider extends ServiceProvider
      */
     private function defineGates(): void
     {
-        // Cambio de empresa: admin/administrativo siempre. Inversor sólo si pertenece a >=2 empresas.
+        // Cambio de empresa:
+        //  - admin/administrativo: sí, salvo que estén fijados a una empresa
+        //    (empresa_restringida_id).
+        //  - inversor: sólo si pertenece a >= 2 empresas.
         Gate::define('switch-empresa', function (User $user) {
             if ($user->isAdminOrAdministrativo()) {
-                return true;
+                return $user->empresa_restringida_id === null;
             }
 
             if ($user->isInversor()) {
