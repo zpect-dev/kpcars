@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -79,9 +80,13 @@ class Transaccion extends Model
     {
         return $query->when($search, function (Builder $q, string $search) {
             $escaped = addcslashes($search, '%_\\');
+            // Inventario global: la búsqueda no se limita a la empresa activa.
             $q->whereHas('vehiculo', function (Builder $q2) use ($escaped) {
-                $q2->where('marca', 'like', "%{$escaped}%")
-                    ->orWhere('modelo', 'like', "%{$escaped}%");
+                $q2->withoutGlobalScope(TenantScope::class)
+                    ->where(function (Builder $q3) use ($escaped) {
+                        $q3->where('marca', 'like', "%{$escaped}%")
+                            ->orWhere('modelo', 'like', "%{$escaped}%");
+                    });
             });
         });
     }
@@ -93,8 +98,10 @@ class Transaccion extends Model
     {
         return $query->when($plate, function (Builder $q, string $plate) {
             $escaped = addcslashes($plate, '%_\\');
+            // Inventario global: la búsqueda por patente no se limita a la empresa activa.
             $q->whereHas('vehiculo', function (Builder $q2) use ($escaped) {
-                $q2->where('patente', 'like', "%{$escaped}%");
+                $q2->withoutGlobalScope(TenantScope::class)
+                    ->where('patente', 'like', "%{$escaped}%");
             });
         });
     }

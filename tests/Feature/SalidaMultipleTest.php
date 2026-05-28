@@ -149,3 +149,38 @@ it('salida a EXTERNO no genera cobro', function () {
     expect($this->aceite->fresh()->stock)->toBe(8)
         ->and(Cobro::withoutGlobalScope(TenantScope::class)->count())->toBe(0);
 });
+
+it('el historial de transacciones es GLOBAL (muestra OUT de todas las empresas)', function () {
+    // Carro en empresa A.
+    $invA = Inversion::create(['nombre' => 'Inv A', 'empresa_id' => $this->empresaA->id]);
+    $vehA = Vehiculo::create([
+        'patente' => 'AAA111',
+        'marca' => 'Toyota',
+        'modelo' => 'Etios',
+        'anio' => '2020',
+        'inversion_id' => $invA->id,
+        'empresa_id' => $this->empresaA->id,
+    ]);
+
+    $this->actingAs($this->admin);
+
+    // Egreso a empresa A (estando en A) y a empresa B (estando en A: inventario global).
+    session(['active_company_id' => $this->empresaA->id]);
+    (new \App\Actions\ProcessBulkStockOutAction)->execute(
+        [['articulo_id' => $this->aceite->id, 'cantidad' => 1]], 'AAA111', 'Taller',
+    );
+    (new \App\Actions\ProcessBulkStockOutAction)->execute(
+        [['articulo_id' => $this->filtro->id, 'cantidad' => 1]], 'BBB222', 'Taller',
+    );
+
+    // Estando en empresa A, el historial debe mostrar AMBAS transacciones OUT.
+    $this->get('/transactions')->assertInertia(fn ($p) => $p
+        ->has('transactions.data', 2)
+    );
+
+    // Y filtrando por la patente de la otra empresa también la encuentra.
+    $this->get('/transactions?plate=BBB222')->assertInertia(fn ($p) => $p
+        ->has('transactions.data', 1)
+        ->where('transactions.data.0.vehiculo.patente', 'BBB222')
+    );
+});

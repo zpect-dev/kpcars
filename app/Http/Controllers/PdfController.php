@@ -40,19 +40,19 @@ class PdfController extends Controller
     public function transactions(Request $request): Response
     {
         // Acceso: middleware role:administrador,administrativo.
+        // Inventario es global: el historial abarca todas las empresas.
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;
 
-        $empresaActiva = session('active_company_id');
-
-        $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
+        $transactions = Transaccion::with([
+            'articulo',
+            'vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+            'user',
+        ])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($empresaActiva, fn ($q) => $q->where(function ($q2) {
-                $q2->whereNull('vehiculo_id')->orWhereHas('vehiculo');
-            }))
             ->latest()
             ->get();
 

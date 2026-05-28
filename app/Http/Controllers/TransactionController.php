@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AnnulTransactionAction;
 use App\Models\Articulo;
+use App\Models\Scopes\TenantScope;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
@@ -25,16 +26,18 @@ class TransactionController extends Controller
 
         $articleId = $filters['article'] ?? null;
 
-        $empresaActiva = session('active_company_id');
-
-        $transactions = Transaccion::with(['articulo', 'vehiculo', 'user'])
+        // Inventario es global: el historial de transacciones muestra TODAS las
+        // operaciones de todas las empresas. Eager-load del vehículo sin
+        // TenantScope para que la patente se vea aunque sea de otra empresa.
+        $transactions = Transaccion::with([
+            'articulo',
+            'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
+            'user',
+        ])
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)
             ->filterByDate($filters['from'] ?? null, $filters['to'] ?? null)
-            ->when($empresaActiva, fn ($q) => $q->where(function ($q2) {
-                $q2->whereNull('vehiculo_id')->orWhereHas('vehiculo');
-            }))
             ->latest()
             ->paginate(60)
             ->withQueryString();
@@ -43,7 +46,10 @@ class TransactionController extends Controller
             'transactions' => $transactions,
             'filters' => $filters,
             'items' => Articulo::orderBy('descripcion')->select('id', 'descripcion')->get(),
-            'vehiculos' => Vehiculo::query()->orderBy('patente')->select('id', 'patente', 'marca', 'modelo')->get(),
+            'vehiculos' => Vehiculo::withoutGlobalScope(TenantScope::class)
+                ->orderBy('patente')
+                ->select('id', 'patente', 'marca', 'modelo')
+                ->get(),
         ]);
     }
 
