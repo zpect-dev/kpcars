@@ -437,11 +437,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     )}
                                                 >
                                                     <span className="truncate">{item.descripcion}</span>
-                                                    {item.repuestos && (
-                                                        <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                            Repuesto
-                                                        </span>
-                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 truncate text-xs text-muted-foreground sm:px-6 sm:py-4">
                                                     {item.codigo || '—'}
@@ -523,18 +518,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         )}>
                                             {item.descripcion}
                                         </p>
-                                        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                            {item.codigo && (
+                                        {item.codigo && (
+                                            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
                                                 <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
                                                     {item.codigo}
                                                 </span>
-                                            )}
-                                            {item.repuestos && (
-                                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                    Repuesto
-                                                </span>
-                                            )}
-                                        </div>
+                                            </div>
+                                        )}
                                         <div className="flex items-baseline gap-4 text-xs">
                                             <span>
                                                 Stock:{' '}

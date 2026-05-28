@@ -102,6 +102,17 @@ class User extends Authenticatable
     }
 
     /**
+     * Vehículo actualmente asignado al chofer, según vehiculos.user_id —
+     * la MISMA fuente de verdad que usa el dashboard de vehículos. Se usa en
+     * Personal para que ambas vistas no diverjan (la tabla Asignacion puede
+     * quedar desincronizada si se editó el conductor sin cerrar la asignación).
+     */
+    public function vehiculoAsignado(): HasOne
+    {
+        return $this->hasOne(Vehiculo::class, 'user_id');
+    }
+
+    /**
      * Empresas a las que el usuario pertenece (pivot empresa_user).
      *
      * Aplica principalmente a inversores: declaran a qué empresas participan.

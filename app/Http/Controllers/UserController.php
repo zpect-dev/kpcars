@@ -114,9 +114,10 @@ class UserController extends Controller
 
         if ($isChoferFilter) {
             // Personal es global: el carro asignado al chofer puede ser de
-            // cualquier empresa (bypass TenantScope en la relación).
+            // cualquier empresa (bypass TenantScope en la relación). Usamos
+            // vehiculoAsignado (vehiculos.user_id) — misma fuente que el dashboard.
             $query->with([
-                'asignacionActiva.vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+                'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
             ]);
         }
 
@@ -131,8 +132,8 @@ class UserController extends Controller
         if ($isChoferFilter) {
             $today = now()->startOfDay();
             $users = $users->map(function (User $user) use ($today) {
-                $arr = collect($user->toArray())->except(['asignacion_activa'])->all();
-                $vehiculo = $user->asignacionActiva?->vehiculo;
+                $arr = collect($user->toArray())->except(['vehiculo_asignado'])->all();
+                $vehiculo = $user->vehiculoAsignado;
                 $vencimientoLicencia = $user->fecha_vencimiento_licencia;
 
                 $arr['vehiculo'] = $vehiculo ? [
