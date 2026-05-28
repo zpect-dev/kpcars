@@ -48,7 +48,6 @@ class PdfController extends Controller
                 'articulos.codigo',
                 'articulos.precio',
                 'articulos.stock',
-                'articulos.imagen',
             ])
             ->selectRaw('COALESCE(SUM(transacciones.cantidad), 0) as total_salida')
             ->where('articulos.repuestos', true)
@@ -63,29 +62,10 @@ class PdfController extends Controller
                 'articulos.codigo',
                 'articulos.precio',
                 'articulos.stock',
-                'articulos.imagen',
             )
             ->havingRaw('SUM(transacciones.cantidad) > 0')
             ->orderByDesc('total_salida')
             ->get();
-
-        // Embed images as base64 to avoid DomPDF chroot/path issues in production.
-        $articulos->each(function ($a) {
-            $a->imagen_data = null;
-            if ($a->imagen) {
-                $path = storage_path('app/public/'.$a->imagen);
-                if (file_exists($path)) {
-                    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                    $mime = match ($ext) {
-                        'jpg', 'jpeg' => 'image/jpeg',
-                        'png' => 'image/png',
-                        'webp' => 'image/webp',
-                        default => 'image/png',
-                    };
-                    $a->imagen_data = 'data:'.$mime.';base64,'.base64_encode(file_get_contents($path));
-                }
-            }
-        });
 
         $ventasTotales = $articulos->sum(
             fn ($a) => (float) $a->total_salida * round((float) $a->precio * 0.85, 2),

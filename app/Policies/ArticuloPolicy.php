@@ -44,14 +44,4 @@ class ArticuloPolicy
     {
         return $user->isAdmin();
     }
-
-    public function uploadImage(User $user, Articulo $articulo): bool
-    {
-        return $user->isAdmin();
-    }
-
-    public function deleteImage(User $user, Articulo $articulo): bool
-    {
-        return $user->isAdmin();
-    }
 }

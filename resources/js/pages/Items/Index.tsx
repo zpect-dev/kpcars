@@ -3,20 +3,16 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     Check,
-    ChevronDown,
     FileDown,
     History,
-    Image as ImageIcon,
     Loader2,
-    TrendingUp,
     Pencil,
-    Plus,
     Search,
+    TrendingUp,
     Trash2,
-    Upload,
     X,
 } from 'lucide-react';
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import { cn } from '@/lib/utils';
@@ -31,14 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    index,
-    movimiento,
-    store,
-    updatePrecio,
-    uploadImage,
-    deleteImage,
-} from '@/routes/articulos';
+import { index, salidaMultiple, store, updatePrecio } from '@/routes/articulos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -89,38 +78,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         });
     }
 
-    // ─── Expandable rows ────────────────────────────────────────────────────
-    const [expandedId, setExpandedId] = useState<number | null>(null);
-
-    // ─── Imagen del artículo ────────────────────────────────────────────────
-    const [viewingImage, setViewingImage] = useState<Articulo | null>(null);
-    const [uploadingId, setUploadingId] = useState<number | null>(null);
-    const imageInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-
-    function handleImageUpload(item: Articulo, file: File) {
-        setUploadingId(item.id);
-        const formData = new FormData();
-        formData.append('imagen', file);
-
-        router.post(uploadImage.url(item.id), formData, {
-            preserveScroll: true,
-            preserveState: true,
-            forceFormData: true,
-            onFinish: () => setUploadingId(null),
-        });
-    }
-
-    function handleImageDelete(item: Articulo) {
-        router.delete(deleteImage.url(item.id), {
-            preserveScroll: true,
-            preserveState: true,
-        });
-    }
-
-    function triggerImageInput(itemId: number) {
-        imageInputRefs.current[itemId]?.click();
-    }
-
     // ─── Buscador de artículos ───────────────────────────────────────────────
     const [itemSearch, setItemSearch] = useState('');
 
@@ -132,18 +89,42 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         );
     }, [items, itemSearch]);
 
-    // ─── Modal Egreso (OUT) ──────────────────────────────────────────────────
-    const [showMovModal, setShowMovModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState<Articulo | null>(null);
-    const [movLocalErrors, setMovLocalErrors] = useState<{ cantidad?: string }>(
-        {},
+    // ─── Selección múltiple para salida ──────────────────────────────────────
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+    const selectedItems = useMemo(
+        () => items.filter((i) => selectedIds.includes(i.id)),
+        [items, selectedIds],
     );
 
-    const movForm = useForm({
-        tipo: 'OUT' as string,
-        cantidad: '' as string,
-        solicitante: '' as string,
+    function toggleSelect(id: number) {
+        setSelectedIds((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        );
+    }
+
+    const allFilteredSelected =
+        filteredItems.length > 0 &&
+        filteredItems.every((i) => selectedIds.includes(i.id));
+
+    function toggleSelectAll() {
+        if (allFilteredSelected) {
+            const filteredIds = filteredItems.map((i) => i.id);
+            setSelectedIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+        } else {
+            setSelectedIds((prev) => [
+                ...new Set([...prev, ...filteredItems.map((i) => i.id)]),
+            ]);
+        }
+    }
+
+    // ─── Modal Salida múltiple (OUT) ─────────────────────────────────────────
+    const [showSalidaModal, setShowSalidaModal] = useState(false);
+    // Cantidades por artículo (id -> string).
+    const [cantidades, setCantidades] = useState<Record<number, string>>({});
+    const salidaForm = useForm({
         patente: '' as string,
+        solicitante: '' as string,
         descripcion: '' as string,
     });
 
@@ -157,39 +138,79 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         [vehiculos],
     );
 
-    function openMovModal(item: Articulo) {
-        setSelectedItem(item);
-        movForm.reset();
-        movForm.setData('tipo', 'OUT');
-        setMovLocalErrors({});
-        setShowMovModal(true);
-    }
-
-    function closeMovModal() {
-        setShowMovModal(false);
-        setSelectedItem(null);
-        movForm.reset();
-        setMovLocalErrors({});
-    }
-
-    function handleMovSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!selectedItem) return;
-
-        const cantidad = Number(movForm.data.cantidad);
-        if (cantidad > selectedItem.stock) {
-            setMovLocalErrors({
-                cantidad: `Stock insuficiente. Disponible: ${selectedItem.stock}`,
-            });
-            return;
-        }
-
-        setMovLocalErrors({});
-        movForm.post(movimiento.url(selectedItem.id), {
-            onSuccess: () => closeMovModal(),
-            preserveScroll: true,
-            preserveState: true,
+    function openSalidaModal() {
+        if (selectedItems.length === 0) return;
+        const init: Record<number, string> = {};
+        selectedItems.forEach((i) => {
+            init[i.id] = '1';
         });
+        setCantidades(init);
+        salidaForm.reset();
+        salidaForm.clearErrors();
+        setShowSalidaModal(true);
+    }
+
+    function closeSalidaModal() {
+        setShowSalidaModal(false);
+        salidaForm.reset();
+        salidaForm.clearErrors();
+    }
+
+    function removeFromSalida(id: number) {
+        setSelectedIds((prev) => prev.filter((x) => x !== id));
+        setCantidades((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+    }
+
+    // ¿Alguna línea supera el stock disponible?
+    const lineErrors = useMemo(() => {
+        const errs: Record<number, string> = {};
+        selectedItems.forEach((i) => {
+            const c = Number(cantidades[i.id] ?? '0');
+            if (!c || c < 1) {
+                errs[i.id] = 'Cantidad inválida';
+            } else if (c > i.stock) {
+                errs[i.id] = `Máx: ${i.stock}`;
+            }
+        });
+        return errs;
+    }, [selectedItems, cantidades]);
+
+    const salidaValida =
+        selectedItems.length > 0 &&
+        Object.keys(lineErrors).length === 0 &&
+        !!salidaForm.data.patente;
+
+    function handleSalidaSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!salidaValida) return;
+
+        const lineas = selectedItems.map((i) => ({
+            articulo_id: i.id,
+            cantidad: Number(cantidades[i.id]),
+        }));
+
+        router.post(
+            salidaMultiple.url(),
+            {
+                patente: salidaForm.data.patente,
+                solicitante: salidaForm.data.solicitante,
+                descripcion: salidaForm.data.descripcion,
+                lineas,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => {
+                    closeSalidaModal();
+                    setSelectedIds([]);
+                    setCantidades({});
+                },
+            },
+        );
     }
 
     // ─── Modal Ingreso / Nuevo Artículo ──────────────────────────────────────
@@ -209,19 +230,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         precio: '0',
     });
 
-    // Filtro del dropdown de sugerencias basado en lo escrito
     const suggestions = useMemo(() => {
         const q = createForm.data.descripcion.toLowerCase().trim();
         if (!q) return items;
         return items.filter((i) => i.descripcion.toLowerCase().includes(q));
     }, [items, createForm.data.descripcion]);
-
-    // ¿El texto escrito coincide exactamente con alguno existente?
-    const exactMatch = items.find(
-        (i) =>
-            i.descripcion.toLowerCase() ===
-            createForm.data.descripcion.toLowerCase().trim(),
-    );
 
     const isRestock = matchedItem !== null && !isNewMode;
 
@@ -271,9 +284,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setShowSuggestions(true);
     }
 
-    function handleDescripcionKeyDown(
-        e: React.KeyboardEvent<HTMLInputElement>,
-    ) {
+    function handleDescripcionKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
         if (!showSuggestions || suggestions.length === 0) return;
 
         if (e.key === 'ArrowDown') {
@@ -311,7 +322,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             precio: String(item.precio ?? 0),
         });
         setShowSuggestions(false);
-        // Pasar el foco al input de cantidad
     }
 
     function handleCreateSubmit(e: React.FormEvent) {
@@ -322,6 +332,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             preserveState: true,
         });
     }
+
+    const colSpan = canWrite ? 6 : 5;
 
     return (
         <>
@@ -383,281 +395,132 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
-                                    <th
-                                        scope="col"
-                                        className="w-[32%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Descripción
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Código
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Stock Actual
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[12%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Stock Mínimo
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[16%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Precio
-                                    </th>
                                     {canWrite && (
-                                        <th
-                                            scope="col"
-                                            className="w-[16%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4"
-                                        >
-                                            Acciones
+                                        <th scope="col" className="w-[5%] px-4 py-3 sm:px-6 sm:py-4">
+                                            <input
+                                                type="checkbox"
+                                                aria-label="Seleccionar todos"
+                                                checked={allFilteredSelected}
+                                                onChange={toggleSelectAll}
+                                                className="h-4 w-4 rounded border-border"
+                                            />
                                         </th>
                                     )}
+                                    <th scope="col" className="w-[35%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Descripción
+                                    </th>
+                                    <th scope="col" className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Código
+                                    </th>
+                                    <th scope="col" className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Stock Actual
+                                    </th>
+                                    <th scope="col" className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Stock Mínimo
+                                    </th>
+                                    <th scope="col" className="w-[18%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Precio
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {filteredItems.length === 0 ? (
                                     <tr>
-                                        <td
-                                            colSpan={canWrite ? 6 : 5}
-                                            className="px-6 py-12 text-center text-muted-foreground"
-                                        >
-                                            No hay artículos registrados o no
-                                            coinciden con la búsqueda.
+                                        <td colSpan={colSpan} className="px-6 py-12 text-center text-muted-foreground">
+                                            No hay artículos registrados o no coinciden con la búsqueda.
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredItems.map((item) => {
                                         const lowStock = item.stock <= item.min_stock;
-                                        const isExpanded = expandedId === item.id;
-                                        const pct = item.min_stock > 0
-                                            ? Math.min(100, Math.round((item.stock / (item.min_stock * 3)) * 100))
-                                            : item.stock > 0 ? 100 : 0;
-                                        const barColor = item.stock === 0
-                                            ? 'bg-red-500'
-                                            : lowStock
-                                                ? 'bg-orange-400'
-                                                : pct < 60
-                                                    ? 'bg-yellow-400'
-                                                    : 'bg-green-500';
-                                        const statusLabel = item.stock === 0
-                                            ? 'Sin stock'
-                                            : lowStock
-                                                ? 'Stock crítico'
-                                                : 'Normal';
-                                        const statusColor = item.stock === 0
-                                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
-                                            : lowStock
-                                                ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
-                                                : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+                                        const selected = selectedIds.includes(item.id);
                                         return (
-                                            <Fragment key={item.id}>
-                                                <tr
-                                                    className={cn(
-                                                        'cursor-pointer transition-colors',
-                                                        lowStock
+                                            <tr
+                                                key={item.id}
+                                                className={cn(
+                                                    'transition-colors',
+                                                    selected
+                                                        ? 'bg-primary/5'
+                                                        : lowStock
                                                             ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
                                                             : 'bg-card hover:bg-muted/40',
-                                                    )}
-                                                    onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                                                >
-                                                    <td
-                                                        className={cn(
-                                                            'px-4 py-3 font-medium sm:px-6 sm:py-4',
-                                                            lowStock
-                                                                ? 'text-red-800 dark:text-red-300'
-                                                                : 'text-foreground',
-                                                        )}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            <ChevronDown className={cn(
-                                                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
-                                                                isExpanded && 'rotate-180',
-                                                            )} />
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    if (item.imagen_url) setViewingImage(item);
-                                                                }}
-                                                                className={cn(
-                                                                    'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
-                                                                    item.imagen_url ? 'cursor-pointer hover:ring-2 hover:ring-primary/40' : 'cursor-default',
-                                                                )}
-                                                                aria-label={item.imagen_url ? 'Ver imagen' : 'Sin imagen'}
-                                                            >
-                                                                {item.imagen_url ? (
-                                                                    <img
-                                                                        src={item.imagen_url}
-                                                                        alt={item.descripcion}
-                                                                        className="h-full w-full object-cover"
-                                                                    />
-                                                                ) : (
-                                                                    <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                                                                )}
-                                                            </button>
-                                                            <span className="truncate">{item.descripcion}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3 truncate text-xs text-muted-foreground sm:px-6 sm:py-4">
-                                                        {item.codigo || '—'}
-                                                    </td>
-                                                    <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
-                                                        <span className={lowStock ? 'font-semibold text-red-700 dark:text-red-400' : ''}>
-                                                            {item.stock}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
-                                                        {item.min_stock}
-                                                    </td>
-                                                    <td className="px-4 py-3 sm:px-6 sm:py-4" onClick={(e) => e.stopPropagation()}>
-                                                        {editingPriceId === item.id ? (
-                                                            <div className="flex items-center gap-1">
-                                                                <Input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    step="0.01"
-                                                                    value={editingPriceValue}
-                                                                    onChange={(e) => setEditingPriceValue(e.target.value)}
-                                                                    onKeyDown={(e) => {
-                                                                        if (e.key === 'Enter') submitPrice(item);
-                                                                        if (e.key === 'Escape') cancelEditPrice();
-                                                                    }}
-                                                                    className="h-7 w-24 text-xs"
-                                                                    autoFocus
-                                                                />
-                                                                <button type="button" onClick={() => submitPrice(item)} disabled={savingPriceId === item.id} className="text-foreground hover:text-foreground/80 disabled:cursor-default">
-                                                                    {savingPriceId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                                                                </button>
-                                                                <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
-                                                                    <X className="h-3.5 w-3.5" />
-                                                                </button>
-                                                            </div>
-                                                        ) : (
-                                                            <button
-                                                                type="button"
-                                                                className={cn(
-                                                                    'inline-flex items-center gap-1 text-sm',
-                                                                    isAdmin && 'cursor-pointer hover:underline',
-                                                                )}
-                                                                onClick={() => isAdmin && startEditPrice(item)}
-                                                                disabled={!isAdmin}
-                                                            >
-                                                                {formatARS(Number(item.precio))}
-                                                                {isAdmin && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                    {canWrite && (
-                                                        <td className="px-4 py-3 text-right truncate sm:px-6 sm:py-4" onClick={(e) => e.stopPropagation()}>
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => openMovModal(item)}
-                                                            >
-                                                                <ArrowUpCircle className="h-4 w-4" />
-                                                                <span className="hidden sm:inline">Salida</span>
-                                                            </Button>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                                {isExpanded && (
-                                                    <tr className="bg-muted/50">
-                                                        <td colSpan={canWrite ? 6 : 5} className="px-6 py-4">
-                                                            <div className="flex flex-col gap-3">
-                                                                {/* Info grid */}
-                                                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-muted-foreground">Estado:</span>
-                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColor)}>
-                                                                            {statusLabel}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-muted-foreground">Precio unitario:</span>
-                                                                        <span className="font-medium">{formatARS(Number(item.precio))}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-muted-foreground">Valor total en stock:</span>
-                                                                        <span className="font-medium">{formatARS(Number(item.precio) * item.stock)}</span>
-                                                                    </div>
-                                                                    {canWrite && (
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            className="ml-auto"
-                                                                            onClick={(e) => { e.stopPropagation(); openMovModal(item); }}
-                                                                        >
-                                                                            <ArrowUpCircle className="h-4 w-4" />
-                                                                            Registrar salida
-                                                                        </Button>
-                                                                    )}
-                                                                </div>
-
-                                                                {canWrite && (
-                                                                    <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                                                                        <span className="text-xs text-muted-foreground">
-                                                                            Imagen del artículo:
-                                                                        </span>
-                                                                        <input
-                                                                            ref={(el) => {
-                                                                                imageInputRefs.current[item.id] = el;
-                                                                            }}
-                                                                            type="file"
-                                                                            accept="image/jpeg,image/png,image/webp"
-                                                                            className="hidden"
-                                                                            onChange={(e) => {
-                                                                                const file = e.target.files?.[0];
-                                                                                if (file) handleImageUpload(item, file);
-                                                                                e.target.value = '';
-                                                                            }}
-                                                                        />
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={(e) => {
-                                                                                e.stopPropagation();
-                                                                                triggerImageInput(item.id);
-                                                                            }}
-                                                                            disabled={uploadingId === item.id}
-                                                                        >
-                                                                            <Upload className="h-4 w-4" />
-                                                                            {item.imagen_url ? 'Cambiar imagen' : 'Subir imagen'}
-                                                                        </Button>
-                                                                        {item.imagen_url && (
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="ghost"
-                                                                                className="text-destructive hover:text-destructive"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    handleImageDelete(item);
-                                                                                }}
-                                                                            >
-                                                                                <Trash2 className="h-4 w-4" />
-                                                                                Eliminar
-                                                                            </Button>
-                                                                        )}
-                                                                        {uploadingId === item.id && (
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                Subiendo...
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
                                                 )}
-                                            </Fragment>
+                                            >
+                                                {canWrite && (
+                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                        <input
+                                                            type="checkbox"
+                                                            aria-label={`Seleccionar ${item.descripcion}`}
+                                                            checked={selected}
+                                                            disabled={item.stock < 1}
+                                                            onChange={() => toggleSelect(item.id)}
+                                                            className="h-4 w-4 rounded border-border disabled:opacity-40"
+                                                        />
+                                                    </td>
+                                                )}
+                                                <td
+                                                    className={cn(
+                                                        'px-4 py-3 font-medium sm:px-6 sm:py-4',
+                                                        lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
+                                                    )}
+                                                >
+                                                    <span className="truncate">{item.descripcion}</span>
+                                                    {item.repuestos && (
+                                                        <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                            Repuesto
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 truncate text-xs text-muted-foreground sm:px-6 sm:py-4">
+                                                    {item.codigo || '—'}
+                                                </td>
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                    <span className={lowStock ? 'font-semibold text-red-700 dark:text-red-400' : ''}>
+                                                        {item.stock}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 truncate sm:px-6 sm:py-4">
+                                                    {item.min_stock}
+                                                </td>
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                    {editingPriceId === item.id ? (
+                                                        <div className="flex items-center gap-1">
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={editingPriceValue}
+                                                                onChange={(e) => setEditingPriceValue(e.target.value)}
+                                                                onKeyDown={(e) => {
+                                                                    if (e.key === 'Enter') submitPrice(item);
+                                                                    if (e.key === 'Escape') cancelEditPrice();
+                                                                }}
+                                                                className="h-7 w-24 text-xs"
+                                                                autoFocus
+                                                            />
+                                                            <button type="button" onClick={() => submitPrice(item)} disabled={savingPriceId === item.id} className="text-foreground hover:text-foreground/80 disabled:cursor-default">
+                                                                {savingPriceId === item.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                                            </button>
+                                                            <button type="button" onClick={cancelEditPrice} className="text-muted-foreground hover:text-foreground">
+                                                                <X className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            className={cn(
+                                                                'inline-flex items-center gap-1 text-sm',
+                                                                isAdmin && 'cursor-pointer hover:underline',
+                                                            )}
+                                                            onClick={() => isAdmin && startEditPrice(item)}
+                                                            disabled={!isAdmin}
+                                                        >
+                                                            {formatARS(Number(item.precio))}
+                                                            {isAdmin && <Pencil className="h-3 w-3 text-muted-foreground" />}
+                                                        </button>
+                                                    )}
+                                                </td>
+                                            </tr>
                                         );
                                     })
                                 )}
@@ -669,183 +532,69 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     <ul className="divide-y divide-border md:hidden">
                         {filteredItems.length === 0 ? (
                             <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No hay artículos registrados o no coinciden con
-                                la búsqueda.
+                                No hay artículos registrados o no coinciden con la búsqueda.
                             </li>
                         ) : (
                             filteredItems.map((item) => {
                                 const lowStock = item.stock <= item.min_stock;
-                                const isExpanded = expandedId === item.id;
-                                const pct = item.min_stock > 0
-                                    ? Math.min(100, Math.round((item.stock / (item.min_stock * 3)) * 100))
-                                    : item.stock > 0 ? 100 : 0;
-                                const barColor = item.stock === 0
-                                    ? 'bg-red-500'
-                                    : lowStock ? 'bg-orange-400'
-                                    : pct < 60 ? 'bg-yellow-400'
-                                    : 'bg-green-500';
-                                const statusLabel = item.stock === 0
-                                    ? 'Sin stock'
-                                    : lowStock ? 'Stock crítico'
-                                    : 'Normal';
-                                const statusColor = item.stock === 0
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
-                                    : lowStock
-                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400'
-                                        : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400';
+                                const selected = selectedIds.includes(item.id);
                                 return (
                                     <li
                                         key={item.id}
                                         className={cn(
-                                            'flex flex-col gap-0',
-                                            lowStock && 'bg-red-50 dark:bg-red-950/30',
+                                            'flex items-start gap-3 p-4',
+                                            selected
+                                                ? 'bg-primary/5'
+                                                : lowStock && 'bg-red-50 dark:bg-red-950/30',
                                         )}
                                     >
-                                        <button
-                                            type="button"
-                                            className="flex w-full items-start justify-between gap-3 p-4 text-left"
-                                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                                        >
-                                            <div
-                                                role="button"
-                                                tabIndex={0}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (item.imagen_url) setViewingImage(item);
-                                                }}
-                                                className={cn(
-                                                    'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted',
-                                                    item.imagen_url && 'cursor-pointer',
-                                                )}
-                                            >
-                                                {item.imagen_url ? (
-                                                    <img
-                                                        src={item.imagen_url}
-                                                        alt={item.descripcion}
-                                                        className="h-full w-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                                                )}
-                                            </div>
-                                            <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                                <p className={cn(
-                                                    'line-clamp-2 text-sm font-semibold',
-                                                    lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
-                                                )}>
-                                                    {item.descripcion}
-                                                </p>
-                                                <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                                    {item.codigo && (
-                                                        <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
-                                                            {item.codigo}
-                                                        </span>
-                                                    )}
-                                                    {item.repuestos && (
-                                                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                                            Repuesto
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-baseline gap-4 text-xs">
-                                                    <span>
-                                                        Stock:{' '}
-                                                        <span className={cn(
-                                                            'text-base font-semibold',
-                                                            lowStock ? 'text-red-700 dark:text-red-400' : 'text-foreground',
-                                                        )}>
-                                                            {item.stock}
-                                                        </span>
-                                                    </span>
-                                                    <span className="text-muted-foreground">
-                                                        Mín: <span className="font-medium">{item.min_stock}</span>
-                                                    </span>
-                                                    <span className="text-muted-foreground">
-                                                        Precio: <span className="font-medium">{formatARS(Number(item.precio))}</span>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <ChevronDown className={cn(
-                                                'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 mt-0.5',
-                                                isExpanded && 'rotate-180',
-                                            )} />
-                                        </button>
-                                        {isExpanded && (
-                                            <div className="border-t border-border bg-muted/50 px-4 pb-4 pt-3">
-                                                <div className="flex flex-col gap-3">
-                                                    <div className="flex flex-wrap items-center gap-2 text-sm">
-                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusColor)}>
-                                                            {statusLabel}
-                                                        </span>
-                                                        <span className="text-muted-foreground text-xs">
-                                                            Valor total: <span className="font-medium text-foreground">{formatARS(Number(item.precio) * item.stock)}</span>
-                                                        </span>
-                                                        {canWrite && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="ml-auto"
-                                                                onClick={(e) => { e.stopPropagation(); openMovModal(item); }}
-                                                            >
-                                                                <ArrowUpCircle className="h-4 w-4" />
-                                                                Salida
-                                                            </Button>
-                                                        )}
-                                                    </div>
-
-                                                    {canWrite && (
-                                                        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Imagen:
-                                                            </span>
-                                                            <input
-                                                                ref={(el) => {
-                                                                    imageInputRefs.current[item.id] = el;
-                                                                }}
-                                                                type="file"
-                                                                accept="image/jpeg,image/png,image/webp"
-                                                                className="hidden"
-                                                                onChange={(e) => {
-                                                                    const file = e.target.files?.[0];
-                                                                    if (file) handleImageUpload(item, file);
-                                                                    e.target.value = '';
-                                                                }}
-                                                            />
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    triggerImageInput(item.id);
-                                                                }}
-                                                                disabled={uploadingId === item.id}
-                                                            >
-                                                                <Upload className="h-4 w-4" />
-                                                                {item.imagen_url ? 'Cambiar' : 'Subir'}
-                                                            </Button>
-                                                            {item.imagen_url && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="text-destructive hover:text-destructive"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        handleImageDelete(item);
-                                                                    }}
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                            {uploadingId === item.id && (
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    Subiendo...
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
+                                        {canWrite && (
+                                            <input
+                                                type="checkbox"
+                                                aria-label={`Seleccionar ${item.descripcion}`}
+                                                checked={selected}
+                                                disabled={item.stock < 1}
+                                                onChange={() => toggleSelect(item.id)}
+                                                className="mt-1 h-4 w-4 shrink-0 rounded border-border disabled:opacity-40"
+                                            />
                                         )}
+                                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                            <p className={cn(
+                                                'line-clamp-2 text-sm font-semibold',
+                                                lowStock ? 'text-red-800 dark:text-red-300' : 'text-foreground',
+                                            )}>
+                                                {item.descripcion}
+                                            </p>
+                                            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                                {item.codigo && (
+                                                    <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
+                                                        {item.codigo}
+                                                    </span>
+                                                )}
+                                                {item.repuestos && (
+                                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                                        Repuesto
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-baseline gap-4 text-xs">
+                                                <span>
+                                                    Stock:{' '}
+                                                    <span className={cn(
+                                                        'text-base font-semibold',
+                                                        lowStock ? 'text-red-700 dark:text-red-400' : 'text-foreground',
+                                                    )}>
+                                                        {item.stock}
+                                                    </span>
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                    Mín: <span className="font-medium">{item.min_stock}</span>
+                                                </span>
+                                                <span className="text-muted-foreground">
+                                                    Precio: <span className="font-medium">{formatARS(Number(item.precio))}</span>
+                                                </span>
+                                            </div>
+                                        </div>
                                     </li>
                                 );
                             })
@@ -854,44 +603,102 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 </div>
             </div>
 
-            {/* ─── Modal Egreso ─────────────────────────────────────────────────── */}
+            {/* ─── Botón flotante: Registrar salida (N) ───────────────────────── */}
+            {canWrite && selectedIds.length > 0 && (
+                <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+                    <Button
+                        size="lg"
+                        className="shadow-lg"
+                        onClick={openSalidaModal}
+                    >
+                        <ArrowUpCircle className="h-5 w-5" />
+                        Registrar salida ({selectedIds.length})
+                    </Button>
+                </div>
+            )}
+
+            {/* ─── Modal Salida múltiple ──────────────────────────────────────── */}
             <Dialog
-                open={showMovModal}
+                open={showSalidaModal}
                 onOpenChange={(open) => {
-                    if (!open) closeMovModal();
+                    if (!open) closeSalidaModal();
                 }}
             >
-                <DialogContent>
+                <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Registrar Salida</DialogTitle>
-                        <DialogDescription asChild>
-                            <div className="flex items-center gap-2">
-                                <span>{selectedItem?.descripcion}</span>
-                                <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                    Stock: {selectedItem?.stock}
-                                </span>
-                            </div>
+                        <DialogDescription>
+                            {selectedItems.length} artículo(s) en este pedido. Todo se despacha al mismo vehículo.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleMovSubmit} className="grid gap-4">
+                    <form onSubmit={handleSalidaSubmit} className="grid gap-4">
+                        {/* Líneas del pedido */}
+                        <div className="max-h-64 overflow-y-auto rounded-md border border-border">
+                            <table className="w-full text-sm">
+                                <thead className="bg-muted/40 text-xs text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="px-3 py-2 text-left font-medium">Artículo</th>
+                                        <th className="w-24 px-3 py-2 text-left font-medium">Cantidad</th>
+                                        <th className="w-8 px-2 py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {selectedItems.map((item) => (
+                                        <tr key={item.id}>
+                                            <td className="px-3 py-2">
+                                                <p className="font-medium text-foreground">{item.descripcion}</p>
+                                                <p className="text-[11px] text-muted-foreground">Disponible: {item.stock}</p>
+                                            </td>
+                                            <td className="px-3 py-2">
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max={item.stock}
+                                                    value={cantidades[item.id] ?? ''}
+                                                    onChange={(e) =>
+                                                        setCantidades((prev) => ({
+                                                            ...prev,
+                                                            [item.id]: e.target.value,
+                                                        }))
+                                                    }
+                                                    className={cn(
+                                                        'h-8 w-20 text-sm',
+                                                        lineErrors[item.id] && 'border-destructive',
+                                                    )}
+                                                />
+                                                {lineErrors[item.id] && (
+                                                    <p className="mt-0.5 text-[10px] text-destructive">{lineErrors[item.id]}</p>
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeFromSalida(item.id)}
+                                                    className="text-muted-foreground hover:text-destructive"
+                                                    aria-label="Quitar del pedido"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
                         <div className="grid gap-2">
-                            <Label htmlFor="cantidad">Cantidad</Label>
-                            <Input
-                                id="cantidad"
-                                type="number"
-                                min="1"
-                                value={movForm.data.cantidad}
-                                onChange={(e) => {
-                                    movForm.setData('cantidad', e.target.value);
-                                    if (movLocalErrors.cantidad)
-                                        setMovLocalErrors({});
-                                }}
-                                placeholder="Cantidad"
+                            <Label htmlFor="patente">Patente del Vehículo</Label>
+                            <Combobox
+                                id="patente"
+                                placeholder="Buscar patente, marca o modelo..."
+                                options={patenteOptions}
+                                value={salidaForm.data.patente}
+                                onSelect={(o) => salidaForm.setData('patente', o.value)}
+                                uppercase
                             />
-                            <InputError message={movForm.errors.cantidad} />
-                            <InputError message={movLocalErrors.cantidad} />
-                            <InputError message={(movForm.errors as Record<string, string>).stock} />
+                            <InputError message={salidaForm.errors.patente} />
+                            <InputError message={(salidaForm.errors as Record<string, string>).lineas} />
                         </div>
 
                         <div className="grid gap-2">
@@ -899,74 +706,33 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <Input
                                 id="solicitante"
                                 type="text"
-                                value={movForm.data.solicitante}
-                                onChange={(e) =>
-                                    movForm.setData(
-                                        'solicitante',
-                                        e.target.value,
-                                    )
-                                }
+                                value={salidaForm.data.solicitante}
+                                onChange={(e) => salidaForm.setData('solicitante', e.target.value)}
                                 placeholder="Nombre del solicitante"
                             />
-                            <InputError message={movForm.errors.solicitante} />
+                            <InputError message={salidaForm.errors.solicitante} />
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="patente">
-                                Patente del Vehículo
-                            </Label>
-                            <Combobox
-                                id="patente"
-                                placeholder="Buscar patente, marca o modelo..."
-                                options={patenteOptions}
-                                value={movForm.data.patente}
-                                onSelect={(o) =>
-                                    movForm.setData('patente', o.value)
-                                }
-                                uppercase
-                            />
-                            <InputError message={movForm.errors.patente} />
-                        </div>
-
-                        {movForm.data.patente === 'EXTERNO' && (
+                        {salidaForm.data.patente === 'EXTERNO' && (
                             <div className="grid gap-2">
                                 <Label htmlFor="descripcion">Descripción (Externo)</Label>
                                 <Input
                                     id="descripcion"
                                     type="text"
-                                    value={movForm.data.descripcion}
-                                    onChange={(e) =>
-                                        movForm.setData(
-                                            'descripcion',
-                                            e.target.value,
-                                        )
-                                    }
+                                    value={salidaForm.data.descripcion}
+                                    onChange={(e) => salidaForm.setData('descripcion', e.target.value)}
                                     placeholder="Motivo o detalle del egreso externo..."
                                 />
-                                <InputError message={movForm.errors.descripcion} />
+                                <InputError message={salidaForm.errors.descripcion} />
                             </div>
                         )}
 
                         <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={closeMovModal}
-                            >
+                            <Button type="button" variant="outline" onClick={closeSalidaModal}>
                                 Cancelar
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={
-                                    movForm.processing ||
-                                    !movForm.data.cantidad ||
-                                    Number(movForm.data.cantidad) < 1 ||
-                                    !movForm.data.patente
-                                }
-                            >
-                                {movForm.processing
-                                    ? 'Procesando...'
-                                    : 'Confirmar'}
+                            <Button type="submit" disabled={salidaForm.processing || !salidaValida}>
+                                {salidaForm.processing ? 'Procesando...' : 'Confirmar salida'}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -983,35 +749,26 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {isNewMode
-                                ? 'Nuevo Artículo'
-                                : 'Ingreso de Artículo'}
+                            {isNewMode ? 'Nuevo Artículo' : 'Ingreso de Artículo'}
                         </DialogTitle>
                     </DialogHeader>
 
                     <form onSubmit={handleCreateSubmit} className="grid gap-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="descripcion">Artículo</Label>
+                            <Label htmlFor="create-descripcion">Artículo</Label>
                             {isNewMode ? (
-                                <>
-                                    <Input
-                                        id="descripcion"
-                                        ref={descripcionRef}
-                                        autoComplete="off"
-                                        placeholder="Nombre del nuevo artículo..."
-                                        value={createForm.data.descripcion}
-                                        onChange={(e) =>
-                                            createForm.setData(
-                                                'descripcion',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                </>
+                                <Input
+                                    id="create-descripcion"
+                                    ref={descripcionRef}
+                                    autoComplete="off"
+                                    placeholder="Nombre del nuevo artículo..."
+                                    value={createForm.data.descripcion}
+                                    onChange={(e) => createForm.setData('descripcion', e.target.value)}
+                                />
                             ) : (
                                 <div className="relative">
                                     <Input
-                                        id="descripcion"
+                                        id="create-descripcion"
                                         ref={descripcionRef}
                                         autoComplete="off"
                                         placeholder="Buscar artículo..."
@@ -1020,66 +777,38 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         onKeyDown={handleDescripcionKeyDown}
                                         onFocus={() => setShowSuggestions(true)}
                                         onBlur={() => {
-                                            setTimeout(
-                                                () => setShowSuggestions(false),
-                                                150,
-                                            );
+                                            setTimeout(() => setShowSuggestions(false), 150);
                                         }}
                                     />
-                                    {showSuggestions &&
-                                        createForm.data.descripcion.trim() !==
-                                            '' && (
-                                            <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                                                <div className="max-h-52 overflow-y-auto">
-                                                    {suggestions.length ===
-                                                    0 ? (
-                                                        <p className="px-3 py-2 text-sm text-muted-foreground">
-                                                            Sin coincidencias
-                                                        </p>
-                                                    ) : (
-                                                        suggestions.map(
-                                                            (item, idx) => (
-                                                                <button
-                                                                    key={
-                                                                        item.id
-                                                                    }
-                                                                    type="button"
-                                                                    className={cn(
-                                                                        'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
-                                                                        highlightedIndex ===
-                                                                            idx
-                                                                            ? 'bg-accent'
-                                                                            : 'hover:bg-accent/60',
-                                                                    )}
-                                                                    onMouseEnter={() =>
-                                                                        setHighlightedIndex(
-                                                                            idx,
-                                                                        )
-                                                                    }
-                                                                    onMouseDown={() =>
-                                                                        handleSelectSuggestion(
-                                                                            item,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <span className="font-medium">
-                                                                        {
-                                                                            item.descripcion
-                                                                        }
-                                                                    </span>
-                                                                    <span className="ml-4 shrink-0 text-xs text-muted-foreground">
-                                                                        Stock:{' '}
-                                                                        {
-                                                                            item.stock
-                                                                        }
-                                                                    </span>
-                                                                </button>
-                                                            ),
-                                                        )
-                                                    )}
-                                                </div>
+                                    {showSuggestions && createForm.data.descripcion.trim() !== '' && (
+                                        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                                            <div className="max-h-52 overflow-y-auto">
+                                                {suggestions.length === 0 ? (
+                                                    <p className="px-3 py-2 text-sm text-muted-foreground">
+                                                        Sin coincidencias
+                                                    </p>
+                                                ) : (
+                                                    suggestions.map((item, idx) => (
+                                                        <button
+                                                            key={item.id}
+                                                            type="button"
+                                                            className={cn(
+                                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                                                                highlightedIndex === idx ? 'bg-accent' : 'hover:bg-accent/60',
+                                                            )}
+                                                            onMouseEnter={() => setHighlightedIndex(idx)}
+                                                            onMouseDown={() => handleSelectSuggestion(item)}
+                                                        >
+                                                            <span className="font-medium">{item.descripcion}</span>
+                                                            <span className="ml-4 shrink-0 text-xs text-muted-foreground">
+                                                                Stock: {item.stock}
+                                                            </span>
+                                                        </button>
+                                                    ))
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {isRestock && matchedItem && (
@@ -1087,76 +816,48 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     Stock: {matchedItem.stock}
                                 </span>
                             )}
-                            <InputError
-                                message={createForm.errors.descripcion}
-                            />
+                            <InputError message={createForm.errors.descripcion} />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label htmlFor="codigo">Código</Label>
                                 <Input
                                     id="codigo"
                                     type="text"
                                     value={createForm.data.codigo}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'codigo',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => createForm.setData('codigo', e.target.value)}
                                     placeholder="Código del artículo"
                                 />
-                                <InputError
-                                    message={createForm.errors.codigo}
-                                />
+                                <InputError message={createForm.errors.codigo} />
                             </div>
                             <div className="grid gap-2">
-                                <Label
-                                    htmlFor="repuestos"
-                                    className="flex items-center gap-2"
-                                >
+                                <Label htmlFor="repuestos" className="flex items-center gap-2">
                                     <input
                                         id="repuestos"
                                         type="checkbox"
                                         checked={createForm.data.repuestos}
-                                        onChange={(e) =>
-                                            createForm.setData(
-                                                'repuestos',
-                                                e.target.checked,
-                                            )
-                                        }
+                                        onChange={(e) => createForm.setData('repuestos', e.target.checked)}
                                         className="h-4 w-4 rounded border-border"
                                     />
                                     Es repuesto
                                 </Label>
-                                <p className="text-xs text-muted-foreground">
-                                    Marcar si el artículo es un repuesto.
-                                </p>
-                                <InputError
-                                    message={createForm.errors.repuestos}
-                                />
+                                <p className="text-xs text-muted-foreground">Marcar si el artículo es un repuesto.</p>
+                                <InputError message={createForm.errors.repuestos} />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="grid gap-2">
                                 <Label htmlFor="stock">
-                                    {isRestock
-                                        ? 'Cantidad a ingresar'
-                                        : 'Stock Inicial'}
+                                    {isRestock ? 'Cantidad a ingresar' : 'Stock Inicial'}
                                 </Label>
                                 <Input
                                     id="stock"
                                     type="number"
                                     min="0"
                                     value={createForm.data.stock}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'stock',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => createForm.setData('stock', e.target.value)}
                                 />
                                 <InputError message={createForm.errors.stock} />
                             </div>
@@ -1167,16 +868,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     type="number"
                                     min="0"
                                     value={createForm.data.min_stock}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'min_stock',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => createForm.setData('min_stock', e.target.value)}
                                 />
-                                <InputError
-                                    message={createForm.errors.min_stock}
-                                />
+                                <InputError message={createForm.errors.min_stock} />
                             </div>
                         </div>
 
@@ -1189,17 +883,10 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     min="0"
                                     step="0.01"
                                     value={createForm.data.precio}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'precio',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => createForm.setData('precio', e.target.value)}
                                     placeholder="0.00"
                                 />
-                                <InputError
-                                    message={createForm.errors.precio}
-                                />
+                                <InputError message={createForm.errors.precio} />
                             </div>
                         )}
 
@@ -1213,11 +900,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 {isNewMode ? 'Ingreso' : 'Nuevo'}
                             </Button>
                             <div className="flex gap-2">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={closeCreateModal}
-                                >
+                                <Button type="button" variant="outline" onClick={closeCreateModal}>
                                     Cancelar
                                 </Button>
                                 <Button
@@ -1226,42 +909,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         createForm.processing ||
                                         !createForm.data.descripcion.trim() ||
                                         (!isNewMode && !matchedItem) ||
-                                        (isRestock &&
-                                            Number(createForm.data.stock) < 1)
+                                        (isRestock && Number(createForm.data.stock) < 1)
                                     }
                                 >
-                                    {createForm.processing
-                                        ? 'Procesando...'
-                                        : 'Confirmar'}
+                                    {createForm.processing ? 'Procesando...' : 'Confirmar'}
                                 </Button>
                             </div>
                         </DialogFooter>
                     </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* ─── Modal Visor de Imagen ────────────────────────────────────── */}
-            <Dialog
-                open={viewingImage !== null}
-                onOpenChange={(open) => {
-                    if (!open) setViewingImage(null);
-                }}
-            >
-                <DialogContent className="max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle className="truncate">
-                            {viewingImage?.descripcion}
-                        </DialogTitle>
-                    </DialogHeader>
-                    {viewingImage?.imagen_url && (
-                        <div className="flex max-h-[70vh] items-center justify-center overflow-hidden rounded-lg bg-muted">
-                            <img
-                                src={viewingImage.imagen_url}
-                                alt={viewingImage.descripcion}
-                                className="max-h-[70vh] w-auto object-contain"
-                            />
-                        </div>
-                    )}
                 </DialogContent>
             </Dialog>
         </>

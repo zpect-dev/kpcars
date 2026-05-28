@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\ProcessBulkStockOutAction;
 use App\Actions\ProcessStockMovementAction;
 use App\Models\Articulo;
 use App\Models\Vehiculo;
@@ -11,7 +12,6 @@ use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
@@ -144,42 +144,38 @@ class ArticuloController extends Controller
     }
 
     /**
-     * Upload (or replace) the image of an article.
+     * Procesa un pedido de salida (OUT) con múltiples artículos a un único
+     * destino (vehículo + solicitante), de forma atómica.
      */
-    public function uploadImage(Request $request, Articulo $articulo): RedirectResponse
+    public function salidaMultiple(Request $request, ProcessBulkStockOutAction $action): RedirectResponse
     {
-        $this->authorize('uploadImage', $articulo);
+        $this->authorize('storeMovement', Articulo::class);
 
-        $request->validate([
-            'imagen' => ['required', 'image', 'mimes:jpeg,jpg,png,webp', 'max:5120'],
+        $validated = $request->validate([
+            'patente' => ['required', 'string'],
+            'solicitante' => ['nullable', 'string', 'max:255'],
+            'descripcion' => ['nullable', 'string', 'max:255'],
+            'lineas' => ['required', 'array', 'min:1'],
+            'lineas.*.articulo_id' => ['required', 'integer', 'exists:articulos,id'],
+            'lineas.*.cantidad' => ['required', 'integer', 'min:1'],
         ]);
 
-        // Remove previous image if exists
-        if ($articulo->imagen && Storage::disk('public')->exists($articulo->imagen)) {
-            Storage::disk('public')->delete($articulo->imagen);
+        try {
+            $action->execute(
+                $validated['lineas'],
+                $validated['patente'],
+                $validated['solicitante'] ?? null,
+                $validated['descripcion'] ?? null,
+            );
+        } catch (InvalidArgumentException $e) {
+            return redirect()->back()->withErrors(['patente' => $e->getMessage()]);
+        } catch (Exception $e) {
+            return redirect()->back()->withErrors(['lineas' => $e->getMessage()]);
         }
 
-        $path = $request->file('imagen')->store('articulos', 'public');
+        $count = count($validated['lineas']);
 
-        $articulo->update(['imagen' => $path]);
-
-        return redirect()->back()->with('success', 'Imagen actualizada correctamente.');
-    }
-
-    /**
-     * Delete the image of an article.
-     */
-    public function deleteImage(Request $request, Articulo $articulo): RedirectResponse
-    {
-        $this->authorize('deleteImage', $articulo);
-
-        if ($articulo->imagen && Storage::disk('public')->exists($articulo->imagen)) {
-            Storage::disk('public')->delete($articulo->imagen);
-        }
-
-        $articulo->update(['imagen' => null]);
-
-        return redirect()->back()->with('success', 'Imagen eliminada correctamente.');
+        return redirect()->back()->with('success', "Salida registrada: {$count} artículo(s) despachado(s).");
     }
 
     /**

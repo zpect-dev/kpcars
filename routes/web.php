@@ -48,6 +48,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('articulos', [ArticuloController::class, 'index'])->name('articulos.index');
         Route::post('articulos', [ArticuloController::class, 'store'])->name('articulos.store');
         Route::post('articulos/{articulo}/movimiento', [ArticuloController::class, 'storeMovement'])->name('articulos.movimiento');
+        Route::post('articulos/salida-multiple', [ArticuloController::class, 'salidaMultiple'])->name('articulos.salida-multiple');
 
         // Turnos (mecánico puede ver y cambiar status; create lo limita la Policy).
         Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
@@ -138,10 +139,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Importación de asignaciones (operación masiva)
         Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
 
-        // Precios e imágenes de inventario (decisión comercial)
+        // Precios de inventario (decisión comercial)
         Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
-        Route::post('articulos/{articulo}/imagen', [ArticuloController::class, 'uploadImage'])->name('articulos.upload-image');
-        Route::delete('articulos/{articulo}/imagen', [ArticuloController::class, 'deleteImage'])->name('articulos.delete-image');
 
         // PDFs/Excels financieros y de cierres
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');

@@ -41,8 +41,6 @@ export interface Articulo {
     stock: number;
     min_stock: number;
     precio: number;
-    imagen: string | null;
-    imagen_url: string | null;
     created_at?: string;
     updated_at?: string;
 }
