@@ -2,19 +2,16 @@
 
 namespace App\Models;
 
-use App\Models\Scopes\TenantScope;
-use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[ScopedBy([TenantScope::class])]
+// Revisiones es entidad global: NO se aplica TenantScope.
 class CierreRevision extends Model
 {
     protected $table = 'cierres_revisiones';
 
     protected $fillable = [
-        'empresa_id',
         'user_id',
         'periodo_inicio',
         'periodo_fin',

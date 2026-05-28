@@ -233,7 +233,7 @@ it('Inversor: solo ve datos de su empresa porque SetActiveCompany lo fuerza', fu
     expect(Vehiculo::pluck('patente')->all())->toBe(['BBB222']);
 });
 
-it('Cierres (Inversion/Caja/Revision): filtran por empresa activa y aislan cálculos', function () {
+it('Cierres (Inversion/Caja): filtran por empresa activa y aislan cálculos', function () {
     $admin = User::factory()->create([
         'role' => UserRole::ADMINISTRADOR,
         'dni' => '20000099',
@@ -262,27 +262,13 @@ it('Cierres (Inversion/Caja/Revision): filtran por empresa activa y aislan cálc
     \App\Models\CierreCaja::create(['empresa_id' => $this->empresaA->id, 'user_id' => $admin->id]);
     \App\Models\CierreCaja::create(['empresa_id' => $this->empresaB->id, 'user_id' => $admin->id]);
 
-    \App\Models\CierreRevision::create([
-        'empresa_id' => $this->empresaA->id,
-        'user_id' => $admin->id,
-        'periodo_inicio' => now()->subWeek(),
-        'periodo_fin' => now(),
-    ]);
-    \App\Models\CierreRevision::create([
-        'empresa_id' => $this->empresaB->id,
-        'user_id' => $admin->id,
-        'periodo_inicio' => now()->subWeek(),
-        'periodo_fin' => now(),
-    ]);
-
     $this->actingAs($admin);
 
     // En empresa A: sólo veo los cierres de A.
     session(['active_company_id' => $this->empresaA->id]);
     expect(\App\Models\CierreInversion::count())->toBe(1)
         ->and(\App\Models\CierreInversion::first()->id)->toBe($cierreInvA->id)
-        ->and(\App\Models\CierreCaja::count())->toBe(1)
-        ->and(\App\Models\CierreRevision::count())->toBe(1);
+        ->and(\App\Models\CierreCaja::count())->toBe(1);
 
     // En empresa B: sólo veo los de B. El "último cierre" cambia.
     session(['active_company_id' => $this->empresaB->id]);
@@ -408,4 +394,60 @@ it('ProcessCierreInversionAction sigue rechazando más de 6 inversores en una in
 
     expect(fn () => $action->execute([$inv->id => 600], $admin, null))
         ->toThrow(\RuntimeException::class, 'el máximo permitido es 6');
+});
+
+it('Revisiones es GLOBAL: el panel y el cierre abarcan carros de todas las empresas', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '22000001',
+    ]);
+
+    // Asigno conductores a vehA (empresaA) y vehB (empresaB).
+    $choferA = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '22000010']);
+    $choferB = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '22000011']);
+    $this->vehA->update(['user_id' => $choferA->id]);
+    $this->vehB->update(['user_id' => $choferB->id]);
+
+    $this->actingAs($admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    // El panel de revisiones muestra AMBOS carros, no sólo el de la empresa activa.
+    $this->get('/revisiones')->assertInertia(fn ($p) => $p->has('vehiculos', 2));
+
+    // El cierre abarca ambos carros (CierreRevision NO es scopeado).
+    $action = new \App\Actions\CerrarRevisionesAction;
+    $cierre = $action->execute($admin);
+
+    expect($cierre->detalles()->count())->toBe(2);
+
+    // Visible desde la otra empresa también (global).
+    session(['active_company_id' => $this->empresaB->id]);
+    expect(\App\Models\CierreRevision::count())->toBe(1);
+});
+
+it('Inventario es GLOBAL: egreso a un carro de otra empresa enruta el cobro a la empresa del carro', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '22000002',
+    ]);
+
+    $articulo = \App\Models\Articulo::create([
+        'descripcion' => 'Filtro',
+        'stock' => 10,
+        'min_stock' => 1,
+        'precio' => 500,
+    ]);
+
+    $this->actingAs($admin);
+    // Estoy en empresa A pero despacho al carro de empresa B.
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $action = new \App\Actions\ProcessStockMovementAction;
+    $action->execute($articulo, 'OUT', 2, $this->vehB->patente, 'Taller');
+
+    // El cobro se generó y quedó asignado a la empresa del carro (B), no a la activa (A).
+    $cobro = Cobro::withoutGlobalScope(TenantScope::class)->first();
+    expect($cobro)->not->toBeNull()
+        ->and($cobro->empresa_id)->toBe($this->empresaB->id)
+        ->and($cobro->inversion_id)->toBe($this->invB->id);
 });

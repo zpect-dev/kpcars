@@ -41,8 +41,11 @@ class ProcessStockMovementAction
                     throw new Exception('Stock insuficiente para realizar esta operación.');
                 }
 
-                // Lookup vehicle based on licensePlate
-                $vehiculo = Vehiculo::where('patente', $licensePlate)->first();
+                // Inventario es global: el carro destino puede ser de cualquier
+                // empresa (el cobro se enruta a la empresa del carro, ver abajo).
+                $vehiculo = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                    ->where('patente', $licensePlate)
+                    ->first();
                 if (! $vehiculo) {
                     throw new Exception("El vehículo con patente {$licensePlate} no existe en la base de datos.");
                 }

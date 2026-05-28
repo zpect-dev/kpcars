@@ -45,7 +45,9 @@ class AppointmentController extends Controller
             ->paginate(30)
             ->withQueryString();
 
-        $vehiculos = Vehiculo::select('id', 'patente', 'marca', 'modelo', 'user_id')
+        // Turnos es global: el combo lista todos los carros de todas las empresas.
+        $vehiculos = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            ->select('id', 'patente', 'marca', 'modelo', 'user_id')
             ->orderBy('patente')
             ->get();
 

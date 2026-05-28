@@ -113,7 +113,11 @@ class UserController extends Controller
             });
 
         if ($isChoferFilter) {
-            $query->with(['asignacionActiva.vehiculo']);
+            // Personal es global: el carro asignado al chofer puede ser de
+            // cualquier empresa (bypass TenantScope en la relación).
+            $query->with([
+                'asignacionActiva.vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+            ]);
         }
 
         if ($isInversorFilter) {

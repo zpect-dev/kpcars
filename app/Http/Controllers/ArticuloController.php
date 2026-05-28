@@ -24,7 +24,9 @@ class ArticuloController extends Controller
     public function index(Request $request): Response
     {
         $articulos = Articulo::orderBy('descripcion')->get();
-        $vehiculos = Vehiculo::query()
+        // Inventario es global: se puede despachar a cualquier carro de cualquier
+        // empresa. El cobro generado se asigna a la empresa del carro destino.
+        $vehiculos = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->orderBy('patente')
             ->select('id', 'patente', 'marca', 'modelo')
             ->get();

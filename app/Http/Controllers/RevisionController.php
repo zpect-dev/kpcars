@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\StoreRevisionAction;
 use App\Models\Revision;
+use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,9 @@ class RevisionController extends Controller
      */
     public function index(Request $request): Response
     {
-        $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
+        // Revisiones es global: todos los carros de todas las empresas.
+        $vehiculos = Vehiculo::withoutGlobalScope(TenantScope::class)
+            ->with(['user', 'inversion', 'empresa'])
             ->where('patente', '!=', 'EXTERNO')
             ->whereNotNull('user_id')
             ->orderBy('patente')
@@ -62,9 +65,12 @@ class RevisionController extends Controller
     /**
      * Store a new revision for a vehicle.
      */
-    public function store(Request $request, Vehiculo $vehiculo, StoreRevisionAction $action): RedirectResponse
+    public function store(Request $request, int $vehiculo, StoreRevisionAction $action): RedirectResponse
     {
         $this->authorize('create', \App\Models\Revision::class);
+
+        // Revisiones es global: el carro puede ser de cualquier empresa.
+        $vehiculo = Vehiculo::withoutGlobalScope(TenantScope::class)->findOrFail($vehiculo);
 
         $validated = $request->validate([
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
@@ -118,7 +124,9 @@ class RevisionController extends Controller
     {
         $cierre->load([
             'user:id,name',
-            'detalles.vehiculo:id,patente,marca,modelo',
+            // Global: el cierre abarca carros de todas las empresas.
+            'detalles.vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'patente', 'marca', 'modelo'),
             'detalles.revision.revisor:id,name',
         ]);
 

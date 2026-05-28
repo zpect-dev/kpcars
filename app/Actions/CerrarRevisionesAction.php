@@ -6,6 +6,7 @@ namespace App\Actions;
 
 use App\Models\CierreRevision;
 use App\Models\Revision;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Support\Carbon;
@@ -23,14 +24,15 @@ class CerrarRevisionesAction
             $periodoFin = Carbon::today();
 
             $cierre = CierreRevision::create([
-                'empresa_id' => session('active_company_id'),
                 'user_id' => $admin->id,
                 'periodo_inicio' => $periodoInicio,
                 'periodo_fin' => $periodoFin,
             ]);
 
-            // Get all vehicles that are currently active and require revisions
-            $vehiculos = Vehiculo::where('patente', '!=', 'EXTERNO')
+            // Revisiones es global: cerramos TODOS los carros activos de todas
+            // las empresas (bypass TenantScope).
+            $vehiculos = Vehiculo::withoutGlobalScope(TenantScope::class)
+                ->where('patente', '!=', 'EXTERNO')
                 ->whereNotNull('user_id')
                 ->get();
 
