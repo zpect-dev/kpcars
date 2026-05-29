@@ -9,6 +9,7 @@ use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class VehiculoController extends Controller
 {
@@ -24,9 +25,11 @@ class VehiculoController extends Controller
             'propietario' => ['nullable', 'string', 'max:255'],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
-            'user_id' => ['nullable', 'exists:users,id'],
+            'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
             'fecha_vencimiento_gnc' => ['nullable', 'date_format:Y-m'],
+        ], [
+            'user_id.exists' => 'No se puede asignar un conductor inactivo.',
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));
@@ -84,9 +87,11 @@ class VehiculoController extends Controller
             'propietario' => ['nullable', 'string', 'max:255'],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
-            'user_id' => ['nullable', 'exists:users,id'],
+            'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
             'fecha_vencimiento_vtv' => ['nullable', 'date_format:Y-m'],
             'fecha_vencimiento_gnc' => ['nullable', 'date_format:Y-m'],
+        ], [
+            'user_id.exists' => 'No se puede asignar un conductor inactivo.',
         ]);
 
         $validated['patente'] = strtoupper(trim($validated['patente']));

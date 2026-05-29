@@ -37,7 +37,8 @@ class DashboardController extends Controller
             ->values();
 
         $empresas = collect();
-        $users = User::orderBy('name')->get(['id', 'name']);
+        // Solo usuarios activos: no se puede asignar un conductor inactivo.
+        $users = User::where('inactivo', false)->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('dashboard', [
             'vehiculos' => $vehiculos,

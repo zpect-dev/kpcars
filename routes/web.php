@@ -13,6 +13,7 @@ use App\Http\Controllers\InversionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\VehiculoController;
@@ -54,6 +55,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
         Route::post('appointments', [AppointmentController::class, 'store'])->name('appointments.store');
         Route::patch('appointments/{appointment}/status', [AppointmentController::class, 'updateStatus'])->name('appointments.status');
+
+        // Service (global): mecánico también, es quien realiza el service.
+        Route::get('services', [ServiceController::class, 'index'])->name('services.index');
+        Route::post('services/{vehiculo}', [ServiceController::class, 'store'])->name('services.store');
+        Route::delete('services/{service}', [ServiceController::class, 'destroy'])->name('services.destroy');
 
         // PDFs de inventario/turnos
         Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');

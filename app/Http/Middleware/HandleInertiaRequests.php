@@ -20,6 +20,7 @@ class HandleInertiaRequests extends Middleware
         'view-inventario', 'manage-inventario', 'manage-precios',
         'view-turnos', 'manage-turnos',
         'view-revisiones', 'manage-revisiones',
+        'view-service', 'manage-service',
         'view-personal', 'manage-users',
         'view-cobros', 'manage-cobros',
         'view-gastos', 'manage-gastos',

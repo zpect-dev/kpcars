@@ -43,6 +43,8 @@ export type Permissions = Partial<{
     can_manage_turnos: boolean;
     can_view_revisiones: boolean;
     can_manage_revisiones: boolean;
+    can_view_service: boolean;
+    can_manage_service: boolean;
     can_view_personal: boolean;
     can_manage_users: boolean;
     can_view_cobros: boolean;

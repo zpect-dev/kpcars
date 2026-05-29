@@ -75,4 +75,23 @@ class Vehiculo extends Model
     {
         return $this->hasOne(Revision::class)->latestOfMany();
     }
+
+    /**
+     * Get the service history for the vehicle (most recent first).
+     */
+    public function services(): HasMany
+    {
+        return $this->hasMany(Service::class)->orderByDesc('fecha')->orderByDesc('id');
+    }
+
+    /**
+     * Get the most recent service for the vehicle.
+     */
+    public function latestService(): HasOne
+    {
+        return $this->hasOne(Service::class)->ofMany([
+            'fecha' => 'max',
+            'id' => 'max',
+        ]);
+    }
 }

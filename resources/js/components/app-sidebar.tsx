@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { useEffect } from 'react';
-import { CalendarClock, CarFront, ClipboardCheck, HandCoins, Package, Receipt, Users, Wallet } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Gauge, HandCoins, Package, Receipt, Users, Wallet } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain, type NavGroup } from '@/components/nav-main';
@@ -45,6 +45,9 @@ export function AppSidebar() {
     }
     if (perms.can_view_revisiones) {
         tallerItems.push({ title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck });
+    }
+    if (perms.can_view_service) {
+        tallerItems.push({ title: 'Service', href: '/services', icon: Gauge });
     }
 
     // ── Grupo Gestión ────────────────────────────────────────────────────
