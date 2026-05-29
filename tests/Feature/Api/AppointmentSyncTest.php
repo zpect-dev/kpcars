@@ -79,10 +79,18 @@ it('requiere autenticación para sync-turnos', function () {
         ->assertUnauthorized();
 });
 
-it('valida parámetros from y to en sync-turnos', function () {
+it('usa rango por defecto cuando no se envían from y to', function () {
     $this->withHeaders([
         'Authorization' => 'Bearer '.$this->token,
     ])->getJson('/api/sync-turnos')
+        ->assertSuccessful()
+        ->assertJsonStructure(['count', 'appointments']);
+});
+
+it('valida que to sea posterior o igual a from en sync-turnos', function () {
+    $this->withHeaders([
+        'Authorization' => 'Bearer '.$this->token,
+    ])->getJson('/api/sync-turnos?from=2026-04-25&to=2026-04-20')
         ->assertUnprocessable();
 });
 

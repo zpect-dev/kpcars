@@ -425,6 +425,30 @@ it('Revisiones es GLOBAL: el panel y el cierre abarcan carros de todas las empre
     expect(\App\Models\CierreRevision::count())->toBe(1);
 });
 
+it('Desactivar chofer desasigna sus vehículos en TODAS las empresas, no sólo la activa', function () {
+    $admin = User::factory()->create([
+        'role' => UserRole::ADMINISTRADOR,
+        'dni' => '22000050',
+    ]);
+
+    // Chofer con un vehículo en cada empresa.
+    $chofer = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '22000051']);
+    $this->vehA->update(['user_id' => $chofer->id]);
+    $this->vehB->update(['user_id' => $chofer->id]);
+
+    $this->actingAs($admin);
+    // Empresa activa = A, pero el chofer también tiene el carro de B.
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $this->patch("/users/{$chofer->id}/toggle-status")->assertRedirect();
+
+    // Ambos vehículos quedan desasignados, sin importar la empresa activa.
+    $this->vehA->refresh();
+    $this->vehB->refresh();
+    expect($this->vehA->user_id)->toBeNull()
+        ->and($this->vehB->user_id)->toBeNull();
+});
+
 it('Inventario es GLOBAL: egreso a un carro de otra empresa enruta el cobro a la empresa del carro', function () {
     $admin = User::factory()->create([
         'role' => UserRole::ADMINISTRADOR,

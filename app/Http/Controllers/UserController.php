@@ -220,8 +220,11 @@ class UserController extends Controller
                     ->whereNull('fecha_fin')
                     ->update(['fecha_fin' => now()]);
 
-                // Desvincular vehículos que estuvieran a su nombre
-                Vehiculo::where('user_id', $user->id)
+                // Desvincular vehículos que estuvieran a su nombre.
+                // Sin el TenantScope: el usuario puede tener vehículos en
+                // otras empresas y todos deben quedar desasignados.
+                Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                    ->where('user_id', $user->id)
                     ->update(['user_id' => null]);
             }
         });

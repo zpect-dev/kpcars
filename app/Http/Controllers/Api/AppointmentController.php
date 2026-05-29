@@ -77,8 +77,6 @@ class AppointmentController extends Controller
      */
     public function storeExternal(Request $request, ScheduleAppointmentAction $action): JsonResponse
     {
-        abort_unless($request->user()->isAdmin(), 403, 'No autorizado para integraciones externas.');
-
         $validated = $request->validate([
             'service' => ['required', 'string', 'max:255'],
             'license_plate' => ['required', 'string', 'max:20'],
@@ -112,8 +110,6 @@ class AppointmentController extends Controller
      */
     public function cancelExternal(Request $request, Appointment $appointment): JsonResponse
     {
-        abort_unless($request->user()->isAdmin(), 403, 'No autorizado para integraciones externas.');
-
         if ($appointment->status === 'cancelado') {
             return response()->json(['message' => 'El turno ya se encuentra cancelado.'], 400);
         }
