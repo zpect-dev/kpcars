@@ -18,6 +18,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
@@ -424,28 +425,37 @@ export default function Revisiones({ vehiculos }: Props) {
 
             {/* Wizard Dialog */}
             <Dialog open={wizardOpen} onOpenChange={(o) => !o && setWizardOpen(false)}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
-                    <DialogHeader>
-                        <DialogTitle>Revisión — {selectedRow?.vehiculo.patente}</DialogTitle>
-                        <DialogDescription>
-                            Paso {step + 1} de {STEPS.length}: {STEPS[step]}
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+                    {/* Header */}
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
+                            <ClipboardCheck className="h-5 w-5 text-teal-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">
+                                Revisión — {selectedRow?.vehiculo.patente}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Paso {step + 1} de {STEPS.length}: {STEPS[step]}
+                            </DialogDescription>
+                        </div>
+                    </div>
 
                     {/* Progress bar */}
-                    <div className="flex gap-1">
+                    <div className="flex gap-1 px-5 pt-4">
                         {STEPS.map((_, i) => (
                             <div
                                 key={i}
                                 className={cn(
                                     'h-1.5 flex-1 rounded-full transition-colors',
-                                    i <= step ? 'bg-primary' : 'bg-muted',
+                                    i <= step ? 'bg-teal-500' : 'bg-muted',
                                 )}
                             />
                         ))}
                     </div>
 
-                    <div className="flex flex-col gap-4 py-2">
+                    {/* Step content */}
+                    <div className="flex max-h-[55vh] flex-col gap-4 overflow-y-auto px-5 py-4">
                         {step === 0 && (
                             <div className="space-y-4">
                                 <MonthYearPicker
@@ -468,24 +478,16 @@ export default function Revisiones({ vehiculos }: Props) {
                                 <div className="space-y-2">
                                     <Label>Nivel de Limpieza</Label>
                                     <div className="flex gap-3">
-                                        <OptionButton selected={form.data.limpieza === 'mala'} onClick={() => form.setData('limpieza', 'mala')}>
-                                            Mala
-                                        </OptionButton>
-                                        <OptionButton selected={form.data.limpieza === 'buena'} onClick={() => form.setData('limpieza', 'buena')}>
-                                            Buena
-                                        </OptionButton>
+                                        <OptionButton selected={form.data.limpieza === 'mala'} onClick={() => form.setData('limpieza', 'mala')}>Mala</OptionButton>
+                                        <OptionButton selected={form.data.limpieza === 'buena'} onClick={() => form.setData('limpieza', 'buena')}>Buena</OptionButton>
                                     </div>
                                     <InputError message={form.errors.limpieza} />
                                 </div>
                                 <div className="space-y-2">
                                     <Label>Nivel de Nafta</Label>
                                     <div className="flex gap-3">
-                                        <OptionButton selected={form.data.nivel_nafta === 'bajo'} onClick={() => form.setData('nivel_nafta', 'bajo')}>
-                                            Bajo
-                                        </OptionButton>
-                                        <OptionButton selected={form.data.nivel_nafta === 'optimo'} onClick={() => form.setData('nivel_nafta', 'optimo')}>
-                                            Óptimo
-                                        </OptionButton>
+                                        <OptionButton selected={form.data.nivel_nafta === 'bajo'} onClick={() => form.setData('nivel_nafta', 'bajo')}>Bajo</OptionButton>
+                                        <OptionButton selected={form.data.nivel_nafta === 'optimo'} onClick={() => form.setData('nivel_nafta', 'optimo')}>Óptimo</OptionButton>
                                     </div>
                                     <InputError message={form.errors.nivel_nafta} />
                                 </div>
@@ -514,30 +516,10 @@ export default function Revisiones({ vehiculos }: Props) {
 
                         {step === 3 && (
                             <div className="space-y-3">
-                                <ToggleSwitch
-                                    id="rueda_auxiliar"
-                                    label="¿Posee rueda auxiliar?"
-                                    checked={form.data.rueda_auxiliar}
-                                    onChange={(v) => form.setData('rueda_auxiliar', v)}
-                                />
-                                <ToggleSwitch
-                                    id="kit_seguridad"
-                                    label="¿Posee kit de seguridad?"
-                                    checked={form.data.kit_seguridad}
-                                    onChange={(v) => form.setData('kit_seguridad', v)}
-                                />
-                                <ToggleSwitch
-                                    id="sticker"
-                                    label="¿Posee sticker?"
-                                    checked={form.data.sticker}
-                                    onChange={(v) => form.setData('sticker', v)}
-                                />
-                                <ToggleSwitch
-                                    id="posee_fundas"
-                                    label="¿Posee fundas?"
-                                    checked={form.data.posee_fundas}
-                                    onChange={(v) => form.setData('posee_fundas', v)}
-                                />
+                                <ToggleSwitch id="rueda_auxiliar" label="¿Posee rueda auxiliar?" checked={form.data.rueda_auxiliar} onChange={(v) => form.setData('rueda_auxiliar', v)} />
+                                <ToggleSwitch id="kit_seguridad" label="¿Posee kit de seguridad?" checked={form.data.kit_seguridad} onChange={(v) => form.setData('kit_seguridad', v)} />
+                                <ToggleSwitch id="sticker" label="¿Posee sticker?" checked={form.data.sticker} onChange={(v) => form.setData('sticker', v)} />
+                                <ToggleSwitch id="posee_fundas" label="¿Posee fundas?" checked={form.data.posee_fundas} onChange={(v) => form.setData('posee_fundas', v)} />
                             </div>
                         )}
 
@@ -557,52 +539,57 @@ export default function Revisiones({ vehiculos }: Props) {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-4">
+                    {/* Navigation footer */}
+                    <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">
                         <Button
                             type="button"
                             variant="outline"
-                            size="sm"
                             disabled={step === 0}
                             onClick={() => setStep((s) => s - 1)}
                         >
-                            <ArrowLeft className="mr-1 h-4 w-4" /> Anterior
+                            <ArrowLeft className="h-4 w-4" /> Anterior
                         </Button>
 
                         {step < STEPS.length - 1 ? (
                             <Button
                                 type="button"
-                                size="sm"
                                 disabled={!canAdvance()}
                                 onClick={() => setStep((s) => s + 1)}
                             >
-                                Siguiente <ArrowRight className="ml-1 h-4 w-4" />
+                                Siguiente <ArrowRight className="h-4 w-4" />
                             </Button>
                         ) : (
                             <Button
                                 type="button"
-                                size="sm"
                                 disabled={form.processing}
                                 onClick={handleSubmit}
                             >
-                                {form.processing ? 'Guardando...' : 'Guardar Revisión'}
-                                {!form.processing && <Check className="ml-1 h-4 w-4" />}
+                                {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar revisión</>}
                             </Button>
                         )}
-                    </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Detail Dialog */}
             <Dialog open={detailOpen} onOpenChange={(o) => !o && setDetailOpen(false)}>
-                <DialogContent className="sm:max-w-[420px]">
-                    <DialogHeader>
-                        <DialogTitle>Detalle — {selectedRow?.vehiculo.patente}</DialogTitle>
-                        <DialogDescription>
-                            {selectedRow?.vehiculo.marca} {selectedRow?.vehiculo.modelo}
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">
+                                Detalle — {selectedRow?.vehiculo.patente}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {selectedRow?.vehiculo.marca} {selectedRow?.vehiculo.modelo}
+                            </DialogDescription>
+                        </div>
+                    </div>
+
                     {selectedRow?.revision_semanal && (
-                        <div className="space-y-4 text-sm">
+                        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5 text-sm">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
                                     <span className="text-xs text-muted-foreground">VTV</span>
@@ -651,6 +638,10 @@ export default function Revisiones({ vehiculos }: Props) {
                             )}
                         </div>
                     )}
+
+                    <DialogFooter className="border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setDetailOpen(false)}>Cerrar</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

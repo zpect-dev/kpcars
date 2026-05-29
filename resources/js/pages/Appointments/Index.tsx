@@ -4,6 +4,7 @@ import {
     Ban,
     CalendarIcon,
     CalendarPlus,
+    Check,
     CheckCircle2,
     Clock,
     FileDown,
@@ -345,97 +346,107 @@ export default function AppointmentsIndex({
                                         <span className="hidden sm:inline">Agendar Turno</span>
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-[425px]">
-                                    <DialogHeader>
-                                        <DialogTitle>Agendar Turno</DialogTitle>
-                                        <DialogDescription className="sr-only">
-                                            Completa los datos para agendar un turno
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
-                                        <div className={cn(
-                                            'flex items-center gap-3 rounded-md border p-3 transition-colors',
-                                            form.data.type === 'emergencia'
-                                                ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
-                                                : 'border-border bg-card',
-                                        )}>
-                                            <button
-                                                type="button"
-                                                role="switch"
-                                                aria-checked={form.data.type === 'emergencia'}
-                                                onClick={() => form.setData('type', form.data.type === 'normal' ? 'emergencia' : 'normal')}
-                                                className={cn(
-                                                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                                    form.data.type === 'emergencia' ? 'bg-red-600' : 'bg-gray-200 dark:bg-gray-700',
-                                                )}
-                                            >
-                                                <span className={cn(
-                                                    'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
-                                                    form.data.type === 'emergencia' && 'translate-x-4',
-                                                )} />
-                                            </button>
-                                            <div className="flex items-center gap-1.5">
-                                                <AlertTriangle className={cn('h-4 w-4', form.data.type === 'emergencia' ? 'text-red-600' : 'text-muted-foreground')} />
-                                                <Label className="cursor-pointer select-none text-sm">Turno de emergencia</Label>
+                                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
+                                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15">
+                                            <CalendarPlus className="h-5 w-5 text-indigo-500" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <DialogTitle className="text-base font-semibold">Agendar turno</DialogTitle>
+                                            <DialogDescription className="text-xs">
+                                                Completá los datos para registrar un nuevo turno.
+                                            </DialogDescription>
+                                        </div>
+                                    </div>
+                                    <form onSubmit={handleSubmit}>
+                                        <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto px-5 py-5">
+                                            <div className={cn(
+                                                'flex items-center gap-3 rounded-xl border p-3 transition-colors',
+                                                form.data.type === 'emergencia'
+                                                    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                    : 'border-border bg-card',
+                                            )}>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={form.data.type === 'emergencia'}
+                                                    onClick={() => form.setData('type', form.data.type === 'normal' ? 'emergencia' : 'normal')}
+                                                    className={cn(
+                                                        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                                        form.data.type === 'emergencia' ? 'bg-red-600' : 'bg-gray-200 dark:bg-gray-700',
+                                                    )}
+                                                >
+                                                    <span className={cn(
+                                                        'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
+                                                        form.data.type === 'emergencia' && 'translate-x-4',
+                                                    )} />
+                                                </button>
+                                                <div className="flex items-center gap-1.5">
+                                                    <AlertTriangle className={cn('h-4 w-4', form.data.type === 'emergencia' ? 'text-red-600' : 'text-muted-foreground')} />
+                                                    <Label className="cursor-pointer select-none text-sm">Turno de emergencia</Label>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label htmlFor="service">Servicio</Label>
+                                                <Input
+                                                    id="service"
+                                                    type="text"
+                                                    placeholder="Ej. Cambio de aceite"
+                                                    value={form.data.service}
+                                                    onChange={(e) => form.setData('service', e.target.value)}
+                                                />
+                                                <InputError message={form.errors.service} />
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label htmlFor="license_plate">Patente</Label>
+                                                <Combobox
+                                                    id="license_plate"
+                                                    placeholder="Buscar patente..."
+                                                    options={patenteOptions}
+                                                    value={form.data.license_plate}
+                                                    onSelect={(o) => {
+                                                        form.setData('license_plate', o.value);
+                                                        const v = vehiculos.find((veh) => veh.patente === o.value);
+                                                        if (v && v.user_id) form.setData('conductor_id', v.user_id);
+                                                    }}
+                                                    uppercase
+                                                />
+                                                <InputError message={form.errors.license_plate} />
+                                            </div>
+
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label htmlFor="conductor_id">Solicitante</Label>
+                                                <Combobox
+                                                    id="conductor_id"
+                                                    placeholder="Seleccionar chofer..."
+                                                    options={conductorOptions}
+                                                    value={String(form.data.conductor_id)}
+                                                    onSelect={(o) => form.setData('conductor_id', o.value)}
+                                                />
+                                                <InputError message={form.errors.conductor_id} />
+                                            </div>
+
+                                            <div className="flex flex-col gap-2">
+                                                <AppointmentCalendar
+                                                    value={form.data.preferred_date}
+                                                    onChange={(val) => form.setData('preferred_date', val)}
+                                                    minDate={today}
+                                                    dailySlots={dailySlots}
+                                                    maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots}
+                                                    viewMode="week"
+                                                />
+                                                <InputError message={form.errors.preferred_date} />
                                             </div>
                                         </div>
 
-                                        <div className="flex flex-col gap-1.5">
-                                            <Label htmlFor="service">Servicio</Label>
-                                            <Input
-                                                id="service"
-                                                type="text"
-                                                placeholder="Ej. Cambio de aceite"
-                                                value={form.data.service}
-                                                onChange={(e) => form.setData('service', e.target.value)}
-                                            />
-                                            <InputError message={form.errors.service} />
-                                        </div>
-
-                                        <div className="flex flex-col gap-1.5">
-                                            <Label htmlFor="license_plate">Patente</Label>
-                                            <Combobox
-                                                id="license_plate"
-                                                placeholder="Buscar patente..."
-                                                options={patenteOptions}
-                                                value={form.data.license_plate}
-                                                onSelect={(o) => {
-                                                    form.setData('license_plate', o.value);
-                                                    const v = vehiculos.find((veh) => veh.patente === o.value);
-                                                    if (v && v.user_id) form.setData('conductor_id', v.user_id);
-                                                }}
-                                                uppercase
-                                            />
-                                            <InputError message={form.errors.license_plate} />
-                                        </div>
-
-                                        <div className="flex flex-col gap-1.5">
-                                            <Label htmlFor="conductor_id">Solicitante</Label>
-                                            <Combobox
-                                                id="conductor_id"
-                                                placeholder="Seleccionar chofer..."
-                                                options={conductorOptions}
-                                                value={String(form.data.conductor_id)}
-                                                onSelect={(o) => form.setData('conductor_id', o.value)}
-                                            />
-                                            <InputError message={form.errors.conductor_id} />
-                                        </div>
-
-                                        <div className="col-span-full grid gap-2">
-                                            <AppointmentCalendar
-                                                value={form.data.preferred_date}
-                                                onChange={(val) => form.setData('preferred_date', val)}
-                                                minDate={today}
-                                                dailySlots={dailySlots}
-                                                maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots}
-                                                viewMode="week"
-                                            />
-                                            <InputError message={form.errors.preferred_date} />
-                                        </div>
-
-                                        <DialogFooter>
+                                        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                                            <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                                Cancelar
+                                            </Button>
                                             <Button type="submit" disabled={!canSubmit}>
-                                                {form.processing ? 'Procesando...' : 'Guardar Turno'}
+                                                {form.processing ? 'Procesando...' : <><Check className="h-4 w-4" /> Guardar turno</>}
                                             </Button>
                                         </DialogFooter>
                                     </form>
@@ -694,20 +705,25 @@ export default function AppointmentsIndex({
                     }
                 }}
             >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Marcar turno como completado</DialogTitle>
-                        <DialogDescription>
-                            Selecciona el mecánico e ingresa una descripción del trabajo realizado.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-4">
-                        <div className="grid gap-2">
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Completar turno</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Seleccioná el mecánico e ingresá una descripción del trabajo.
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
+                        <div className="flex flex-col gap-2">
                             <Label>Mecánico</Label>
                             {mecanicosVisibles.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">No hay mecánicos disponibles.</p>
                             ) : (
-                                <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border">
+                                <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                                     {mecanicosVisibles.map((m) => {
                                         const isSelected = selectedMecanicoId === String(m.id);
                                         return (
@@ -716,21 +732,21 @@ export default function AppointmentsIndex({
                                                 type="button"
                                                 onClick={() => setSelectedMecanicoId(String(m.id))}
                                                 className={cn(
-                                                    'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
+                                                    'flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm transition-colors',
                                                     isSelected
-                                                        ? 'bg-primary/10 font-medium text-foreground'
+                                                        ? 'bg-emerald-500/10 font-medium text-foreground'
                                                         : 'text-muted-foreground hover:bg-muted/60',
                                                 )}
                                             >
                                                 <span>{m.name}</span>
-                                                {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                                                {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
                                             </button>
                                         );
                                     })}
                                 </div>
                             )}
                         </div>
-                        <div className="grid gap-2">
+                        <div className="flex flex-col gap-2">
                             <Label htmlFor="completion_description">Descripción del trabajo realizado</Label>
                             <textarea
                                 id="completion_description"
@@ -739,17 +755,24 @@ export default function AppointmentsIndex({
                                 value={completionDescription}
                                 onChange={(e) => setCompletionDescription(e.target.value)}
                                 maxLength={2000}
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             />
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => { setCompleteDialog(null); setSelectedMecanicoId(''); setCompletionDescription(''); }}
+                        >
+                            Cancelar
+                        </Button>
                         <Button
                             type="button"
                             onClick={submitComplete}
                             disabled={!selectedMecanicoId || completionDescription.trim() === ''}
                         >
-                            Confirmar
+                            <Check className="h-4 w-4" /> Confirmar
                         </Button>
                     </DialogFooter>
                 </DialogContent>

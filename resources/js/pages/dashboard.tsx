@@ -1,5 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
+    Car,
+    Check,
     FileDown,
     FileUp,
     History,
@@ -541,23 +543,26 @@ export default function Dashboard({
                                         </span>
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="sm:max-w-[480px]">
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Registrar Vehículo
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Complete los datos del nuevo
-                                            vehículo.
-                                        </DialogDescription>
-                                    </DialogHeader>
+                                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+                                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                                            <Car className="h-5 w-5 text-sky-500" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <DialogTitle className="text-base font-semibold">Registrar vehículo</DialogTitle>
+                                            <DialogDescription className="text-xs">
+                                                Completá los datos del nuevo vehículo.
+                                            </DialogDescription>
+                                        </div>
+                                    </div>
                                     <VehiculoForm
                                         form={createForm}
                                         onSubmit={handleCreate}
+                                        onCancel={() => setIsCreateOpen(false)}
                                         empresas={empresas}
                                         inversiones={inversiones}
                                         users={users}
-                                        submitLabel="Registrar"
+                                        submitLabel="Registrar vehículo"
                                     />
                                 </DialogContent>
                             </Dialog>
@@ -1154,20 +1159,26 @@ export default function Dashboard({
                 open={editingVehiculo !== null}
                 onOpenChange={(open) => !open && setEditingVehiculo(null)}
             >
-                <DialogContent className="sm:max-w-[480px]">
-                    <DialogHeader>
-                        <DialogTitle>Editar Vehículo</DialogTitle>
-                        <DialogDescription>
-                            Modifique los datos del vehículo.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                            <Car className="h-5 w-5 text-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Editar vehículo</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {editingVehiculo?.patente} — {editingVehiculo?.marca} {editingVehiculo?.modelo}
+                            </DialogDescription>
+                        </div>
+                    </div>
                     <VehiculoForm
                         form={editForm}
                         onSubmit={handleEdit}
+                        onCancel={() => setEditingVehiculo(null)}
                         empresas={empresas}
                         inversiones={inversiones}
                         users={users}
-                        submitLabel="Guardar Cambios"
+                        submitLabel="Guardar cambios"
                     />
                 </DialogContent>
             </Dialog>
@@ -1329,6 +1340,7 @@ interface VehiculoFormProps {
         }>
     >;
     onSubmit: (e: React.FormEvent) => void;
+    onCancel?: () => void;
     empresas: Pick<Empresa, 'id' | 'nombre'>[];
     inversiones: Pick<Inversion, 'id' | 'nombre'>[];
     users: Pick<User, 'id' | 'name'>[];
@@ -1338,6 +1350,7 @@ interface VehiculoFormProps {
 function VehiculoForm({
     form,
     onSubmit,
+    onCancel,
     empresas,
     inversiones,
     users,
@@ -1367,7 +1380,8 @@ function VehiculoForm({
     }));
 
     return (
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+        <form onSubmit={onSubmit}>
+        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                     <Label htmlFor="patente">Patente</Label>
@@ -1487,11 +1501,17 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <DialogFooter>
-                <Button type="submit" disabled={!canSubmit}>
-                    {form.processing ? 'Procesando...' : submitLabel}
+        </div>
+        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+            {onCancel && (
+                <Button type="button" variant="outline" onClick={onCancel}>
+                    Cancelar
                 </Button>
-            </DialogFooter>
+            )}
+            <Button type="submit" disabled={!canSubmit}>
+                {form.processing ? 'Procesando...' : <><Check className="h-4 w-4" /> {submitLabel}</>}
+            </Button>
+        </DialogFooter>
         </form>
     );
 }

@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, Filter, Plus, Search, Camera } from 'lucide-react';
+import { Check, Filter, Plus, Search, Camera, UserPlus, UserCog } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -1022,15 +1022,21 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 open={showCreateModal}
                 onOpenChange={(open) => !open && closeCreateModal()}
             >
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Nuevo usuario</DialogTitle>
-                        <DialogDescription>
-                            La contraseña provisional será la primera letra del nombre + DNI.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
+                            <UserPlus className="h-5 w-5 text-violet-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Nuevo usuario</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                La contraseña provisional será la primera letra del nombre + DNI.
+                            </DialogDescription>
+                        </div>
+                    </div>
 
-                    <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+                    <form onSubmit={handleCreateSubmit}>
+                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
                         {/* Foto + Nombre */}
                         <div className="flex items-center gap-4">
                             <div className="shrink-0">
@@ -1176,10 +1182,11 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
-                        <DialogFooter>
+                        </div>
+                        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
                             <Button type="button" variant="outline" onClick={closeCreateModal}>Cancelar</Button>
                             <Button type="submit" disabled={createForm.processing}>
-                                {createForm.processing ? 'Creando...' : 'Crear usuario'}
+                                {createForm.processing ? 'Creando...' : <><Check className="h-4 w-4" /> Crear usuario</>}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -1190,15 +1197,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 open={!!userToEdit}
                 onOpenChange={(open) => !open && closeEditModal()}
             >
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Editar usuario</DialogTitle>
-                        <DialogDescription>
-                            {userToEdit?.name}
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
+                            <UserCog className="h-5 w-5 text-violet-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Editar usuario</DialogTitle>
+                            <DialogDescription className="text-xs">{userToEdit?.name}</DialogDescription>
+                        </div>
+                    </div>
 
-                    <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
+                    <form onSubmit={handleEditSubmit}>
+                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
                         {/* Foto + Nombre */}
                         <div className="flex items-center gap-4">
                             <div className="shrink-0">
@@ -1299,16 +1310,17 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
-                        <DialogFooter className="sm:justify-between">
+                        </div>
+                        <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">
                             {userToEdit && (
-                                <Button type="button" variant="secondary" onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)} className="mb-2 sm:mb-0">
+                                <Button type="button" variant="ghost" size="sm" onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)}>
                                     Ver asignaciones
                                 </Button>
                             )}
-                            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                            <div className="flex gap-2">
                                 <Button type="button" variant="outline" onClick={closeEditModal}>Cancelar</Button>
                                 <Button type="submit" disabled={editForm.processing}>
-                                    {editForm.processing ? 'Guardando...' : 'Guardar cambios'}
+                                    {editForm.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar cambios</>}
                                 </Button>
                             </div>
                         </DialogFooter>

@@ -7,10 +7,13 @@ import {
     History,
     Loader2,
     Minus,
+    Package,
     Pencil,
     Plus,
     Search,
+    Sparkles,
     Trash2,
+    TrendingUp,
     X,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
@@ -225,6 +228,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     const [matchedItem, setMatchedItem] = useState<Articulo | null>(null);
     const [isNewMode, setIsNewMode] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const [adjustingMinStock, setAdjustingMinStock] = useState(false);
     const descripcionRef = useRef<HTMLInputElement>(null);
 
     const createForm = useForm({
@@ -261,6 +265,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setIsNewMode(false);
         setShowSuggestions(false);
         setHighlightedIndex(-1);
+        setAdjustingMinStock(false);
     }
 
     function toggleNewMode() {
@@ -268,6 +273,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         setMatchedItem(null);
         setShowSuggestions(false);
         setHighlightedIndex(-1);
+        setAdjustingMinStock(false);
         createForm.setData({
             descripcion: '',
             codigo: '',
@@ -559,22 +565,21 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 open={showSalidaModal}
                 onOpenChange={(open) => { if (!open) closeSalidaModal(); }}
             >
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500">
-                                <ArrowUpCircle className="h-5 w-5 text-white" />
-                            </div>
-                            <div>
-                                <DialogTitle>Registrar egreso</DialogTitle>
-                                <DialogDescription>
-                                    Sumá los repuestos del pedido. Todo se despacha al mismo vehículo.
-                                </DialogDescription>
-                            </div>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+                    {/* Header */}
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+                            <ArrowUpCircle className="h-5 w-5 text-red-500" />
                         </div>
-                    </DialogHeader>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Registrar egreso</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Sumá los repuestos del pedido. Todo se despacha al mismo vehículo.
+                            </DialogDescription>
+                        </div>
+                    </div>
 
-                    <form onSubmit={handleSalidaSubmit} className="flex flex-col gap-5">
+                    <form onSubmit={handleSalidaSubmit} className="flex flex-col gap-5 p-5">
                         {/* Artículos */}
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
@@ -713,26 +718,28 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </div>
                         )}
 
-                        <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-2">
-                                <span className={cn('h-2 w-2 rounded-full transition-colors', salidaValida ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                        <DialogFooter className="flex-row items-center border-t border-border pt-4">
+                            <div className="mr-auto flex items-center gap-2">
+                                {salidaValida ? (
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    </span>
+                                ) : (
+                                    <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
+                                )}
                                 <span className="text-xs text-muted-foreground">
                                     {salidaValida ? 'Listo para confirmar' : 'Completá los datos para confirmar'}
                                 </span>
                             </div>
-                            <div className="flex gap-2">
-                                <Button type="button" variant="outline" onClick={closeSalidaModal}>
-                                    Cancelar
-                                </Button>
-                                <Button type="submit" disabled={salidaForm.processing || !salidaValida} className="gap-1.5">
-                                    {salidaForm.processing ? 'Procesando...' : (
-                                        <>
-                                            <Check className="h-4 w-4" />
-                                            Confirmar egreso
-                                        </>
-                                    )}
-                                </Button>
-                            </div>
+                            <Button type="button" variant="outline" onClick={closeSalidaModal}>
+                                Cancelar
+                            </Button>
+                            <Button type="submit" disabled={salidaForm.processing || !salidaValida}>
+                                {salidaForm.processing ? 'Procesando...' : (
+                                    <><Check className="h-4 w-4" /> Confirmar egreso</>
+                                )}
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -743,46 +750,79 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 open={showCreateModal}
                 onOpenChange={(open) => { if (!open) closeCreateModal(); }}
             >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>{isNewMode ? 'Nuevo artículo' : 'Ingreso de stock'}</DialogTitle>
-                        <DialogDescription>
-                            {isNewMode ? 'Registrá un artículo nuevo en el inventario.' : 'Sumá unidades a un artículo existente.'}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    {/* Toggle de modo */}
-                    <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-                        <button
-                            type="button"
-                            onClick={() => isNewMode && toggleNewMode()}
-                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-all',
-                                !isNewMode ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
-                            )}
-                        >
-                            Ingreso a existente
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => !isNewMode && toggleNewMode()}
-                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-all',
-                                isNewMode ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
-                            )}
-                        >
-                            Nuevo artículo
-                        </button>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                    {/* Header */}
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
+                            <ArrowDownCircle className="h-5 w-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Ingreso de stock</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Sumá unidades al depósito o registrá un repuesto nuevo.
+                            </DialogDescription>
+                        </div>
                     </div>
 
-                    <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+                    {/* Toggle de modo */}
+                    <div className="border-b border-border bg-muted px-3 py-2.5">
+                        <div className="flex gap-1 rounded-xl bg-muted/60 p-1">
+                            <button
+                                type="button"
+                                onClick={() => isNewMode && toggleNewMode()}
+                                className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
+                                    !isNewMode ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Sumar a existente
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => !isNewMode && toggleNewMode()}
+                                className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
+                                    isNewMode ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Repuesto nuevo
+                            </button>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleCreateSubmit} className="flex flex-col gap-5 p-5">
                         {/* Artículo */}
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="create-descripcion">{isNewMode ? 'Nombre' : 'Artículo'}</Label>
-                            {isNewMode ? (
+                            <Label className="text-sm font-medium">
+                                {isNewMode ? 'Nombre del repuesto' : '¿Qué repuesto entró?'}
+                            </Label>
+                            {isRestock && matchedItem ? (
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-orange-500/50 bg-orange-500/10 px-3.5 py-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate font-semibold text-foreground">{matchedItem.descripcion}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {matchedItem.stock} en depósito · mínimo {matchedItem.min_stock}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMatchedItem(null);
+                                            setAdjustingMinStock(false);
+                                            createForm.setData({ ...createForm.data, descripcion: '', stock: '0' });
+                                            setTimeout(() => descripcionRef.current?.focus(), 50);
+                                        }}
+                                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-orange-500/20 hover:text-foreground"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            ) : isNewMode ? (
                                 <Input
                                     id="create-descripcion"
                                     ref={descripcionRef}
                                     autoComplete="off"
-                                    placeholder="Nombre del nuevo artículo..."
+                                    placeholder="Ej. Pastillas freno delant. Cruze..."
                                     value={createForm.data.descripcion}
                                     onChange={(e) => createForm.setData('descripcion', e.target.value)}
                                 />
@@ -792,7 +832,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         id="create-descripcion"
                                         ref={descripcionRef}
                                         autoComplete="off"
-                                        placeholder="Buscar artículo..."
+                                        placeholder="Buscar repuesto..."
                                         value={createForm.data.descripcion}
                                         onChange={handleDescripcionChange}
                                         onKeyDown={handleDescripcionKeyDown}
@@ -801,7 +841,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     />
                                     {showSuggestions && createForm.data.descripcion.trim() !== '' && (
                                         <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
-                                            <div className="max-h-52 overflow-y-auto divide-y divide-border">
+                                            <div className="max-h-52 divide-y divide-border overflow-y-auto">
                                                 {suggestions.length === 0 ? (
                                                     <p className="px-3 py-2.5 text-sm text-muted-foreground">Sin coincidencias</p>
                                                 ) : (
@@ -826,53 +866,132 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     )}
                                 </div>
                             )}
-                            {isRestock && matchedItem && (
-                                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                    <span className="text-sm font-semibold text-foreground">{matchedItem.descripcion}</span>
-                                    <span className="text-xs text-muted-foreground">Stock actual: <span className="font-semibold text-foreground">{matchedItem.stock}</span></span>
-                                </div>
-                            )}
                             <InputError message={createForm.errors.descripcion} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="codigo">Código</Label>
-                                <Input
-                                    id="codigo"
-                                    type="text"
-                                    value={createForm.data.codigo}
-                                    onChange={(e) => createForm.setData('codigo', e.target.value)}
-                                    placeholder="Opcional"
-                                />
-                                <InputError message={createForm.errors.codigo} />
+                        {/* Cantidad */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-medium">
+                                    {isNewMode ? 'Stock inicial' : 'Cantidad que ingresa'}
+                                </Label>
+                                {!isNewMode && (
+                                    <div className="flex items-center gap-1">
+                                        <span className="mr-0.5 text-xs text-muted-foreground">Sumar</span>
+                                        {[1, 5, 10, 25].map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => createForm.setData('stock', String(Math.max(0, Number(createForm.data.stock) + n)))}
+                                                className="h-6 rounded-full border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                                            >
+                                                +{n}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="stock">{isRestock ? 'Cantidad a ingresar' : 'Stock inicial'}</Label>
-                                <Input
-                                    id="stock"
-                                    type="number"
-                                    min="0"
-                                    value={createForm.data.stock}
-                                    onChange={(e) => createForm.setData('stock', e.target.value)}
-                                />
-                                <InputError message={createForm.errors.stock} />
+                            <div className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => createForm.setData('stock', String(Math.max(0, Number(createForm.data.stock) - 1)))}
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted transition-colors hover:bg-muted/60"
+                                    >
+                                        <Minus className="h-3.5 w-3.5" />
+                                    </button>
+                                    <span className="w-12 text-center text-2xl font-semibold tabular-nums text-foreground">
+                                        {createForm.data.stock}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => createForm.setData('stock', String(Number(createForm.data.stock) + 1))}
+                                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted transition-colors hover:bg-muted/60"
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                                {isRestock && matchedItem && Number(createForm.data.stock) > 0 && (
+                                    <>
+                                        <div className="h-8 w-px bg-border" />
+                                        <div className="flex-1">
+                                            <p className="text-xs text-muted-foreground">Quedará en depósito</p>
+                                            <p className="tabular-nums text-lg font-semibold leading-tight text-foreground">
+                                                {matchedItem.stock + Number(createForm.data.stock)}{' '}
+                                                <span className="text-sm font-normal text-muted-foreground">unidades</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-500">
+                                            <TrendingUp className="h-3 w-3" />
+                                            +{createForm.data.stock}
+                                        </div>
+                                    </>
+                                )}
                             </div>
+                            <InputError message={createForm.errors.stock} />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="min_stock">Stock mínimo</Label>
-                                <Input
-                                    id="min_stock"
-                                    type="number"
-                                    min="0"
-                                    value={createForm.data.min_stock}
-                                    onChange={(e) => createForm.setData('min_stock', e.target.value)}
-                                />
-                                <InputError message={createForm.errors.min_stock} />
+                        {/* Ajustar stock mínimo */}
+                        {isRestock && matchedItem && (
+                            <div>
+                                {!adjustingMinStock ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAdjustingMinStock(true)}
+                                        className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        <Pencil className="h-3 w-3" />
+                                        Ajustar stock mínimo (actual: {matchedItem.min_stock} )
+                                    </button>
+                                ) : (
+                                    <div className="flex items-center gap-2">
+                                        <Label className="shrink-0 text-xs text-muted-foreground">Stock mínimo</Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            className="h-7 text-xs"
+                                            value={createForm.data.min_stock}
+                                            onChange={(e) => createForm.setData('min_stock', e.target.value)}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setAdjustingMinStock(false)}
+                                            className="text-muted-foreground transition-colors hover:text-foreground"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                            {isNewMode && (
+                        )}
+
+                        {/* Campos extra para modo nuevo */}
+                        {isNewMode && (
+                            <>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="codigo">Código</Label>
+                                        <Input
+                                            id="codigo"
+                                            type="text"
+                                            value={createForm.data.codigo}
+                                            onChange={(e) => createForm.setData('codigo', e.target.value)}
+                                            placeholder="Opcional"
+                                        />
+                                        <InputError message={createForm.errors.codigo} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="min_stock">Stock mínimo</Label>
+                                        <Input
+                                            id="min_stock"
+                                            type="number"
+                                            min="0"
+                                            value={createForm.data.min_stock}
+                                            onChange={(e) => createForm.setData('min_stock', e.target.value)}
+                                        />
+                                        <InputError message={createForm.errors.min_stock} />
+                                    </div>
+                                </div>
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="precio">Precio (ARS)</Label>
                                     <Input
@@ -886,25 +1005,19 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     />
                                     <InputError message={createForm.errors.precio} />
                                 </div>
-                            )}
-                        </div>
-
-                        {isNewMode && (
-                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border px-3.5 py-2.5 transition-colors hover:bg-muted/40">
-                                <input
-                                    type="checkbox"
-                                    checked={createForm.data.repuestos}
-                                    onChange={(e) => createForm.setData('repuestos', e.target.checked)}
-                                    className="h-4 w-4 rounded border-border"
-                                />
-                                <div>
-                                    <p className="text-sm font-medium text-foreground">Es repuesto</p>
-                                    <p className="text-xs text-muted-foreground">Aparece en egresos de taller</p>
-                                </div>
-                            </label>
+                            </>
                         )}
 
-                        <DialogFooter>
+                        <DialogFooter className="flex-row items-center border-t border-border pt-4">
+                            {isRestock && Number(createForm.data.stock) > 0 && (
+                                <div className="mr-auto flex items-center gap-2 text-sm font-medium text-emerald-500">
+                                    <span className="relative flex h-2.5 w-2.5">
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    </span>
+                                    +{createForm.data.stock} unidades
+                                </div>
+                            )}
                             <Button type="button" variant="outline" onClick={closeCreateModal}>
                                 Cancelar
                             </Button>
@@ -917,7 +1030,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     (isRestock && Number(createForm.data.stock) < 1)
                                 }
                             >
-                                {createForm.processing ? 'Procesando...' : isNewMode ? 'Crear artículo' : 'Confirmar ingreso'}
+                                {createForm.processing
+                                    ? 'Procesando...'
+                                    : isNewMode
+                                        ? 'Crear repuesto'
+                                        : <><Check className="h-4 w-4" /> Confirmar ingreso</>
+                                }
                             </Button>
                         </DialogFooter>
                     </form>
