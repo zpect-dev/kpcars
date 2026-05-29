@@ -558,7 +558,7 @@ function ManageDialog({
                     </span>
                 </div>
 
-                <div className="max-h-95 overflow-y-auto rounded-lg border border-border">
+                <div className="max-h-95 overflow-y-auto rounded-xl border border-border">
                     {filteredRows.length === 0 ? (
                         <p className="p-4 text-sm text-muted-foreground italic">
                             No hay inversores que coincidan.

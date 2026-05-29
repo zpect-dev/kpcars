@@ -27,8 +27,9 @@ class ArticuloController extends Controller
         // Inventario es global: se puede despachar a cualquier carro de cualquier
         // empresa. El cobro generado se asigna a la empresa del carro destino.
         $vehiculos = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            ->with('user:id,name')
             ->orderBy('patente')
-            ->select('id', 'patente', 'marca', 'modelo')
+            ->select('id', 'patente', 'marca', 'modelo', 'user_id')
             ->get();
 
         return Inertia::render('Items/Index', [

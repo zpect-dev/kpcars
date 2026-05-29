@@ -149,6 +149,7 @@ class UserController extends Controller
                 $arr['licencia_por_vencer'] = $vencimientoLicencia !== null
                     && $vencimientoLicencia->gte($today)
                     && $vencimientoLicencia->lte($today->copy()->addDays(30));
+                $arr['sin_licencia'] = $vencimientoLicencia === null;
                 $arr['falta_foto'] = $user->profile_photo_path === null;
 
                 return $arr;

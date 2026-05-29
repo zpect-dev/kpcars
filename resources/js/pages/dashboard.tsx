@@ -21,6 +21,7 @@ import {
     Dialog,
     DialogContent,
     DialogDescription,
+    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
@@ -1191,20 +1192,14 @@ export default function Dashboard({
                             ?
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex justify-end gap-3 pt-4">
-                        <Button
-                            variant="outline"
-                            onClick={() => setUnassigningVehiculo(null)}
-                        >
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setUnassigningVehiculo(null)}>
                             Cancelar
                         </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={handleUnassign}
-                        >
+                        <Button variant="destructive" onClick={handleUnassign}>
                             Desasignar
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
@@ -1224,17 +1219,14 @@ export default function Dashboard({
                             ? Esta acción no se puede deshacer.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex justify-end gap-3 pt-4">
-                        <Button
-                            variant="outline"
-                            onClick={() => setDeletingVehiculo(null)}
-                        >
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeletingVehiculo(null)}>
                             Cancelar
                         </Button>
                         <Button variant="destructive" onClick={handleDelete}>
                             Eliminar
                         </Button>
-                    </div>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>
@@ -1375,25 +1367,20 @@ function VehiculoForm({
     }));
 
     return (
-        <form onSubmit={onSubmit} className="grid gap-4 py-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
+        <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
                     <Label htmlFor="patente">Patente</Label>
                     <Input
                         id="patente"
                         type="text"
                         placeholder="Ej. ABC123"
                         value={form.data.patente}
-                        onChange={(e) =>
-                            form.setData(
-                                'patente',
-                                e.target.value.toUpperCase(),
-                            )
-                        }
+                        onChange={(e) => form.setData('patente', e.target.value.toUpperCase())}
                     />
                     <InputError message={form.errors.patente} />
                 </div>
-                <div className="grid gap-2">
+                <div className="flex flex-col gap-1.5">
                     <Label htmlFor="anio">Año</Label>
                     <Input
                         id="anio"
@@ -1406,8 +1393,8 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
                     <Label htmlFor="marca">Marca</Label>
                     <Input
                         id="marca"
@@ -1418,7 +1405,7 @@ function VehiculoForm({
                     />
                     <InputError message={form.errors.marca} />
                 </div>
-                <div className="grid gap-2">
+                <div className="flex flex-col gap-1.5">
                     <Label htmlFor="modelo">Modelo</Label>
                     <Input
                         id="modelo"
@@ -1431,21 +1418,19 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="flex flex-col gap-1.5">
                 <Label htmlFor="propietario">Titular</Label>
                 <Input
                     id="propietario"
                     type="text"
                     placeholder="Nombre del titular"
                     value={form.data.propietario}
-                    onChange={(e) =>
-                        form.setData('propietario', e.target.value)
-                    }
+                    onChange={(e) => form.setData('propietario', e.target.value)}
                 />
                 <InputError message={form.errors.propietario} />
             </div>
 
-            <div className="grid gap-2">
+            <div className="flex flex-col gap-1.5">
                 <Label htmlFor="inversion_id">Inversión</Label>
                 <Combobox
                     id="inversion_id"
@@ -1458,7 +1443,7 @@ function VehiculoForm({
             </div>
 
             {empresaOptions.length > 0 && (
-                <div className="grid gap-2">
+                <div className="flex flex-col gap-1.5">
                     <Label htmlFor="empresa_id">Empresa</Label>
                     <Combobox
                         id="empresa_id"
@@ -1471,8 +1456,8 @@ function VehiculoForm({
                 </div>
             )}
 
-            <div className="grid gap-2">
-                <Label htmlFor="user_id">Conductor Asignado</Label>
+            <div className="flex flex-col gap-1.5">
+                <Label htmlFor="user_id">Conductor asignado</Label>
                 <Combobox
                     id="user_id"
                     placeholder="Buscar conductor..."
@@ -1483,8 +1468,8 @@ function VehiculoForm({
                 <InputError message={form.errors.user_id} />
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
+            <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
                     <Label>Vencimiento VTV</Label>
                     <VtvMonthYearPicker
                         value={form.data.fecha_vencimiento_vtv}
@@ -1492,7 +1477,7 @@ function VehiculoForm({
                     />
                     <InputError message={form.errors.fecha_vencimiento_vtv} />
                 </div>
-                <div className="grid gap-2">
+                <div className="flex flex-col gap-1.5">
                     <Label>Vencimiento GNC</Label>
                     <VtvMonthYearPicker
                         value={form.data.fecha_vencimiento_gnc}
@@ -1502,11 +1487,11 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <DialogFooter>
                 <Button type="submit" disabled={!canSubmit}>
                     {form.processing ? 'Procesando...' : submitLabel}
                 </Button>
-            </div>
+            </DialogFooter>
         </form>
     );
 }

@@ -796,18 +796,18 @@ export default function TransactionsIndex({
                             </DialogDescription>
                         </DialogHeader>
 
-                        <div className="my-4 rounded-lg bg-muted/50 p-3 text-xs space-y-1">
+                        <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Tipo:</span>
+                                <span className="text-muted-foreground">Tipo</span>
                                 <span className="font-medium text-foreground">{selectedTx?.tipo === 'IN' ? 'Ingreso' : 'Egreso'}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Cantidad:</span>
+                                <span className="text-muted-foreground">Cantidad</span>
                                 <span className="font-medium text-foreground">{selectedTx?.cantidad} unidades</span>
                             </div>
                             {selectedTx?.vehiculo && (
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Vehículo:</span>
+                                    <span className="text-muted-foreground">Vehículo</span>
                                     <span className="font-medium text-foreground">{selectedTx.vehiculo.patente}</span>
                                 </div>
                             )}

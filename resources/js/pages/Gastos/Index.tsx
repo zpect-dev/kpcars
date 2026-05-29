@@ -645,8 +645,8 @@ export default function GastosIndex({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="grid gap-3">
-                        <div className="grid gap-1.5">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="g-tipo">Tipo / Patente</Label>
                             <Combobox
                                 id="g-tipo"
@@ -664,7 +664,7 @@ export default function GastosIndex({
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="grid gap-1.5">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="g-fecha">Fecha</Label>
                                 <Input
                                     id="g-fecha"
@@ -678,7 +678,7 @@ export default function GastosIndex({
                                     </p>
                                 )}
                             </div>
-                            <div className="grid gap-1.5">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="g-monto">Monto</Label>
                                 <Input
                                     id="g-monto"
@@ -697,7 +697,7 @@ export default function GastosIndex({
                             </div>
                         </div>
 
-                        <div className="grid gap-1.5">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="g-recibio">Recibió</Label>
                             <Input
                                 id="g-recibio"
@@ -712,7 +712,7 @@ export default function GastosIndex({
                             )}
                         </div>
 
-                        <div className="grid gap-1.5">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="g-metodo">Método de pago</Label>
                             <Select
                                 value={metodoPago}
@@ -734,7 +734,7 @@ export default function GastosIndex({
                             </Select>
                         </div>
 
-                        <div className="grid gap-1.5">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="g-descripcion">
                                 Descripción (opcional)
                             </Label>
@@ -745,7 +745,7 @@ export default function GastosIndex({
                                     setDescripcion(e.target.value)
                                 }
                                 rows={3}
-                                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
+                                className="flex w-full rounded-xl border border-input bg-transparent px-3.5 py-2.5 text-sm shadow-xs focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 focus-visible:outline-none"
                                 placeholder="Detalle del gasto..."
                             />
                         </div>

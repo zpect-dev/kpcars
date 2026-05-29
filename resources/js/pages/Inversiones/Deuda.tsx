@@ -197,8 +197,8 @@ export default function DeudaShow({ inversion, user, movimientos, saldo, tasaAct
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleSubmit} className="grid gap-4 py-2">
-                        <div className="grid gap-2">
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="tipo">Tipo</Label>
                             <Select
                                 value={form.data.tipo}
@@ -217,7 +217,7 @@ export default function DeudaShow({ inversion, user, movimientos, saldo, tasaAct
                             <InputError message={form.errors.tipo} />
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="monto">Monto (ARS)</Label>
                             <Input
                                 id="monto"
@@ -232,7 +232,7 @@ export default function DeudaShow({ inversion, user, movimientos, saldo, tasaAct
                             <InputError message={form.errors.monto} />
                         </div>
 
-                        <div className="grid gap-2">
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="descripcion">
                                 Descripción (opcional)
                             </Label>

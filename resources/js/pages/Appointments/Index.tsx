@@ -5,16 +5,13 @@ import {
     CalendarIcon,
     CalendarPlus,
     CheckCircle2,
-    ChevronDown,
-    ChevronLeft,
-    ChevronRight,
     Clock,
     FileDown,
     MoreHorizontal,
-    X,
     Wrench,
+    X,
 } from 'lucide-react';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Vehiculo } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -37,15 +34,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import InputError from '@/components/input-error';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
 import { AppointmentCalendar } from './AppointmentCalendar';
 
@@ -57,15 +47,10 @@ interface AppointmentRow {
     service: string;
     type: AppointmentType;
     license_plate: string;
-    conductor?: {
-        id: number;
-        name: string;
-    } | null;
+    conductor?: { id: number; name: string } | null;
     scheduled_date: string;
     status: AppointmentStatus;
-    completed_by?: {
-        name: string;
-    } | null;
+    completed_by?: { name: string } | null;
     completed_at?: string | null;
     completion_description?: string | null;
 }
@@ -89,10 +74,7 @@ interface Filters {
 interface Props {
     appointments: PaginationInfo;
     filters: Filters;
-    vehiculos: Pick<
-        Vehiculo,
-        'id' | 'patente' | 'marca' | 'modelo' | 'user_id'
-    >[];
+    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo' | 'user_id'>[];
     conductores: { id: number; name: string }[];
     mecanicos: { id: number; name: string }[];
     dailySlots: Record<string, number>;
@@ -101,18 +83,15 @@ interface Props {
 }
 
 const STATUS_STYLES: Record<AppointmentStatus, string> = {
-    agendado:
-        'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    en_proceso:
-        'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    completado:
-        'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    agendado: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    en_proceso: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    completado: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     cancelado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const STATUS_LABEL: Record<AppointmentStatus, string> = {
     agendado: 'Agendado',
-    en_proceso: 'En proceso',
+    en_proceso: 'En curso',
     completado: 'Completado',
     cancelado: 'Cancelado',
 };
@@ -126,6 +105,23 @@ const TYPE_LABEL: Record<AppointmentType, string> = {
     normal: 'Normal',
     emergencia: 'Emergencia',
 };
+
+// Dot color + active bg/text per status tab
+const TAB_CONFIG: Record<'all' | AppointmentStatus, { dot: string; active: string }> = {
+    all:        { dot: 'bg-zinc-400 dark:bg-zinc-500',  active: 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' },
+    agendado:   { dot: 'bg-amber-400',                   active: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
+    en_proceso: { dot: 'bg-blue-400',                    active: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
+    completado: { dot: 'bg-green-400',                   active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
+    cancelado:  { dot: 'bg-red-400',                     active: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
+};
+
+const TABS: { key: 'all' | AppointmentStatus; label: string }[] = [
+    { key: 'all',        label: 'Todos' },
+    { key: 'agendado',   label: 'Agendados' },
+    { key: 'en_proceso', label: 'En curso' },
+    { key: 'completado', label: 'Completados' },
+    { key: 'cancelado',  label: 'Cancelados' },
+];
 
 function formatDate(iso: string): string {
     const d = iso.length >= 10 ? iso.slice(0, 10) : iso;
@@ -150,26 +146,18 @@ export default function AppointmentsIndex({
     remainingToday,
     maxSlots,
 }: Props) {
+    const today = useRef(new Date().toISOString().slice(0, 10)).current;
+
     const [from, setFrom] = useState(filters.from || '');
     const [to, setTo] = useState(filters.to || '');
-    const [status, setStatus] = useState(filters.status || '');
     const [plate, setPlate] = useState(filters.plate || '');
+    const [statusTab, setStatusTab] = useState<'all' | AppointmentStatus>('all');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(
-        null,
-    );
-    const [expandedId, setExpandedId] = useState<number | null>(null);
-    const [selectedMecanicoId, setSelectedMecanicoId] = useState<string>('');
-    const [completionDescription, setCompletionDescription] = useState<string>('');
+    const [completeDialog, setCompleteDialog] = useState<{ id: number } | null>(null);
+    const [selectedMecanicoId, setSelectedMecanicoId] = useState('');
+    const [completionDescription, setCompletionDescription] = useState('');
 
-    const mecanicoOptions: ComboboxOption[] = useMemo(
-        () =>
-            mecanicos.map((m) => ({
-                value: String(m.id),
-                label: m.name,
-            })),
-        [mecanicos],
-    );
+    const isMounted = useRef(false);
 
     const { auth } = usePage<any>().props;
     const isMechanic = auth.user.role === 'mecanico';
@@ -180,8 +168,6 @@ export default function AppointmentsIndex({
         [mecanicos, auth.user.id],
     );
 
-    const today = useRef(new Date().toISOString().slice(0, 10)).current;
-
     const form = useForm({
         service: '' as string,
         license_plate: '' as string,
@@ -190,51 +176,74 @@ export default function AppointmentsIndex({
         type: 'normal' as AppointmentType,
     });
 
-    const isMounted = useRef(false);
-
     const patenteOptions: ComboboxOption[] = useMemo(
-        () =>
-            vehiculos.map((v) => ({
-                value: v.patente,
-                label: v.patente,
-                sub: `${v.marca} ${v.modelo}`,
-            })),
+        () => vehiculos.map((v) => ({ value: v.patente, label: v.patente, sub: `${v.marca} ${v.modelo}` })),
         [vehiculos],
     );
 
     const conductorOptions: ComboboxOption[] = useMemo(
-        () =>
-            conductores.map((c) => ({
-                value: String(c.id),
-                label: c.name,
-            })),
+        () => conductores.map((c) => ({ value: String(c.id), label: c.name })),
         [conductores],
     );
 
-    /**
-     * Check if a given date string (YYYY-MM-DD) has exhausted normal slots.
-     */
-    const isDateFull = (dateStr: string): boolean => {
-        return (dailySlots[dateStr] ?? 0) >= maxSlots;
-    };
+    // Sync date/plate filters to URL (status is client-side)
+    useEffect(() => {
+        if (!isMounted.current) {
+            isMounted.current = true;
+            return;
+        }
+        const hasChanges =
+            from !== (filters.from || '') ||
+            to !== (filters.to || '') ||
+            plate !== (filters.plate || '');
+        if (!hasChanges) return;
 
-    /**
-     * Get the slot usage text for the selected date.
-     */
-    const selectedDateSlots = useMemo(() => {
-        const date = form.data.preferred_date;
-        if (!date) return null;
-        const used = dailySlots[date] ?? 0;
-        return { used, max: maxSlots, full: used >= maxSlots };
-    }, [form.data.preferred_date, dailySlots, maxSlots]);
+        const timeoutId = setTimeout(() => {
+            const active: Record<string, string> = { from, to };
+            if (plate) active.plate = plate;
+            router.get('/appointments', active, {
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            });
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
+    }, [from, to, plate, filters]);
+
+    // Reset tab when server data changes (new filter applied)
+    useEffect(() => {
+        setStatusTab('all');
+    }, [appointments.data]);
+
+    const tabCounts = useMemo(() => ({
+        all:        appointments.data.length,
+        agendado:   appointments.data.filter((a) => a.status === 'agendado').length,
+        en_proceso: appointments.data.filter((a) => a.status === 'en_proceso').length,
+        completado: appointments.data.filter((a) => a.status === 'completado').length,
+        cancelado:  appointments.data.filter((a) => a.status === 'cancelado').length,
+    }), [appointments.data]);
+
+    const filteredAppointments = useMemo(() => {
+        if (statusTab === 'all') return appointments.data;
+        return appointments.data.filter((a) => a.status === statusTab);
+    }, [appointments.data, statusTab]);
+
+    function clearFilters() {
+        setFrom('');
+        setTo('');
+        setPlate('');
+        setStatusTab('all');
+        router.get('/appointments', { from: '', to: '' }, { preserveState: false, preserveScroll: true });
+    }
+
+    const hasActiveFilters = !!(from || to || plate);
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         form.post('/appointments', {
             preserveScroll: true,
-            onSuccess: () => {
-                setIsDialogOpen(false);
-            },
+            onSuccess: () => setIsDialogOpen(false),
         });
     }
 
@@ -245,77 +254,21 @@ export default function AppointmentsIndex({
         form.data.conductor_id !== '' &&
         form.data.preferred_date !== '';
 
-    useEffect(() => {
-        if (!isMounted.current) {
-            isMounted.current = true;
-            return;
-        }
-
-        const hasChanges =
-            from !== (filters.from || '') ||
-            to !== (filters.to || '') ||
-            status !== (filters.status || '') ||
-            plate !== (filters.plate || '');
-
-        if (!hasChanges) return;
-
-        const timeoutId = setTimeout(() => {
-            const active: Record<string, string> = {
-                from: from,
-                to: to,
-            };
-            if (status) active.status = status;
-            if (plate) active.plate = plate;
-
-            router.get('/appointments', active, {
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            });
-        }, 300);
-
-        return () => clearTimeout(timeoutId);
-    }, [from, to, status, plate, filters]);
-
-    function clearFilters() {
-        setFrom('');
-        setTo('');
-        setStatus('');
-        setPlate('');
-        // Enviar explícitamente from y to vacíos con preserveState: false
-        router.get(
-            '/appointments',
-            { from: '', to: '' },
-            { preserveState: false, preserveScroll: true },
-        );
-    }
-
-    const hasActiveFilters = !!(from || to || status || plate);
-
     function changeStatus(id: number, next: AppointmentStatus) {
         if (next === 'completado') {
             setSelectedMecanicoId('');
             setCompletionDescription('');
-            // Un pequeño delay evita el parpadeo visual entre el cierre del dropdown
-            // y la apertura del modal controlado por estado.
-            setTimeout(() => {
-                setCompleteDialog({ id });
-            }, 10);
+            setTimeout(() => setCompleteDialog({ id }), 10);
             return;
         }
-        router.patch(
-            `/appointments/${id}/status`,
-            { status: next },
-            {
-                preserveScroll: true,
-                preserveState: true,
-            },
-        );
+        router.patch(`/appointments/${id}/status`, { status: next }, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     }
 
     function submitComplete() {
-        if (!completeDialog || !selectedMecanicoId) return;
-        if (completionDescription.trim() === '') return;
+        if (!completeDialog || !selectedMecanicoId || completionDescription.trim() === '') return;
         router.patch(
             `/appointments/${completeDialog.id}/status`,
             {
@@ -346,28 +299,17 @@ export default function AppointmentsIndex({
                         <h1 className="text-lg font-semibold text-foreground sm:text-xl">
                             Turnos Asignados
                         </h1>
-                        <div className="flex items-center gap-2">
-                            <span
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                                    remainingToday > 0
-                                        ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-                                        : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
-                                )}
-                            >
-                                <span
-                                    className={cn(
-                                        'h-1.5 w-1.5 rounded-full',
-                                        remainingToday > 0
-                                            ? 'bg-green-500'
-                                            : 'bg-red-500',
-                                    )}
-                                />
-                                {remainingToday === 0
-                                    ? 'Sin cupos disponibles para hoy'
-                                    : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`}
-                            </span>
-                        </div>
+                        <span className={cn(
+                            'inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+                            remainingToday > 0
+                                ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
+                                : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
+                        )}>
+                            <span className={cn('h-1.5 w-1.5 rounded-full', remainingToday > 0 ? 'bg-green-500' : 'bg-red-500')} />
+                            {remainingToday === 0
+                                ? 'Sin cupos disponibles para hoy'
+                                : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`}
+                        </span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button
@@ -377,19 +319,13 @@ export default function AppointmentsIndex({
                                 const params = new URLSearchParams();
                                 if (from) params.set('from', from);
                                 if (to) params.set('to', to);
-                                if (status) params.set('status', status);
                                 if (plate) params.set('plate', plate);
                                 const qs = params.toString();
-                                window.open(
-                                    '/pdf/appointments' + (qs ? '?' + qs : ''),
-                                    '_blank',
-                                );
+                                window.open('/pdf/appointments' + (qs ? '?' + qs : ''), '_blank');
                             }}
                         >
                             <FileDown className="h-4 w-4" />
-                            <span className="hidden sm:inline">
-                                Exportar PDF
-                            </span>
+                            <span className="hidden sm:inline">Exportar PDF</span>
                         </Button>
 
                         {!isMechanic && !isInversor && (
@@ -406,184 +342,100 @@ export default function AppointmentsIndex({
                                 <DialogTrigger asChild>
                                     <Button size="sm">
                                         <CalendarPlus className="h-4 w-4" />
-                                        <span className="hidden sm:inline">
-                                            Agendar Turno
-                                        </span>
+                                        <span className="hidden sm:inline">Agendar Turno</span>
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-[425px]">
                                     <DialogHeader>
                                         <DialogTitle>Agendar Turno</DialogTitle>
                                         <DialogDescription className="sr-only">
-                                            Completa los datos para agendar un
-                                            turno
+                                            Completa los datos para agendar un turno
                                         </DialogDescription>
                                     </DialogHeader>
-
-                                    <form
-                                        onSubmit={handleSubmit}
-                                        className="grid gap-4 py-4"
-                                    >
-                                        {/* Toggle emergencia */}
-                                        <div
-                                            className={cn(
-                                                'flex items-center gap-3 rounded-md border p-3 transition-colors',
-                                                form.data.type === 'emergencia'
-                                                    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
-                                                    : 'border-border bg-card',
-                                            )}
-                                        >
+                                    <form onSubmit={handleSubmit} className="flex flex-col gap-4 py-4">
+                                        <div className={cn(
+                                            'flex items-center gap-3 rounded-md border p-3 transition-colors',
+                                            form.data.type === 'emergencia'
+                                                ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                : 'border-border bg-card',
+                                        )}>
                                             <button
                                                 type="button"
                                                 role="switch"
-                                                aria-checked={
-                                                    form.data.type ===
-                                                    'emergencia'
-                                                }
-                                                onClick={() =>
-                                                    form.setData(
-                                                        'type',
-                                                        form.data.type ===
-                                                            'normal'
-                                                            ? 'emergencia'
-                                                            : 'normal',
-                                                    )
-                                                }
+                                                aria-checked={form.data.type === 'emergencia'}
+                                                onClick={() => form.setData('type', form.data.type === 'normal' ? 'emergencia' : 'normal')}
                                                 className={cn(
-                                                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
-                                                    form.data.type ===
-                                                        'emergencia'
-                                                        ? 'bg-red-600'
-                                                        : 'bg-gray-200 dark:bg-gray-700',
+                                                    'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                                    form.data.type === 'emergencia' ? 'bg-red-600' : 'bg-gray-200 dark:bg-gray-700',
                                                 )}
                                             >
-                                                <span
-                                                    className={cn(
-                                                        'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
-                                                        form.data.type ===
-                                                            'emergencia' &&
-                                                            'translate-x-4',
-                                                    )}
-                                                />
+                                                <span className={cn(
+                                                    'pointer-events-none mt-0.5 ml-0.5 block h-4 w-4 rounded-full bg-white shadow-sm ring-0 transition-transform',
+                                                    form.data.type === 'emergencia' && 'translate-x-4',
+                                                )} />
                                             </button>
                                             <div className="flex items-center gap-1.5">
-                                                <AlertTriangle
-                                                    className={cn(
-                                                        'h-4 w-4',
-                                                        form.data.type ===
-                                                            'emergencia'
-                                                            ? 'text-red-600'
-                                                            : 'text-muted-foreground',
-                                                    )}
-                                                />
-                                                <Label className="cursor-pointer text-sm select-none">
-                                                    Turno de emergencia
-                                                </Label>
+                                                <AlertTriangle className={cn('h-4 w-4', form.data.type === 'emergencia' ? 'text-red-600' : 'text-muted-foreground')} />
+                                                <Label className="cursor-pointer select-none text-sm">Turno de emergencia</Label>
                                             </div>
                                         </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="service">
-                                                Servicio
-                                            </Label>
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="service">Servicio</Label>
                                             <Input
                                                 id="service"
                                                 type="text"
                                                 placeholder="Ej. Cambio de aceite"
                                                 value={form.data.service}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'service',
-                                                        e.target.value,
-                                                    )
-                                                }
+                                                onChange={(e) => form.setData('service', e.target.value)}
                                             />
-                                            <InputError
-                                                message={form.errors.service}
-                                            />
+                                            <InputError message={form.errors.service} />
                                         </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="license_plate">
-                                                Patente
-                                            </Label>
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="license_plate">Patente</Label>
                                             <Combobox
                                                 id="license_plate"
                                                 placeholder="Buscar patente..."
                                                 options={patenteOptions}
                                                 value={form.data.license_plate}
                                                 onSelect={(o) => {
-                                                    form.setData(
-                                                        'license_plate',
-                                                        o.value,
-                                                    );
-                                                    // Autocompletar conductor asignado
-                                                    const v = vehiculos.find(
-                                                        (v) =>
-                                                            v.patente ===
-                                                            o.value,
-                                                    );
-                                                    if (v && v.user_id) {
-                                                        form.setData(
-                                                            'conductor_id',
-                                                            v.user_id,
-                                                        );
-                                                    }
+                                                    form.setData('license_plate', o.value);
+                                                    const v = vehiculos.find((veh) => veh.patente === o.value);
+                                                    if (v && v.user_id) form.setData('conductor_id', v.user_id);
                                                 }}
                                                 uppercase
                                             />
-                                            <InputError
-                                                message={
-                                                    form.errors.license_plate
-                                                }
-                                            />
+                                            <InputError message={form.errors.license_plate} />
                                         </div>
 
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="conductor_id">
-                                                Solicitante
-                                            </Label>
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="conductor_id">Solicitante</Label>
                                             <Combobox
                                                 id="conductor_id"
                                                 placeholder="Seleccionar chofer..."
                                                 options={conductorOptions}
-                                                value={String(
-                                                    form.data.conductor_id,
-                                                )}
-                                                onSelect={(o) =>
-                                                    form.setData(
-                                                        'conductor_id',
-                                                        o.value,
-                                                    )
-                                                }
+                                                value={String(form.data.conductor_id)}
+                                                onSelect={(o) => form.setData('conductor_id', o.value)}
                                             />
-                                            <InputError
-                                                message={
-                                                    form.errors.conductor_id
-                                                }
-                                            />
+                                            <InputError message={form.errors.conductor_id} />
                                         </div>
 
-                                        <div className="grid gap-2 col-span-full">
+                                        <div className="col-span-full grid gap-2">
                                             <AppointmentCalendar
                                                 value={form.data.preferred_date}
                                                 onChange={(val) => form.setData('preferred_date', val)}
                                                 minDate={today}
                                                 dailySlots={dailySlots}
-                                                maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots} // Allow selection if emergency
+                                                maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots}
                                                 viewMode="week"
                                             />
                                             <InputError message={form.errors.preferred_date} />
                                         </div>
 
                                         <DialogFooter>
-                                            <Button
-                                                type="submit"
-                                                disabled={!canSubmit}
-                                            >
-                                                {form.processing
-                                                    ? 'Procesando...'
-                                                    : 'Guardar Turno'}
+                                            <Button type="submit" disabled={!canSubmit}>
+                                                {form.processing ? 'Procesando...' : 'Guardar Turno'}
                                             </Button>
                                         </DialogFooter>
                                     </form>
@@ -593,64 +445,9 @@ export default function AppointmentsIndex({
                     </div>
                 </div>
 
-                {/* Filtros */}
+                {/* Date + plate filters */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,1fr))_auto]">
-                        {/* Funcionalidad Desde/Hasta guardada por si se necesita a futuro:
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="from">Desde</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        id="from"
-                                        variant="outline"
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !from && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {from ? formatDate(from) : <span>Seleccionar fecha</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <AppointmentCalendar
-                                        value={from}
-                                        onChange={(v) => setFrom(v)}
-                                        title={null}
-                                        className="border-0 bg-popover"
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="to">Hasta</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button
-                                        id="to"
-                                        variant="outline"
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !to && "text-muted-foreground"
-                                        )}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {to ? formatDate(to) : <span>Seleccionar fecha</span>}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <AppointmentCalendar
-                                        value={to}
-                                        onChange={(v) => setTo(v)}
-                                        title={null}
-                                        className="border-0 bg-popover"
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
-                        */}
-
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="date">Rango de Fechas</Label>
                             <Popover>
@@ -658,15 +455,12 @@ export default function AppointmentsIndex({
                                     <Button
                                         id="date"
                                         variant="outline"
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !from && !to && "text-muted-foreground"
-                                        )}
+                                        className={cn('w-full justify-start text-left font-normal', !from && !to && 'text-muted-foreground')}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {from && to 
-                                            ? from === to 
-                                                ? formatDate(from) 
+                                        {from && to
+                                            ? from === to
+                                                ? formatDate(from)
                                                 : `${formatDate(from)} - ${formatDate(to)}`
                                             : <span>Seleccionar rango</span>}
                                     </Button>
@@ -675,10 +469,7 @@ export default function AppointmentsIndex({
                                     <AppointmentCalendar
                                         mode="range"
                                         rangeValue={{ from, to }}
-                                        onRangeChange={(range) => {
-                                            setFrom(range.from);
-                                            setTo(range.to);
-                                        }}
+                                        onRangeChange={(range) => { setFrom(range.from); setTo(range.to); }}
                                         title={null}
                                         className="border-0 bg-popover"
                                         dailySlots={dailySlots}
@@ -688,34 +479,7 @@ export default function AppointmentsIndex({
                                 </PopoverContent>
                             </Popover>
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <Label htmlFor="status">Estado</Label>
-                            <Select
-                                value={status || 'all'}
-                                onValueChange={(v) =>
-                                    setStatus(v === 'all' ? '' : v)
-                                }
-                            >
-                                <SelectTrigger id="status" className="w-full">
-                                    <SelectValue placeholder="Todos" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="agendado">
-                                        Agendado
-                                    </SelectItem>
-                                    <SelectItem value="en_proceso">
-                                        En proceso
-                                    </SelectItem>
-                                    <SelectItem value="completado">
-                                        Completado
-                                    </SelectItem>
-                                    <SelectItem value="cancelado">
-                                        Cancelado
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="plate">Patente</Label>
                             <Combobox
@@ -729,479 +493,197 @@ export default function AppointmentsIndex({
                             />
                         </div>
 
-                        <div className="col-span-full flex items-end sm:col-span-1 lg:col-span-1">
+                        <div className="flex items-end">
                             <button
                                 type="button"
                                 onClick={clearFilters}
                                 disabled={!hasActiveFilters}
                                 title="Limpiar filtros"
                                 className={cn(
-                                    'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all duration-150 lg:w-9 lg:px-0',
+                                    'flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-all lg:w-9 lg:px-0',
                                     hasActiveFilters
                                         ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
                                         : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
                                 )}
                             >
                                 <X className="h-4 w-4" />
-                                <span className="lg:hidden">
-                                    Limpiar filtros
-                                </span>
+                                <span className="lg:hidden">Limpiar filtros</span>
                             </button>
                         </div>
                     </div>
                 </div>
 
-                {/* Tabla + cards */}
-                <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    {/* Desktop */}
-                    <div className="hidden overflow-x-auto md:block">
-                        <table className="w-full table-fixed text-left text-sm text-muted-foreground">
-                            <thead className="border-b border-border bg-muted/40 text-xs uppercase">
-                                <tr>
-                                    <th className="w-[6%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        # Turno
-                                    </th>
-                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Fecha
-                                    </th>
-                                    <th className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Servicio
-                                    </th>
-                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Patente
-                                    </th>
-                                    <th className="w-[11%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Solicitante
-                                    </th>
-                                    <th className="w-[8%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Tipo
-                                    </th>
-                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Estado
-                                    </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Completado por
-                                    </th>
-                                    <th className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Fecha completado
-                                    </th>
-                                    <th className="w-[9%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Descripción
-                                    </th>
-                                    <th className="w-[5%] px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
-                                        Acciones
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {appointments.data.length === 0 ? (
-                                    <tr>
-                                        <td
-                                            colSpan={11}
-                                            className="px-6 py-12 text-center text-muted-foreground"
-                                        >
-                                            No hay turnos que coincidan con los
-                                            filtros.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    appointments.data.map((a) => {
-                                        const isExpanded = expandedId === a.id;
-                                        return (
-                                            <Fragment key={a.id}>
-                                                <tr
-                                                    className="bg-card cursor-pointer transition-colors hover:bg-muted/40"
-                                                    onClick={() => setExpandedId(isExpanded ? null : a.id)}
-                                                >
-                                                    <td className="px-4 py-3 font-medium text-foreground sm:px-6 sm:py-4">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200', isExpanded && 'rotate-180')} />
-                                                            #{a.id}
-                                                        </div>
-                                                    </td>
-                                                    <td
-                                                        className="truncate px-4 py-3 font-medium text-muted-foreground sm:px-6 sm:py-4"
-                                                        title={formatDate(a.scheduled_date)}
-                                                    >
-                                                        {formatDate(a.scheduled_date)}
-                                                    </td>
-                                                    <td
-                                                        className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                        title={a.service}
-                                                    >
-                                                        {a.service}
-                                                    </td>
-                                                    <td
-                                                        className="truncate px-4 py-3 font-mono text-foreground sm:px-6 sm:py-4"
-                                                        title={a.license_plate}
-                                                    >
-                                                        {a.license_plate}
-                                                    </td>
-                                                    <td
-                                                        className="truncate px-4 py-3 sm:px-6 sm:py-4"
-                                                        title={a.conductor?.name || '-'}
-                                                    >
-                                                        {a.conductor?.name || '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
-                                                            {TYPE_LABEL[a.type]}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                        <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
-                                                            {STATUS_LABEL[a.status]}
-                                                        </span>
-                                                    </td>
-                                                    <td className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                        {a.status === 'completado' && a.completed_by ? (
-                                                            <span className="font-medium text-foreground" title={a.completed_by.name}>
-                                                                {a.completed_by.name}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-muted-foreground/40 italic">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                        {a.status === 'completado' && a.completed_at ? (
-                                                            <span className="text-muted-foreground">{formatDateTime(a.completed_at)}</span>
-                                                        ) : (
-                                                            <span className="text-muted-foreground/40 italic">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="truncate px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                        {a.status === 'completado' && a.completion_description ? (
-                                                            <span className="text-muted-foreground">{a.completion_description}</span>
-                                                        ) : (
-                                                            <span className="text-muted-foreground/40 italic">-</span>
-                                                        )}
-                                                    </td>
-                                                    <td
-                                                        className="px-4 py-3 text-right sm:px-6 sm:py-4"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        {!isInversor && (
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-8 w-8 p-0"
-                                                                        disabled={isMechanic && a.status === 'completado'}
-                                                                    >
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                        <span className="sr-only">Acciones</span>
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem
-                                                                        disabled={a.status === 'agendado'}
-                                                                        onSelect={() => changeStatus(a.id, 'agendado')}
-                                                                    >
-                                                                        <Clock className="h-4 w-4" />
-                                                                        Marcar agendado
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem
-                                                                        disabled={a.status === 'en_proceso'}
-                                                                        onSelect={() => changeStatus(a.id, 'en_proceso')}
-                                                                    >
-                                                                        <Wrench className="h-4 w-4" />
-                                                                        Marcar en proceso
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem
-                                                                        disabled={a.status === 'completado'}
-                                                                        onSelect={() => changeStatus(a.id, 'completado')}
-                                                                    >
-                                                                        <CheckCircle2 className="h-4 w-4" />
-                                                                        Marcar completado
-                                                                    </DropdownMenuItem>
-                                                                    {!isMechanic && (
-                                                                        <>
-                                                                            <DropdownMenuSeparator />
-                                                                            <DropdownMenuItem
-                                                                                disabled={a.status === 'cancelado'}
-                                                                                onSelect={() => changeStatus(a.id, 'cancelado')}
-                                                                                className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
-                                                                            >
-                                                                                <Ban className="h-4 w-4" />
-                                                                                Cancelar turno
-                                                                            </DropdownMenuItem>
-                                                                        </>
-                                                                    )}
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                                {isExpanded && (
-                                                    <tr className="bg-muted/20">
-                                                        <td colSpan={11} className="px-6 py-5">
-                                                            <div className="flex flex-col gap-4">
-                                                                {/* Info general */}
-                                                                <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Turno</p>
-                                                                        <p className="text-sm font-medium text-foreground">#{a.id}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha agendada</p>
-                                                                        <p className="text-sm text-foreground">{formatDate(a.scheduled_date)}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Patente</p>
-                                                                        <p className="font-mono text-sm font-medium text-foreground">{a.license_plate}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Solicitante</p>
-                                                                        <p className="text-sm text-foreground">{a.conductor?.name || <span className="italic text-muted-foreground">—</span>}</p>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Tipo</p>
-                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
-                                                                            {TYPE_LABEL[a.type]}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Estado</p>
-                                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
-                                                                            {STATUS_LABEL[a.status]}
-                                                                        </span>
-                                                                    </div>
-                                                                    {a.completed_by && (
-                                                                        <div>
-                                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Completado por</p>
-                                                                            <p className="text-sm text-foreground">{a.completed_by.name}</p>
-                                                                        </div>
-                                                                    )}
-                                                                    {a.completed_at && (
-                                                                        <div>
-                                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha completado</p>
-                                                                            <p className="text-sm text-foreground">{formatDateTime(a.completed_at)}</p>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {/* Servicio */}
-                                                                <div className="border-t border-border/60 pt-3">
-                                                                    <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Servicio</p>
-                                                                    <p className="text-sm text-foreground">{a.service}</p>
-                                                                </div>
-                                                                {/* Descripción */}
-                                                                {a.completion_description && (
-                                                                    <div className="border-t border-border/60 pt-3">
-                                                                        <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Descripción del trabajo realizado</p>
-                                                                        <p className="text-sm leading-relaxed text-foreground">{a.completion_description}</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </Fragment>
-                                        );
-                                    })
+                {/* Status tabs */}
+                <div className="flex flex-wrap gap-2">
+                    {TABS.map(({ key, label }) => {
+                        const count = tabCounts[key];
+                        const isActive = statusTab === key;
+                        const cfg = TAB_CONFIG[key];
+                        return (
+                            <button
+                                key={key}
+                                type="button"
+                                onClick={() => setStatusTab(key)}
+                                className={cn(
+                                    'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all',
+                                    isActive
+                                        ? cfg.active
+                                        : 'bg-muted text-muted-foreground hover:text-foreground',
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
+                            >
+                                <span className={cn(
+                                    'h-1.5 w-1.5 rounded-full transition-opacity',
+                                    cfg.dot,
+                                    isActive ? 'opacity-100' : 'opacity-40',
+                                )} />
+                                {label}
+                                <span className={cn(
+                                    'min-w-[1.25rem] rounded-full px-1 py-px text-center text-[10px] font-bold tabular-nums',
+                                    isActive
+                                        ? 'bg-black/10 dark:bg-white/20'
+                                        : 'bg-background text-foreground/60',
+                                )}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
 
-                    {/* Mobile cards */}
-                    <ul className="divide-y divide-border md:hidden">
-                        {appointments.data.length === 0 ? (
-                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No hay turnos que coincidan con los filtros.
-                            </li>
-                        ) : (
-                            appointments.data.map((a) => {
-                                const isExpanded = expandedId === a.id;
-                                return (
-                                    <li key={a.id} className="flex flex-col gap-2 p-4">
-                                        <div className="flex items-start justify-between gap-2">
-                                            <button
-                                                type="button"
-                                                className="flex flex-wrap items-center gap-2"
-                                                onClick={() => setExpandedId(isExpanded ? null : a.id)}
-                                            >
-                                                <span className="font-semibold text-foreground">#{a.id}</span>
-                                                <span className={cn('inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
-                                                    {STATUS_LABEL[a.status]}
-                                                </span>
-                                                <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform duration-200', isExpanded && 'rotate-180')} />
-                                            </button>
-                                            {!isInversor && (
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="-mt-1 -mr-2 shrink-0"
-                                                            disabled={isMechanic && a.status === 'completado'}
-                                                        >
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                            <span className="sr-only">Acciones</span>
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem disabled={a.status === 'agendado'} onSelect={() => changeStatus(a.id, 'agendado')}>
-                                                            <Clock className="h-4 w-4" />Marcar agendado
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem disabled={a.status === 'en_proceso'} onSelect={() => changeStatus(a.id, 'en_proceso')}>
-                                                            <Wrench className="h-4 w-4" />Marcar en proceso
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem disabled={a.status === 'completado'} onSelect={() => changeStatus(a.id, 'completado')}>
-                                                            <CheckCircle2 className="h-4 w-4" />Marcar completado
-                                                        </DropdownMenuItem>
-                                                        {!isMechanic && (
-                                                            <>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem
-                                                                    disabled={a.status === 'cancelado'}
-                                                                    onSelect={() => changeStatus(a.id, 'cancelado')}
-                                                                    className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
-                                                                >
-                                                                    <Ban className="h-4 w-4" />Cancelar turno
-                                                                </DropdownMenuItem>
-                                                            </>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            )}
-                                        </div>
+                {/* Appointment cards */}
+                <div className="flex flex-col gap-3 pb-4">
+                    {filteredAppointments.length === 0 ? (
+                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
+                            No hay turnos que coincidan con los filtros.
+                        </div>
+                    ) : (
+                        filteredAppointments.map((a) => (
+                            <div
+                                key={a.id}
+                                className="flex gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+                            >
+                                {/* Number badge */}
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                                    <span className="text-xs font-bold text-muted-foreground">#{a.id}</span>
+                                </div>
 
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>{formatDate(a.scheduled_date)}</span>
-                                            <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium', TYPE_STYLES[a.type])}>
+                                {/* Content */}
+                                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                                    {/* Row 1: service + badges + actions */}
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                            <span className="font-semibold leading-snug text-foreground">
+                                                {a.service}
+                                            </span>
+                                            <span className={cn(
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                TYPE_STYLES[a.type],
+                                            )}>
                                                 {TYPE_LABEL[a.type]}
+                                            </span>
+                                            <span className={cn(
+                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                STATUS_STYLES[a.status],
+                                            )}>
+                                                {STATUS_LABEL[a.status]}
                                             </span>
                                         </div>
 
-                                        <p className="line-clamp-2 text-sm text-foreground">{a.service}</p>
-
-                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                            <span className="font-mono font-medium text-foreground">{a.license_plate}</span>
-                                            {a.conductor?.name && (
-                                                <span>Solicitante: <span className="text-foreground">{a.conductor.name}</span></span>
-                                            )}
-                                        </div>
-
-                                        {isExpanded && (
-                                            <div className="mt-1 flex flex-col gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
-                                                {/* Grid de datos */}
-                                                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Turno</p>
-                                                        <p className="text-sm font-medium text-foreground">#{a.id}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha agendada</p>
-                                                        <p className="text-sm text-foreground">{formatDate(a.scheduled_date)}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Patente</p>
-                                                        <p className="font-mono text-sm font-medium text-foreground">{a.license_plate}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Solicitante</p>
-                                                        <p className="text-sm text-foreground">{a.conductor?.name || '—'}</p>
-                                                    </div>
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Tipo</p>
-                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', TYPE_STYLES[a.type])}>
-                                                            {TYPE_LABEL[a.type]}
-                                                        </span>
-                                                    </div>
-                                                    <div>
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Estado</p>
-                                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLES[a.status])}>
-                                                            {STATUS_LABEL[a.status]}
-                                                        </span>
-                                                    </div>
-                                                    {a.completed_by && (
-                                                        <div>
-                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Completado por</p>
-                                                            <p className="text-sm text-foreground">{a.completed_by.name}</p>
-                                                        </div>
+                                        {!isInversor && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 shrink-0"
+                                                        disabled={isMechanic && a.status === 'completado'}
+                                                    >
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                        <span className="sr-only">Acciones</span>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Cambiar estado</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        disabled={a.status === 'agendado'}
+                                                        onSelect={() => changeStatus(a.id, 'agendado')}
+                                                    >
+                                                        <Clock className="h-4 w-4" />
+                                                        Marcar agendado
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        disabled={a.status === 'en_proceso'}
+                                                        onSelect={() => changeStatus(a.id, 'en_proceso')}
+                                                    >
+                                                        <Wrench className="h-4 w-4" />
+                                                        Marcar en proceso
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        disabled={a.status === 'completado'}
+                                                        onSelect={() => changeStatus(a.id, 'completado')}
+                                                    >
+                                                        <CheckCircle2 className="h-4 w-4" />
+                                                        Marcar completado
+                                                    </DropdownMenuItem>
+                                                    {!isMechanic && (
+                                                        <>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                disabled={a.status === 'cancelado'}
+                                                                onSelect={() => changeStatus(a.id, 'cancelado')}
+                                                                className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                            >
+                                                                <Ban className="h-4 w-4" />
+                                                                Cancelar turno
+                                                            </DropdownMenuItem>
+                                                        </>
                                                     )}
-                                                    {a.completed_at && (
-                                                        <div>
-                                                            <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Fecha completado</p>
-                                                            <p className="text-sm text-foreground">{formatDateTime(a.completed_at)}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                {/* Servicio */}
-                                                <div className="border-t border-border/60 pt-2">
-                                                    <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Servicio</p>
-                                                    <p className="text-sm text-foreground">{a.service}</p>
-                                                </div>
-                                                {/* Descripción */}
-                                                {a.completion_description && (
-                                                    <div className="border-t border-border/60 pt-2">
-                                                        <p className="mb-0.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Descripción del trabajo realizado</p>
-                                                        <p className="text-sm leading-relaxed text-foreground">{a.completion_description}</p>
-                                                    </div>
-                                                )}
-                                            </div>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         )}
-                                    </li>
-                                );
-                            })
-                        )}
-                    </ul>
+                                    </div>
 
-                    {/* Paginación */}
-                    {appointments.last_page > 1 && (
-                        <div className="flex items-center justify-between border-t border-border px-4 py-3 sm:px-6">
-                            <span className="text-xs text-muted-foreground">
-                                Página {appointments.current_page} de{' '}
-                                {appointments.last_page}
-                            </span>
-                            <div className="flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!appointments.prev_page_url}
-                                    onClick={() =>
-                                        appointments.prev_page_url &&
-                                        router.get(
-                                            appointments.prev_page_url,
-                                            {},
-                                            {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={!appointments.next_page_url}
-                                    onClick={() =>
-                                        appointments.next_page_url &&
-                                        router.get(
-                                            appointments.next_page_url,
-                                            {},
-                                            {
-                                                preserveState: true,
-                                                preserveScroll: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
+                                    {/* Row 2: date + plate + conductor */}
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                                        <span className="text-xs text-muted-foreground">
+                                            {formatDate(a.scheduled_date)}
+                                        </span>
+                                        <span className="font-mono text-xs font-bold uppercase tracking-widest text-foreground">
+                                            {a.license_plate}
+                                        </span>
+                                        {a.conductor?.name && (
+                                            <span className="text-xs text-muted-foreground">
+                                                {a.conductor.name}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {/* Row 3: completed by */}
+                                    {a.completed_by && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Realizado por{' '}
+                                            <span className="font-medium text-foreground">{a.completed_by.name}</span>
+                                            {a.completed_at && (
+                                                <span className="text-muted-foreground/70"> · {formatDateTime(a.completed_at)}</span>
+                                            )}
+                                        </p>
+                                    )}
+
+                                    {/* Row 4: description */}
+                                    {a.completion_description && (
+                                        <p className="text-xs leading-relaxed text-muted-foreground">
+                                            {a.completion_description}
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ))
                     )}
                 </div>
             </div>
 
+            {/* Complete dialog */}
             <Dialog
                 open={completeDialog !== null}
                 onOpenChange={(o) => {
@@ -1219,27 +701,20 @@ export default function AppointmentsIndex({
                             Selecciona el mecánico e ingresa una descripción del trabajo realizado.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-3 py-2">
+                    <div className="flex flex-col gap-4">
                         <div className="grid gap-2">
                             <Label>Mecánico</Label>
                             {mecanicosVisibles.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No hay mecánicos disponibles.
-                                </p>
+                                <p className="text-sm text-muted-foreground">No hay mecánicos disponibles.</p>
                             ) : (
                                 <div className="max-h-60 divide-y divide-border overflow-y-auto rounded-md border border-border">
                                     {mecanicosVisibles.map((m) => {
-                                        const isSelected =
-                                            selectedMecanicoId === String(m.id);
+                                        const isSelected = selectedMecanicoId === String(m.id);
                                         return (
                                             <button
                                                 key={m.id}
                                                 type="button"
-                                                onClick={() =>
-                                                    setSelectedMecanicoId(
-                                                        String(m.id),
-                                                    )
-                                                }
+                                                onClick={() => setSelectedMecanicoId(String(m.id))}
                                                 className={cn(
                                                     'flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
                                                     isSelected
@@ -1248,28 +723,21 @@ export default function AppointmentsIndex({
                                                 )}
                                             >
                                                 <span>{m.name}</span>
-                                                {isSelected && (
-                                                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                                                )}
+                                                {isSelected && <CheckCircle2 className="h-4 w-4 text-primary" />}
                                             </button>
                                         );
                                     })}
                                 </div>
                             )}
                         </div>
-
                         <div className="grid gap-2">
-                            <Label htmlFor="completion_description">
-                                Descripción del trabajo realizado
-                            </Label>
+                            <Label htmlFor="completion_description">Descripción del trabajo realizado</Label>
                             <textarea
                                 id="completion_description"
                                 rows={4}
                                 placeholder="Describí el trabajo realizado..."
                                 value={completionDescription}
-                                onChange={(e) =>
-                                    setCompletionDescription(e.target.value)
-                                }
+                                onChange={(e) => setCompletionDescription(e.target.value)}
                                 maxLength={2000}
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                             />
@@ -1279,10 +747,7 @@ export default function AppointmentsIndex({
                         <Button
                             type="button"
                             onClick={submitComplete}
-                            disabled={
-                                !selectedMecanicoId ||
-                                completionDescription.trim() === ''
-                            }
+                            disabled={!selectedMecanicoId || completionDescription.trim() === ''}
                         >
                             Confirmar
                         </Button>

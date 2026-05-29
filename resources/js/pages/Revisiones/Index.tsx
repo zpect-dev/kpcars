@@ -445,7 +445,7 @@ export default function Revisiones({ vehiculos }: Props) {
                         ))}
                     </div>
 
-                    <div className="space-y-4 py-2">
+                    <div className="flex flex-col gap-4 py-2">
                         {step === 0 && (
                             <div className="space-y-4">
                                 <MonthYearPicker
@@ -550,7 +550,7 @@ export default function Revisiones({ vehiculos }: Props) {
                                     placeholder="Escriba cualquier observación..."
                                     value={form.data.observaciones}
                                     onChange={(e) => form.setData('observaciones', e.target.value)}
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                                 />
                                 <InputError message={form.errors.observaciones} />
                             </div>
@@ -644,7 +644,7 @@ export default function Revisiones({ vehiculos }: Props) {
                             {selectedRow.revision_semanal.observaciones && (
                                 <div className="space-y-1">
                                     <span className="text-xs text-muted-foreground">Observaciones</span>
-                                    <p className="rounded-md border border-border bg-muted/50 p-3 text-sm">
+                                    <p className="rounded-xl border border-border bg-muted/30 px-3.5 py-3 text-sm">
                                         {selectedRow.revision_semanal.observaciones}
                                     </p>
                                 </div>

@@ -423,7 +423,7 @@ export default function CobrosIndex({
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="rounded-lg border border-border bg-muted/30 p-4">
+                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
                         <p className="text-xs font-medium text-muted-foreground uppercase">
                             Total a cerrar
                         </p>
@@ -743,7 +743,7 @@ export default function CobrosIndex({
                         })()}
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between rounded-lg bg-muted/30 px-4 py-3">
+                    <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
                         <span className="text-sm font-semibold text-muted-foreground">
                             Total
                         </span>

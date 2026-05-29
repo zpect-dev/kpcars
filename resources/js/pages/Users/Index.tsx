@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Car, Check, Filter, Plus, Search, Camera } from 'lucide-react';
+import { Check, Filter, Plus, Search, Camera } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -36,6 +36,7 @@ interface User {
     deposito_moneda?: string | null;
     vehiculo?: { patente: string; marca: string; modelo: string } | null;
     licencia_por_vencer?: boolean;
+    sin_licencia?: boolean;
     falta_foto?: boolean;
 }
 
@@ -115,10 +116,92 @@ function AvatarDropzone({
     );
 }
 
+type FilterAlertValue = 'all' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito';
+
+const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
+    all:                  'Todos',
+    licencia_por_vencer:  'Lic. por vencer',
+    sin_licencia:         'Sin licencia',
+    falta_foto:           'Sin foto',
+    falta_telefono:       'Sin teléfono',
+    falta_correo:         'Sin correo',
+    falta_deposito:       'Sin depósito',
+};
+
+const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: string; desc: string }[] }[] = [
+    {
+        label: 'Licencia',
+        items: [
+            { val: 'licencia_por_vencer', label: 'Próxima a vencer',    desc: 'Vence en los próximos 30 días' },
+            { val: 'sin_licencia',        label: 'Sin fecha cargada',    desc: 'No tiene vencimiento registrado' },
+        ],
+    },
+    {
+        label: 'Contacto',
+        items: [
+            { val: 'falta_foto',     label: 'Sin foto de perfil', desc: 'Sin imagen de identificación' },
+            { val: 'falta_telefono', label: 'Sin teléfono',       desc: 'Sin número de contacto' },
+            { val: 'falta_correo',   label: 'Sin correo',         desc: 'Sin dirección de email' },
+        ],
+    },
+    {
+        label: 'Garantía',
+        items: [
+            { val: 'falta_deposito', label: 'Sin depósito', desc: 'Sin garantía registrada' },
+        ],
+    },
+];
+
+function FilterPopoverItem({
+    label,
+    desc,
+    count,
+    isActive,
+    onClick,
+}: {
+    label: string;
+    desc?: string;
+    count: number;
+    isActive: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
+                isActive ? 'bg-muted' : 'hover:bg-muted/60',
+            )}
+        >
+            <div className={cn(
+                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+                isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent',
+            )}>
+                {isActive && <Check className="h-3 w-3 text-background" />}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col">
+                <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>
+                    {label}
+                </span>
+                {desc && (
+                    <span className="text-xs text-muted-foreground leading-tight mt-0.5">{desc}</span>
+                )}
+            </div>
+            <span className={cn(
+                'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
+            )}>
+                {count}
+            </span>
+        </button>
+    );
+}
+
 export default function UsersIndex({ users, roles, empresas, monedas, choferCounts }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterAlert, setFilterAlert] = useState<'all' | 'licencia_por_vencer' | 'falta_foto'>('all');
+    const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
     const [previewImage, setPreviewImage] = useState<{
         url: string;
         name: string;
@@ -133,13 +216,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         if (searchTerm) {
             const q = searchTerm.toLowerCase();
             result = result.filter(
-                (u) => u.name.toLowerCase().includes(q) || u.dni.toLowerCase().includes(q),
+                (u) =>
+                    u.name.toLowerCase().includes(q) ||
+                    u.dni.toLowerCase().includes(q) ||
+                    (u.vehiculo?.patente?.toLowerCase().includes(q) ?? false),
             );
         }
         if (filterRole === 'chofer' && filterAlert !== 'all') {
             result = result.filter((u) => {
                 if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
+                if (filterAlert === 'sin_licencia') return u.sin_licencia === true;
                 if (filterAlert === 'falta_foto') return u.falta_foto === true;
+                if (filterAlert === 'falta_telefono') return !u.telefono;
+                if (filterAlert === 'falta_correo') return !u.correo;
+                if (filterAlert === 'falta_deposito') return !u.deposito;
                 return true;
             });
         }
@@ -147,10 +237,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_por_vencer: 0, falta_foto: 0 };
+        if (filterRole !== 'chofer') return { licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0 };
         return {
             licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
+            sin_licencia: users.filter((u) => u.sin_licencia).length,
             falta_foto: users.filter((u) => u.falta_foto).length,
+            falta_telefono: users.filter((u) => !u.telefono).length,
+            falta_correo: users.filter((u) => !u.correo).length,
+            falta_deposito: users.filter((u) => !u.deposito).length,
         };
     }, [users, filterRole]);
 
@@ -294,11 +388,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         return formatted;
     }
 
+
     function formatDeposito(user: User) {
         if (!user.deposito) return null;
-        const m = monedas.find((x) => x.value === user.deposito_moneda);
-        const symbol = m?.symbol ?? '$';
-        return `${symbol} ${Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const currency = user.deposito_moneda ?? 'ARS';
+        const amount = Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        return `${currency} ${amount}`;
     }
 
     function parseLicenciaDate(fechaStr: string): Date {
@@ -381,128 +476,106 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                         </div>
 
                         {/* Filter bar */}
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="relative min-w-[180px] flex-1 max-w-xs">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="relative min-w-[200px] max-w-sm flex-1">
                                 <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                 <Input
                                     type="text"
-                                    placeholder="Buscar por nombre o DNI..."
+                                    placeholder="Buscar por nombre, DNI o patente..."
                                     className="bg-card pl-9 shadow-sm"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
 
-                            <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 p-0.5">
-                                <button
-                                    type="button"
-                                    onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
-                                    className={cn(
-                                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                                        filterStatus === 'activos'
-                                            ? 'bg-background text-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:text-foreground',
-                                    )}
-                                >
-                                    Activos
-                                    <span className={cn(
-                                        'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                                        filterStatus === 'activos'
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-muted-foreground/20 text-muted-foreground',
-                                    )}>
-                                        {choferCounts?.activos ?? 0}
-                                    </span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
-                                    className={cn(
-                                        'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                                        filterStatus === 'inactivos'
-                                            ? 'bg-background text-foreground shadow-sm'
-                                            : 'text-muted-foreground hover:text-foreground',
-                                    )}
-                                >
-                                    Inactivos
-                                    <span className={cn(
-                                        'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold',
-                                        filterStatus === 'inactivos'
-                                            ? 'bg-red-500 text-white'
-                                            : 'bg-muted-foreground/20 text-muted-foreground',
-                                    )}>
-                                        {choferCounts?.inactivos ?? 0}
-                                    </span>
-                                </button>
-                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
+                                        className={cn(
+                                            'flex items-baseline gap-1.5 rounded-lg px-4 py-1.5 transition-all',
+                                            filterStatus === 'activos' ? 'bg-background shadow-sm' : 'hover:bg-background/60',
+                                        )}
+                                    >
+                                        <span className={cn('text-sm font-bold tabular-nums', filterStatus === 'activos' ? 'text-foreground' : 'text-muted-foreground')}>
+                                            {choferCounts?.activos ?? 0}
+                                        </span>
+                                        <span className={cn('text-xs', filterStatus === 'activos' ? 'text-muted-foreground' : 'text-muted-foreground/50')}>
+                                            activos
+                                        </span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
+                                        className={cn(
+                                            'flex items-baseline gap-1.5 rounded-lg px-4 py-1.5 transition-all',
+                                            filterStatus === 'inactivos' ? 'bg-background shadow-sm' : 'hover:bg-background/60',
+                                        )}
+                                    >
+                                        <span className={cn('text-sm font-bold tabular-nums', filterStatus === 'inactivos' ? 'text-foreground' : 'text-muted-foreground')}>
+                                            {choferCounts?.inactivos ?? 0}
+                                        </span>
+                                        <span className={cn('text-xs', filterStatus === 'inactivos' ? 'text-muted-foreground' : 'text-muted-foreground/50')}>
+                                            inactivos
+                                        </span>
+                                    </button>
+                                </div>
 
-                            {filterStatus === 'activos' && (
-                                <Popover>
+                                <Popover onOpenChange={(open) => { if (!open && filterAlert === 'all') {} }}>
                                     <PopoverTrigger asChild>
                                         <button
                                             type="button"
                                             className={cn(
-                                                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors',
+                                                'inline-flex items-center gap-2 rounded-lg border px-3 py-[9px] text-sm font-medium transition-all',
                                                 filterAlert !== 'all'
-                                                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                    ? 'border-border bg-muted text-foreground shadow-sm'
                                                     : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
-                                            <Filter className="h-3.5 w-3.5" />
-                                            Filtros
+                                            <Filter className="h-4 w-4 shrink-0" />
+                                            <span className="hidden sm:inline">
+                                                {filterAlert !== 'all' ? FILTER_SHORT_LABELS[filterAlert] : 'Filtrar'}
+                                            </span>
                                             {filterAlert !== 'all' && (
-                                                <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-                                                    1
-                                                </span>
+                                                <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
                                             )}
                                         </button>
                                     </PopoverTrigger>
-                                    <PopoverContent align="end" className="w-60 p-0">
-                                        <div className="p-3">
-                                            <p className="mb-2 px-1 text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-                                                Filtrar por
-                                            </p>
-                                            <div className="flex flex-col gap-0.5">
-                                                {(
-                                                    [
-                                                        { val: 'all' as const, label: 'Todos los choferes', count: users.length, dot: null },
-                                                        { val: 'licencia_por_vencer' as const, label: 'Licencia por vencer', count: alertCounts.licencia_por_vencer, dot: 'amber' },
-                                                        { val: 'falta_foto' as const, label: 'Falta foto', count: alertCounts.falta_foto, dot: 'blue' },
-                                                    ]
-                                                ).map((item) => (
-                                                    <button
-                                                        key={item.val}
-                                                        type="button"
-                                                        onClick={() => setFilterAlert(item.val)}
-                                                        className={cn(
-                                                            'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
-                                                            filterAlert === item.val
-                                                                ? 'bg-muted text-foreground'
-                                                                : 'text-foreground hover:bg-muted/60',
-                                                        )}
-                                                    >
-                                                        {item.dot ? (
-                                                            <span className={cn(
-                                                                'h-2 w-2 shrink-0 rounded-full',
-                                                                item.dot === 'amber' ? 'bg-amber-500' : 'bg-blue-500',
-                                                            )} />
-                                                        ) : (
-                                                            <span className="h-2 w-2 shrink-0" />
-                                                        )}
-                                                        <span className={cn('flex-1 text-left', filterAlert === item.val && 'font-semibold')}>
-                                                            {item.label}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground">{item.count}</span>
-                                                        {filterAlert === item.val && (
-                                                            <Check className="h-3.5 w-3.5 shrink-0 text-foreground" />
-                                                        )}
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    <PopoverContent align="end" className="w-72 p-0 shadow-lg">
+                                        <div className="p-1.5">
+                                            <FilterPopoverItem
+                                                label="Todos los choferes"
+                                                count={users.length}
+                                                isActive={filterAlert === 'all'}
+                                                onClick={() => setFilterAlert('all')}
+                                            />
                                         </div>
+                                        {FILTER_SECTIONS.map((section) => (
+                                            <div key={section.label}>
+                                                <div className="flex items-center gap-2 px-3 py-1.5">
+                                                    <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                                        {section.label}
+                                                    </span>
+                                                    <div className="flex-1 border-t border-border/60" />
+                                                </div>
+                                                <div className="px-1.5 pb-1.5">
+                                                    {section.items.map(({ val, label, desc }) => (
+                                                        <FilterPopoverItem
+                                                            key={val}
+                                                            label={label}
+                                                            desc={desc}
+                                                            count={alertCounts[val as keyof typeof alertCounts]}
+                                                            isActive={filterAlert === val}
+                                                            onClick={() => setFilterAlert(filterAlert === val ? 'all' : val)}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </PopoverContent>
                                 </Popover>
-                            )}
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -726,11 +799,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 {filterRole === 'chofer' ? (
                                                     <div className="flex flex-col gap-1">
                                                         {user.vehiculo ? (
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Car className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                                                <span className="font-mono text-xs font-bold text-foreground">{user.vehiculo.patente}</span>
-                                                                <span className="truncate text-xs text-muted-foreground">{user.vehiculo.marca} {user.vehiculo.modelo}</span>
-                                                            </div>
+                                                            <span className="text-xs font-bold tracking-widest uppercase text-foreground">{user.vehiculo.patente}</span>
                                                         ) : (
                                                             <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
                                                         )}
@@ -936,11 +1005,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[10px] tracking-wider text-muted-foreground uppercase">Vehículo</span>
                                             {user.vehiculo ? (
-                                                <div className="flex items-center gap-1.5">
-                                                    <Car className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                                    <span className="font-mono text-sm font-bold text-foreground">{user.vehiculo.patente}</span>
-                                                    <span className="text-xs text-muted-foreground">{user.vehiculo.marca} {user.vehiculo.modelo}</span>
-                                                </div>
+                                                <span className="text-sm font-bold tracking-widest uppercase text-foreground">{user.vehiculo.patente}</span>
                                             ) : (
                                                 <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
                                             )}
@@ -957,103 +1022,75 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 open={showCreateModal}
                 onOpenChange={(open) => !open && closeCreateModal()}
             >
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Nuevo Usuario</DialogTitle>
+                        <DialogTitle>Nuevo usuario</DialogTitle>
                         <DialogDescription>
-                            Crea un nuevo usuario en el sistema. El usuario
-                            deberá cambiar su contraseña al iniciar sesión por
-                            primera vez desde la App o Web según su rol.
+                            La contraseña provisional será la primera letra del nombre + DNI.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleCreateSubmit} className="grid gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="name">Nombre Completo</Label>
-                            <Input
-                                id="name"
-                                value={createForm.data.name}
-                                onChange={(e) =>
-                                    createForm.setData('name', e.target.value)
-                                }
-                                placeholder="Ej. Juan Pérez"
-                                required
-                            />
-                            <InputError message={createForm.errors.name} />
+                    <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+                        {/* Foto + Nombre */}
+                        <div className="flex items-center gap-4">
+                            <div className="shrink-0">
+                                <AvatarDropzone
+                                    file={createForm.data.profile_photo}
+                                    onDrop={(files) => createForm.setData('profile_photo', files[0])}
+                                />
+                                <InputError message={createForm.errors.profile_photo} />
+                            </div>
+                            <div className="flex flex-1 flex-col gap-1.5">
+                                <Label htmlFor="name">Nombre completo</Label>
+                                <Input
+                                    id="name"
+                                    value={createForm.data.name}
+                                    onChange={(e) => createForm.setData('name', e.target.value)}
+                                    placeholder="Ej. Juan Pérez"
+                                    required
+                                />
+                                <InputError message={createForm.errors.name} />
+                            </div>
                         </div>
 
-                        <div className="mb-2 flex flex-col items-center gap-2">
-                            <Label>Foto de Perfil (Opcional)</Label>
-                            <AvatarDropzone
-                                file={createForm.data.profile_photo}
-                                onDrop={(files) =>
-                                    createForm.setData(
-                                        'profile_photo',
-                                        files[0],
-                                    )
-                                }
-                            />
-                            <InputError
-                                message={createForm.errors.profile_photo}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
+                        {/* DNI + Rol */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="dni">DNI</Label>
                                 <Input
                                     id="dni"
                                     value={createForm.data.dni}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'dni',
-                                            e.target.value,
-                                        )
-                                    }
+                                    onChange={(e) => createForm.setData('dni', e.target.value)}
                                     placeholder="Sin puntos"
                                     required
                                 />
                                 <InputError message={createForm.errors.dni} />
                             </div>
-
-                            <div className="grid gap-2">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="role">Rol</Label>
                                 <select
                                     id="role"
                                     value={createForm.data.role}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'role',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1"
+                                    onChange={(e) => createForm.setData('role', e.target.value)}
+                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                 >
                                     {roles.map((r) => (
-                                        <option
-                                            key={r.value}
-                                            value={r.value}
-                                            className="bg-background text-foreground"
-                                        >
-                                            {r.label}
-                                        </option>
+                                        <option key={r.value} value={r.value} className="bg-background text-foreground">{r.label}</option>
                                     ))}
                                 </select>
                                 <InputError message={createForm.errors.role} />
                             </div>
                         </div>
 
+                        {/* Campos por rol */}
                         {createForm.data.role === 'inversor' && empresas.length > 0 && (
-                            <div className="grid gap-2">
-                                <Label>Empresas a las que pertenece</Label>
-                                <div className="flex flex-col gap-1.5 rounded-md border border-input p-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Empresas</Label>
+                                <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
                                     {empresas.map((e) => {
                                         const checked = createForm.data.empresas.includes(e.id);
                                         return (
-                                            <label
-                                                key={e.id}
-                                                className="flex cursor-pointer items-center gap-2 text-sm"
-                                            >
+                                            <label key={e.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-muted/40 transition-colors">
                                                 <input
                                                     type="checkbox"
                                                     checked={checked}
@@ -1070,193 +1107,79 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         );
                                     })}
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                    El inversor verá las inversiones de todas las empresas que selecciones.
-                                </p>
                                 <InputError message={createForm.errors.empresas as string | undefined} />
                             </div>
                         )}
 
                         {(createForm.data.role === 'administrativo' || createForm.data.role === 'administrador') && empresas.length > 0 && (
-                            <div className="grid gap-2">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="create-empresa-restringida">Acceso a empresa</Label>
                                 <select
                                     id="create-empresa-restringida"
                                     value={createForm.data.empresa_restringida_id}
                                     onChange={(e) => createForm.setData('empresa_restringida_id', e.target.value)}
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                 >
-                                    <option value="" className="bg-background text-foreground">
-                                        Todas (puede cambiar de empresa)
-                                    </option>
+                                    <option value="" className="bg-background text-foreground">Todas las empresas</option>
                                     {empresas.map((e) => (
-                                        <option key={e.id} value={e.id} className="bg-background text-foreground">
-                                            Sólo {e.nombre}
-                                        </option>
+                                        <option key={e.id} value={e.id} className="bg-background text-foreground">Sólo {e.nombre}</option>
                                     ))}
                                 </select>
-                                <p className="text-xs text-muted-foreground">
-                                    Si elegís una empresa, el usuario quedará fijado a ella y no podrá cambiar de contexto.
-                                </p>
                                 <InputError message={createForm.errors.empresa_restringida_id} />
                             </div>
                         )}
 
                         {createForm.data.role === 'chofer' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="correo">Correo</Label>
-                                <Input
-                                    id="correo"
-                                    type="email"
-                                    value={createForm.data.correo}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'correo',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="usuario@correo.com"
-                                />
-                                <InputError
-                                    message={createForm.errors.correo}
-                                />
-                            </div>
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 border-t border-border/60" />
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Contacto y licencia</span>
+                                    <div className="flex-1 border-t border-border/60" />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="correo">Correo</Label>
+                                    <Input id="correo" type="email" value={createForm.data.correo} onChange={(e) => createForm.setData('correo', e.target.value)} placeholder="usuario@correo.com" />
+                                    <InputError message={createForm.errors.correo} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="telefono">Teléfono</Label>
+                                        <Input id="telefono" value={createForm.data.telefono} onChange={(e) => createForm.setData('telefono', formatPhone(e.target.value))} placeholder="+54 9 11 1234-5678" />
+                                        <InputError message={createForm.errors.telefono} />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="fecha_vencimiento_licencia">Venc. licencia</Label>
+                                        <Input id="fecha_vencimiento_licencia" type="date" value={createForm.data.fecha_vencimiento_licencia} onChange={(e) => createForm.setData('fecha_vencimiento_licencia', e.target.value)} />
+                                        <InputError message={createForm.errors.fecha_vencimiento_licencia} />
+                                    </div>
+                                </div>
+                            </>
                         )}
 
-                        {createForm.data.role === 'chofer' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="telefono">Teléfono</Label>
-                                    <Input
-                                        id="telefono"
-                                        value={createForm.data.telefono}
-                                        onChange={(e) =>
-                                            createForm.setData(
-                                                'telefono',
-                                                formatPhone(e.target.value),
-                                            )
-                                        }
-                                        placeholder="+54 9 11 1234-5678"
-                                    />
-                                    <InputError
-                                        message={createForm.errors.telefono}
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="fecha_vencimiento_licencia">
-                                        Vencimiento Licencia
-                                    </Label>
-                                    <Input
-                                        id="fecha_vencimiento_licencia"
-                                        type="date"
-                                        value={
-                                            createForm.data
-                                                .fecha_vencimiento_licencia
-                                        }
-                                        onChange={(e) =>
-                                            createForm.setData(
-                                                'fecha_vencimiento_licencia',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    <InputError
-                                        message={
-                                            createForm.errors
-                                                .fecha_vencimiento_licencia
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="deposito">
-                                    Depósito (Garantía)
-                                </Label>
-                                <Input
-                                    id="deposito"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={createForm.data.deposito}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'deposito',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="0.00"
-                                />
-                                <InputError
-                                    message={createForm.errors.deposito}
-                                />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="deposito_moneda">Moneda</Label>
-                                <select
-                                    id="deposito_moneda"
-                                    value={createForm.data.deposito_moneda}
-                                    onChange={(e) =>
-                                        createForm.setData(
-                                            'deposito_moneda',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {monedas.map((m) => (
-                                        <option
-                                            key={m.value}
-                                            value={m.value}
-                                            className="bg-background text-foreground"
-                                        >
-                                            {m.label}
-                                        </option>
-                                    ))}
-                                </select>
-                                <InputError
-                                    message={createForm.errors.deposito_moneda}
-                                />
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 border-t border-border/60" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Garantía</span>
+                            <div className="flex-1 border-t border-border/60" />
                         </div>
-
-                        <div className="rounded-lg border border-border bg-muted/50 p-3">
-                            <p className="text-xs leading-relaxed text-muted-foreground">
-                                <span className="font-semibold text-foreground">
-                                    Contraseña Automática:
-                                </span>{' '}
-                                La contraseña provisional se generará combinando
-                                la{' '}
-                                <span className="font-medium text-foreground text-red-600">
-                                    primera letra del nombre (Mayúscula)
-                                </span>{' '}
-                                seguido del{' '}
-                                <span className="font-medium text-foreground text-red-600">
-                                    DNI
-                                </span>{' '}
-                                sin puntos.
-                            </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="deposito">Depósito</Label>
+                                <Input id="deposito" type="number" step="0.01" min="0" value={createForm.data.deposito} onChange={(e) => createForm.setData('deposito', e.target.value)} placeholder="0.00" />
+                                <InputError message={createForm.errors.deposito} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="deposito_moneda">Moneda</Label>
+                                <select id="deposito_moneda" value={createForm.data.deposito_moneda} onChange={(e) => createForm.setData('deposito_moneda', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
+                                    {monedas.map((m) => <option key={m.value} value={m.value} className="bg-background text-foreground">{m.label}</option>)}
+                                </select>
+                                <InputError message={createForm.errors.deposito_moneda} />
+                            </div>
                         </div>
 
                         <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={closeCreateModal}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={createForm.processing}
-                            >
-                                {createForm.processing
-                                    ? 'Creando...'
-                                    : 'Crear Usuario'}
+                            <Button type="button" variant="outline" onClick={closeCreateModal}>Cancelar</Button>
+                            <Button type="submit" disabled={createForm.processing}>
+                                {createForm.processing ? 'Creando...' : 'Crear usuario'}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -1267,93 +1190,49 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 open={!!userToEdit}
                 onOpenChange={(open) => !open && closeEditModal()}
             >
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Editar Datos Personales</DialogTitle>
+                        <DialogTitle>Editar usuario</DialogTitle>
                         <DialogDescription>
-                            Modifica los datos personales de {userToEdit?.name}.
+                            {userToEdit?.name}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleEditSubmit} className="grid gap-4">
-                        <div className="mb-2 flex flex-col items-center gap-2">
-                            <Label>Foto Actual</Label>
-                            <AvatarDropzone
-                                file={editForm.data.profile_photo}
-                                currentUrl={userToEdit?.profile_photo_url}
-                                onDrop={(files) =>
-                                    editForm.setData('profile_photo', files[0])
-                                }
-                            />
-                            <InputError
-                                message={editForm.errors.profile_photo}
-                            />
+                    <form onSubmit={handleEditSubmit} className="flex flex-col gap-4">
+                        {/* Foto + Nombre */}
+                        <div className="flex items-center gap-4">
+                            <div className="shrink-0">
+                                <AvatarDropzone
+                                    file={editForm.data.profile_photo}
+                                    currentUrl={userToEdit?.profile_photo_url}
+                                    onDrop={(files) => editForm.setData('profile_photo', files[0])}
+                                />
+                                <InputError message={editForm.errors.profile_photo} />
+                            </div>
+                            <div className="flex flex-1 flex-col gap-1.5">
+                                <Label htmlFor="edit-name">Nombre completo</Label>
+                                <Input id="edit-name" value={editForm.data.name} onChange={(e) => editForm.setData('name', e.target.value)} placeholder="Ej. Juan Pérez" required />
+                                <InputError message={editForm.errors.name} />
+                            </div>
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="edit-name">Nombre Completo</Label>
-                            <Input
-                                id="edit-name"
-                                value={editForm.data.name}
-                                onChange={(e) =>
-                                    editForm.setData('name', e.target.value)
-                                }
-                                placeholder="Ej. Juan Pérez"
-                                required
-                            />
-                            <InputError message={editForm.errors.name} />
-                        </div>
-
-                        <div className="grid gap-2">
+                        {/* DNI */}
+                        <div className="flex flex-col gap-1.5">
                             <Label htmlFor="edit-dni">DNI</Label>
-                            <Input
-                                id="edit-dni"
-                                value={editForm.data.dni}
-                                onChange={(e) =>
-                                    editForm.setData('dni', e.target.value)
-                                }
-                                placeholder="Sin puntos"
-                                required
-                            />
+                            <Input id="edit-dni" value={editForm.data.dni} onChange={(e) => editForm.setData('dni', e.target.value)} placeholder="Sin puntos" required />
                             <InputError message={editForm.errors.dni} />
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="edit-correo">Correo</Label>
-                            <Input
-                                id="edit-correo"
-                                type="email"
-                                value={editForm.data.correo}
-                                onChange={(e) =>
-                                    editForm.setData('correo', e.target.value)
-                                }
-                                placeholder="usuario@correo.com"
-                            />
-                            <InputError message={editForm.errors.correo} />
-                        </div>
-
+                        {/* Campos por rol */}
                         {userToEdit?.role === 'inversor' && empresas.length > 0 && (
-                            <div className="grid gap-2">
-                                <Label>Empresas a las que pertenece</Label>
-                                <div className="flex flex-col gap-1.5 rounded-md border border-input p-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Empresas</Label>
+                                <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
                                     {empresas.map((e) => {
                                         const checked = editForm.data.empresas.includes(e.id);
                                         return (
-                                            <label
-                                                key={e.id}
-                                                className="flex cursor-pointer items-center gap-2 text-sm"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={() => {
-                                                        const next = checked
-                                                            ? editForm.data.empresas.filter((id) => id !== e.id)
-                                                            : [...editForm.data.empresas, e.id];
-                                                        editForm.setData('empresas', next);
-                                                    }}
-                                                    className="h-4 w-4 rounded border-input"
-                                                />
+                                            <label key={e.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-muted/40 transition-colors">
+                                                <input type="checkbox" checked={checked} onChange={() => { const next = checked ? editForm.data.empresas.filter((id) => id !== e.id) : [...editForm.data.empresas, e.id]; editForm.setData('empresas', next); }} className="h-4 w-4 rounded border-input" />
                                                 <span>{e.nombre}</span>
                                             </label>
                                         );
@@ -1364,160 +1243,72 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                         )}
 
                         {(userToEdit?.role === 'administrativo' || userToEdit?.role === 'administrador') && empresas.length > 0 && (
-                            <div className="grid gap-2">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="edit-empresa-restringida">Acceso a empresa</Label>
-                                <select
-                                    id="edit-empresa-restringida"
-                                    value={editForm.data.empresa_restringida_id}
-                                    onChange={(e) => editForm.setData('empresa_restringida_id', e.target.value)}
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="" className="bg-background text-foreground">
-                                        Todas (puede cambiar de empresa)
-                                    </option>
-                                    {empresas.map((e) => (
-                                        <option key={e.id} value={e.id} className="bg-background text-foreground">
-                                            Sólo {e.nombre}
-                                        </option>
-                                    ))}
+                                <select id="edit-empresa-restringida" value={editForm.data.empresa_restringida_id} onChange={(e) => editForm.setData('empresa_restringida_id', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
+                                    <option value="" className="bg-background text-foreground">Todas las empresas</option>
+                                    {empresas.map((e) => <option key={e.id} value={e.id} className="bg-background text-foreground">Sólo {e.nombre}</option>)}
                                 </select>
-                                <p className="text-xs text-muted-foreground">
-                                    Si elegís una empresa, el usuario quedará fijado a ella y no podrá cambiar de contexto.
-                                </p>
                                 <InputError message={editForm.errors.empresa_restringida_id} />
                             </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-telefono">Teléfono</Label>
-                                <Input
-                                    id="edit-telefono"
-                                    value={editForm.data.telefono}
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            'telefono',
-                                            formatPhone(e.target.value),
-                                        )
-                                    }
-                                    placeholder="+54 9 11 1234-5678"
-                                />
-                                <InputError
-                                    message={editForm.errors.telefono}
-                                />
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 border-t border-border/60" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Contacto y licencia</span>
+                            <div className="flex-1 border-t border-border/60" />
+                        </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-fecha_vencimiento_licencia">
-                                    Vencimiento Licencia
-                                </Label>
-                                <Input
-                                    id="edit-fecha_vencimiento_licencia"
-                                    type="date"
-                                    value={
-                                        editForm.data.fecha_vencimiento_licencia
-                                    }
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            'fecha_vencimiento_licencia',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                <InputError
-                                    message={
-                                        editForm.errors
-                                            .fecha_vencimiento_licencia
-                                    }
-                                />
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="edit-correo">Correo</Label>
+                            <Input id="edit-correo" type="email" value={editForm.data.correo} onChange={(e) => editForm.setData('correo', e.target.value)} placeholder="usuario@correo.com" />
+                            <InputError message={editForm.errors.correo} />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-telefono">Teléfono</Label>
+                                <Input id="edit-telefono" value={editForm.data.telefono} onChange={(e) => editForm.setData('telefono', formatPhone(e.target.value))} placeholder="+54 9 11 1234-5678" />
+                                <InputError message={editForm.errors.telefono} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-fecha_vencimiento_licencia">Venc. licencia</Label>
+                                <Input id="edit-fecha_vencimiento_licencia" type="date" value={editForm.data.fecha_vencimiento_licencia} onChange={(e) => editForm.setData('fecha_vencimiento_licencia', e.target.value)} />
+                                <InputError message={editForm.errors.fecha_vencimiento_licencia} />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito">
-                                    Depósito (Garantía)
-                                </Label>
-                                <Input
-                                    id="edit-deposito"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={editForm.data.deposito}
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            'deposito',
-                                            e.target.value,
-                                        )
-                                    }
-                                    placeholder="0.00"
-                                />
-                                <InputError
-                                    message={editForm.errors.deposito}
-                                />
-                            </div>
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 border-t border-border/60" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Garantía</span>
+                            <div className="flex-1 border-t border-border/60" />
+                        </div>
 
-                            <div className="grid gap-2">
-                                <Label htmlFor="edit-deposito_moneda">
-                                    Moneda
-                                </Label>
-                                <select
-                                    id="edit-deposito_moneda"
-                                    value={editForm.data.deposito_moneda}
-                                    onChange={(e) =>
-                                        editForm.setData(
-                                            'deposito_moneda',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-sm ring-offset-background placeholder:text-muted-foreground focus:ring-1 focus:ring-ring focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                    {monedas.map((m) => (
-                                        <option
-                                            key={m.value}
-                                            value={m.value}
-                                            className="bg-background text-foreground"
-                                        >
-                                            {m.label}
-                                        </option>
-                                    ))}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-deposito">Depósito</Label>
+                                <Input id="edit-deposito" type="number" step="0.01" min="0" value={editForm.data.deposito} onChange={(e) => editForm.setData('deposito', e.target.value)} placeholder="0.00" />
+                                <InputError message={editForm.errors.deposito} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-deposito_moneda">Moneda</Label>
+                                <select id="edit-deposito_moneda" value={editForm.data.deposito_moneda} onChange={(e) => editForm.setData('deposito_moneda', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
+                                    {monedas.map((m) => <option key={m.value} value={m.value} className="bg-background text-foreground">{m.label}</option>)}
                                 </select>
-                                <InputError
-                                    message={editForm.errors.deposito_moneda}
-                                />
+                                <InputError message={editForm.errors.deposito_moneda} />
                             </div>
                         </div>
 
                         <DialogFooter className="sm:justify-between">
                             {userToEdit && (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={() =>
-                                        router.get(
-                                            `/users/${userToEdit.id}/asignaciones`,
-                                        )
-                                    }
-                                    className="mb-2 sm:mb-0"
-                                >
-                                    Ver Asignaciones
+                                <Button type="button" variant="secondary" onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)} className="mb-2 sm:mb-0">
+                                    Ver asignaciones
                                 </Button>
                             )}
                             <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={closeEditModal}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={editForm.processing}
-                                >
-                                    {editForm.processing
-                                        ? 'Guardando...'
-                                        : 'Guardar Cambios'}
+                                <Button type="button" variant="outline" onClick={closeEditModal}>Cancelar</Button>
+                                <Button type="submit" disabled={editForm.processing}>
+                                    {editForm.processing ? 'Guardando...' : 'Guardar cambios'}
                                 </Button>
                             </div>
                         </DialogFooter>

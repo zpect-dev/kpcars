@@ -6,7 +6,9 @@ import {
     FileDown,
     History,
     Loader2,
+    Minus,
     Pencil,
+    Plus,
     Search,
     Trash2,
     X,
@@ -32,7 +34,9 @@ import type { Articulo, Vehiculo } from '@/types';
 
 interface Props {
     items: Articulo[];
-    vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
+    vehiculos: (Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'> & {
+        user?: { id: number; name: string } | null;
+    })[];
 }
 
 interface OrderLine {
@@ -115,7 +119,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             vehiculos.map((v) => ({
                 value: v.patente,
                 label: v.patente,
-                sub: `${v.marca} ${v.modelo}`,
+                sub: [v.user?.name, `${v.marca} ${v.modelo}`].filter(Boolean).join(' · '),
             })),
         [vehiculos],
     );
@@ -553,109 +557,141 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             {/* ─── Modal Egreso (OUT múltiple) ────────────────────────────────── */}
             <Dialog
                 open={showSalidaModal}
-                onOpenChange={(open) => {
-                    if (!open) closeSalidaModal();
-                }}
+                onOpenChange={(open) => { if (!open) closeSalidaModal(); }}
             >
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>Registrar Egreso</DialogTitle>
-                        <DialogDescription>
-                            Agregá los artículos del pedido. Todo se despacha al mismo vehículo.
-                        </DialogDescription>
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500">
+                                <ArrowUpCircle className="h-5 w-5 text-white" />
+                            </div>
+                            <div>
+                                <DialogTitle>Registrar egreso</DialogTitle>
+                                <DialogDescription>
+                                    Sumá los repuestos del pedido. Todo se despacha al mismo vehículo.
+                                </DialogDescription>
+                            </div>
+                        </div>
                     </DialogHeader>
 
-                    <form onSubmit={handleSalidaSubmit} className="grid gap-4">
-                        {/* Selector de artículos */}
-                        <div className="grid gap-2">
-                            <Label>Agregar artículo</Label>
+                    <form onSubmit={handleSalidaSubmit} className="flex flex-col gap-5">
+                        {/* Artículos */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-semibold text-foreground">Repuestos del pedido</span>
+                                {orderLines.length > 0 && (
+                                    <span className="text-xs text-muted-foreground">
+                                        {orderLines.length} {orderLines.length === 1 ? 'repuesto' : 'repuestos'} · {orderLines.reduce((s, l) => s + (Number(l.cantidad) || 0), 0)} unidades
+                                    </span>
+                                )}
+                            </div>
                             <Combobox
                                 key={comboKey}
-                                placeholder="Buscar artículo por nombre..."
+                                placeholder="Buscar repuesto..."
                                 options={articuloOptions}
                                 value=""
                                 onSelect={(o) => addArticulo(Number(o.value))}
                                 emptyText="Sin artículos disponibles"
                             />
-                        </div>
-
-                        {/* Líneas del pedido */}
-                        {orderLines.length > 0 ? (
-                            <div className="max-h-64 overflow-y-auto rounded-md border border-border">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-muted/40 text-xs text-muted-foreground uppercase">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left font-medium">Artículo</th>
-                                            <th className="w-24 px-3 py-2 text-left font-medium">Cantidad</th>
-                                            <th className="w-8 px-2 py-2"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {orderLines.map((line) => {
-                                            const item = itemsById.get(line.articulo_id);
-                                            if (!item) return null;
-                                            return (
-                                                <tr key={line.articulo_id}>
-                                                    <td className="px-3 py-2">
-                                                        <p className="font-medium text-foreground">{item.descripcion}</p>
-                                                        <p className="text-[11px] text-muted-foreground">Disponible: {item.stock}</p>
-                                                    </td>
-                                                    <td className="px-3 py-2">
-                                                        <Input
-                                                            type="number"
-                                                            min="1"
-                                                            max={item.stock}
-                                                            value={line.cantidad}
-                                                            onChange={(e) => updateCantidad(line.articulo_id, e.target.value)}
-                                                            className={cn(
-                                                                'h-8 w-20 text-sm',
-                                                                lineErrors[line.articulo_id] && 'border-destructive',
-                                                            )}
-                                                        />
-                                                        {lineErrors[line.articulo_id] && (
-                                                            <p className="mt-0.5 text-[10px] text-destructive">{lineErrors[line.articulo_id]}</p>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-2 py-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeLine(line.articulo_id)}
-                                                            className="text-muted-foreground hover:text-destructive"
-                                                            aria-label="Quitar del pedido"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                                Todavía no agregaste artículos al pedido.
-                            </p>
-                        )}
-
-                        <div className="grid gap-2">
-                            <Label htmlFor="patente">Patente del Vehículo</Label>
-                            <Combobox
-                                id="patente"
-                                placeholder="Buscar patente, marca o modelo..."
-                                options={patenteOptions}
-                                value={salidaForm.data.patente}
-                                onSelect={(o) => salidaForm.setData('patente', o.value)}
-                                uppercase
-                            />
-                            <InputError message={salidaForm.errors.patente} />
+                            {orderLines.length > 0 && (
+                                <div className="max-h-52 overflow-y-auto divide-y divide-border overflow-hidden rounded-xl border border-border">
+                                    {orderLines.map((line) => {
+                                        const item = itemsById.get(line.articulo_id);
+                                        if (!item) return null;
+                                        const qty = Number(line.cantidad) || 0;
+                                        const remaining = item.stock - qty;
+                                        return (
+                                            <div key={line.articulo_id} className="flex items-center gap-3 px-3.5 py-3">
+                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                    <span className="truncate text-sm font-semibold text-foreground">{item.descripcion}</span>
+                                                    <span className={cn('text-[11px]',
+                                                        remaining < 0 ? 'text-destructive' :
+                                                        remaining <= 3 ? 'text-amber-500 dark:text-amber-400' :
+                                                        'text-muted-foreground',
+                                                    )}>
+                                                        Quedarán {remaining} en depósito
+                                                    </span>
+                                                </div>
+                                                {/* Stepper unificado */}
+                                                <div className="flex shrink-0 overflow-hidden rounded-lg border border-border">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateCantidad(line.articulo_id, String(Math.max(1, qty - 1)))}
+                                                        className="flex h-8 w-8 items-center justify-center border-r border-border bg-muted text-foreground transition-colors hover:bg-muted/70"
+                                                    >
+                                                        <Minus className="h-3 w-3" />
+                                                    </button>
+                                                    <span className={cn('flex h-8 w-8 items-center justify-center bg-card text-sm font-bold tabular-nums', lineErrors[line.articulo_id] ? 'text-destructive' : 'text-foreground')}>
+                                                        {line.cantidad}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateCantidad(line.articulo_id, String(Math.min(item.stock, qty + 1)))}
+                                                        disabled={qty >= item.stock}
+                                                        className="flex h-8 w-8 items-center justify-center border-l border-border bg-muted text-foreground transition-colors hover:bg-muted/70 disabled:opacity-40"
+                                                    >
+                                                        <Plus className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeLine(line.articulo_id)}
+                                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-destructive"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             <InputError message={(salidaForm.errors as Record<string, string>).lineas} />
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="solicitante">Solicitante</Label>
+                        {/* Vehículo */}
+                        <div className="flex flex-col gap-2">
+                            <span className="text-sm font-semibold text-foreground">¿A qué vehículo?</span>
+                            {salidaForm.data.patente ? (() => {
+                                const v = vehiculos.find((veh) => veh.patente === salidaForm.data.patente);
+                                return (
+                                    <div className="flex items-center justify-between rounded-xl border border-amber-500/50 bg-amber-500/5 px-4 py-3">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-baseline gap-2">
+                                                <p className="font-mono text-sm font-bold uppercase tracking-widest text-foreground">
+                                                    {salidaForm.data.patente}
+                                                </p>
+                                                {v && <span className="text-xs text-muted-foreground">{v.marca} {v.modelo}</span>}
+                                            </div>
+                                            {v?.user?.name && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-foreground">
+                                                        {v.user.name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()}
+                                                    </div>
+                                                    <span className="text-xs text-muted-foreground">{v.user.name}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button type="button" onClick={() => salidaForm.setData('patente', '')} className="text-muted-foreground transition-colors hover:text-foreground">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                );
+                            })() : (
+                                <Combobox
+                                    placeholder="Buscar patente, chofer, marca o modelo..."
+                                    options={patenteOptions}
+                                    value={salidaForm.data.patente}
+                                    onSelect={(o) => salidaForm.setData('patente', o.value)}
+                                    uppercase
+                                />
+                            )}
+                            <InputError message={salidaForm.errors.patente} />
+                        </div>
+
+                        {/* Solicitante */}
+                        <div className="flex flex-col gap-2">
+                            <span className="text-sm font-semibold text-foreground">¿Quién lo pidió?</span>
                             <Input
-                                id="solicitante"
                                 type="text"
                                 value={salidaForm.data.solicitante}
                                 onChange={(e) => salidaForm.setData('solicitante', e.target.value)}
@@ -665,10 +701,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         </div>
 
                         {salidaForm.data.patente === 'EXTERNO' && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="descripcion">Descripción (Externo)</Label>
+                            <div className="flex flex-col gap-2">
+                                <span className="text-sm font-semibold text-foreground">Descripción</span>
                                 <Input
-                                    id="descripcion"
                                     type="text"
                                     value={salidaForm.data.descripcion}
                                     onChange={(e) => salidaForm.setData('descripcion', e.target.value)}
@@ -678,13 +713,26 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </div>
                         )}
 
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={closeSalidaModal}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={salidaForm.processing || !salidaValida}>
-                                {salidaForm.processing ? 'Procesando...' : 'Confirmar egreso'}
-                            </Button>
+                        <DialogFooter className="flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className={cn('h-2 w-2 rounded-full transition-colors', salidaValida ? 'bg-green-500' : 'bg-muted-foreground/30')} />
+                                <span className="text-xs text-muted-foreground">
+                                    {salidaValida ? 'Listo para confirmar' : 'Completá los datos para confirmar'}
+                                </span>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button type="button" variant="outline" onClick={closeSalidaModal}>
+                                    Cancelar
+                                </Button>
+                                <Button type="submit" disabled={salidaForm.processing || !salidaValida} className="gap-1.5">
+                                    {salidaForm.processing ? 'Procesando...' : (
+                                        <>
+                                            <Check className="h-4 w-4" />
+                                            Confirmar egreso
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -693,20 +741,42 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             {/* ─── Modal Ingreso / Nuevo Artículo ──────────────────────────────── */}
             <Dialog
                 open={showCreateModal}
-                onOpenChange={(open) => {
-                    if (!open) closeCreateModal();
-                }}
+                onOpenChange={(open) => { if (!open) closeCreateModal(); }}
             >
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>
-                            {isNewMode ? 'Nuevo Artículo' : 'Ingreso de Artículo'}
-                        </DialogTitle>
+                        <DialogTitle>{isNewMode ? 'Nuevo artículo' : 'Ingreso de stock'}</DialogTitle>
+                        <DialogDescription>
+                            {isNewMode ? 'Registrá un artículo nuevo en el inventario.' : 'Sumá unidades a un artículo existente.'}
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleCreateSubmit} className="grid gap-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="create-descripcion">Artículo</Label>
+                    {/* Toggle de modo */}
+                    <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+                        <button
+                            type="button"
+                            onClick={() => isNewMode && toggleNewMode()}
+                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-all',
+                                !isNewMode ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+                            )}
+                        >
+                            Ingreso a existente
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => !isNewMode && toggleNewMode()}
+                            className={cn('flex-1 rounded-lg py-1.5 text-xs font-medium transition-all',
+                                isNewMode ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground',
+                            )}
+                        >
+                            Nuevo artículo
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+                        {/* Artículo */}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="create-descripcion">{isNewMode ? 'Nombre' : 'Artículo'}</Label>
                             {isNewMode ? (
                                 <Input
                                     id="create-descripcion"
@@ -727,33 +797,27 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         onChange={handleDescripcionChange}
                                         onKeyDown={handleDescripcionKeyDown}
                                         onFocus={() => setShowSuggestions(true)}
-                                        onBlur={() => {
-                                            setTimeout(() => setShowSuggestions(false), 150);
-                                        }}
+                                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                                     />
                                     {showSuggestions && createForm.data.descripcion.trim() !== '' && (
-                                        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                                            <div className="max-h-52 overflow-y-auto">
+                                        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover shadow-lg">
+                                            <div className="max-h-52 overflow-y-auto divide-y divide-border">
                                                 {suggestions.length === 0 ? (
-                                                    <p className="px-3 py-2 text-sm text-muted-foreground">
-                                                        Sin coincidencias
-                                                    </p>
+                                                    <p className="px-3 py-2.5 text-sm text-muted-foreground">Sin coincidencias</p>
                                                 ) : (
                                                     suggestions.map((item, idx) => (
                                                         <button
                                                             key={item.id}
                                                             type="button"
                                                             className={cn(
-                                                                'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                                                                'flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition-colors',
                                                                 highlightedIndex === idx ? 'bg-accent' : 'hover:bg-accent/60',
                                                             )}
                                                             onMouseEnter={() => setHighlightedIndex(idx)}
                                                             onMouseDown={() => handleSelectSuggestion(item)}
                                                         >
-                                                            <span className="font-medium">{item.descripcion}</span>
-                                                            <span className="ml-4 shrink-0 text-xs text-muted-foreground">
-                                                                Stock: {item.stock}
-                                                            </span>
+                                                            <span className="font-medium text-foreground">{item.descripcion}</span>
+                                                            <span className="ml-4 shrink-0 tabular-nums text-xs text-muted-foreground">Stock: {item.stock}</span>
                                                         </button>
                                                     ))
                                                 )}
@@ -763,46 +827,28 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 </div>
                             )}
                             {isRestock && matchedItem && (
-                                <span className="inline-flex w-fit items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                                    Stock: {matchedItem.stock}
-                                </span>
+                                <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
+                                    <span className="text-sm font-semibold text-foreground">{matchedItem.descripcion}</span>
+                                    <span className="text-xs text-muted-foreground">Stock actual: <span className="font-semibold text-foreground">{matchedItem.stock}</span></span>
+                                </div>
                             )}
                             <InputError message={createForm.errors.descripcion} />
                         </div>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="grid gap-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="codigo">Código</Label>
                                 <Input
                                     id="codigo"
                                     type="text"
                                     value={createForm.data.codigo}
                                     onChange={(e) => createForm.setData('codigo', e.target.value)}
-                                    placeholder="Código del artículo"
+                                    placeholder="Opcional"
                                 />
                                 <InputError message={createForm.errors.codigo} />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="repuestos" className="flex items-center gap-2">
-                                    <input
-                                        id="repuestos"
-                                        type="checkbox"
-                                        checked={createForm.data.repuestos}
-                                        onChange={(e) => createForm.setData('repuestos', e.target.checked)}
-                                        className="h-4 w-4 rounded border-border"
-                                    />
-                                    Es repuesto
-                                </Label>
-                                <p className="text-xs text-muted-foreground">Marcar si el artículo es un repuesto.</p>
-                                <InputError message={createForm.errors.repuestos} />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="grid gap-2">
-                                <Label htmlFor="stock">
-                                    {isRestock ? 'Cantidad a ingresar' : 'Stock Inicial'}
-                                </Label>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="stock">{isRestock ? 'Cantidad a ingresar' : 'Stock inicial'}</Label>
                                 <Input
                                     id="stock"
                                     type="number"
@@ -812,8 +858,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 />
                                 <InputError message={createForm.errors.stock} />
                             </div>
-                            <div className="grid gap-2">
-                                <Label htmlFor="min_stock">Stock Mínimo</Label>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="min_stock">Stock mínimo</Label>
                                 <Input
                                     id="min_stock"
                                     type="number"
@@ -823,49 +872,53 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 />
                                 <InputError message={createForm.errors.min_stock} />
                             </div>
+                            {isNewMode && (
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="precio">Precio (ARS)</Label>
+                                    <Input
+                                        id="precio"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={createForm.data.precio}
+                                        onChange={(e) => createForm.setData('precio', e.target.value)}
+                                        placeholder="0.00"
+                                    />
+                                    <InputError message={createForm.errors.precio} />
+                                </div>
+                            )}
                         </div>
 
                         {isNewMode && (
-                            <div className="grid gap-2">
-                                <Label htmlFor="precio">Precio (ARS)</Label>
-                                <Input
-                                    id="precio"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={createForm.data.precio}
-                                    onChange={(e) => createForm.setData('precio', e.target.value)}
-                                    placeholder="0.00"
+                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-border px-3.5 py-2.5 transition-colors hover:bg-muted/40">
+                                <input
+                                    type="checkbox"
+                                    checked={createForm.data.repuestos}
+                                    onChange={(e) => createForm.setData('repuestos', e.target.checked)}
+                                    className="h-4 w-4 rounded border-border"
                                 />
-                                <InputError message={createForm.errors.precio} />
-                            </div>
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">Es repuesto</p>
+                                    <p className="text-xs text-muted-foreground">Aparece en egresos de taller</p>
+                                </div>
+                            </label>
                         )}
 
-                        <DialogFooter className="sm:justify-between">
-                            <Button
-                                type="button"
-                                variant={isNewMode ? 'default' : 'secondary'}
-                                size="sm"
-                                onClick={toggleNewMode}
-                            >
-                                {isNewMode ? 'Ingreso' : 'Nuevo'}
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={closeCreateModal}>
+                                Cancelar
                             </Button>
-                            <div className="flex gap-2">
-                                <Button type="button" variant="outline" onClick={closeCreateModal}>
-                                    Cancelar
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        createForm.processing ||
-                                        !createForm.data.descripcion.trim() ||
-                                        (!isNewMode && !matchedItem) ||
-                                        (isRestock && Number(createForm.data.stock) < 1)
-                                    }
-                                >
-                                    {createForm.processing ? 'Procesando...' : 'Confirmar'}
-                                </Button>
-                            </div>
+                            <Button
+                                type="submit"
+                                disabled={
+                                    createForm.processing ||
+                                    !createForm.data.descripcion.trim() ||
+                                    (!isNewMode && !matchedItem) ||
+                                    (isRestock && Number(createForm.data.stock) < 1)
+                                }
+                            >
+                                {createForm.processing ? 'Procesando...' : isNewMode ? 'Crear artículo' : 'Confirmar ingreso'}
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
