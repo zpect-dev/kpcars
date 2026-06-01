@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
+use App\Http\Controllers\CierreGastoController;
 use App\Http\Controllers\CierreInversionController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
@@ -121,8 +122,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
         Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
 
+        // Cierres de gastos
+        Route::get('cierres-gasto', [CierreGastoController::class, 'index'])->name('cierres-gasto.index');
+        Route::post('cierres-gasto', [CierreGastoController::class, 'store'])->name('cierres-gasto.store');
+        Route::get('cierres-gasto/{cierreGasto}', [CierreGastoController::class, 'show'])->name('cierres-gasto.show');
+        Route::get('pdf/cierres-gasto/{cierreGasto}', [PdfController::class, 'cierreGasto'])->name('pdf.cierre-gasto');
+        Route::get('excel/cierres-gasto/{cierreGasto}', [ExcelController::class, 'cierreGasto'])->name('excel.cierre-gasto');
+
         // Inversiones
         Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');
+        Route::post('inversiones', [InversionController::class, 'store'])->name('inversiones.store');
         Route::post('inversiones/{inversion}/inversores', [InversionController::class, 'attachInversor'])->name('inversiones.inversores.attach');
         Route::put('inversiones/{inversion}/inversores/sync', [InversionController::class, 'syncInversores'])->name('inversiones.inversores.sync');
         Route::patch('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'updateInversor'])->name('inversiones.inversores.update');
@@ -149,6 +158,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // PDFs/Excels financieros y de cierres
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
+        Route::get('pdf/cobros-integrado', [PdfController::class, 'cobrosIntegrado'])->name('pdf.cobros-integrado');
+        Route::get('excel/cobros-integrado', [ExcelController::class, 'cobrosIntegrado'])->name('excel.cobros-integrado');
         Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
         Route::get('pdf/cierres-inversion/{cierreInversion}', [PdfController::class, 'cierreInversion'])->name('pdf.cierre-inversion');
         Route::get('excel/cierres-inversion/{cierreInversion}', [ExcelController::class, 'cierreInversion'])->name('excel.cierre-inversion');

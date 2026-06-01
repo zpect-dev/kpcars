@@ -12,7 +12,7 @@ import {
     Receipt,
     User,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -28,6 +28,7 @@ import type {
     CobroDesglose,
     CobroResumenInversion,
     CobroTransaccion,
+    ResumenIntegradoInversion,
 } from '@/types';
 
 function formatARS(value: number): string {
@@ -57,6 +58,8 @@ interface Props {
         created_at: string;
     } | null;
     historialCierres: CierreHistorial[];
+    resumenIntegrado: ResumenIntegradoInversion[];
+    totalIntegrado: number;
 }
 
 export default function CobrosIndex({
@@ -64,6 +67,8 @@ export default function CobrosIndex({
     totalGeneral,
     ultimoCierre,
     historialCierres,
+    resumenIntegrado,
+    totalIntegrado,
 }: Props) {
     const { auth } = usePage<any>().props;
     const isAdmin = auth.user.role === 'administrador';
@@ -75,6 +80,29 @@ export default function CobrosIndex({
     // ─── Cierre de Caja Modal ─────────────────────────────────────────────
     const [showCierreModal, setShowCierreModal] = useState(false);
     const [processingCierre, setProcessingCierre] = useState(false);
+
+    // ─── Resumen con gastos (solo lectura) ────────────────────────────────
+    const [showResumenModal, setShowResumenModal] = useState(false);
+    const [expandedIntegrado, setExpandedIntegrado] = useState<Set<number>>(new Set());
+    const [expandedVehInt, setExpandedVehInt] = useState<Set<number>>(new Set());
+
+    function toggleIntegrado(invId: number) {
+        setExpandedIntegrado((prev) => {
+            const next = new Set(prev);
+            if (next.has(invId)) next.delete(invId);
+            else next.add(invId);
+            return next;
+        });
+    }
+
+    function toggleVehInt(vehId: number) {
+        setExpandedVehInt((prev) => {
+            const next = new Set(prev);
+            if (next.has(vehId)) next.delete(vehId);
+            else next.add(vehId);
+            return next;
+        });
+    }
 
     // ─── Historial Detail Modal ───────────────────────────────────────────
     const [selectedCierre, setSelectedCierre] =
@@ -211,6 +239,15 @@ export default function CobrosIndex({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resumenIntegrado.length === 0}
+                            onClick={() => setShowResumenModal(true)}
+                        >
+                            <Car className="h-4 w-4" />
+                            <span className="hidden sm:inline">Resumen con gastos</span>
+                        </Button>
                         <Button
                             variant="outline"
                             size="sm"
@@ -410,6 +447,177 @@ export default function CobrosIndex({
                     </div>
                 )}
             </div>
+
+            {/* ─── Modal Resumen con gastos (solo lectura) ───────────────────── */}
+            <Dialog open={showResumenModal} onOpenChange={setShowResumenModal}>
+                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[640px]">
+                    <DialogHeader>
+                        <DialogTitle>Resumen con gastos</DialogTitle>
+                        <DialogDescription>
+                            Cobros del período más los gastos de cada vehículo (desde el último cierre de caja), integrados por inversión. Solo lectura.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <div>
+                            <p className="text-xs font-medium text-muted-foreground uppercase">
+                                Total integrado (cobros + gastos)
+                            </p>
+                            <p className="mt-1 text-xl font-bold text-foreground">
+                                {formatARS(totalIntegrado)}
+                            </p>
+                        </div>
+                        {resumenIntegrado.length > 0 && (
+                            <div className="flex shrink-0 items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open('/pdf/cobros-integrado', '_blank')}
+                                >
+                                    <Download className="h-4 w-4" />
+                                    <span className="hidden sm:inline">PDF</span>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open('/excel/cobros-integrado', '_blank')}
+                                >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Excel</span>
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {resumenIntegrado.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-muted-foreground">
+                            No hay cobros ni gastos en el período.
+                        </p>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {resumenIntegrado.map((inv) => {
+                                const open = expandedIntegrado.has(inv.inversion_id);
+                                return (
+                                    <div key={inv.inversion_id} className="overflow-hidden rounded-xl border border-border">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleIntegrado(inv.inversion_id)}
+                                            className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+                                        >
+                                            {open ? (
+                                                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            ) : (
+                                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            )}
+                                            <div className="flex min-w-0 flex-1 flex-col">
+                                                <span className="truncate text-sm font-semibold text-foreground">
+                                                    {inv.inversion_nombre}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Cobros {formatARS(inv.total_cobros)} · Gastos {formatARS(inv.total_gastos)}
+                                                </span>
+                                            </div>
+                                            <span className="shrink-0 text-sm font-bold text-foreground">
+                                                {formatARS(inv.total)}
+                                            </span>
+                                        </button>
+
+                                        {open && (
+                                            <div className="border-t border-border">
+                                                <table className="w-full text-sm">
+                                                    <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                        <tr>
+                                                            <th className="px-4 py-2 text-left font-medium">Vehículo</th>
+                                                            <th className="px-3 py-2 text-right font-medium">Cobros</th>
+                                                            <th className="px-3 py-2 text-right font-medium">Gastos</th>
+                                                            <th className="px-4 py-2 text-right font-medium">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-border">
+                                                        {inv.vehiculos.map((v) => {
+                                                            const vOpen = expandedVehInt.has(v.vehiculo_id);
+                                                            return (
+                                                                <Fragment key={v.vehiculo_id}>
+                                                                    <tr
+                                                                        className="cursor-pointer hover:bg-muted/20"
+                                                                        onClick={() => toggleVehInt(v.vehiculo_id)}
+                                                                    >
+                                                                        <td className="px-4 py-2">
+                                                                            <span className="inline-flex items-center gap-1.5">
+                                                                                {vOpen ? (
+                                                                                    <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                                ) : (
+                                                                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                                )}
+                                                                                <span className="font-mono font-medium text-foreground">{v.patente}</span>
+                                                                                <span className="text-xs text-muted-foreground">{v.marca} {v.modelo}</span>
+                                                                            </span>
+                                                                        </td>
+                                                                        <td className="px-3 py-2 text-right text-muted-foreground">{formatARS(v.cobros)}</td>
+                                                                        <td className="px-3 py-2 text-right text-muted-foreground">{formatARS(v.gastos)}</td>
+                                                                        <td className="px-4 py-2 text-right font-semibold text-foreground">{formatARS(v.total)}</td>
+                                                                    </tr>
+                                                                    {vOpen && (
+                                                                        <tr className="bg-muted/10">
+                                                                            <td colSpan={4} className="px-4 py-3">
+                                                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                                                    <div>
+                                                                                        <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Cobros</p>
+                                                                                        {v.cobros_detalle.length === 0 ? (
+                                                                                            <p className="text-xs text-muted-foreground">Sin cobros.</p>
+                                                                                        ) : (
+                                                                                            <ul className="flex flex-col gap-0.5">
+                                                                                                {v.cobros_detalle.map((c, i) => (
+                                                                                                    <li key={i} className="flex justify-between gap-2 text-xs">
+                                                                                                        <span className="text-foreground">{c.articulo} <span className="text-muted-foreground">×{c.cantidad}</span></span>
+                                                                                                        <span className="shrink-0 text-muted-foreground">{formatARS(c.subtotal)}</span>
+                                                                                                    </li>
+                                                                                                ))}
+                                                                                            </ul>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Gastos</p>
+                                                                                        {v.gastos_detalle.length === 0 ? (
+                                                                                            <p className="text-xs text-muted-foreground">Sin gastos.</p>
+                                                                                        ) : (
+                                                                                            <ul className="flex flex-col gap-0.5">
+                                                                                                {v.gastos_detalle.map((g, i) => (
+                                                                                                    <li key={i} className="flex justify-between gap-2 text-xs">
+                                                                                                        <span className="text-foreground">
+                                                                                                            {g.fecha ? `${g.fecha.slice(8, 10)}/${g.fecha.slice(5, 7)} · ` : ''}
+                                                                                                            {g.descripcion?.trim() || g.recibio || 'Gasto'}
+                                                                                                        </span>
+                                                                                                        <span className="shrink-0 text-muted-foreground">{formatARS(g.monto)}</span>
+                                                                                                    </li>
+                                                                                                ))}
+                                                                                            </ul>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </Fragment>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setShowResumenModal(false)}>
+                            Cerrar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* ─── Modal Cierre de Caja ──────────────────────────────────────── */}
             <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>

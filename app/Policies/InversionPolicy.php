@@ -15,6 +15,11 @@ class InversionPolicy
         return $user->isAdmin();
     }
 
+    public function create(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
     public function view(User $user, Inversion $inversion): bool
     {
         return $user->isAdmin();

@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -100,6 +101,34 @@ class InversionController extends Controller
             ] : null,
             'maxInversores' => Inversion::MAX_INVERSORES,
         ]);
+    }
+
+    /**
+     * Crea una inversión en la empresa activa.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('create', Inversion::class);
+
+        $empresaActiva = session('active_company_id');
+
+        $validated = $request->validate([
+            'nombre' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('inversiones', 'nombre')->where(fn ($q) => $q->where('empresa_id', $empresaActiva)),
+            ],
+        ], [
+            'nombre.unique' => 'Ya existe una inversión con ese nombre en esta empresa.',
+        ]);
+
+        Inversion::create([
+            'nombre' => trim($validated['nombre']),
+            'empresa_id' => $empresaActiva,
+        ]);
+
+        return back()->with('success', 'Inversión creada correctamente.');
     }
 
     /**

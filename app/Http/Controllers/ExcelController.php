@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\BuildResumenIntegradoAction;
+use App\Models\CierreGasto;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
 use App\Models\Cobro;
@@ -14,6 +16,98 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExcelController extends Controller
 {
+    /**
+     * Excel del resumen integrado: cobros + gastos por vehículo e inversión.
+     */
+    public function cobrosIntegrado(Request $request, BuildResumenIntegradoAction $action): StreamedResponse
+    {
+        // Acceso: middleware role:administrador.
+        $resumen = $action->execute();
+
+        $filename = 'resumen-cobros-gastos-'.now()->format('Y-m-d').'.xlsx';
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Inversión', 'Patente', 'Tipo', 'Detalle', 'Monto ARS']);
+
+        foreach ($resumen as $inv) {
+            foreach ($inv['vehiculos'] as $v) {
+                $vehiculoLabel = trim($v['patente'].' '.$v['marca'].' '.$v['modelo']);
+
+                foreach ($v['cobros_detalle'] as $c) {
+                    $writer->addRow([
+                        $inv['inversion_nombre'],
+                        $v['patente'],
+                        'Cobro',
+                        $c['articulo'].' ×'.$c['cantidad'],
+                        round((float) $c['subtotal'], 2),
+                    ]);
+                }
+
+                foreach ($v['gastos_detalle'] as $g) {
+                    $detalle = trim(($g['fecha'] ? $g['fecha'].' ' : '').($g['descripcion'] ?: $g['recibio'] ?: 'Gasto'));
+                    $writer->addRow([
+                        $inv['inversion_nombre'],
+                        $v['patente'],
+                        'Gasto',
+                        $detalle,
+                        round((float) $g['monto'], 2),
+                    ]);
+                }
+
+                $writer->addRow([
+                    $inv['inversion_nombre'],
+                    $v['patente'],
+                    'Subtotal vehículo',
+                    $vehiculoLabel,
+                    round((float) $v['total'], 2),
+                ]);
+            }
+
+            $writer->addRow([
+                $inv['inversion_nombre'],
+                '',
+                'Subtotal inversión',
+                'Cobros '.round((float) $inv['total_cobros'], 2).' + Gastos '.round((float) $inv['total_gastos'], 2),
+                round((float) $inv['total'], 2),
+            ]);
+        }
+
+        $writer->addRow(['TOTAL GENERAL', '', '', '', round((float) $resumen->sum('total'), 2)]);
+
+        return $writer->toBrowser();
+    }
+
+    /**
+     * Excel export de un cierre de gastos: desglose por tipo y por patente.
+     */
+    public function cierreGasto(Request $request, CierreGasto $cierreGasto): StreamedResponse
+    {
+        // Acceso: middleware role:administrador.
+        $cierreGasto->load('detalles');
+
+        $filename = 'cierre-gastos-'.$cierreGasto->id.'-'.$cierreGasto->periodo_fin->format('Y-m-d').'.xlsx';
+
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Categoría', 'Detalle', 'Monto ARS']);
+
+        $cierreGasto->detalles
+            ->where('tipo', '!=', 'vehiculo')
+            ->sortBy('tipo')
+            ->each(function ($d) use ($writer) {
+                $writer->addRow([ucfirst($d->tipo), '', round((float) $d->total, 2)]);
+            });
+
+        $cierreGasto->detalles
+            ->where('tipo', 'vehiculo')
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->each(function ($d) use ($writer) {
+                $writer->addRow(['Vehículo', $d->patente ?? '—', round((float) $d->total, 2)]);
+            });
+
+        $writer->addRow(['TOTAL', '', round((float) $cierreGasto->total_general, 2)]);
+
+        return $writer->toBrowser();
+    }
+
     /**
      * Excel export for a cierre de inversión.
      */

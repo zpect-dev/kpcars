@@ -13,6 +13,7 @@ import {
     Trash2,
     UserCheck,
     UserX,
+    Wallet,
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -70,6 +71,8 @@ export default function Dashboard({
 }: Props) {
     const { auth } = usePage<any>().props;
     const isInversor = auth?.user?.role === 'inversor';
+    const isAdmin = auth?.user?.role === 'administrador';
+    const empresaActivaNombre = auth?.active_company?.nombre ?? null;
     // El selector de empresa se reemplazó por el switcher del dropdown de usuario.
     // El filtro por empresa en el dashboard queda obsoleto: TenantScope ya filtra
     // las queries por la empresa activa.
@@ -115,6 +118,7 @@ export default function Dashboard({
     }, [search, asignacionFiltro]);
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isCreateInversionOpen, setIsCreateInversionOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [editingVehiculo, setEditingVehiculo] = useState<Vehiculo | null>(
         null,
@@ -269,6 +273,20 @@ export default function Dashboard({
             onSuccess: () => {
                 createForm.reset();
                 setIsCreateOpen(false);
+            },
+        });
+    }
+
+    // --- Create inversión form ---
+    const inversionForm = useForm({ nombre: '' });
+
+    function handleCreateInversion(e: React.FormEvent) {
+        e.preventDefault();
+        inversionForm.post('/inversiones', {
+            preserveScroll: true,
+            onSuccess: () => {
+                inversionForm.reset();
+                setIsCreateInversionOpen(false);
             },
         });
     }
@@ -530,6 +548,66 @@ export default function Dashboard({
                                     </form>
                                 </DialogContent>
                             </Dialog>
+
+                            {isAdmin && (
+                                <Dialog
+                                    open={isCreateInversionOpen}
+                                    onOpenChange={(o) => {
+                                        setIsCreateInversionOpen(o);
+                                        if (!o) {
+                                            inversionForm.reset();
+                                            inversionForm.clearErrors();
+                                        }
+                                    }}
+                                >
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <Wallet className="h-4 w-4" />
+                                            <span className="ml-2 hidden sm:inline">
+                                                Nueva Inversión
+                                            </span>
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[420px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Nueva inversión</DialogTitle>
+                                            <DialogDescription>
+                                                Se creará en la empresa activa
+                                                {empresaActivaNombre ? ` (${empresaActivaNombre})` : ''}.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handleCreateInversion} className="grid gap-4 py-2">
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="inversion_nombre">Nombre</Label>
+                                                <Input
+                                                    id="inversion_nombre"
+                                                    type="text"
+                                                    placeholder="Ej. Inversión 7"
+                                                    value={inversionForm.data.nombre}
+                                                    onChange={(e) => inversionForm.setData('nombre', e.target.value)}
+                                                    autoFocus
+                                                />
+                                                <InputError message={inversionForm.errors.nombre} />
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => setIsCreateInversionOpen(false)}
+                                                >
+                                                    Cancelar
+                                                </Button>
+                                                <Button
+                                                    type="submit"
+                                                    disabled={inversionForm.processing || inversionForm.data.nombre.trim() === ''}
+                                                >
+                                                    {inversionForm.processing ? 'Creando...' : 'Crear inversión'}
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            )}
 
                             <Dialog
                                 open={isCreateOpen}

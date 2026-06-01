@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\BuildResumenIntegradoAction;
 use App\Actions\ProcessCierreCajaAction;
 use App\Models\CierreCaja;
 use App\Models\Cobro;
@@ -93,11 +94,15 @@ class CobroController extends Controller
                 ];
             });
 
+        $resumenIntegrado = app(BuildResumenIntegradoAction::class)->execute();
+
         return Inertia::render('Cobros/Index', [
             'resumen' => $resumen,
             'totalGeneral' => $totalGeneral,
             'ultimoCierre' => $ultimoCierre,
             'historialCierres' => $historialCierres,
+            'resumenIntegrado' => $resumenIntegrado,
+            'totalIntegrado' => $resumenIntegrado->sum('total'),
         ]);
     }
 

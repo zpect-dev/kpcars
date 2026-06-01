@@ -121,6 +121,42 @@ export interface CobroDesglose {
     subtotal: number;
 }
 
+export interface ResumenIntegradoCobroLinea {
+    articulo: string;
+    cantidad: number;
+    precio_unitario: number;
+    subtotal: number;
+}
+
+export interface ResumenIntegradoGastoLinea {
+    fecha: string | null;
+    descripcion: string | null;
+    recibio: string | null;
+    monto: number;
+}
+
+export interface ResumenIntegradoVehiculo {
+    vehiculo_id: number;
+    patente: string;
+    marca: string;
+    modelo: string;
+    cobros: number;
+    gastos: number;
+    total: number;
+    cobros_detalle: ResumenIntegradoCobroLinea[];
+    gastos_detalle: ResumenIntegradoGastoLinea[];
+}
+
+export interface ResumenIntegradoInversion {
+    inversion_id: number;
+    inversion_nombre: string;
+    empresa_nombre: string;
+    total_cobros: number;
+    total_gastos: number;
+    total: number;
+    vehiculos: ResumenIntegradoVehiculo[];
+}
+
 export interface CobroTransaccion {
     id: number;
     patente: string;

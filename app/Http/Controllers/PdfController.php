@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\BuildResumenIntegradoAction;
 use App\Models\Appointment;
 use App\Models\Articulo;
 use App\Models\CierreCaja;
+use App\Models\CierreGasto;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
 use App\Models\Cobro;
@@ -20,6 +22,32 @@ use Illuminate\Http\Response;
 
 class PdfController extends Controller
 {
+    /**
+     * PDF de un cierre de gastos con desglose por tipo y por patente.
+     */
+    public function cierreGasto(Request $request, CierreGasto $cierreGasto): Response
+    {
+        // Acceso: middleware role:administrador.
+        $cierreGasto->load(['user:id,name', 'detalles']);
+
+        $porTipo = $cierreGasto->detalles
+            ->where('tipo', '!=', 'vehiculo')
+            ->sortBy('tipo')
+            ->values();
+
+        $porVehiculo = $cierreGasto->detalles
+            ->where('tipo', 'vehiculo')
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $cierre = $cierreGasto;
+
+        $pdf = Pdf::loadView('pdf.cierre-gasto', compact('cierre', 'porTipo', 'porVehiculo'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('cierre-gastos-'.$cierre->id.'-'.$cierre->periodo_fin->format('Y-m-d').'.pdf');
+    }
+
     /**
      * Generate PDF with current stock of all articles.
      */
@@ -105,6 +133,21 @@ class PdfController extends Controller
     /**
      * Generate PDF with pending cobros details grouped by inversion.
      */
+    /**
+     * PDF del resumen integrado: cobros + gastos de cada vehículo por inversión.
+     */
+    public function cobrosIntegrado(Request $request, BuildResumenIntegradoAction $action): Response
+    {
+        // Acceso: middleware role:administrador.
+        $resumen = $action->execute();
+        $total = $resumen->sum('total');
+
+        $pdf = Pdf::loadView('pdf.cobros-integrado', compact('resumen', 'total'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('resumen-cobros-gastos-'.now()->format('Y-m-d').'.pdf');
+    }
+
     public function cobros(Request $request): Response
     {
         // Acceso: middleware role:administrador.

@@ -29,6 +29,7 @@ class GastoController extends Controller
         // gastos cuyo vehículo pertenece a la empresa activa). El branch del inversor
         // se mantiene como filtro adicional por distribuciones suyas.
         $gastosQuery = Gasto::query()
+            ->pendientes()
             ->with([
                 'user:id,name',
                 'vehiculo:id,patente,marca,modelo,inversion_id,empresa_id',
