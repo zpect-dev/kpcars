@@ -85,6 +85,8 @@ class AppServiceProvider extends ServiceProvider
         // Áreas exclusivas del Administrador puro.
         Gate::define('view-cobros', fn (User $user) => $user->isAdmin());
         Gate::define('manage-cobros', fn (User $user) => $user->isAdmin());
+        Gate::define('view-recaudaciones', fn (User $user) => $user->isAdmin());
+        Gate::define('manage-recaudaciones', fn (User $user) => $user->isAdmin());
         Gate::define('view-gastos', fn (User $user) => $user->isAdmin());
         Gate::define('manage-gastos', fn (User $user) => $user->isAdmin());
         Gate::define('view-inversiones', fn (User $user) => $user->isAdmin());

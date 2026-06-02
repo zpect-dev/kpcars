@@ -21,6 +21,7 @@ export interface Vehiculo {
     modelo: string;
     anio: string;
     propietario: string | null;
+    precio: number;
     estado_patente: 'buen_estado' | 'mal_estado' | 'provisional' | 'no_posee' | null;
     user_id: number | null;
     inversion_id: number;
@@ -165,4 +166,52 @@ export interface CobroTransaccion {
     cantidad: number;
     precio_unitario: number;
     subtotal: number;
+}
+
+// ─── Recaudaciones Module ─────────────────────────────────────────────────────
+
+export interface RecaudacionFila {
+    /** Id de la recaudación (presente al editar registros de un cierre). */
+    id?: number;
+    vehiculo_id: number;
+    inversion_nombre: string;
+    patente: string;
+    chofer: string;
+    precio: number;
+    efectivo: number;
+    transferencia: number;
+    total: number;
+    descuento: number;
+    descripcion: string;
+    deuda: number;
+    estado: 'pagado' | 'deuda';
+}
+
+export interface RecaudacionCierreDetalle {
+    patente: string;
+    inversion_nombre: string;
+    efectivo: number;
+    transferencia: number;
+    total: number;
+    descuento: number;
+    precio: number;
+    descripcion: string;
+    deuda: number;
+    estado: 'pagado' | 'deuda';
+}
+
+export interface RecaudacionCierreHistorial {
+    id: number;
+    user: { id: number; name: string } | null;
+    total: number;
+    detalles: RecaudacionCierreDetalle[];
+    created_at: string;
+}
+
+export interface RecaudacionCierreResumen {
+    id: number;
+    user: { id: number; name: string } | null;
+    total: number;
+    vehiculos_count: number;
+    created_at: string;
 }

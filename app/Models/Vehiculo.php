@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'estado_patente', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
+#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'precio', 'estado_patente', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
 #[ScopedBy([TenantScope::class])]
 class Vehiculo extends Model
 {
@@ -26,6 +26,7 @@ class Vehiculo extends Model
     protected function casts(): array
     {
         return [
+            'precio' => 'decimal:2',
             'fecha_vencimiento_vtv' => 'date',
             'fecha_vencimiento_gnc' => 'date',
         ];
@@ -101,5 +102,21 @@ class Vehiculo extends Model
     public function lecturasKilometraje(): HasMany
     {
         return $this->hasMany(KilometrajeLectura::class)->orderByDesc('fecha')->orderByDesc('id');
+    }
+
+    /**
+     * Get the recaudaciones for the vehicle.
+     */
+    public function recaudaciones(): HasMany
+    {
+        return $this->hasMany(Recaudacion::class);
+    }
+
+    /**
+     * Get the open (current period) recaudacion for the vehicle.
+     */
+    public function recaudacionAbierta(): HasOne
+    {
+        return $this->hasOne(Recaudacion::class)->whereNull('cierre_id');
     }
 }

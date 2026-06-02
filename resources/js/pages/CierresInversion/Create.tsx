@@ -1,11 +1,11 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, AlertCircle, Calculator, CheckCircle2 } from 'lucide-react';
+import { useMemo } from 'react';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import InputError from '@/components/input-error';
-import { useMemo } from 'react';
 
 interface InversionRow {
     id: number;
@@ -13,6 +13,7 @@ interface InversionRow {
     inversores_count: number;
     deudores: number;
     financiadores: number;
+    recaudado: number;
     puede_procesar: boolean;
 }
 
@@ -31,7 +32,10 @@ function formatARS(value: number): string {
 }
 
 function formatDate(d: string | null): string {
-    if (!d) return '—';
+    if (!d) {
+return '—';
+}
+
     return new Date(d).toLocaleString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -46,9 +50,10 @@ export default function CierresCreate({
     ultimoCierre,
     maxInversores,
 }: Props) {
+    // Autocompletar con lo recaudado del último cierre de recaudaciones.
     const initial: Record<string, string> = {};
     inversiones.forEach((i) => {
-        initial[String(i.id)] = '';
+        initial[String(i.id)] = i.recaudado > 0 ? String(i.recaudado) : '';
     });
 
     const form = useForm<{

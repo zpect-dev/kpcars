@@ -318,6 +318,85 @@ class PdfController extends Controller
     }
 
     /**
+     * Generate PDF with the current debtors of recaudaciones, grouped by inversion.
+     */
+    public function recaudacionesDeudores(Request $request): Response
+    {
+        // Acceso: middleware role:administrador.
+        // Vehiculo auto-scopea por empresa activa vía TenantScope.
+        $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'recaudacionAbierta'])
+            ->whereNotNull('user_id')
+            ->where('patente', '!=', 'EXTERNO')
+            ->get();
+
+        $deudores = $vehiculos
+            ->map(function (Vehiculo $v) {
+                $r = $v->recaudacionAbierta;
+                $total = (float) ($r->total ?? 0);
+                $descuento = (float) ($r->descuento ?? 0);
+                $precioEfectivo = max((float) $v->precio - $descuento, 0);
+
+                return [
+                    'inversion_nombre' => $v->inversion?->nombre ?? 'Sin inversión',
+                    'patente' => $v->patente,
+                    'chofer' => $v->user?->name ?? 'N/A',
+                    'recaudado' => $total,
+                    'deuda' => max($precioEfectivo - $total, 0),
+                ];
+            })
+            ->filter(fn ($d) => $d['deuda'] > 0)
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $inversiones = $deudores
+            ->groupBy('inversion_nombre')
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+
+        $pdf = Pdf::loadView('pdf.recaudaciones-deudores', compact('inversiones'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('recaudaciones-deudores-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Generate PDF with the debtors of a historical recaudacion closing.
+     */
+    public function recaudacionesDeudoresCierre(Request $request, \App\Models\CierreRecaudacion $cierreRecaudacion): Response
+    {
+        // Acceso: middleware role:administrador. TenantScope scopea el cierre.
+        $cierreRecaudacion->load([
+            'recaudaciones.vehiculo:id,patente,inversion_id,user_id',
+            'recaudaciones.vehiculo.inversion:id,nombre',
+            'recaudaciones.vehiculo.user:id,name',
+        ]);
+
+        $deudores = $cierreRecaudacion->recaudaciones
+            ->map(function (\App\Models\Recaudacion $r) {
+                $precioEfectivo = max((float) $r->precio - (float) $r->descuento, 0);
+
+                return [
+                    'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                    'patente' => $r->vehiculo?->patente ?? 'N/A',
+                    'chofer' => $r->vehiculo?->user?->name ?? 'N/A',
+                    'recaudado' => (float) $r->total,
+                    'deuda' => max($precioEfectivo - (float) $r->total, 0),
+                ];
+            })
+            ->filter(fn ($d) => $d['deuda'] > 0)
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $inversiones = $deudores
+            ->groupBy('inversion_nombre')
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+
+        $pdf = Pdf::loadView('pdf.recaudaciones-deudores', compact('inversiones'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('recaudaciones-deudores-cierre-'.$cierreRecaudacion->id.'.pdf');
+    }
+
+    /**
      * Generate PDF with the detail of a historical cierre de caja.
      */
     public function cierreCaja(Request $request, CierreCaja $cierre): Response

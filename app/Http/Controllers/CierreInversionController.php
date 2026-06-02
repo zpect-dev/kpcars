@@ -7,7 +7,9 @@ namespace App\Http\Controllers;
 use App\Actions\ProcessCierreInversionAction;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
+use App\Models\CierreRecaudacion;
 use App\Models\Inversion;
+use App\Models\Recaudacion;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,12 +42,16 @@ class CierreInversionController extends Controller
     {
         $this->authorize('create', CierreInversion::class);
 
+        // Recaudado por inversión según el último cierre de recaudaciones de la
+        // empresa activa, para autocompletar los montos del formulario.
+        $recaudadoPorInversion = $this->recaudadoUltimoCierre();
+
         $inversiones = Inversion::with([
             'inversores:id,name',
         ])->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
-            ->map(function (Inversion $inv) {
+            ->map(function (Inversion $inv) use ($recaudadoPorInversion) {
             $deudores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->tiene_deuda)->count();
             $financiadores = $inv->inversores->filter(fn ($u) => (bool) $u->pivot->es_financiador)->count();
 
@@ -57,6 +63,8 @@ class CierreInversionController extends Controller
                 'inversores_count' => $count,
                 'deudores' => $deudores,
                 'financiadores' => $financiadores,
+                // Monto recaudado tomado del último cierre de recaudaciones (0 si no hay).
+                'recaudado' => (float) ($recaudadoPorInversion[$inv->id] ?? 0),
                 // El mínimo es 0 (se saltea). El máximo es MAX_INVERSORES.
                 // Si hay deudores, debe haber al menos un financiador.
                 'puede_procesar' => $count <= Inversion::MAX_INVERSORES
@@ -74,6 +82,30 @@ class CierreInversionController extends Controller
             ] : null,
             'maxInversores' => Inversion::MAX_INVERSORES,
         ]);
+    }
+
+    /**
+     * Totales recaudados por inversión del último cierre de recaudaciones
+     * de la empresa activa.
+     *
+     * @return array<int, float> [inversion_id => total]
+     */
+    private function recaudadoUltimoCierre(): array
+    {
+        $ultimo = CierreRecaudacion::latest()->first();
+
+        if ($ultimo === null) {
+            return [];
+        }
+
+        return Recaudacion::query()
+            ->where('recaudaciones.cierre_id', $ultimo->id)
+            ->join('vehiculos', 'recaudaciones.vehiculo_id', '=', 'vehiculos.id')
+            ->groupBy('vehiculos.inversion_id')
+            ->selectRaw('vehiculos.inversion_id as inversion_id, SUM(recaudaciones.total) as total')
+            ->pluck('total', 'inversion_id')
+            ->map(fn ($t) => (float) $t)
+            ->all();
     }
 
     /**

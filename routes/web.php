@@ -11,6 +11,7 @@ use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
+use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
@@ -119,6 +120,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
         Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
+        // Recaudaciones
+        Route::get('recaudaciones', [RecaudacionController::class, 'index'])->name('recaudaciones.index');
+        Route::post('recaudaciones/cierre', [RecaudacionController::class, 'cierre'])->name('recaudaciones.cierre');
+        Route::get('recaudaciones/historial', [RecaudacionController::class, 'historial'])->name('recaudaciones.historial');
+        Route::get('recaudaciones/cierres/{cierreRecaudacion}', [RecaudacionController::class, 'showCierre'])->name('recaudaciones.cierres.show');
+        Route::patch('recaudaciones/registro/{recaudacion}', [RecaudacionController::class, 'updateRegistro'])->name('recaudaciones.registro.update');
+        Route::patch('recaudaciones/{vehiculo}', [RecaudacionController::class, 'update'])->name('recaudaciones.update');
+
         // Gastos
         Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
@@ -159,6 +168,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
 
         // PDFs/Excels financieros y de cierres
+        Route::get('pdf/recaudaciones-deudores', [PdfController::class, 'recaudacionesDeudores'])->name('pdf.recaudaciones-deudores');
+        Route::get('pdf/recaudaciones-deudores/cierre/{cierreRecaudacion}', [PdfController::class, 'recaudacionesDeudoresCierre'])->name('pdf.recaudaciones-deudores-cierre');
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
         Route::get('pdf/cobros-integrado', [PdfController::class, 'cobrosIntegrado'])->name('pdf.cobros-integrado');
         Route::get('excel/cobros-integrado', [ExcelController::class, 'cobrosIntegrado'])->name('excel.cobros-integrado');

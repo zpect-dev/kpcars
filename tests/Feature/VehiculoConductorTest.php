@@ -32,6 +32,7 @@ function datosVehiculo(array $overrides = []): array
         'marca' => 'Toyota',
         'modelo' => 'Etios',
         'anio' => '2020',
+        'precio' => 360000,
         'inversion_id' => test()->inversion->id,
     ], $overrides);
 }

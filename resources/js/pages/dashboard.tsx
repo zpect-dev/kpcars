@@ -17,9 +17,10 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import InputError from '@/components/input-error';
+import { Button } from '@/components/ui/button';
+import { Combobox  } from '@/components/ui/combobox';
+import type {ComboboxOption} from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
@@ -110,9 +111,13 @@ export default function Dashboard({
 
     const FILTERS_STORAGE_KEY = 'vehiculos:filters';
     const storedFilters = (() => {
-        if (typeof window === 'undefined') return null;
+        if (typeof window === 'undefined') {
+return null;
+}
+
         try {
             const raw = sessionStorage.getItem(FILTERS_STORAGE_KEY);
+
             return raw ? JSON.parse(raw) : null;
         } catch {
             return null;
@@ -147,7 +152,10 @@ export default function Dashboard({
     const [estadoPatenteVehiculo, setEstadoPatenteVehiculo] = useState<Vehiculo | null>(null);
 
     function setEstadoPatente(estado: Exclude<EstadoPatente, null>) {
-        if (!estadoPatenteVehiculo) return;
+        if (!estadoPatenteVehiculo) {
+return;
+}
+
         router.patch(
             `/vehiculos/${estadoPatenteVehiculo.id}/estado-patente`,
             { estado_patente: estado },
@@ -171,13 +179,20 @@ export default function Dashboard({
     // --- Autocomplete suggestions (client-side) ---
     const suggestions = useMemo(() => {
         const q = search.toLowerCase().trim();
-        if (!q) return [];
+
+        if (!q) {
+return [];
+}
+
         const results: { label: string; sub: string; vehiculoId: number }[] =
             [];
         const seen = new Set<number>();
 
         for (const v of vehiculos) {
-            if (seen.has(v.id)) continue;
+            if (seen.has(v.id)) {
+continue;
+}
+
             if (v.patente.toLowerCase().includes(q)) {
                 results.push({
                     label: v.patente,
@@ -194,6 +209,7 @@ export default function Dashboard({
                 seen.add(v.id);
             }
         }
+
         return results.slice(0, 8);
     }, [vehiculos, search]);
 
@@ -202,6 +218,7 @@ export default function Dashboard({
         let result = vehiculos;
 
         const q = search.toLowerCase().trim();
+
         if (q) {
             result = result.filter(
                 (v) =>
@@ -210,16 +227,21 @@ export default function Dashboard({
             );
         }
 
-        if (asignacionFiltro === 'con')
-            result = result.filter((v) => !!v.user_id);
-        if (asignacionFiltro === 'sin')
-            result = result.filter((v) => !v.user_id);
+        if (asignacionFiltro === 'con') {
+result = result.filter((v) => !!v.user_id);
+}
+
+        if (asignacionFiltro === 'sin') {
+result = result.filter((v) => !v.user_id);
+}
 
         return result;
     }, [vehiculos, search, asignacionFiltro]);
 
     function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (!showSearchDropdown || suggestions.length === 0) return;
+        if (!showSearchDropdown || suggestions.length === 0) {
+return;
+}
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -251,6 +273,7 @@ export default function Dashboard({
     useEffect(() => {
         if (!isMounted.current) {
             isMounted.current = true;
+
             return;
         }
 
@@ -258,12 +281,20 @@ export default function Dashboard({
             empresaId !== (filters.empresa_id || '') ||
             inversionId !== (filters.inversion_id || '');
 
-        if (!hasChanges) return;
+        if (!hasChanges) {
+return;
+}
 
         const timeoutId = setTimeout(() => {
             const active: Record<string, string> = {};
-            if (empresaId) active.empresa_id = empresaId;
-            if (inversionId) active.inversion_id = inversionId;
+
+            if (empresaId) {
+active.empresa_id = empresaId;
+}
+
+            if (inversionId) {
+active.inversion_id = inversionId;
+}
 
             router.get('/dashboard', active, {
                 preserveState: true,
@@ -296,6 +327,7 @@ export default function Dashboard({
         modelo: '',
         anio: '',
         propietario: '',
+        precio: '360000',
         inversion_id: '' as string,
         empresa_id: '' as string,
         user_id: '' as string,
@@ -351,6 +383,7 @@ export default function Dashboard({
         modelo: '',
         anio: '',
         propietario: '',
+        precio: '360000',
         inversion_id: '' as string,
         empresa_id: '' as string,
         user_id: '' as string,
@@ -402,9 +435,13 @@ export default function Dashboard({
     }
 
     function formatVtv(dateStr?: string | null): string {
-        if (!dateStr) return '';
+        if (!dateStr) {
+return '';
+}
+
         const datePart = dateStr.split('T')[0].split(' ')[0];
         const [year, month] = datePart.split('-');
+
         return `${month}/${year}`;
     }
 
@@ -432,6 +469,7 @@ export default function Dashboard({
             modelo: v.modelo,
             anio: v.anio,
             propietario: v.propietario || '',
+            precio: v.precio != null ? String(v.precio) : '360000',
             inversion_id: String(v.inversion_id || ''),
             empresa_id: String(v.empresa_id || ''),
             user_id: String(v.user_id || ''),
@@ -443,7 +481,11 @@ export default function Dashboard({
 
     function handleEdit(e: React.FormEvent) {
         e.preventDefault();
-        if (!editingVehiculo) return;
+
+        if (!editingVehiculo) {
+return;
+}
+
         editForm.put(`/vehiculos/${editingVehiculo.id}`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -454,7 +496,10 @@ export default function Dashboard({
 
     // --- Delete ---
     function handleDelete() {
-        if (!deletingVehiculo) return;
+        if (!deletingVehiculo) {
+return;
+}
+
         router.delete(`/vehiculos/${deletingVehiculo.id}`, {
             preserveScroll: true,
             onSuccess: () => setDeletingVehiculo(null),
@@ -463,7 +508,10 @@ export default function Dashboard({
 
     // --- Unassign ---
     function handleUnassign() {
-        if (!unassigningVehiculo) return;
+        if (!unassigningVehiculo) {
+return;
+}
+
         router.patch(
             `/vehiculos/${unassigningVehiculo.id}/desasignar`,
             {},
@@ -501,12 +549,23 @@ export default function Dashboard({
                                 size="sm"
                                 onClick={() => {
                                     const params = new URLSearchParams();
-                                    if (empresaId) params.set('empresa_id', empresaId);
-                                    if (inversionId) params.set('inversion_id', inversionId);
-                                    if (search.trim()) params.set('search', search.trim());
+
+                                    if (empresaId) {
+params.set('empresa_id', empresaId);
+}
+
+                                    if (inversionId) {
+params.set('inversion_id', inversionId);
+}
+
+                                    if (search.trim()) {
+params.set('search', search.trim());
+}
+
                                     if (asignacionFiltro === 'con' || asignacionFiltro === 'sin') {
                                         params.set('asignacion', asignacionFiltro);
                                     }
+
                                     const qs = params.toString();
                                     window.open(
                                         `/pdf/vehiculos${qs ? `?${qs}` : ''}`,
@@ -591,6 +650,7 @@ export default function Dashboard({
                                     open={isCreateInversionOpen}
                                     onOpenChange={(o) => {
                                         setIsCreateInversionOpen(o);
+
                                         if (!o) {
                                             inversionForm.reset();
                                             inversionForm.clearErrors();
@@ -943,6 +1003,7 @@ export default function Dashboard({
                                                     <span>{vehiculo.patente}</span>
                                                     {(() => {
                                                         const b = estadoPatenteBadge(vehiculo.estado_patente);
+
                                                         return (
                                                             <button
                                                                 type="button"
@@ -1145,6 +1206,7 @@ export default function Dashboard({
                                             </span>
                                             {(() => {
                                                 const b = estadoPatenteBadge(vehiculo.estado_patente);
+
                                                 return (
                                                     <button
                                                         type="button"
@@ -1410,6 +1472,7 @@ export default function Dashboard({
                         {ESTADO_PATENTE_OPCIONES.map((opt) => {
                             const b = estadoPatenteBadge(opt.value);
                             const selected = estadoPatenteVehiculo?.estado_patente === opt.value;
+
                             return (
                                 <button
                                     key={opt.value}
@@ -1525,6 +1588,7 @@ interface VehiculoFormProps {
             modelo: string;
             anio: string;
             propietario: string;
+            precio: string;
             inversion_id: string;
             empresa_id: string;
             user_id: string;
@@ -1625,16 +1689,31 @@ function VehiculoForm({
                 </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-                <Label htmlFor="propietario">Titular</Label>
-                <Input
-                    id="propietario"
-                    type="text"
-                    placeholder="Nombre del titular"
-                    value={form.data.propietario}
-                    onChange={(e) => form.setData('propietario', e.target.value)}
-                />
-                <InputError message={form.errors.propietario} />
+            <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="propietario">Titular</Label>
+                    <Input
+                        id="propietario"
+                        type="text"
+                        placeholder="Nombre del titular"
+                        value={form.data.propietario}
+                        onChange={(e) => form.setData('propietario', e.target.value)}
+                    />
+                    <InputError message={form.errors.propietario} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="precio">Precio</Label>
+                    <Input
+                        id="precio"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Ej. 360000"
+                        value={form.data.precio}
+                        onChange={(e) => form.setData('precio', e.target.value)}
+                    />
+                    <InputError message={form.errors.precio} />
+                </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
