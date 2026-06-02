@@ -49,12 +49,13 @@ import {
 import { cn } from '@/lib/utils';
 import type { Empresa, Inversion, User, Vehiculo } from '@/types';
 
-type EstadoPatente = 'buen_estado' | 'mal_estado' | 'provisional' | null;
+type EstadoPatente = 'buen_estado' | 'mal_estado' | 'provisional' | 'no_posee' | null;
 
 const ESTADO_PATENTE_OPCIONES: { value: Exclude<EstadoPatente, null>; label: string }[] = [
     { value: 'buen_estado', label: 'Buen estado' },
     { value: 'mal_estado', label: 'Mal estado' },
     { value: 'provisional', label: 'Provisional' },
+    { value: 'no_posee', label: 'No posee' },
 ];
 
 function estadoPatenteBadge(estado: EstadoPatente): { label: string; badge: string; dot: string } {
@@ -65,6 +66,8 @@ function estadoPatenteBadge(estado: EstadoPatente): { label: string; badge: stri
             return { label: 'Mal estado', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', dot: 'bg-red-500' };
         case 'provisional':
             return { label: 'Provisional', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500' };
+        case 'no_posee':
+            return { label: 'No posee', badge: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300', dot: 'bg-zinc-500' };
         default:
             return { label: 'Sin estado', badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/40' };
     }

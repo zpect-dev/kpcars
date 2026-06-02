@@ -23,7 +23,7 @@ class VehiculoController extends Controller
             'modelo' => ['required', 'string', 'max:100'],
             'anio' => ['required', 'string', 'max:10'],
             'propietario' => ['nullable', 'string', 'max:255'],
-            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional', 'no_posee'])],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
@@ -86,7 +86,7 @@ class VehiculoController extends Controller
             'modelo' => ['required', 'string', 'max:100'],
             'anio' => ['required', 'string', 'max:10'],
             'propietario' => ['nullable', 'string', 'max:255'],
-            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional', 'no_posee'])],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
@@ -160,7 +160,7 @@ class VehiculoController extends Controller
         $this->authorize('update', $vehiculo);
 
         $validated = $request->validate([
-            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional', 'no_posee'])],
         ]);
 
         $vehiculo->update(['estado_patente' => $validated['estado_patente'] ?? null]);

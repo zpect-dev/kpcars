@@ -21,7 +21,7 @@ export interface Vehiculo {
     modelo: string;
     anio: string;
     propietario: string | null;
-    estado_patente: 'buen_estado' | 'mal_estado' | 'provisional' | null;
+    estado_patente: 'buen_estado' | 'mal_estado' | 'provisional' | 'no_posee' | null;
     user_id: number | null;
     inversion_id: number;
     empresa_id: number | null;
