@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
+#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'estado_patente', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
 #[ScopedBy([TenantScope::class])]
 class Vehiculo extends Model
 {
@@ -93,5 +93,13 @@ class Vehiculo extends Model
             'fecha' => 'max',
             'id' => 'max',
         ]);
+    }
+
+    /**
+     * Get the manual odometer readings for the vehicle (most recent first).
+     */
+    public function lecturasKilometraje(): HasMany
+    {
+        return $this->hasMany(KilometrajeLectura::class)->orderByDesc('fecha')->orderByDesc('id');
     }
 }

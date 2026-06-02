@@ -115,6 +115,8 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
     const [filterEstado, setFilterEstado] = useState<Estado | 'all'>('all');
     const [selected, setSelected] = useState<ServiceRow | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [kmRow, setKmRow] = useState<ServiceRow | null>(null);
+    const [kmDialogOpen, setKmDialogOpen] = useState(false);
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -122,6 +124,31 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
         kilometraje: '',
         fecha: today,
     });
+
+    const kmForm = useForm({
+        kilometraje: '',
+        fecha: today,
+    });
+
+    function openKmDialog(row: ServiceRow) {
+        setKmRow(row);
+        kmForm.reset();
+        kmForm.clearErrors();
+        kmForm.setData({
+            kilometraje: row.km_actual != null ? String(row.km_actual) : '',
+            fecha: today,
+        });
+        setKmDialogOpen(true);
+    }
+
+    function handleKmSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!kmRow) return;
+        kmForm.post(`/services/${kmRow.id}/kilometraje`, {
+            preserveScroll: true,
+            onSuccess: () => setKmDialogOpen(false),
+        });
+    }
 
     function openDialog(row: ServiceRow) {
         setSelected(row);
@@ -344,6 +371,20 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                             </div>
                                         )}
                                     </div>
+
+                                    {canManage && (
+                                        <button
+                                            type="button"
+                                            title="Cargar kilometraje"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                openKmDialog(row);
+                                            }}
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <Gauge className="h-4 w-4" />
+                                        </button>
+                                    )}
                                 </div>
                             );
                         })}
@@ -562,6 +603,53 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                             </Button>
                         </DialogFooter>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Carga rápida de kilometraje */}
+            <Dialog open={kmDialogOpen} onOpenChange={(o) => !o && setKmDialogOpen(false)}>
+                <DialogContent className="sm:max-w-[420px]">
+                    <DialogHeader>
+                        <DialogTitle>Cargar kilometraje — {kmRow?.patente}</DialogTitle>
+                        <DialogDescription>
+                            Se usará como km actual si es la lectura más reciente por fecha (convive con las revisiones).
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleKmSubmit} className="grid gap-4 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="km_lectura">Kilometraje</Label>
+                                <Input
+                                    id="km_lectura"
+                                    type="number"
+                                    min={0}
+                                    placeholder="Ej. 65000"
+                                    value={kmForm.data.kilometraje}
+                                    onChange={(e) => kmForm.setData('kilometraje', e.target.value)}
+                                    autoFocus
+                                />
+                                <InputError message={kmForm.errors.kilometraje} />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="km_fecha">Fecha</Label>
+                                <Input
+                                    id="km_fecha"
+                                    type="date"
+                                    value={kmForm.data.fecha}
+                                    onChange={(e) => kmForm.setData('fecha', e.target.value)}
+                                />
+                                <InputError message={kmForm.errors.fecha} />
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setKmDialogOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button type="submit" disabled={kmForm.processing || kmForm.data.kilometraje === ''}>
+                                {kmForm.processing ? 'Guardando...' : 'Guardar km'}
+                            </Button>
+                        </div>
+                    </form>
                 </DialogContent>
             </Dialog>
         </>

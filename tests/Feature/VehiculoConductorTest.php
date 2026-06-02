@@ -75,3 +75,34 @@ it('no permite reasignar un vehículo a un conductor inactivo al editar', functi
 
     expect($veh->fresh()->user_id)->toBe($activo->id);
 });
+
+it('guarda el estado de la patente al crear', function () {
+    $this->post('/vehiculos', datosVehiculo(['estado_patente' => 'provisional']))
+        ->assertSessionHasNoErrors();
+
+    $veh = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->first();
+    expect($veh->estado_patente)->toBe('provisional');
+});
+
+it('el estado de la patente queda vacío por defecto', function () {
+    $this->post('/vehiculos', datosVehiculo())
+        ->assertSessionHasNoErrors();
+
+    $veh = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->first();
+    expect($veh->estado_patente)->toBeNull();
+});
+
+it('rechaza un estado de patente inválido', function () {
+    $this->post('/vehiculos', datosVehiculo(['estado_patente' => 'roto']))
+        ->assertSessionHasErrors('estado_patente');
+});
+
+it('actualiza el estado de la patente desde el endpoint del badge', function () {
+    $veh = Vehiculo::create(datosVehiculo(['empresa_id' => $this->empresa->id]));
+
+    $this->patch("/vehiculos/{$veh->id}/estado-patente", ['estado_patente' => 'mal_estado'])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($veh->fresh()->estado_patente)->toBe('mal_estado');
+});

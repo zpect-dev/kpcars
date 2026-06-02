@@ -23,6 +23,7 @@ class VehiculoController extends Controller
             'modelo' => ['required', 'string', 'max:100'],
             'anio' => ['required', 'string', 'max:10'],
             'propietario' => ['nullable', 'string', 'max:255'],
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
@@ -85,6 +86,7 @@ class VehiculoController extends Controller
             'modelo' => ['required', 'string', 'max:100'],
             'anio' => ['required', 'string', 'max:10'],
             'propietario' => ['nullable', 'string', 'max:255'],
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
             'inversion_id' => ['required', 'exists:inversiones,id'],
             'empresa_id' => ['nullable', 'exists:empresas,id'],
             'user_id' => ['nullable', Rule::exists('users', 'id')->where('inactivo', 0)],
@@ -148,6 +150,22 @@ class VehiculoController extends Controller
         });
 
         return redirect()->back()->with('success', "Vehículo {$validated['patente']} actualizado correctamente.");
+    }
+
+    /**
+     * Actualiza sólo el estado de la patente (edición rápida desde el badge).
+     */
+    public function updateEstadoPatente(Request $request, Vehiculo $vehiculo): RedirectResponse
+    {
+        $this->authorize('update', $vehiculo);
+
+        $validated = $request->validate([
+            'estado_patente' => ['nullable', Rule::in(['buen_estado', 'mal_estado', 'provisional'])],
+        ]);
+
+        $vehiculo->update(['estado_patente' => $validated['estado_patente'] ?? null]);
+
+        return redirect()->back()->with('success', 'Estado de la patente actualizado.');
     }
 
     public function desasignar(Request $request, Vehiculo $vehiculo): RedirectResponse

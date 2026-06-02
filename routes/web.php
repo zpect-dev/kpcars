@@ -60,6 +60,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Service (global): mecánico también, es quien realiza el service.
         Route::get('services', [ServiceController::class, 'index'])->name('services.index');
         Route::post('services/{vehiculo}', [ServiceController::class, 'store'])->name('services.store');
+        Route::post('services/{vehiculo}/kilometraje', [ServiceController::class, 'storeKilometraje'])->name('services.kilometraje');
         Route::delete('services/{service}', [ServiceController::class, 'destroy'])->name('services.destroy');
 
         // PDFs de inventario/turnos
@@ -78,6 +79,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');
         Route::put('vehiculos/{vehiculo}', [VehiculoController::class, 'update'])->name('vehiculos.update');
         Route::patch('vehiculos/{vehiculo}/desasignar', [VehiculoController::class, 'desasignar'])->name('vehiculos.desasignar');
+        Route::patch('vehiculos/{vehiculo}/estado-patente', [VehiculoController::class, 'updateEstadoPatente'])->name('vehiculos.estado-patente');
         Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
         Route::get('vehiculos/{vehiculo}/asignaciones', [AsignacionController::class, 'index'])->name('vehiculos.asignaciones');
         Route::get('vehiculos/{vehiculo}/asignaciones/pdf', [AsignacionController::class, 'pdf'])->name('vehiculos.asignaciones.pdf');

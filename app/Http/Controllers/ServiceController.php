@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\KilometrajeLectura;
 use App\Models\Revision;
 use App\Models\Scopes\TenantScope;
 use App\Models\Service;
@@ -40,8 +41,28 @@ class ServiceController extends Controller
             ->get()
             ->groupBy('vehiculo_id');
 
-        $payload = $vehiculos->map(function (Vehiculo $vehiculo) use ($ultimaRevision): array {
-            $kmActual = $ultimaRevision->get($vehiculo->id)?->first()?->kilometraje;
+        // Última lectura de kilometraje cargada manualmente por vehículo.
+        $ultimaLectura = KilometrajeLectura::select('vehiculo_id', 'kilometraje', 'fecha')
+            ->whereIn('vehiculo_id', $vehiculoIds)
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy('vehiculo_id');
+
+        $payload = $vehiculos->map(function (Vehiculo $vehiculo) use ($ultimaRevision, $ultimaLectura): array {
+            // Km actual = la lectura más reciente por fecha entre la última
+            // revisión y la última carga manual. En empate de fecha, el mayor km.
+            $candidatos = [];
+            if ($rev = $ultimaRevision->get($vehiculo->id)?->first()) {
+                $candidatos[] = ['fecha' => $rev->created_at->toDateString(), 'km' => (int) $rev->kilometraje];
+            }
+            if ($lec = $ultimaLectura->get($vehiculo->id)?->first()) {
+                $candidatos[] = ['fecha' => $lec->fecha->toDateString(), 'km' => (int) $lec->kilometraje];
+            }
+
+            usort($candidatos, fn ($a, $b) => $a['fecha'] <=> $b['fecha'] ?: $a['km'] <=> $b['km']);
+            $kmActual = $candidatos ? end($candidatos)['km'] : null;
+
             $ultimoService = $vehiculo->services->first(); // ya ordenado desc por la relación
 
             $kmRecorridos = null;
@@ -114,6 +135,31 @@ class ServiceController extends Controller
         ]);
 
         return redirect()->back()->with('success', "Service registrado para {$vehiculo->patente}.");
+    }
+
+    /**
+     * Registra una lectura de kilometraje para un vehículo.
+     */
+    public function storeKilometraje(Request $request, int $vehiculo): RedirectResponse
+    {
+        $this->authorize('manage-service');
+
+        // Service es global: el carro puede ser de cualquier empresa.
+        $vehiculo = Vehiculo::withoutGlobalScope(TenantScope::class)->findOrFail($vehiculo);
+
+        $validated = $request->validate([
+            'kilometraje' => ['required', 'integer', 'min:0'],
+            'fecha' => ['nullable', 'date'],
+        ]);
+
+        KilometrajeLectura::create([
+            'vehiculo_id' => $vehiculo->id,
+            'registrado_por' => $request->user()->id,
+            'kilometraje' => $validated['kilometraje'],
+            'fecha' => $validated['fecha'] ?? now()->toDateString(),
+        ]);
+
+        return redirect()->back()->with('success', "Kilometraje actualizado para {$vehiculo->patente}.");
     }
 
     /**

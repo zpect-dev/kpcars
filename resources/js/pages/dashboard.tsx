@@ -49,6 +49,27 @@ import {
 import { cn } from '@/lib/utils';
 import type { Empresa, Inversion, User, Vehiculo } from '@/types';
 
+type EstadoPatente = 'buen_estado' | 'mal_estado' | 'provisional' | null;
+
+const ESTADO_PATENTE_OPCIONES: { value: Exclude<EstadoPatente, null>; label: string }[] = [
+    { value: 'buen_estado', label: 'Buen estado' },
+    { value: 'mal_estado', label: 'Mal estado' },
+    { value: 'provisional', label: 'Provisional' },
+];
+
+function estadoPatenteBadge(estado: EstadoPatente): { label: string; badge: string; dot: string } {
+    switch (estado) {
+        case 'buen_estado':
+            return { label: 'Buen estado', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500' };
+        case 'mal_estado':
+            return { label: 'Mal estado', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', dot: 'bg-red-500' };
+        case 'provisional':
+            return { label: 'Provisional', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500' };
+        default:
+            return { label: 'Sin estado', badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/40' };
+    }
+}
+
 interface Filters {
     empresa_id?: string;
     inversion_id?: string;
@@ -120,6 +141,19 @@ export default function Dashboard({
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isCreateInversionOpen, setIsCreateInversionOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [estadoPatenteVehiculo, setEstadoPatenteVehiculo] = useState<Vehiculo | null>(null);
+
+    function setEstadoPatente(estado: Exclude<EstadoPatente, null>) {
+        if (!estadoPatenteVehiculo) return;
+        router.patch(
+            `/vehiculos/${estadoPatenteVehiculo.id}/estado-patente`,
+            { estado_patente: estado },
+            {
+                preserveScroll: true,
+                onSuccess: () => setEstadoPatenteVehiculo(null),
+            },
+        );
+    }
     const [editingVehiculo, setEditingVehiculo] = useState<Vehiculo | null>(
         null,
     );
@@ -902,7 +936,26 @@ export default function Dashboard({
                                                 className="truncate px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4"
                                                 title={vehiculo.patente}
                                             >
-                                                {vehiculo.patente}
+                                                <div className="flex flex-col items-start gap-1">
+                                                    <span>{vehiculo.patente}</span>
+                                                    {(() => {
+                                                        const b = estadoPatenteBadge(vehiculo.estado_patente);
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEstadoPatenteVehiculo(vehiculo)}
+                                                                title="Editar estado de la patente"
+                                                                className={cn(
+                                                                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
+                                                                    b.badge,
+                                                                )}
+                                                            >
+                                                                <span className={cn('h-1 w-1 rounded-full', b.dot)} />
+                                                                Patente: {b.label}
+                                                            </button>
+                                                        );
+                                                    })()}
+                                                </div>
                                             </td>
                                             <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex flex-col">
@@ -1083,9 +1136,28 @@ export default function Dashboard({
                                     className="flex flex-col gap-2 p-4"
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <span className="font-mono text-base font-semibold text-foreground">
-                                            {vehiculo.patente}
-                                        </span>
+                                        <div className="flex flex-col items-start gap-1">
+                                            <span className="font-mono text-base font-semibold text-foreground">
+                                                {vehiculo.patente}
+                                            </span>
+                                            {(() => {
+                                                const b = estadoPatenteBadge(vehiculo.estado_patente);
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEstadoPatenteVehiculo(vehiculo)}
+                                                        title="Editar estado de la patente"
+                                                        className={cn(
+                                                            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
+                                                            b.badge,
+                                                        )}
+                                                    >
+                                                        <span className={cn('h-1 w-1 rounded-full', b.dot)} />
+                                                        Patente: {b.label}
+                                                    </button>
+                                                );
+                                            })()}
+                                        </div>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button
@@ -1316,6 +1388,46 @@ export default function Dashboard({
                             Eliminar
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Estado de la patente Dialog */}
+            <Dialog
+                open={estadoPatenteVehiculo !== null}
+                onOpenChange={(open) => !open && setEstadoPatenteVehiculo(null)}
+            >
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Estado de la patente</DialogTitle>
+                        <DialogDescription>
+                            {estadoPatenteVehiculo?.patente} — elegí el estado de la patente.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-2 py-2">
+                        {ESTADO_PATENTE_OPCIONES.map((opt) => {
+                            const b = estadoPatenteBadge(opt.value);
+                            const selected = estadoPatenteVehiculo?.estado_patente === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setEstadoPatente(opt.value)}
+                                    className={cn(
+                                        'flex items-center justify-between rounded-md border px-4 py-3 text-sm font-medium transition-all',
+                                        selected
+                                            ? 'border-primary bg-primary/10 text-foreground'
+                                            : 'border-border bg-card text-muted-foreground hover:bg-muted',
+                                    )}
+                                >
+                                    <span className="inline-flex items-center gap-2">
+                                        <span className={cn('h-2 w-2 rounded-full', b.dot)} />
+                                        {opt.label}
+                                    </span>
+                                    {selected && <Check className="h-4 w-4 text-primary" />}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </DialogContent>
             </Dialog>
         </>

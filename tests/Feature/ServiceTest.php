@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\UserRole;
 use App\Models\Empresa;
 use App\Models\Inversion;
+use App\Models\KilometrajeLectura;
 use App\Models\Revision;
 use App\Models\Service;
 use App\Models\User;
@@ -172,4 +173,48 @@ it('el chofer y el inversor no pueden acceder al panel de service', function () 
 
     $this->actingAs($chofer)->get('/services')->assertForbidden();
     $this->actingAs($inversor)->get('/services')->assertForbidden();
+});
+
+it('la carga manual de km pisa una revisión más vieja', function () {
+    $veh = nuevoVehiculo('AAA111');
+    $rev = nuevaRevision($veh, 9000);
+    $rev->update(['created_at' => now()->subDays(5)]);
+    KilometrajeLectura::create(['vehiculo_id' => $veh->id, 'kilometraje' => 25000, 'fecha' => now()]);
+
+    $this->actingAs($this->admin)->get('/services')->assertInertia(fn (Assert $p) => $p
+        ->where('vehiculos.0.km_actual', 25000)
+    );
+});
+
+it('una revisión más reciente gana sobre una carga manual vieja', function () {
+    $veh = nuevoVehiculo('AAA111');
+    $lectura = KilometrajeLectura::create(['vehiculo_id' => $veh->id, 'kilometraje' => 9000, 'fecha' => now()->subDays(5)]);
+    $lectura->update(['created_at' => now()->subDays(5)]);
+    nuevaRevision($veh, 25000); // creada hoy
+
+    $this->actingAs($this->admin)->get('/services')->assertInertia(fn (Assert $p) => $p
+        ->where('vehiculos.0.km_actual', 25000)
+    );
+});
+
+it('permite cargar una lectura de kilometraje', function () {
+    $veh = nuevoVehiculo('AAA111');
+
+    $this->actingAs($this->admin)
+        ->post("/services/{$veh->id}/kilometraje", ['kilometraje' => 65000, 'fecha' => '2026-05-20'])
+        ->assertRedirect();
+
+    $lectura = KilometrajeLectura::first();
+    expect($lectura)->not->toBeNull()
+        ->and($lectura->kilometraje)->toBe(65000)
+        ->and($lectura->vehiculo_id)->toBe($veh->id)
+        ->and($lectura->registrado_por)->toBe($this->admin->id);
+});
+
+it('valida que el kilometraje sea obligatorio en la carga manual', function () {
+    $veh = nuevoVehiculo('AAA111');
+
+    $this->actingAs($this->admin)
+        ->post("/services/{$veh->id}/kilometraje", ['fecha' => '2026-05-20'])
+        ->assertSessionHasErrors('kilometraje');
 });
