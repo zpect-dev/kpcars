@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Models\Gasto;
 use App\Models\GastoDistribucion;
 use App\Models\Inversion;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Support\Facades\DB;
@@ -95,18 +96,24 @@ class CreateGastoAction
      */
     protected function distribuirPorVehiculo(int $vehiculoId, float $monto): array
     {
-        $vehiculo = Vehiculo::find($vehiculoId);
+        // El combobox de gastos es global: el vehículo puede pertenecer a una
+        // empresa distinta de la activa, así que ignoramos el TenantScope para
+        // resolver el vehículo y sus inversiones.
+        $vehiculo = Vehiculo::withoutGlobalScope(TenantScope::class)->find($vehiculoId);
         if (! $vehiculo || ! $vehiculo->inversion_id) {
             return [];
         }
 
-        $inversionActual = Inversion::with('inversores')->find($vehiculo->inversion_id);
+        $inversionActual = Inversion::withoutGlobalScope(TenantScope::class)
+            ->with('inversores')
+            ->find($vehiculo->inversion_id);
         if (! $inversionActual) {
             return [];
         }
 
         // Inversión previa por orden natural dentro de la misma empresa.
-        $inversionPrevia = Inversion::with('inversores')
+        $inversionPrevia = Inversion::withoutGlobalScope(TenantScope::class)
+            ->with('inversores')
             ->where('empresa_id', $inversionActual->empresa_id)
             ->where('id', '!=', $inversionActual->id)
             ->get()

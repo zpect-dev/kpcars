@@ -9,6 +9,7 @@ import {
     Lock,
     Plus,
     Trash2,
+    Warehouse,
     Wrench,
     Box,
     UserCircle2,
@@ -79,10 +80,17 @@ interface Gasto {
     mi_monto: number | null;
 }
 
+interface CardData {
+    key: string;
+    label: string;
+    total: number;
+}
+
 interface Props {
     gastos: Gasto[];
+    ultimosGlobales: Gasto[];
+    cards: CardData[];
     patentes: PatenteOption[];
-    totalGeneral: number;
     canManage: boolean;
 }
 
@@ -102,6 +110,14 @@ const TIPO_LABEL: Record<Tipo, string> = {
     stock: 'Stock',
     vehiculo: 'Vehículo',
 };
+
+function cardIcon(key: string): React.ReactNode {
+    const cls = 'h-5 w-5 text-muted-foreground';
+    if (key.startsWith('empresa_')) return <Building2 className={cls} />;
+    if (key === 'kevin') return <UserCircle2 className={cls} />;
+    if (key === 'galpon') return <Warehouse className={cls} />;
+    return <HandCoins className={cls} />;
+}
 
 function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
@@ -132,8 +148,9 @@ function formatDateDia(d: string): string {
 
 export default function GastosIndex({
     gastos,
+    ultimosGlobales,
+    cards,
     patentes,
-    totalGeneral,
     canManage,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -491,24 +508,86 @@ export default function GastosIndex({
                     )}
                 </div>
 
-                {/* Total */}
-                <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                            <HandCoins className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                {isInversor ? 'Total que te corresponde' : 'Total registrado'}
-                            </p>
-                            <p className="text-2xl font-bold text-foreground">
-                                {formatARS(Number(totalGeneral))}
-                            </p>
-                        </div>
-                    </div>
+                {/* ─── Sección 1: cards de totales ───────────────────────── */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    {cards.map((card) => {
+                        const isGeneral = card.key === 'general';
+                        return (
+                            <div
+                                key={card.key}
+                                className={`rounded-xl border p-4 shadow-sm ${
+                                    isGeneral
+                                        ? 'border-primary/40 bg-primary/5'
+                                        : 'border-border bg-card'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                        {cardIcon(card.key)}
+                                    </div>
+                                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                        {card.label}
+                                    </p>
+                                </div>
+                                <p className="mt-2 text-xl font-bold text-foreground">
+                                    {formatARS(Number(card.total))}
+                                </p>
+                            </div>
+                        );
+                    })}
                 </div>
 
-                {/* Lista por categoría */}
+                {/* ─── Sección 2: últimos 10 gastos globales ─────────────── */}
+                <div className="rounded-xl border border-border bg-card shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                        <History className="h-4 w-4 text-muted-foreground" />
+                        <h3 className="text-sm font-semibold text-foreground">
+                            Últimos 10 gastos
+                        </h3>
+                    </div>
+                    {ultimosGlobales.length === 0 ? (
+                        <p className="px-4 py-6 text-center text-sm text-muted-foreground">
+                            No hay gastos registrados.
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="px-3 py-2 font-medium">Fecha</th>
+                                        <th className="px-3 py-2 font-medium">Descripción</th>
+                                        <th className="px-3 py-2 font-medium">Categoría</th>
+                                        <th className="px-3 py-2 font-medium">Patente</th>
+                                        <th className="px-3 py-2 text-right font-medium">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {ultimosGlobales.map((g) => (
+                                        <tr key={g.id} className="hover:bg-muted/20">
+                                            <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                {formatDate(g.fecha)}
+                                            </td>
+                                            <td className="px-3 py-2 font-medium text-foreground">
+                                                {g.descripcion?.trim() || 'Sin descripción'}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                                                {TIPO_LABEL[g.tipo]}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                                                {g.vehiculo?.patente ?? '—'}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-bold whitespace-nowrap text-foreground">
+                                                {formatARS(Number(g.monto))}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+
+                {/* ─── Sección 3: desglose detallado por categoría ───────── */}
                 {gastos.length === 0 ? (
                     <div className="rounded-xl border border-border bg-card p-12 text-center shadow-sm">
                         <HandCoins className="mx-auto h-10 w-10 text-muted-foreground/50" />

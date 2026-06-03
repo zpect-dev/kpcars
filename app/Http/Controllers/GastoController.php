@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\CreateGastoAction;
+use App\Models\Empresa;
 use App\Models\Gasto;
+use App\Models\Scopes\GastoTenantScope;
+use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,83 +22,99 @@ class GastoController extends Controller
     {
         $this->authorize('viewAny', Gasto::class);
 
-        // El branch de inversor queda como código legado: la ruta sólo admite
-        // role:administrador, así que isInversor siempre será false. Se elimina
-        // junto con la vista vieja en Fase 8.
-        $isInversor = false;
-        $userId = $request->user()->id;
-
-        // GastoTenantScope ya filtra por empresa activa (gastos globales sin vehiculo +
-        // gastos cuyo vehículo pertenece a la empresa activa). El branch del inversor
-        // se mantiene como filtro adicional por distribuciones suyas.
-        $gastosQuery = Gasto::query()
-            ->pendientes()
+        // Vista GLOBAL: ignora la empresa activa para mostrar en simultáneo los
+        // totales de todas las empresas. Cada gasto de vehículo se considera
+        // pendiente contra el cierre de su propia empresa (scopePendientesGlobal).
+        $gastosColl = Gasto::query()
+            ->withoutGlobalScope(GastoTenantScope::class)
+            ->pendientesGlobal()
             ->with([
                 'user:id,name',
-                'vehiculo:id,patente,marca,modelo,inversion_id,empresa_id',
-                'vehiculo.inversion:id,nombre',
+                // Vehículo e inversión son globales aquí: hay que ignorar el
+                // TenantScope para no perder los de otras empresas.
+                'vehiculo' => fn ($q) => $q
+                    ->withoutGlobalScope(TenantScope::class)
+                    ->select('id', 'patente', 'marca', 'modelo', 'inversion_id', 'empresa_id'),
+                'vehiculo.inversion' => fn ($q) => $q
+                    ->withoutGlobalScope(TenantScope::class)
+                    ->select('id', 'nombre'),
                 'distribuciones.user:id,name',
             ])
-            ->when($isInversor, function ($q) use ($userId) {
-                $q->whereHas('distribuciones', fn ($q2) => $q2->where('user_id', $userId));
-            })
             ->latest('fecha')
-            ->latest('id');
+            ->latest('id')
+            ->get();
 
-        $gastos = $gastosQuery->get()->map(function (Gasto $g) use ($isInversor, $userId) {
-            $miMonto = null;
-            if ($isInversor) {
-                $miMonto = (float) $g->distribuciones
-                    ->where('user_id', $userId)
-                    ->sum('monto');
-            }
+        $mapGasto = fn (Gasto $g) => [
+            'id' => $g->id,
+            'fecha' => $g->fecha?->format('Y-m-d'),
+            'monto' => (float) $g->monto,
+            'recibio' => $g->recibio,
+            'metodo_pago' => $g->metodo_pago,
+            'descripcion' => $g->descripcion,
+            'tipo' => $g->tipo,
+            'vehiculo' => $g->vehiculo
+                ? [
+                    'id' => $g->vehiculo->id,
+                    'patente' => $g->vehiculo->patente,
+                    'marca' => $g->vehiculo->marca,
+                    'modelo' => $g->vehiculo->modelo,
+                    'inversion_id' => $g->vehiculo->inversion_id,
+                    'inversion_nombre' => $g->vehiculo->inversion?->nombre,
+                ]
+                : null,
+            'registrado_por' => $g->user?->name,
+            'distribuciones' => $g->distribuciones->map(fn ($d) => [
+                'user_id' => $d->user_id,
+                'user_name' => $d->user?->name,
+                'monto' => (float) $d->monto,
+            ])->values(),
+            'mi_monto' => null,
+        ];
 
-            return [
-                'id' => $g->id,
-                'fecha' => $g->fecha?->format('Y-m-d'),
-                'monto' => (float) $g->monto,
-                'recibio' => $g->recibio,
-                'metodo_pago' => $g->metodo_pago,
-                'descripcion' => $g->descripcion,
-                'tipo' => $g->tipo,
-                'vehiculo' => $g->vehiculo
-                    ? [
-                        'id' => $g->vehiculo->id,
-                        'patente' => $g->vehiculo->patente,
-                        'marca' => $g->vehiculo->marca,
-                        'modelo' => $g->vehiculo->modelo,
-                        'inversion_id' => $g->vehiculo->inversion_id,
-                        'inversion_nombre' => $g->vehiculo->inversion?->nombre,
-                    ]
-                    : null,
-                'registrado_por' => $g->user?->name,
-                'distribuciones' => $isInversor
-                    ? null
-                    : $g->distribuciones->map(fn ($d) => [
-                        'user_id' => $d->user_id,
-                        'user_name' => $d->user?->name,
-                        'monto' => (float) $d->monto,
-                    ])->values(),
-                'mi_monto' => $miMonto,
-            ];
-        });
+        $gastos = $gastosColl->map($mapGasto)->values();
 
-        // Combobox options: categorías fijas + patentes.
-        $patentes = $isInversor
-            ? collect()
-            : Vehiculo::query()
-                ->select('id', 'patente', 'marca', 'modelo')
-                ->orderBy('patente')
-                ->get();
+        // Sección 1: 5 cards de totales del período pendiente.
+        $empresas = Empresa::orderBy('id')->get(['id', 'nombre']);
 
-        $totalGeneral = $isInversor
-            ? $gastos->sum('mi_monto')
-            : $gastos->sum('monto');
+        $cards = $empresas->map(fn (Empresa $emp) => [
+            'key' => 'empresa_'.$emp->id,
+            'label' => $emp->nombre,
+            'total' => (float) $gastosColl
+                ->filter(fn (Gasto $g) => $g->tipo === 'vehiculo' && $g->vehiculo?->empresa_id === $emp->id)
+                ->sum(fn (Gasto $g) => (float) $g->monto),
+        ])->values()->all();
+
+        $cards[] = [
+            'key' => 'kevin',
+            'label' => 'Kevin',
+            'total' => (float) $gastosColl->whereIn('tipo', ['kevin', 'stock'])->sum(fn (Gasto $g) => (float) $g->monto),
+        ];
+        $cards[] = [
+            'key' => 'galpon',
+            'label' => 'Galpón',
+            'total' => (float) $gastosColl->whereIn('tipo', ['galpon', 'taller', 'oficina'])->sum(fn (Gasto $g) => (float) $g->monto),
+        ];
+        $cards[] = [
+            'key' => 'general',
+            'label' => 'Total general',
+            'total' => (float) $gastosColl->sum(fn (Gasto $g) => (float) $g->monto),
+        ];
+
+        // Sección 2: últimos 10 gastos (de todas las empresas).
+        $ultimosGlobales = $gastos->take(10)->values();
+
+        // Combobox del alta: patentes de TODAS las empresas (global).
+        $patentes = Vehiculo::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->select('id', 'patente', 'marca', 'modelo')
+            ->orderBy('patente')
+            ->get();
 
         return Inertia::render('Gastos/Index', [
             'gastos' => $gastos,
+            'ultimosGlobales' => $ultimosGlobales,
+            'cards' => $cards,
             'patentes' => $patentes,
-            'totalGeneral' => $totalGeneral,
             'canManage' => $request->user()->isAdmin(),
         ]);
     }

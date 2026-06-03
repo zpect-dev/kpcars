@@ -91,4 +91,57 @@ class Gasto extends Model
             });
         });
     }
+
+    /**
+     * Scope: gastos pendientes de TODAS las empresas (vista global).
+     *
+     * Igual que {@see scopePendientes()} pero sin atarse a la empresa activa:
+     *  - Gastos GLOBALES (sin vehículo): pendientes contra el último cierre
+     *    global (cualquier empresa).
+     *  - Gastos de VEHÍCULO: cada uno se evalúa contra el último cierre de SU
+     *    propia empresa (no de la activa), de modo que ambos pools conviven
+     *    correctamente cuando una empresa cerró y la otra no.
+     *
+     * Debe usarse junto con `withoutGlobalScope(GastoTenantScope::class)`.
+     */
+    public function scopePendientesGlobal(Builder $query): Builder
+    {
+        // Último cierre global (cualquier empresa) para los gastos sin vehículo.
+        $ultimoCierreGlobal = CierreGasto::withoutGlobalScope(TenantScope::class)
+            ->max('created_at');
+
+        // Último cierre por empresa para los gastos de vehículo.
+        $cierresPorEmpresa = CierreGasto::withoutGlobalScope(TenantScope::class)
+            ->selectRaw('empresa_id, MAX(created_at) as ultimo')
+            ->groupBy('empresa_id')
+            ->pluck('ultimo', 'empresa_id');
+
+        return $query->where(function (Builder $q) use ($ultimoCierreGlobal, $cierresPorEmpresa) {
+            // Gastos globales (sin vehículo): contra el último cierre global.
+            $q->where(function (Builder $g) use ($ultimoCierreGlobal) {
+                $g->whereNull('gastos.vehiculo_id')
+                    ->when($ultimoCierreGlobal, fn (Builder $gg) => $gg->where('gastos.created_at', '>', $ultimoCierreGlobal));
+            })
+            // Gastos de vehículo: cada uno contra el último cierre de su empresa.
+            ->orWhere(function (Builder $g) use ($cierresPorEmpresa) {
+                $g->whereNotNull('gastos.vehiculo_id')
+                    ->where(function (Builder $porEmpresa) use ($cierresPorEmpresa) {
+                        foreach ($cierresPorEmpresa as $empresaId => $ultimo) {
+                            $porEmpresa->orWhere(fn (Builder $e) => $e
+                                ->whereHas('vehiculo', fn (Builder $v) => $v
+                                    ->withoutGlobalScope(TenantScope::class)
+                                    ->where('empresa_id', $empresaId))
+                                ->where('gastos.created_at', '>', $ultimo));
+                        }
+
+                        // Vehículos de empresas que nunca cerraron: todo pendiente.
+                        $empresasConCierre = $cierresPorEmpresa->keys()->all();
+                        $porEmpresa->orWhereHas('vehiculo', fn (Builder $v) => $v
+                            ->withoutGlobalScope(TenantScope::class)
+                            ->whereNotIn('empresa_id', $empresasConCierre)
+                            ->orWhereNull('empresa_id'));
+                    });
+            });
+        });
+    }
 }
