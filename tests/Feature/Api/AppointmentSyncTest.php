@@ -101,7 +101,7 @@ it('crea un turno desde el endpoint externo', function () {
         'service' => 'Cambio de aceite',
         'license_plate' => 'ABC123',
         'applicant' => 'Juan Pérez',
-        'preferred_date' => '2026-04-22',
+        'preferred_date' => '2026-04-21',
         'type' => 'normal',
     ]);
 
@@ -119,7 +119,7 @@ it('crea un turno de emergencia desde el endpoint externo', function () {
             'service' => 'Normal '.$i,
             'license_plate' => 'FILL'.$i,
             'applicant' => 'Fill',
-            'scheduled_date' => '2026-04-22',
+            'scheduled_date' => '2026-04-21',
             'type' => 'normal',
             'status' => 'agendado',
         ]);
@@ -131,7 +131,7 @@ it('crea un turno de emergencia desde el endpoint externo', function () {
         'service' => 'Reparación urgente',
         'license_plate' => 'EMR001',
         'applicant' => 'Carlos',
-        'preferred_date' => '2026-04-22',
+        'preferred_date' => '2026-04-21',
         'type' => 'emergencia',
     ]);
 
@@ -146,7 +146,7 @@ it('rechaza turno normal externo si no hay cupos', function () {
             'service' => 'Normal '.$i,
             'license_plate' => 'FILL'.$i,
             'applicant' => 'Fill',
-            'scheduled_date' => '2026-04-22',
+            'scheduled_date' => '2026-04-21',
             'type' => 'normal',
             'status' => 'agendado',
         ]);
@@ -158,7 +158,7 @@ it('rechaza turno normal externo si no hay cupos', function () {
         'service' => 'Quinto normal',
         'license_plate' => 'FAIL01',
         'applicant' => 'Rechazado',
-        'preferred_date' => '2026-04-22',
+        'preferred_date' => '2026-04-21',
         'type' => 'normal',
     ]);
 

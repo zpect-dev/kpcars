@@ -20,12 +20,12 @@ class ScheduleAppointmentAction
      * - Turnos "normal": máximo MAX_NORMAL_SLOTS por día. Si el día está
      *   lleno se lanza una RuntimeException (no se desplaza).
      * - Turnos "emergencia": cupos ilimitados, se insertan directamente.
-     * - Domingos bloqueados para ambos tipos.
+     * - Domingos y miércoles bloqueados para ambos tipos.
      *
      * Todo el proceso corre dentro de una transacción con bloqueo pesimista
      * (lockForUpdate) para evitar sobreasignación concurrente.
      *
-     * @throws RuntimeException Si no hay cupos o la fecha es domingo.
+     * @throws RuntimeException Si no hay cupos o la fecha es domingo o miércoles.
      */
     public function execute(
         string $service,
@@ -39,6 +39,10 @@ class ScheduleAppointmentAction
 
             if ($requestedDate->isSunday()) {
                 throw new RuntimeException('El taller no atiende los días domingo. Por favor seleccione otro día.');
+            }
+
+            if ($requestedDate->isWednesday()) {
+                throw new RuntimeException('No se asignan turnos los días miércoles. Por favor seleccione otro día.');
             }
 
             if ($type === 'normal') {

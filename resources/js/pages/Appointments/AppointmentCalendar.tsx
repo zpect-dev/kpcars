@@ -175,6 +175,7 @@ export function AppointmentCalendar({
                         
                         // State checks
                         const isPast = minDateObj ? date < minDateObj : false;
+                        const isWednesday = date.getDay() === 3;
                         const slotsUsed = dailySlots ? (dailySlots[dateStr] ?? 0) : 0;
                         const isFull = maxSlots !== undefined ? slotsUsed >= maxSlots : false;
 
@@ -192,7 +193,7 @@ export function AppointmentCalendar({
                             isSelected = value === dateStr;
                         }
                         
-                        const isDisabled = isFilterMode ? false : (isPast || (isFull && !isSelected));
+                        const isDisabled = isFilterMode ? false : (isPast || isWednesday || (isFull && !isSelected));
 
                         let defaultStyle = 'bg-[#27272a] text-white hover:bg-[#3f3f46] hover:scale-105';
                         if (isFilterMode && dailySlots && maxSlots !== undefined) {
