@@ -321,6 +321,7 @@ export default function AppointmentsIndex({
                                 if (from) params.set('from', from);
                                 if (to) params.set('to', to);
                                 if (plate) params.set('plate', plate);
+                                if (statusTab !== 'all') params.set('status', statusTab);
                                 const qs = params.toString();
                                 window.open('/pdf/appointments' + (qs ? '?' + qs : ''), '_blank');
                             }}

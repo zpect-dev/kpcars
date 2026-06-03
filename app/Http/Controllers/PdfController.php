@@ -289,9 +289,15 @@ class PdfController extends Controller
     public function vehiculos(Request $request): Response
     {
         // Acceso: middleware role:administrador,administrativo.
-        $filters = $request->only(['inversion_id', 'search', 'asignacion']);
+        // Refleja TODOS los filtros del dashboard de vehículos, incluidos los
+        // avanzados (estado de patente, titular, VTV y GNC).
+        $filters = $request->only(['inversion_id', 'search', 'asignacion', 'estado_patente', 'titular', 'vtv', 'gnc']);
         $search = trim((string) ($filters['search'] ?? ''));
         $asignacion = $filters['asignacion'] ?? null;
+        $estadoPatente = $filters['estado_patente'] ?? null;
+        $titular = trim((string) ($filters['titular'] ?? ''));
+        $vtv = $filters['vtv'] ?? null;
+        $gnc = $filters['gnc'] ?? null;
 
         $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
             ->where('patente', '!=', 'EXTERNO')
@@ -305,7 +311,30 @@ class PdfController extends Controller
             })
             ->when($asignacion === 'con', fn ($q) => $q->whereNotNull('user_id'))
             ->when($asignacion === 'sin', fn ($q) => $q->whereNull('user_id'))
-            ->get()
+            ->when($estadoPatente === '__none__', fn ($q) => $q->whereNull('estado_patente'))
+            ->when($estadoPatente && $estadoPatente !== '__none__', fn ($q) => $q->where('estado_patente', $estadoPatente))
+            ->when($titular !== '', function ($q) use ($titular) {
+                $escaped = addcslashes($titular, '%_\\');
+                $q->where('propietario', 'like', "%{$escaped}%");
+            })
+            ->when($vtv === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_vtv'))
+            ->when($gnc === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_gnc'))
+            ->get();
+
+        // VTV/GNC por estado (ok/warning/expired) se calcula sobre fin de mes,
+        // igual que en el dashboard; se filtra en PHP para garantizar paridad.
+        if ($vtv && $vtv !== 'none') {
+            $vehiculos = $vehiculos->filter(
+                fn (Vehiculo $v) => $this->vencimientoStatus($v->fecha_vencimiento_vtv) === $vtv
+            );
+        }
+        if ($gnc && $gnc !== 'none') {
+            $vehiculos = $vehiculos->filter(
+                fn (Vehiculo $v) => $this->vencimientoStatus($v->fecha_vencimiento_gnc) === $gnc
+            );
+        }
+
+        $vehiculos = $vehiculos
             ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
             ->sortBy(fn ($v) => $v->inversion?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
             ->sortBy(fn ($v) => $v->empresa?->nombre ?? '', SORT_NATURAL | SORT_FLAG_CASE)
@@ -315,6 +344,35 @@ class PdfController extends Controller
             ->setPaper('a4', 'landscape');
 
         return $pdf->download('vehiculos-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Estado de un vencimiento (VTV/GNC) según el fin del mes almacenado.
+     *
+     * Replica la lógica de `vtvStatus` del dashboard:
+     *  - expired: el vencimiento ya pasó (fin de mes < hoy).
+     *  - warning: vence dentro del próximo mes.
+     *  - ok: vence más allá.
+     * Devuelve null si no hay fecha.
+     */
+    private function vencimientoStatus($fecha): ?string
+    {
+        if (! $fecha) {
+            return null;
+        }
+
+        $vence = Carbon::parse($fecha)->endOfMonth()->startOfDay();
+        $hoy = Carbon::now()->startOfDay();
+
+        if ($vence->lt($hoy)) {
+            return 'expired';
+        }
+
+        if ($vence->lte($hoy->copy()->addMonth())) {
+            return 'warning';
+        }
+
+        return 'ok';
     }
 
     /**

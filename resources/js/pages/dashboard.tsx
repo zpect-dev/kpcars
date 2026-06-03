@@ -610,6 +610,22 @@ params.set('search', search.trim());
                                         params.set('asignacion', asignacionFiltro);
                                     }
 
+                                    if (filterEstadoPatente) {
+                                        params.set('estado_patente', filterEstadoPatente);
+                                    }
+
+                                    if (filterTitular.trim()) {
+                                        params.set('titular', filterTitular.trim());
+                                    }
+
+                                    if (filterVtv) {
+                                        params.set('vtv', filterVtv);
+                                    }
+
+                                    if (filterGnc) {
+                                        params.set('gnc', filterGnc);
+                                    }
+
                                     const qs = params.toString();
                                     window.open(
                                         `/pdf/vehiculos${qs ? `?${qs}` : ''}`,
