@@ -2,8 +2,10 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Car,
     Check,
+    ChevronDown,
     FileDown,
     FileUp,
+    Filter,
     History,
     LayoutList,
     MoreHorizontal,
@@ -47,6 +49,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { Empresa, Inversion, User, Vehiculo } from '@/types';
 
@@ -134,6 +137,12 @@ return null;
     const [asignacionFiltro, setAsignacionFiltro] = useState<
         'all' | 'con' | 'sin'
     >(storedFilters?.asignacionFiltro ?? 'all');
+
+    const [filterEstadoPatente, setFilterEstadoPatente] = useState('');
+    const [filterTitular, setFilterTitular] = useState('');
+    const [filterVtv, setFilterVtv] = useState('');
+    const [filterGnc, setFilterGnc] = useState('');
+    const [openFilterSection, setOpenFilterSection] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         try {
@@ -227,16 +236,22 @@ continue;
             );
         }
 
-        if (asignacionFiltro === 'con') {
-result = result.filter((v) => !!v.user_id);
-}
+        if (asignacionFiltro === 'con') result = result.filter((v) => !!v.user_id);
+        if (asignacionFiltro === 'sin') result = result.filter((v) => !v.user_id);
 
-        if (asignacionFiltro === 'sin') {
-result = result.filter((v) => !v.user_id);
-}
+        if (filterEstadoPatente === '__none__') result = result.filter((v) => !v.estado_patente);
+        else if (filterEstadoPatente) result = result.filter((v) => v.estado_patente === filterEstadoPatente);
+
+        if (filterTitular.trim()) result = result.filter((v) => v.propietario?.toLowerCase().includes(filterTitular.toLowerCase()));
+
+        if (filterVtv === 'none') result = result.filter((v) => !v.fecha_vencimiento_vtv);
+        else if (filterVtv) result = result.filter((v) => !!v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === filterVtv);
+
+        if (filterGnc === 'none') result = result.filter((v) => !v.fecha_vencimiento_gnc);
+        else if (filterGnc) result = result.filter((v) => !!v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === filterGnc);
 
         return result;
-    }, [vehiculos, search, asignacionFiltro]);
+    }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc]);
 
     function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
         if (!showSearchDropdown || suggestions.length === 0) {
@@ -311,14 +326,40 @@ active.inversion_id = inversionId;
         setEmpresaId('');
         setInversionId('');
         setAsignacionFiltro('all');
+        setFilterEstadoPatente('');
+        setFilterTitular('');
+        setFilterVtv('');
+        setFilterGnc('');
     }
 
     const hasActiveFilters = !!(
-        search ||
-        empresaId ||
-        inversionId ||
-        asignacionFiltro !== 'all'
+        search || empresaId || inversionId || asignacionFiltro !== 'all' ||
+        filterEstadoPatente || filterTitular || filterVtv || filterGnc
     );
+
+    const advancedFilterCount = [filterEstadoPatente, filterTitular, filterVtv, filterGnc].filter(Boolean).length;
+
+    const vCounts = useMemo(() => ({
+        estadoPatente: {
+            __none__:    vehiculos.filter((v) => !v.estado_patente).length,
+            buen_estado: vehiculos.filter((v) => v.estado_patente === 'buen_estado').length,
+            mal_estado:  vehiculos.filter((v) => v.estado_patente === 'mal_estado').length,
+            provisional: vehiculos.filter((v) => v.estado_patente === 'provisional').length,
+            no_posee:    vehiculos.filter((v) => v.estado_patente === 'no_posee').length,
+        },
+        vtv: {
+            ok:      vehiculos.filter((v) => v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === 'ok').length,
+            warning: vehiculos.filter((v) => v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === 'warning').length,
+            expired: vehiculos.filter((v) => v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === 'expired').length,
+            none:    vehiculos.filter((v) => !v.fecha_vencimiento_vtv).length,
+        },
+        gnc: {
+            ok:      vehiculos.filter((v) => v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === 'ok').length,
+            warning: vehiculos.filter((v) => v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === 'warning').length,
+            expired: vehiculos.filter((v) => v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === 'expired').length,
+            none:    vehiculos.filter((v) => !v.fecha_vencimiento_gnc).length,
+        },
+    }), [vehiculos]);
 
     // --- Create form ---
     const createForm = useForm({
@@ -333,6 +374,7 @@ active.inversion_id = inversionId;
         user_id: '' as string,
         fecha_vencimiento_vtv: '',
         fecha_vencimiento_gnc: '',
+        estado_patente: '' as string,
     });
 
     function handleCreate(e: React.FormEvent) {
@@ -389,6 +431,7 @@ active.inversion_id = inversionId;
         user_id: '' as string,
         fecha_vencimiento_vtv: '',
         fecha_vencimiento_gnc: '',
+        estado_patente: '' as string,
     });
 
     function vtvStatus(
@@ -475,6 +518,7 @@ return '';
             user_id: String(v.user_id || ''),
             fecha_vencimiento_vtv: formattedVtv,
             fecha_vencimiento_gnc: formattedGnc,
+            estado_patente: v.estado_patente ?? '',
         });
         setEditingVehiculo(v);
     }
@@ -747,7 +791,7 @@ params.set('search', search.trim());
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-wrap items-end gap-4">
+                    <div className="flex flex-wrap items-end gap-3">
                         {/* Buscar */}
                         <div className="flex w-full flex-col gap-2 lg:min-w-[240px] lg:flex-1">
                             <Label htmlFor="search">Buscar</Label>
@@ -767,49 +811,30 @@ params.set('search', search.trim());
                                     }}
                                     onKeyDown={handleSearchKeyDown}
                                     onFocus={() => setShowSearchDropdown(true)}
-                                    onBlur={() =>
-                                        setTimeout(
-                                            () => setShowSearchDropdown(false),
-                                            150,
-                                        )
-                                    }
+                                    onBlur={() => setTimeout(() => setShowSearchDropdown(false), 150)}
                                     className="pl-9"
                                 />
-                                {showSearchDropdown &&
-                                    suggestions.length > 0 && (
-                                        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
-                                            <div className="max-h-52 overflow-y-auto">
-                                                {suggestions.map((s, idx) => (
-                                                    <button
-                                                        key={`${s.vehiculoId}-${idx}`}
-                                                        type="button"
-                                                        className={cn(
-                                                            'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
-                                                            highlightedIndex ===
-                                                                idx
-                                                                ? 'bg-accent'
-                                                                : 'hover:bg-accent/60',
-                                                        )}
-                                                        onMouseEnter={() =>
-                                                            setHighlightedIndex(
-                                                                idx,
-                                                            )
-                                                        }
-                                                        onMouseDown={() =>
-                                                            selectSuggestion(s)
-                                                        }
-                                                    >
-                                                        <span className="font-medium">
-                                                            {s.label}
-                                                        </span>
-                                                        <span className="ml-4 shrink-0 text-xs text-muted-foreground">
-                                                            {s.sub}
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
+                                {showSearchDropdown && suggestions.length > 0 && (
+                                    <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-md">
+                                        <div className="max-h-52 overflow-y-auto">
+                                            {suggestions.map((s, idx) => (
+                                                <button
+                                                    key={`${s.vehiculoId}-${idx}`}
+                                                    type="button"
+                                                    className={cn(
+                                                        'flex w-full items-center justify-between px-3 py-2 text-left text-sm',
+                                                        highlightedIndex === idx ? 'bg-accent' : 'hover:bg-accent/60',
+                                                    )}
+                                                    onMouseEnter={() => setHighlightedIndex(idx)}
+                                                    onMouseDown={() => selectSuggestion(s)}
+                                                >
+                                                    <span className="font-medium">{s.label}</span>
+                                                    <span className="ml-4 shrink-0 text-xs text-muted-foreground">{s.sub}</span>
+                                                </button>
+                                            ))}
                                         </div>
-                                    )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -817,29 +842,14 @@ params.set('search', search.trim());
                         {!hideEmpresa && (
                             <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                                 <Label htmlFor="empresa_filter">Empresa</Label>
-                                <Select
-                                    value={empresaId || 'all'}
-                                    onValueChange={(v) =>
-                                        setEmpresaId(v === 'all' ? '' : v)
-                                    }
-                                >
-                                    <SelectTrigger
-                                        id="empresa_filter"
-                                        className="w-full lg:w-[180px]"
-                                    >
+                                <Select value={empresaId || 'all'} onValueChange={(v) => setEmpresaId(v === 'all' ? '' : v)}>
+                                    <SelectTrigger id="empresa_filter" className="w-full lg:w-[180px]">
                                         <SelectValue placeholder="Todas" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">
-                                            Todas
-                                        </SelectItem>
+                                        <SelectItem value="all">Todas</SelectItem>
                                         {empresas.map((e) => (
-                                            <SelectItem
-                                                key={e.id}
-                                                value={String(e.id)}
-                                            >
-                                                {e.nombre}
-                                            </SelectItem>
+                                            <SelectItem key={e.id} value={String(e.id)}>{e.nombre}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -849,67 +859,38 @@ params.set('search', search.trim());
                         {/* Inversión */}
                         <div className="flex w-full flex-col gap-2 lg:w-auto lg:min-w-[150px]">
                             <Label htmlFor="inversion_filter">Inversión</Label>
-                            <Select
-                                value={inversionId || 'all'}
-                                onValueChange={(v) =>
-                                    setInversionId(v === 'all' ? '' : v)
-                                }
-                            >
-                                <SelectTrigger
-                                    id="inversion_filter"
-                                    className="w-full lg:w-[180px]"
-                                >
+                            <Select value={inversionId || 'all'} onValueChange={(v) => setInversionId(v === 'all' ? '' : v)}>
+                                <SelectTrigger id="inversion_filter" className="w-full lg:w-[180px]">
                                     <SelectValue placeholder="Todas" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Todas</SelectItem>
                                     {inversiones.map((i) => (
-                                        <SelectItem
-                                            key={i.id}
-                                            value={String(i.id)}
-                                        >
-                                            {i.nombre}
-                                        </SelectItem>
+                                        <SelectItem key={i.id} value={String(i.id)}>{i.nombre}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        {/* Conductor */}
+                        {/* Conductor + Filtrar + Limpiar */}
                         <div className="flex w-full flex-col gap-2 lg:w-auto">
                             <Label>Conductor</Label>
                             <div className="flex h-9 gap-1.5">
-                                {(
-                                    [
-                                        {
-                                            val: 'all',
-                                            label: 'Todos',
-                                            icon: LayoutList,
-                                        },
-                                        {
-                                            val: 'con',
-                                            label: 'Asignado',
-                                            icon: UserCheck,
-                                        },
-                                        {
-                                            val: 'sin',
-                                            label: 'Libre',
-                                            icon: UserX,
-                                        },
-                                    ] as const
-                                ).map(({ val, label, icon: Icon }) => (
+                                {([
+                                    { val: 'all', label: 'Todos', icon: LayoutList },
+                                    { val: 'con', label: 'Asignado', icon: UserCheck },
+                                    { val: 'sin', label: 'Libre', icon: UserX },
+                                ] as const).map(({ val, label, icon: Icon }) => (
                                     <button
                                         key={val}
                                         type="button"
                                         onClick={() => setAsignacionFiltro(val)}
                                         className={cn(
-                                            'flex h-full flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] lg:flex-none',
+                                            'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                             asignacionFiltro === val
-                                                ? val === 'con'
-                                                    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
-                                                    : val === 'sin'
-                                                      ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                                                      : 'border-primary/30 bg-primary/10 text-primary'
+                                                ? val === 'con' ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
+                                                : val === 'sin' ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                : 'border-primary/30 bg-primary/10 text-primary'
                                                 : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                         )}
                                     >
@@ -917,28 +898,190 @@ params.set('search', search.trim());
                                         {label}
                                     </button>
                                 ))}
-                            </div>
-                        </div>
 
-                        {/* Limpiar */}
-                        <div className="flex w-full items-center justify-end lg:w-auto">
-                            <button
-                                type="button"
-                                onClick={clearFilters}
-                                disabled={!hasActiveFilters}
-                                title="Limpiar filtros"
-                                className={cn(
-                                    'flex h-9 w-full items-center justify-center gap-2 rounded-lg border transition-all duration-150 lg:w-9 lg:px-0',
-                                    hasActiveFilters
-                                        ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
-                                        : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
-                                )}
-                            >
-                                <X className="h-4 w-4" />
-                                <span className="text-xs lg:hidden">
-                                    Limpiar filtros
-                                </span>
-                            </button>
+                                <div className="h-full w-px bg-border/60" />
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className={cn(
+                                                'flex h-full items-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
+                                                advancedFilterCount > 0
+                                                    ? 'border-border bg-muted text-foreground shadow-sm'
+                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                            )}
+                                        >
+                                            <Filter className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="hidden sm:inline">Filtrar</span>
+                                            {advancedFilterCount > 0 && (
+                                                <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                                            )}
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-72 p-0 shadow-lg">
+
+                                        {/* Titular */}
+                                        <div className="p-1.5 border-b border-border">
+                                            <div className="flex items-center gap-2 rounded-lg px-2.5 py-2">
+                                                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar por titular..."
+                                                    value={filterTitular}
+                                                    onChange={(e) => setFilterTitular(e.target.value)}
+                                                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                                                />
+                                                {filterTitular && (
+                                                    <button type="button" onClick={() => setFilterTitular('')} className="text-muted-foreground hover:text-foreground">
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Estado de patente */}
+                                        <div className="border-b border-border">
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFilterSection((s) => ({ ...s, estado: !s.estado }))}
+                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">Estado de patente</span>
+                                                    {filterEstadoPatente && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                </div>
+                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openFilterSection.estado && 'rotate-180')} />
+                                            </button>
+                                            {openFilterSection.estado && (
+                                                <div className="px-1.5 pb-1.5">
+                                                    {[
+                                                        { value: '__none__',    label: 'Sin estado',   desc: 'Sin estado registrado',   count: vCounts.estadoPatente.__none__ },
+                                                        { value: 'buen_estado', label: 'Buen estado',  desc: 'Patente en buen estado',  count: vCounts.estadoPatente.buen_estado },
+                                                        { value: 'mal_estado',  label: 'Mal estado',   desc: 'Patente deteriorada',     count: vCounts.estadoPatente.mal_estado },
+                                                        { value: 'provisional', label: 'Provisional',  desc: 'Patente provisional',     count: vCounts.estadoPatente.provisional },
+                                                        { value: 'no_posee',    label: 'No posee',     desc: 'Sin patente física',      count: vCounts.estadoPatente.no_posee },
+                                                    ].map((opt) => {
+                                                        const isActive = filterEstadoPatente === opt.value;
+                                                        return (
+                                                            <button key={opt.value} type="button" onClick={() => setFilterEstadoPatente(isActive ? '' : opt.value)}
+                                                                className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
+                                                            >
+                                                                <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>
+                                                                    {isActive && <Check className="h-3 w-3 text-background" />}
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                                    <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
+                                                                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
+                                                                </div>
+                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* VTV */}
+                                        <div className="border-b border-border">
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFilterSection((s) => ({ ...s, vtv: !s.vtv }))}
+                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">VTV</span>
+                                                    {filterVtv && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                </div>
+                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openFilterSection.vtv && 'rotate-180')} />
+                                            </button>
+                                            {openFilterSection.vtv && (
+                                                <div className="px-1.5 pb-1.5">
+                                                    {[
+                                                        { value: 'ok',      label: 'Vigente',      desc: 'Vence en más de 1 mes',         count: vCounts.vtv.ok },
+                                                        { value: 'warning', label: 'Por vencer',   desc: 'Vence en los próximos 30 días', count: vCounts.vtv.warning },
+                                                        { value: 'expired', label: 'Vencida',      desc: 'VTV ya expirada',               count: vCounts.vtv.expired },
+                                                        { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de VTV cargada',      count: vCounts.vtv.none },
+                                                    ].map((opt) => {
+                                                        const isActive = filterVtv === opt.value;
+                                                        return (
+                                                            <button key={opt.value} type="button" onClick={() => setFilterVtv(isActive ? '' : opt.value)}
+                                                                className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
+                                                            >
+                                                                <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>
+                                                                    {isActive && <Check className="h-3 w-3 text-background" />}
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                                    <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
+                                                                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
+                                                                </div>
+                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* GNC */}
+                                        <div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFilterSection((s) => ({ ...s, gnc: !s.gnc }))}
+                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">GNC</span>
+                                                    {filterGnc && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                </div>
+                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openFilterSection.gnc && 'rotate-180')} />
+                                            </button>
+                                            {openFilterSection.gnc && (
+                                                <div className="px-1.5 pb-1.5">
+                                                    {[
+                                                        { value: 'ok',      label: 'Vigente',      desc: 'Vence en más de 1 mes',         count: vCounts.gnc.ok },
+                                                        { value: 'warning', label: 'Por vencer',   desc: 'Vence en los próximos 30 días', count: vCounts.gnc.warning },
+                                                        { value: 'expired', label: 'Vencida',      desc: 'GNC ya expirado',               count: vCounts.gnc.expired },
+                                                        { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de GNC cargada',      count: vCounts.gnc.none },
+                                                    ].map((opt) => {
+                                                        const isActive = filterGnc === opt.value;
+                                                        return (
+                                                            <button key={opt.value} type="button" onClick={() => setFilterGnc(isActive ? '' : opt.value)}
+                                                                className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
+                                                            >
+                                                                <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>
+                                                                    {isActive && <Check className="h-3 w-3 text-background" />}
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                                    <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
+                                                                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
+                                                                </div>
+                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                    </PopoverContent>
+                                </Popover>
+
+                                <button
+                                    type="button"
+                                    onClick={clearFilters}
+                                    disabled={!hasActiveFilters}
+                                    title="Limpiar filtros"
+                                    className={cn(
+                                        'flex h-full w-9 items-center justify-center rounded-lg border transition-all duration-150',
+                                        hasActiveFilters
+                                            ? 'border-border text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]'
+                                            : 'cursor-not-allowed border-border/40 text-muted-foreground/30',
+                                    )}
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1001,7 +1144,7 @@ params.set('search', search.trim());
                                             >
                                                 <div className="flex flex-col items-start gap-1">
                                                     <span>{vehiculo.patente}</span>
-                                                    {(() => {
+                                                    {vehiculo.estado_patente && (() => {
                                                         const b = estadoPatenteBadge(vehiculo.estado_patente);
 
                                                         return (
@@ -1204,7 +1347,7 @@ params.set('search', search.trim());
                                             <span className="font-mono text-base font-semibold text-foreground">
                                                 {vehiculo.patente}
                                             </span>
-                                            {(() => {
+                                            {vehiculo.estado_patente && (() => {
                                                 const b = estadoPatenteBadge(vehiculo.estado_patente);
 
                                                 return (
@@ -1594,6 +1737,7 @@ interface VehiculoFormProps {
             user_id: string;
             fecha_vencimiento_vtv: string;
             fecha_vencimiento_gnc: string;
+            estado_patente: string;
         }>
     >;
     onSubmit: (e: React.FormEvent) => void;
@@ -1687,6 +1831,42 @@ function VehiculoForm({
                     />
                     <InputError message={form.errors.modelo} />
                 </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+                <Label>Estado de patente</Label>
+                <Select
+                    value={form.data.estado_patente || '__none__'}
+                    onValueChange={(v) => form.setData('estado_patente', v === '__none__' ? '' : v)}
+                >
+                    <SelectTrigger>
+                        <SelectValue>
+                            {form.data.estado_patente ? (
+                                <span className="flex items-center gap-2">
+                                    <span className={cn('h-2 w-2 shrink-0 rounded-full', estadoPatenteBadge(form.data.estado_patente as EstadoPatente).dot)} />
+                                    {estadoPatenteBadge(form.data.estado_patente as EstadoPatente).label}
+                                </span>
+                            ) : (
+                                <span className="text-muted-foreground">Sin estado</span>
+                            )}
+                        </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="__none__">Sin estado</SelectItem>
+                        {ESTADO_PATENTE_OPCIONES.map((opt) => {
+                            const b = estadoPatenteBadge(opt.value);
+                            return (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                    <span className="flex items-center gap-2">
+                                        <span className={cn('h-2 w-2 shrink-0 rounded-full', b.dot)} />
+                                        {opt.label}
+                                    </span>
+                                </SelectItem>
+                            );
+                        })}
+                    </SelectContent>
+                </Select>
+                <InputError message={form.errors.estado_patente} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">

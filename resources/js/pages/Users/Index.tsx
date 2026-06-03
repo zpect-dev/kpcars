@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, Filter, Plus, Search, Camera, UserPlus, UserCog } from 'lucide-react';
+import { Check, ChevronDown, Filter, Plus, Search, Camera, UserPlus, UserCog } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -202,6 +202,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
+    const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({});
     const [previewImage, setPreviewImage] = useState<{
         url: string;
         name: string;
@@ -455,126 +456,148 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 {filterRole === 'chofer' ? (
                     <div className="flex flex-col gap-4">
                         {/* Page header */}
-                        <div className="flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <div>
-                                <div className="flex items-center gap-2.5">
-                                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Choferes</h1>
-                                    <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-sm font-semibold text-foreground">
-                                        {(choferCounts?.activos ?? 0) + (choferCounts?.inactivos ?? 0)}
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">Choferes</h1>
+                                    <span className="inline-flex items-center rounded-full border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                        {(choferCounts?.activos ?? 0) + (choferCounts?.inactivos ?? 0)} choferes
                                     </span>
                                 </div>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    Gestión de conductores asignados a la flota
-                                </p>
                             </div>
                             {!isInversor && (
-                                <Button onClick={openCreateModal} className="shrink-0">
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Nuevo chofer
+                                <Button size="sm" onClick={openCreateModal} className="shrink-0">
+                                    <Plus className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Nuevo chofer</span>
                                 </Button>
                             )}
                         </div>
 
                         {/* Filter bar */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="relative min-w-[200px] max-w-sm flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Buscar por nombre, DNI o patente..."
-                                    className="bg-card pl-9 shadow-sm"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
+                        <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
+                            <div className="flex flex-wrap items-end gap-3">
 
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
-                                        className={cn(
-                                            'flex items-baseline gap-1.5 rounded-lg px-4 py-1.5 transition-all',
-                                            filterStatus === 'activos' ? 'bg-background shadow-sm' : 'hover:bg-background/60',
-                                        )}
-                                    >
-                                        <span className={cn('text-sm font-bold tabular-nums', filterStatus === 'activos' ? 'text-foreground' : 'text-muted-foreground')}>
-                                            {choferCounts?.activos ?? 0}
-                                        </span>
-                                        <span className={cn('text-xs', filterStatus === 'activos' ? 'text-muted-foreground' : 'text-muted-foreground/50')}>
-                                            activos
-                                        </span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
-                                        className={cn(
-                                            'flex items-baseline gap-1.5 rounded-lg px-4 py-1.5 transition-all',
-                                            filterStatus === 'inactivos' ? 'bg-background shadow-sm' : 'hover:bg-background/60',
-                                        )}
-                                    >
-                                        <span className={cn('text-sm font-bold tabular-nums', filterStatus === 'inactivos' ? 'text-foreground' : 'text-muted-foreground')}>
-                                            {choferCounts?.inactivos ?? 0}
-                                        </span>
-                                        <span className={cn('text-xs', filterStatus === 'inactivos' ? 'text-muted-foreground' : 'text-muted-foreground/50')}>
-                                            inactivos
-                                        </span>
-                                    </button>
+                                {/* Buscar */}
+                                <div className="flex w-full flex-col gap-2 lg:min-w-[240px] lg:flex-1">
+                                    <Label htmlFor="chofer-search">Buscar</Label>
+                                    <div className="relative">
+                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            id="chofer-search"
+                                            type="text"
+                                            placeholder="Buscar por nombre, DNI o patente..."
+                                            className="pl-9"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
-                                <Popover onOpenChange={(open) => { if (!open && filterAlert === 'all') {} }}>
-                                    <PopoverTrigger asChild>
+                                {/* Estado */}
+                                <div className="flex w-full flex-col gap-2 lg:w-auto">
+                                    <Label>Estado</Label>
+                                    <div className="flex h-9 gap-1.5">
                                         <button
                                             type="button"
+                                            onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
                                             className={cn(
-                                                'inline-flex items-center gap-2 rounded-lg border px-3 py-[9px] text-sm font-medium transition-all',
-                                                filterAlert !== 'all'
-                                                    ? 'border-border bg-muted text-foreground shadow-sm'
-                                                    : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
+                                                'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
+                                                filterStatus === 'activos'
+                                                    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
+                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
-                                            <Filter className="h-4 w-4 shrink-0" />
-                                            <span className="hidden sm:inline">
-                                                {filterAlert !== 'all' ? FILTER_SHORT_LABELS[filterAlert] : 'Filtrar'}
-                                            </span>
-                                            {filterAlert !== 'all' && (
-                                                <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                                            )}
+                                            <span className="font-bold tabular-nums">{choferCounts?.activos ?? 0}</span>
+                                            activos
                                         </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent align="end" className="w-72 p-0 shadow-lg">
-                                        <div className="p-1.5">
-                                            <FilterPopoverItem
-                                                label="Todos los choferes"
-                                                count={users.length}
-                                                isActive={filterAlert === 'all'}
-                                                onClick={() => setFilterAlert('all')}
-                                            />
-                                        </div>
-                                        {FILTER_SECTIONS.map((section) => (
-                                            <div key={section.label}>
-                                                <div className="flex items-center gap-2 px-3 py-1.5">
-                                                    <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
-                                                        {section.label}
+                                        <button
+                                            type="button"
+                                            onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
+                                            className={cn(
+                                                'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
+                                                filterStatus === 'inactivos'
+                                                    ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                            )}
+                                        >
+                                            <span className="font-bold tabular-nums">{choferCounts?.inactivos ?? 0}</span>
+                                            inactivos
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Filtrar */}
+                                <div className="flex w-full items-end gap-2 lg:w-auto">
+                                    <div className="flex flex-col gap-2">
+                                        <Label className="invisible hidden lg:block">Más</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        'inline-flex items-center gap-2 rounded-lg border px-3 py-[9px] text-sm font-medium transition-all',
+                                                        filterAlert !== 'all'
+                                                            ? 'border-border bg-muted text-foreground shadow-sm'
+                                                            : 'border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground',
+                                                    )}
+                                                >
+                                                    <Filter className="h-4 w-4 shrink-0" />
+                                                    <span className="hidden sm:inline">
+                                                        {filterAlert !== 'all' ? FILTER_SHORT_LABELS[filterAlert] : 'Filtrar'}
                                                     </span>
-                                                    <div className="flex-1 border-t border-border/60" />
+                                                    {filterAlert !== 'all' && (
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                                                    )}
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent align="end" className="w-72 p-0 shadow-lg">
+                                                <div className="p-1.5 border-b border-border">
+                                                    <FilterPopoverItem
+                                                        label="Todos los choferes"
+                                                        count={users.length}
+                                                        isActive={filterAlert === 'all'}
+                                                        onClick={() => setFilterAlert('all')}
+                                                    />
                                                 </div>
-                                                <div className="px-1.5 pb-1.5">
-                                                    {section.items.map(({ val, label, desc }) => (
-                                                        <FilterPopoverItem
-                                                            key={val}
-                                                            label={label}
-                                                            desc={desc}
-                                                            count={alertCounts[val as keyof typeof alertCounts]}
-                                                            isActive={filterAlert === val}
-                                                            onClick={() => setFilterAlert(filterAlert === val ? 'all' : val)}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </PopoverContent>
-                                </Popover>
+                                                {FILTER_SECTIONS.map((section, i) => {
+                                                    const isOpen = openFilterSections[section.label] ?? false;
+                                                    const hasActive = section.items.some((it) => filterAlert === it.val);
+                                                    const isLast = i === FILTER_SECTIONS.length - 1;
+                                                    return (
+                                                        <div key={section.label} className={!isLast ? 'border-b border-border' : ''}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setOpenFilterSections((s) => ({ ...s, [section.label]: !s[section.label] }))}
+                                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-medium text-foreground">{section.label}</span>
+                                                                    {hasActive && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                                </div>
+                                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
+                                                            </button>
+                                                            {isOpen && (
+                                                                <div className="px-1.5 pb-1.5">
+                                                                    {section.items.map(({ val, label, desc }) => (
+                                                                        <FilterPopoverItem
+                                                                            key={val}
+                                                                            label={label}
+                                                                            desc={desc}
+                                                                            count={alertCounts[val as keyof typeof alertCounts]}
+                                                                            isActive={filterAlert === val}
+                                                                            onClick={() => setFilterAlert(filterAlert === val ? 'all' : val)}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+                                </div>
+
                             </div>
                         </div>
                     </div>
