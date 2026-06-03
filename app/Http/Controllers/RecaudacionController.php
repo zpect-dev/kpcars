@@ -26,7 +26,7 @@ class RecaudacionController extends Controller
         // Vehiculo se auto-scopea por empresa activa vía TenantScope.
         // Solo vehículos con chofer asignado (y no el placeholder EXTERNO).
         $vehiculos = Vehiculo::query()
-            ->with(['user:id,name', 'inversion:id,nombre', 'recaudacionAbierta'])
+            ->with(['user:id,name,correo,telefono', 'inversion:id,nombre', 'recaudacionAbierta'])
             ->whereNotNull('user_id')
             ->where('patente', '!=', 'EXTERNO')
             ->get();
@@ -44,6 +44,8 @@ class RecaudacionController extends Controller
                     'inversion_nombre' => $v->inversion?->nombre ?? 'Sin inversión',
                     'patente' => $v->patente,
                     'chofer' => $v->user?->name ?? 'N/A',
+                    'chofer_telefono' => $v->user?->telefono,
+                    'chofer_correo' => $v->user?->correo,
                     'precio' => $precio,
                     'efectivo' => (float) ($r->efectivo ?? 0),
                     'transferencia' => (float) ($r->transferencia ?? 0),

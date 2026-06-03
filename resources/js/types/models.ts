@@ -177,6 +177,8 @@ export interface RecaudacionFila {
     inversion_nombre: string;
     patente: string;
     chofer: string;
+    chofer_telefono?: string | null;
+    chofer_correo?: string | null;
     precio: number;
     efectivo: number;
     transferencia: number;

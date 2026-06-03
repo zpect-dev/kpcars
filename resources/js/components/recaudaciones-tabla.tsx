@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { RecaudacionFila } from '@/types';
 
@@ -382,15 +383,60 @@ function RecaudacionRow({
 
             {/* Chofer */}
             <td className="px-3 py-2">
-                <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
-                        {getInitials(fila.chofer)}
-                    </div>
-                    <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{fila.chofer}</p>
-                        <p className="font-mono text-[10px] text-muted-foreground">{fila.patente}</p>
-                    </div>
-                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button type="button" className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity">
+                            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                                {getInitials(fila.chofer)}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">{fila.chofer}</p>
+                                <p className="font-mono text-[10px] text-muted-foreground">{fila.patente}</p>
+                            </div>
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-64 p-0">
+                        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+                                {getInitials(fila.chofer)}
+                            </div>
+                            <div className="min-w-0">
+                                <p className="truncate font-semibold text-foreground">{fila.chofer}</p>
+                                <p className="font-mono text-xs text-muted-foreground">{fila.patente}</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-col gap-0 p-1">
+                            {fila.chofer_telefono ? (
+                                <a
+                                    href={`tel:${fila.chofer_telefono}`}
+                                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted"
+                                >
+                                    <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-foreground">{fila.chofer_telefono}</span>
+                                </a>
+                            ) : (
+                                <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                    <Phone className="h-4 w-4 shrink-0" />
+                                    <span className="italic">Sin teléfono</span>
+                                </div>
+                            )}
+                            {fila.chofer_correo ? (
+                                <a
+                                    href={`mailto:${fila.chofer_correo}`}
+                                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted"
+                                >
+                                    <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate text-foreground">{fila.chofer_correo}</span>
+                                </a>
+                            ) : (
+                                <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                    <Mail className="h-4 w-4 shrink-0" />
+                                    <span className="italic">Sin correo</span>
+                                </div>
+                            )}
+                        </div>
+                    </PopoverContent>
+                </Popover>
             </td>
 
             {/* Inversión */}
