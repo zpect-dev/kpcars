@@ -230,9 +230,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'licencia_vencida') {
                     if (!u.fecha_vencimiento_licencia) return false;
                     const today = new Date(); today.setHours(0, 0, 0, 0);
-                    const parts = u.fecha_vencimiento_licencia.split('-').map(Number);
-                    const fecha = new Date(parts[0], parts[1] - 1, parts[2]);
-                    return fecha < today;
+                    return parseLicenciaDate(u.fecha_vencimiento_licencia) < today;
                 }
                 if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
                 if (filterAlert === 'sin_licencia') return u.sin_licencia === true;
@@ -252,8 +250,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         return {
             licencia_vencida: users.filter((u) => {
                 if (!u.fecha_vencimiento_licencia) return false;
-                const parts = u.fecha_vencimiento_licencia.split('-').map(Number);
-                return new Date(parts[0], parts[1] - 1, parts[2]) < today;
+                return parseLicenciaDate(u.fecha_vencimiento_licencia) < today;
             }).length,
             licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
             sin_licencia: users.filter((u) => u.sin_licencia).length,
