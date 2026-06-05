@@ -85,7 +85,9 @@ class ProcessBulkStockOutAction
                 ]);
 
                 // Cobro auto-generado para egresos a vehículos no-EXTERNO.
-                if ($licensePlate !== 'EXTERNO') {
+                // Los artículos de galpón (repuestos=false) nunca generan cobro:
+                // son consumo interno, no se facturan a ningún vehículo.
+                if ($licensePlate !== 'EXTERNO' && $articulo->repuestos) {
                     Cobro::create([
                         'inversion_id' => $vehiculo->inversion_id,
                         'transaccion_id' => $transaccion->id,

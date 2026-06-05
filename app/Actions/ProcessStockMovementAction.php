@@ -6,6 +6,7 @@ namespace App\Actions;
 
 use App\Models\Articulo;
 use App\Models\Cobro;
+use App\Models\Scopes\TenantScope;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
 use Exception;
@@ -43,7 +44,7 @@ class ProcessStockMovementAction
 
                 // Inventario es global: el carro destino puede ser de cualquier
                 // empresa (el cobro se enruta a la empresa del carro, ver abajo).
-                $vehiculo = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                $vehiculo = Vehiculo::withoutGlobalScope(TenantScope::class)
                     ->where('patente', $licensePlate)
                     ->first();
                 if (! $vehiculo) {
@@ -72,8 +73,10 @@ class ProcessStockMovementAction
                 'descripcion' => $descripcion,
             ]);
 
-            // Auto-generate cobro for OUT transactions to non-EXTERNO vehicles
-            if ($type === 'OUT' && $vehiculo && $licensePlate !== 'EXTERNO') {
+            // Auto-generate cobro for OUT transactions to non-EXTERNO vehicles.
+            // Los artículos de galpón (repuestos=false) nunca generan cobro:
+            // son consumo interno, no se facturan a ningún vehículo.
+            if ($type === 'OUT' && $vehiculo && $licensePlate !== 'EXTERNO' && $articulo->repuestos) {
                 Cobro::create([
                     'inversion_id' => $vehiculo->inversion_id,
                     'transaccion_id' => $transaccion->id,
