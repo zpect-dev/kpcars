@@ -473,7 +473,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-lg font-semibold text-foreground sm:text-xl">Choferes</h1>
                                     <span className="inline-flex items-center rounded-full border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                                        {(choferCounts?.activos ?? 0) + (choferCounts?.inactivos ?? 0)} choferes
+                                        {choferCounts?.activos ?? 0} activos
                                     </span>
                                 </div>
                             </div>
