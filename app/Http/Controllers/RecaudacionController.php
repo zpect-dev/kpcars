@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\AperturaRecaudacion;
 use App\Models\CierreRecaudacion;
 use App\Models\Recaudacion;
 use App\Models\Vehiculo;
@@ -24,112 +23,52 @@ class RecaudacionController extends Controller
     {
         $this->authorize('view-recaudaciones');
 
-        // Apertura abierta de la empresa activa (TenantScope la scopea).
-        $apertura = AperturaRecaudacion::abierta()
-            ->with('user:id,name')
-            ->latest()
-            ->first();
+        // Vehiculo se auto-scopea por empresa activa vía TenantScope.
+        // Solo vehículos con chofer asignado (y no el placeholder EXTERNO).
+        $vehiculos = Vehiculo::query()
+            ->with(['user:id,name,correo,telefono', 'inversion:id,nombre', 'recaudacionAbierta'])
+            ->whereNotNull('user_id')
+            ->where('patente', '!=', 'EXTERNO')
+            ->get();
 
-        $filas = collect();
+        $filas = $vehiculos
+            ->map(function (Vehiculo $v) {
+                $r = $v->recaudacionAbierta;
+                $total = (float) ($r->total ?? 0);
+                $descuento = (float) ($r->descuento ?? 0);
+                $precio = (float) $v->precio;
+                $precioEfectivo = max($precio - $descuento, 0);
 
-        if ($apertura !== null) {
-            $apertura->load([
-                'recaudaciones.vehiculo:id,patente,inversion_id',
-                'recaudaciones.vehiculo.inversion:id,nombre',
-                'recaudaciones.chofer:id,name,correo,telefono',
-            ]);
-
-            $filas = $apertura->recaudaciones
-                ->map(function (Recaudacion $r) {
-                    $total = (float) $r->total;
-                    $descuento = (float) $r->descuento;
-                    $precio = (float) $r->precio;
-                    $precioEfectivo = max($precio - $descuento, 0);
-
-                    return [
-                        'vehiculo_id' => $r->vehiculo_id,
-                        'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                        'patente' => $r->vehiculo?->patente ?? 'N/A',
-                        'chofer' => $r->chofer?->name ?? 'N/A',
-                        'chofer_telefono' => $r->chofer?->telefono,
-                        'chofer_correo' => $r->chofer?->correo,
-                        'precio' => $precio,
-                        'efectivo' => (float) $r->efectivo,
-                        'transferencia' => (float) $r->transferencia,
-                        'total' => $total,
-                        'descuento' => $descuento,
-                        'descripcion' => $r->descripcion ?? '',
-                        'deuda' => max($precioEfectivo - $total, 0),
-                        'estado' => $total >= $precioEfectivo ? 'pagado' : 'deuda',
-                    ];
-                })
-                ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
-                ->sortBy('inversion_nombre', SORT_NATURAL | SORT_FLAG_CASE)
-                ->values();
-        }
+                return [
+                    'vehiculo_id' => $v->id,
+                    'inversion_nombre' => $v->inversion?->nombre ?? 'Sin inversión',
+                    'patente' => $v->patente,
+                    'chofer' => $v->user?->name ?? 'N/A',
+                    'chofer_telefono' => $v->user?->telefono,
+                    'chofer_correo' => $v->user?->correo,
+                    'precio' => $precio,
+                    'efectivo' => (float) ($r->efectivo ?? 0),
+                    'transferencia' => (float) ($r->transferencia ?? 0),
+                    'total' => $total,
+                    'descuento' => $descuento,
+                    'descripcion' => $r->descripcion ?? '',
+                    'deuda' => max($precioEfectivo - $total, 0),
+                    'estado' => $total >= $precioEfectivo ? 'pagado' : 'deuda',
+                ];
+            })
+            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy('inversion_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
 
         $ultimo = CierreRecaudacion::with('user:id,name')->latest()->first();
 
         return Inertia::render('Recaudaciones/Index', [
-            'abierta' => $apertura !== null,
-            'apertura' => $apertura
-                ? ['id' => $apertura->id, 'user' => $apertura->user, 'created_at' => $apertura->created_at]
-                : null,
             'filas' => $filas,
             'totalGeneral' => $filas->sum('total'),
             'ultimoCierre' => $ultimo
                 ? ['id' => $ultimo->id, 'user' => $ultimo->user, 'created_at' => $ultimo->created_at]
                 : null,
         ]);
-    }
-
-    /**
-     * Open a new recaudaciones period, snapshotting the current vehicle/driver
-     * assignments into frozen rows. The list stays fixed until the period is closed.
-     */
-    public function abrir(Request $request): RedirectResponse
-    {
-        $this->authorize('manage-recaudaciones');
-
-        // No permitir dos aperturas abiertas a la vez.
-        if (AperturaRecaudacion::abierta()->exists()) {
-            return redirect()->back()->with('warning', 'Ya hay una recaudación abierta.');
-        }
-
-        // Vehículos elegibles en este instante: con chofer asignado y no EXTERNO.
-        $vehiculos = Vehiculo::query()
-            ->whereNotNull('user_id')
-            ->where('patente', '!=', 'EXTERNO')
-            ->get(['id', 'empresa_id', 'user_id', 'precio']);
-
-        if ($vehiculos->isEmpty()) {
-            return redirect()->back()->with('warning', 'No hay vehículos con chofer para abrir la recaudación.');
-        }
-
-        DB::transaction(function () use ($vehiculos) {
-            $apertura = AperturaRecaudacion::create([
-                'empresa_id' => session('active_company_id'),
-                'user_id' => auth()->id(),
-            ]);
-
-            // Una fila congelada por vehículo: snapshot de precio y chofer (user_id).
-            foreach ($vehiculos as $v) {
-                Recaudacion::create([
-                    'vehiculo_id' => $v->id,
-                    'user_id' => $v->user_id,
-                    'empresa_id' => $v->empresa_id,
-                    'apertura_id' => $apertura->id,
-                    'efectivo' => 0,
-                    'transferencia' => 0,
-                    'total' => 0,
-                    'descuento' => 0,
-                    'precio' => (float) $v->precio,
-                    'descripcion' => null,
-                ]);
-            }
-        });
-
-        return redirect()->back()->with('success', 'Recaudación abierta. La lista quedó congelada.');
     }
 
     /**
@@ -166,9 +105,9 @@ class RecaudacionController extends Controller
 
         $cierreRecaudacion->load([
             'user:id,name',
-            'recaudaciones.vehiculo:id,patente,inversion_id',
+            'recaudaciones.vehiculo:id,patente,inversion_id,user_id',
             'recaudaciones.vehiculo.inversion:id,nombre',
-            'recaudaciones.chofer:id,name',
+            'recaudaciones.vehiculo.user:id,name',
         ]);
 
         $filas = $cierreRecaudacion->recaudaciones
@@ -183,7 +122,7 @@ class RecaudacionController extends Controller
                     'vehiculo_id' => $r->vehiculo_id,
                     'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                     'patente' => $r->vehiculo?->patente ?? 'N/A',
-                    'chofer' => $r->chofer?->name ?? 'N/A',
+                    'chofer' => $r->vehiculo?->user?->name ?? 'N/A',
                     'precio' => $precio,
                     'efectivo' => (float) $r->efectivo,
                     'transferencia' => (float) $r->transferencia,
@@ -216,18 +155,6 @@ class RecaudacionController extends Controller
     {
         $this->authorize('manage-recaudaciones');
 
-        // La fila ya existe congelada desde la apertura; si no hay período abierto
-        // o el vehículo no entró en la foto, no se puede cargar.
-        $recaudacion = Recaudacion::abiertas()
-            ->where('vehiculo_id', $vehiculo->id)
-            ->first();
-
-        if ($recaudacion === null) {
-            throw ValidationException::withMessages([
-                'transferencia' => 'No hay una recaudación abierta para este vehículo. Abrí una recaudación primero.',
-            ]);
-        }
-
         $validated = $this->validatePayload($request);
 
         $efectivo = (float) $validated['efectivo'];
@@ -235,16 +162,21 @@ class RecaudacionController extends Controller
         $descuento = (float) $validated['descuento'];
         $total = $efectivo + $transferencia;
 
-        // Se usa el precio congelado en la fila, no el actual del vehículo.
-        $this->assertNoSupera($total, (float) $recaudacion->precio, $descuento);
+        $this->assertNoSupera($total, (float) $vehiculo->precio, $descuento);
 
-        $recaudacion->update([
+        $recaudacion = Recaudacion::abiertas()
+            ->firstOrNew(['vehiculo_id' => $vehiculo->id]);
+
+        $recaudacion->fill([
+            'empresa_id' => $vehiculo->empresa_id,
             'efectivo' => $efectivo,
             'transferencia' => $transferencia,
             'total' => $total,
             'descuento' => $descuento,
+            'precio' => (float) $vehiculo->precio,
             'descripcion' => $validated['descripcion'] ?? null,
         ]);
+        $recaudacion->save();
 
         return redirect()->back()->with('success', "Recaudación de {$vehiculo->patente} guardada.");
     }
@@ -284,22 +216,43 @@ class RecaudacionController extends Controller
     {
         $this->authorize('manage-recaudaciones');
 
-        $apertura = AperturaRecaudacion::abierta()->latest()->first();
+        // Vehículos elegibles de la empresa activa (con chofer, no EXTERNO).
+        $vehiculos = Vehiculo::query()
+            ->with('recaudacionAbierta')
+            ->whereNotNull('user_id')
+            ->where('patente', '!=', 'EXTERNO')
+            ->get();
 
-        if ($apertura === null) {
-            return redirect()->back()->with('warning', 'No hay una recaudación abierta para cerrar.');
+        if ($vehiculos->isEmpty()) {
+            return redirect()->back()->with('warning', 'No hay vehículos con chofer para cerrar.');
         }
 
-        DB::transaction(function () use ($apertura) {
+        DB::transaction(function () use ($vehiculos) {
             $cierre = CierreRecaudacion::create([
                 'empresa_id' => session('active_company_id'),
                 'user_id' => auth()->id(),
             ]);
 
-            // Congelar las filas de la apertura asignándoles este cierre y marcar
-            // la apertura como cerrada. El período queda vacío hasta una nueva apertura.
-            $apertura->recaudaciones()->update(['cierre_id' => $cierre->id]);
-            $apertura->update(['cierre_id' => $cierre->id]);
+            // Crear filas en 0 para los vehículos que no cargaron nada (abonaron 0),
+            // con snapshot del precio actual, para que el cierre incluya a TODOS.
+            foreach ($vehiculos as $v) {
+                if ($v->recaudacionAbierta === null) {
+                    Recaudacion::create([
+                        'vehiculo_id' => $v->id,
+                        'empresa_id' => $v->empresa_id,
+                        'efectivo' => 0,
+                        'transferencia' => 0,
+                        'total' => 0,
+                        'descuento' => 0,
+                        'precio' => (float) $v->precio,
+                        'descripcion' => null,
+                    ]);
+                }
+            }
+
+            // Congelar todas las recaudaciones abiertas de la empresa activa
+            // asignándoles este cierre. TenantScope limita el update a la empresa.
+            Recaudacion::abiertas()->update(['cierre_id' => $cierre->id]);
         });
 
         return redirect()->back()->with('success', 'Cierre de recaudaciones ejecutado correctamente.');

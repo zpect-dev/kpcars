@@ -5,25 +5,20 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\BuildResumenIntegradoAction;
-use App\Models\AperturaRecaudacion;
 use App\Models\Appointment;
 use App\Models\Articulo;
 use App\Models\CierreCaja;
 use App\Models\CierreGasto;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
-use App\Models\CierreRecaudacion;
 use App\Models\Cobro;
 use App\Models\DeudaMovimiento;
-use App\Models\Recaudacion;
-use App\Models\Scopes\TenantScope;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Gate;
 
 class PdfController extends Controller
 {
@@ -79,7 +74,7 @@ class PdfController extends Controller
 
         $transactions = Transaccion::with([
             'articulo',
-            'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
+            'vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
             'user',
         ])
             ->filterByItem($articleId ? (int) $articleId : null)
@@ -157,7 +152,7 @@ class PdfController extends Controller
     {
         // Acceso: middleware role:administrador.
         // Cobro auto-scopea por empresa activa (TenantScope); no requiere filtro manual.
-        $cobros = Cobro::query()
+        $cobros = \App\Models\Cobro::query()
             ->pendientes()
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
@@ -224,13 +219,13 @@ class PdfController extends Controller
     public function miCuenta(Request $request): Response
     {
         // Acceso: middleware role:inversor. El Gate valida que tenga inversiones.
-        Gate::authorize('view-mi-cuenta');
+        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
 
         // Vista cross-empresa para el inversor (idem MiCuentaController).
         $inversiones = $user->inversiones()
-            ->withoutGlobalScope(TenantScope::class)
+            ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
@@ -255,7 +250,7 @@ class PdfController extends Controller
             });
 
         $pagosPorCierre = CierreInversionPago::with([
-            'cierre' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+            'cierre' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
                 ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa'),
         ])
             ->where('user_id', $user->id)
@@ -277,7 +272,7 @@ class PdfController extends Controller
             ];
         })->values();
 
-        $tasaActual = CierreInversion::withoutGlobalScope(TenantScope::class)
+        $tasaActual = CierreInversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
             ->latest('periodo_fin')
             ->value('tasa');
         $tasaActual = $tasaActual ? (float) $tasaActual : null;
@@ -385,26 +380,24 @@ class PdfController extends Controller
      */
     public function recaudacionesDeudores(Request $request): Response
     {
-        // Acceso: middleware role:administrador. TenantScope scopea por empresa activa.
-        // Lee de la apertura abierta (filas congeladas), no de los vehículos en vivo.
-        $apertura = AperturaRecaudacion::abierta()
-            ->with([
-                'recaudaciones.vehiculo:id,patente,inversion_id',
-                'recaudaciones.vehiculo.inversion:id,nombre',
-                'recaudaciones.chofer:id,name',
-            ])
-            ->latest()
-            ->first();
+        // Acceso: middleware role:administrador.
+        // Vehiculo auto-scopea por empresa activa vía TenantScope.
+        $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'recaudacionAbierta'])
+            ->whereNotNull('user_id')
+            ->where('patente', '!=', 'EXTERNO')
+            ->get();
 
-        $deudores = ($apertura?->recaudaciones ?? collect())
-            ->map(function (Recaudacion $r) {
-                $total = (float) $r->total;
-                $precioEfectivo = max((float) $r->precio - (float) $r->descuento, 0);
+        $deudores = $vehiculos
+            ->map(function (Vehiculo $v) {
+                $r = $v->recaudacionAbierta;
+                $total = (float) ($r->total ?? 0);
+                $descuento = (float) ($r->descuento ?? 0);
+                $precioEfectivo = max((float) $v->precio - $descuento, 0);
 
                 return [
-                    'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                    'patente' => $r->vehiculo?->patente ?? 'N/A',
-                    'chofer' => $r->chofer?->name ?? 'N/A',
+                    'inversion_nombre' => $v->inversion?->nombre ?? 'Sin inversión',
+                    'patente' => $v->patente,
+                    'chofer' => $v->user?->name ?? 'N/A',
                     'recaudado' => $total,
                     'deuda' => max($precioEfectivo - $total, 0),
                 ];
@@ -426,23 +419,23 @@ class PdfController extends Controller
     /**
      * Generate PDF with the debtors of a historical recaudacion closing.
      */
-    public function recaudacionesDeudoresCierre(Request $request, CierreRecaudacion $cierreRecaudacion): Response
+    public function recaudacionesDeudoresCierre(Request $request, \App\Models\CierreRecaudacion $cierreRecaudacion): Response
     {
         // Acceso: middleware role:administrador. TenantScope scopea el cierre.
         $cierreRecaudacion->load([
-            'recaudaciones.vehiculo:id,patente,inversion_id',
+            'recaudaciones.vehiculo:id,patente,inversion_id,user_id',
             'recaudaciones.vehiculo.inversion:id,nombre',
-            'recaudaciones.chofer:id,name',
+            'recaudaciones.vehiculo.user:id,name',
         ]);
 
         $deudores = $cierreRecaudacion->recaudaciones
-            ->map(function (Recaudacion $r) {
+            ->map(function (\App\Models\Recaudacion $r) {
                 $precioEfectivo = max((float) $r->precio - (float) $r->descuento, 0);
 
                 return [
                     'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                     'patente' => $r->vehiculo?->patente ?? 'N/A',
-                    'chofer' => $r->chofer?->name ?? 'N/A',
+                    'chofer' => $r->vehiculo?->user?->name ?? 'N/A',
                     'recaudado' => (float) $r->total,
                     'deuda' => max($precioEfectivo - (float) $r->total, 0),
                 ];

@@ -122,7 +122,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Recaudaciones
         Route::get('recaudaciones', [RecaudacionController::class, 'index'])->name('recaudaciones.index');
-        Route::post('recaudaciones/abrir', [RecaudacionController::class, 'abrir'])->name('recaudaciones.abrir');
         Route::post('recaudaciones/cierre', [RecaudacionController::class, 'cierre'])->name('recaudaciones.cierre');
         Route::get('recaudaciones/historial', [RecaudacionController::class, 'historial'])->name('recaudaciones.historial');
         Route::get('recaudaciones/cierres/{cierreRecaudacion}', [RecaudacionController::class, 'showCierre'])->name('recaudaciones.cierres.show');

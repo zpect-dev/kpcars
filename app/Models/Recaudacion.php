@@ -18,10 +18,8 @@ class Recaudacion extends Model
 
     protected $fillable = [
         'vehiculo_id',
-        'user_id',
         'empresa_id',
         'cierre_id',
-        'apertura_id',
         'efectivo',
         'transferencia',
         'total',
@@ -62,23 +60,6 @@ class Recaudacion extends Model
     public function empresa(): BelongsTo
     {
         return $this->belongsTo(Empresa::class);
-    }
-
-    /**
-     * Get the driver (chofer) frozen at apertura time. Stays fixed even if the
-     * vehicle is later reassigned or unassigned.
-     */
-    public function chofer(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
-
-    /**
-     * Get the apertura (snapshot) this recaudacion was captured in.
-     */
-    public function apertura(): BelongsTo
-    {
-        return $this->belongsTo(AperturaRecaudacion::class, 'apertura_id');
     }
 
     /**
