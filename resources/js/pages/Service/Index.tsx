@@ -608,14 +608,17 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
 
             {/* Carga rápida de kilometraje */}
             <Dialog open={kmDialogOpen} onOpenChange={(o) => !o && setKmDialogOpen(false)}>
-                <DialogContent className="sm:max-w-[420px]">
-                    <DialogHeader>
-                        <DialogTitle>Cargar kilometraje — {kmRow?.patente}</DialogTitle>
-                        <DialogDescription>
-                            Se usará como km actual si es la lectura más reciente por fecha (convive con las revisiones).
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleKmSubmit} className="grid gap-4 py-2">
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15">
+                            <Gauge className="h-5 w-5 text-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Cargar kilometraje — {kmRow?.patente}</DialogTitle>
+                            <DialogDescription className="text-xs">Se usará como km actual si es la lectura más reciente por fecha.</DialogDescription>
+                        </div>
+                    </div>
+                    <form id="km-form" onSubmit={handleKmSubmit} className="grid gap-4 px-5 py-5">
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="km_lectura">Kilometraje</Label>
@@ -641,15 +644,13 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                 <InputError message={kmForm.errors.fecha} />
                             </div>
                         </div>
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setKmDialogOpen(false)}>
-                                Cancelar
-                            </Button>
-                            <Button type="submit" disabled={kmForm.processing || kmForm.data.kilometraje === ''}>
-                                {kmForm.processing ? 'Guardando...' : 'Guardar km'}
-                            </Button>
-                        </div>
                     </form>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setKmDialogOpen(false)}>Cancelar</Button>
+                        <Button type="submit" form="km-form" disabled={kmForm.processing || kmForm.data.kilometraje === ''}>
+                            {kmForm.processing ? 'Guardando...' : 'Guardar km'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

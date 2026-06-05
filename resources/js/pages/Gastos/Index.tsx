@@ -738,18 +738,22 @@ export default function GastosIndex({
                 }}
             >
                 <DialogContent
-                    className="sm:max-w-lg"
+                    className="gap-0 overflow-hidden p-0 sm:max-w-lg"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                 >
-                    <DialogHeader>
-                        <DialogTitle>Registrar gasto</DialogTitle>
-                        <DialogDescription>
-                            Completá los datos del gasto. La distribución entre
-                            inversores se calcula automáticamente.
-                        </DialogDescription>
-                    </DialogHeader>
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                            <HandCoins className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Registrar gasto</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Completá los datos del gasto. La distribución entre inversores se calcula automáticamente.
+                            </DialogDescription>
+                        </div>
+                    </div>
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
                         <div className="flex flex-col gap-1.5">
                             <Label htmlFor="g-tipo">Tipo / Patente</Label>
                             <Combobox
@@ -855,21 +859,12 @@ export default function GastosIndex({
                         </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowModal(false)}
-                            disabled={submitting}
-                        >
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setShowModal(false)} disabled={submitting}>
                             Cancelar
                         </Button>
-                        <Button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={submitting}
-                        >
-                            {submitting ? 'Guardando...' : 'Registrar'}
+                        <Button type="button" onClick={handleSubmit} disabled={submitting}>
+                            {submitting ? 'Guardando...' : 'Registrar gasto'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -882,26 +877,21 @@ export default function GastosIndex({
                     if (!open) setConfirmDeleteId(null);
                 }}
             >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Eliminar gasto</DialogTitle>
-                        <DialogDescription>
-                            ¿Estás seguro? Esta acción no se puede deshacer y
-                            también se eliminará la distribución asignada a los
-                            inversores.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setConfirmDeleteId(null)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button variant="destructive" onClick={handleDelete}>
-                            Eliminar
-                        </Button>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+                            <Trash2 className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Eliminar gasto</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Esta acción no se puede deshacer y también eliminará la distribución asignada a los inversores.
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+                        <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

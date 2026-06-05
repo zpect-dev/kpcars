@@ -450,14 +450,18 @@ export default function CobrosIndex({
 
             {/* ─── Modal Resumen con gastos (solo lectura) ───────────────────── */}
             <Dialog open={showResumenModal} onOpenChange={setShowResumenModal}>
-                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[640px]">
-                    <DialogHeader>
-                        <DialogTitle>Resumen con gastos</DialogTitle>
-                        <DialogDescription>
-                            Cobros del período más los gastos de cada vehículo (desde el último cierre de caja), integrados por inversión. Solo lectura.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[640px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
+                            <Receipt className="h-5 w-5 text-teal-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Resumen con gastos</DialogTitle>
+                            <DialogDescription className="text-xs">Cobros del período más los gastos de cada vehículo, integrados por inversión. Solo lectura.</DialogDescription>
+                        </div>
+                    </div>
 
+                    <div className="flex max-h-[70vh] flex-col gap-4 overflow-y-auto px-5 py-5">
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3">
                         <div>
                             <p className="text-xs font-medium text-muted-foreground uppercase">
@@ -611,56 +615,38 @@ export default function CobrosIndex({
                         </div>
                     )}
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setShowResumenModal(false)}>
-                            Cerrar
-                        </Button>
+                    </div>
+                    <DialogFooter className="border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setShowResumenModal(false)}>Cerrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* ─── Modal Cierre de Caja ──────────────────────────────────────── */}
             <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirmar Cierre de Caja</DialogTitle>
-                        <DialogDescription>
-                            Se registrará el cierre del período actual y los
-                            totales quedarán congelados. Un nuevo período
-                            comenzará inmediatamente.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">
-                            Total a cerrar
-                        </p>
-                        <p className="mt-1 text-xl font-bold text-foreground">
-                            {formatARS(totalGeneral)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {resumen.length} inversión
-                            {resumen.length !== 1 ? 'es' : ''} con cobros
-                            pendientes
-                        </p>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
+                            <Lock className="h-5 w-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Confirmar cierre de caja</DialogTitle>
+                            <DialogDescription className="text-xs">Los totales quedarán congelados y comenzará un nuevo período inmediatamente.</DialogDescription>
+                        </div>
                     </div>
-
-                    <DialogFooter>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowCierreModal(false)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            type="button"
-                            onClick={handleCierre}
-                            disabled={processingCierre}
-                        >
-                            {processingCierre
-                                ? 'Procesando...'
-                                : 'Confirmar Cierre'}
+                    <div className="px-5 py-4">
+                        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase">Total a cerrar</p>
+                            <p className="mt-1 text-xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {resumen.length} inversión{resumen.length !== 1 ? 'es' : ''} con cobros pendientes
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setShowCierreModal(false)}>Cancelar</Button>
+                        <Button type="button" onClick={handleCierre} disabled={processingCierre}>
+                            {processingCierre ? 'Procesando...' : 'Confirmar cierre'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -677,17 +663,21 @@ export default function CobrosIndex({
                     }
                 }}
             >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Detalle del Cierre</DialogTitle>
-                        <DialogDescription>
-                            {selectedCierre &&
-                                formatDate(selectedCierre.created_at)}{' '}
-                            — {selectedCierre?.user?.name ?? 'N/A'}
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[640px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                            <Calendar className="h-5 w-5 text-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Detalle del cierre</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {selectedCierre && formatDate(selectedCierre.created_at)} — {selectedCierre?.user?.name ?? 'N/A'}
+                            </DialogDescription>
+                        </div>
+                    </div>
 
-                    <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+                    <div className="flex flex-col gap-4 px-5 py-4">
+                    <div className="max-h-[50vh] space-y-4 overflow-y-auto">
                         {(() => {
                             if (!selectedCierre) return null;
                             const grupos = selectedCierre.detalles.reduce(
@@ -951,37 +941,24 @@ export default function CobrosIndex({
                         })()}
                     </div>
 
-                    <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <span className="text-sm font-semibold text-muted-foreground">
-                            Total
-                        </span>
+                    <div className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
+                        <span className="text-sm font-semibold text-muted-foreground">Total</span>
                         <span className="text-lg font-bold text-foreground">
-                            {selectedCierre &&
-                                formatARS(Number(selectedCierre.total))}
+                            {selectedCierre && formatARS(Number(selectedCierre.total))}
                         </span>
                     </div>
+                    </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
                         <Button
                             variant="outline"
                             disabled={!selectedCierre}
-                            onClick={() => {
-                                if (!selectedCierre) return;
-                                window.open(
-                                    `/pdf/cierres-caja/${selectedCierre.id}`,
-                                    '_blank',
-                                );
-                            }}
+                            onClick={() => { if (!selectedCierre) return; window.open(`/pdf/cierres-caja/${selectedCierre.id}`, '_blank'); }}
                         >
                             <Download className="mr-1.5 h-4 w-4" />
                             Exportar PDF
                         </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => setSelectedCierre(null)}
-                        >
-                            Cerrar
-                        </Button>
+                        <Button variant="outline" onClick={() => setSelectedCierre(null)}>Cerrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowDownCircle, ArrowUpCircle, HandCoins } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -189,23 +189,21 @@ export default function DeudaShow({ inversion, user, movimientos, saldo, tasaAct
             </div>
 
             <Dialog open={openForm} onOpenChange={setOpenForm}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Registrar movimiento</DialogTitle>
-                        <DialogDescription>
-                            Cargo = suma a la deuda. Pago = descuenta.
-                        </DialogDescription>
-                    </DialogHeader>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                            <HandCoins className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Registrar movimiento</DialogTitle>
+                            <DialogDescription className="text-xs">Cargo = suma a la deuda. Pago = descuenta.</DialogDescription>
+                        </div>
+                    </div>
 
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                    <form id="deuda-form" onSubmit={handleSubmit} className="flex flex-col gap-4 px-5 py-5">
                         <div className="flex flex-col gap-1.5">
                             <Label htmlFor="tipo">Tipo</Label>
-                            <Select
-                                value={form.data.tipo}
-                                onValueChange={(v) =>
-                                    form.setData('tipo', v as 'cargo' | 'pago')
-                                }
-                            >
+                            <Select value={form.data.tipo} onValueChange={(v) => form.setData('tipo', v as 'cargo' | 'pago')}>
                                 <SelectTrigger id="tipo">
                                     <SelectValue />
                                 </SelectTrigger>
@@ -225,45 +223,29 @@ export default function DeudaShow({ inversion, user, movimientos, saldo, tasaAct
                                 step="0.01"
                                 min="0.01"
                                 value={form.data.monto}
-                                onChange={(e) =>
-                                    form.setData('monto', e.target.value)
-                                }
+                                onChange={(e) => form.setData('monto', e.target.value)}
                             />
                             <InputError message={form.errors.monto} />
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="descripcion">
-                                Descripción (opcional)
-                            </Label>
+                            <Label htmlFor="descripcion">Descripción (opcional)</Label>
                             <Input
                                 id="descripcion"
                                 type="text"
                                 maxLength={500}
                                 value={form.data.descripcion}
-                                onChange={(e) =>
-                                    form.setData('descripcion', e.target.value)
-                                }
+                                onChange={(e) => form.setData('descripcion', e.target.value)}
                             />
                             <InputError message={form.errors.descripcion} />
                         </div>
-
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setOpenForm(false)}
-                            >
-                                Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={form.processing || !form.data.monto}
-                            >
-                                {form.processing ? 'Guardando...' : 'Registrar'}
-                            </Button>
-                        </DialogFooter>
                     </form>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setOpenForm(false)}>Cancelar</Button>
+                        <Button type="submit" form="deuda-form" disabled={form.processing || !form.data.monto}>
+                            {form.processing ? 'Guardando...' : 'Registrar'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

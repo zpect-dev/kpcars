@@ -136,24 +136,28 @@ export default function RecaudacionesIndex({ filas, totalGeneral, ultimoCierre }
 
             {/* Modal confirmar cierre */}
             <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirmar cierre de recaudaciones</DialogTitle>
-                        <DialogDescription>
-                            Se registrará el cierre del período actual y los valores quedarán
-                            congelados. Un nuevo período comenzará inmediatamente.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Total a cerrar</p>
-                        <p className="mt-1 text-xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {filas.length} vehículo{filas.length !== 1 ? 's' : ''}
-                        </p>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
+                            <Lock className="h-5 w-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Cerrar período</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Los valores quedarán congelados y comenzará un nuevo período inmediatamente.
+                            </DialogDescription>
+                        </div>
                     </div>
-
-                    <DialogFooter>
+                    <div className="px-5 py-4">
+                        <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
+                            <p className="text-xs font-medium text-muted-foreground uppercase">Total a cerrar</p>
+                            <p className="mt-1 text-xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {filas.length} vehículo{filas.length !== 1 ? 's' : ''}
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
                         <Button type="button" variant="outline" onClick={() => setShowCierreModal(false)}>
                             Cancelar
                         </Button>

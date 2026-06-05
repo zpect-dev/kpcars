@@ -76,11 +76,17 @@ export function ResumenRecaudacionModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[480px]">
-                <DialogHeader>
-                    <DialogTitle>Resumen de recaudaciones</DialogTitle>
-                    <DialogDescription>Total recaudado por inversión.</DialogDescription>
-                </DialogHeader>
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
+                        <TrendingUp className="h-5 w-5 text-teal-500" />
+                    </div>
+                    <div className="flex-1">
+                        <DialogTitle className="text-base font-semibold">Resumen de recaudaciones</DialogTitle>
+                        <DialogDescription className="text-xs">Total recaudado por inversión.</DialogDescription>
+                    </div>
+                </div>
+                <div className="max-h-[60vh] overflow-y-auto">
                 {resumen.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">No hay recaudaciones cargadas.</p>
                 ) : (
@@ -109,7 +115,8 @@ export function ResumenRecaudacionModal({
                         </table>
                     </div>
                 )}
-                <DialogFooter>
+                </div>
+                <DialogFooter className="border-t border-border px-5 py-4">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cerrar</Button>
                 </DialogFooter>
             </DialogContent>
@@ -373,7 +380,7 @@ function RecaudacionRow({
     }
 
     function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); save(); }
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
     }
 
     return (

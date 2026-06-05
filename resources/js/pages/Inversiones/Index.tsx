@@ -527,15 +527,18 @@ function ManageDialog({
 
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="sm:max-w-160">
-                <DialogHeader>
-                    <DialogTitle>{inversion.nombre}</DialogTitle>
-                    <DialogDescription>
-                        Marca los inversores que pertenecen a esta inversión y
-                        sus roles. Los cambios se guardan al confirmar.
-                    </DialogDescription>
-                </DialogHeader>
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-160">
+                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
+                        <HandCoins className="h-5 w-5 text-violet-500" />
+                    </div>
+                    <div className="flex-1">
+                        <DialogTitle className="text-base font-semibold">{inversion.nombre}</DialogTitle>
+                        <DialogDescription className="text-xs">Marca los inversores que pertenecen a esta inversión y sus roles. Los cambios se guardan al confirmar.</DialogDescription>
+                    </div>
+                </div>
 
+                <div className="flex flex-col gap-4 px-5 py-5">
                 <div className="flex items-center justify-between gap-3">
                     <input
                         type="text"
@@ -698,21 +701,11 @@ function ManageDialog({
                         {error}
                     </div>
                 )}
+                </div>
 
-                <DialogFooter className="gap-2 sm:gap-2">
-                    <Button
-                        variant="outline"
-                        onClick={onClose}
-                        disabled={processing}
-                    >
-                        Cancelar
-                    </Button>
-                    <Button
-                        onClick={handleSave}
-                        disabled={
-                            processing || seleccionados.length > maxInversores
-                        }
-                    >
+                <DialogFooter className="border-t border-border px-5 py-4 gap-2 sm:gap-2">
+                    <Button variant="outline" onClick={onClose} disabled={processing}>Cancelar</Button>
+                    <Button onClick={handleSave} disabled={processing || seleccionados.length > maxInversores}>
                         {processing ? 'Guardando...' : 'Guardar cambios'}
                     </Button>
                 </DialogFooter>

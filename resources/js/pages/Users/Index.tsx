@@ -116,10 +116,11 @@ function AvatarDropzone({
     );
 }
 
-type FilterAlertValue = 'all' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito';
+type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito';
 
 const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     all:                  'Todos',
+    licencia_vencida:     'Lic. vencida',
     licencia_por_vencer:  'Lic. por vencer',
     sin_licencia:         'Sin licencia',
     falta_foto:           'Sin foto',
@@ -132,8 +133,9 @@ const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: s
     {
         label: 'Licencia',
         items: [
-            { val: 'licencia_por_vencer', label: 'Próxima a vencer',    desc: 'Vence en los próximos 30 días' },
-            { val: 'sin_licencia',        label: 'Sin fecha cargada',    desc: 'No tiene vencimiento registrado' },
+            { val: 'licencia_vencida',     label: 'Vencida',           desc: 'La licencia ya está vencida' },
+            { val: 'licencia_por_vencer',  label: 'Próxima a vencer',  desc: 'Vence en los próximos 30 días' },
+            { val: 'sin_licencia',         label: 'Sin fecha cargada', desc: 'No tiene vencimiento registrado' },
         ],
     },
     {
@@ -225,6 +227,13 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         }
         if (filterRole === 'chofer' && filterAlert !== 'all') {
             result = result.filter((u) => {
+                if (filterAlert === 'licencia_vencida') {
+                    if (!u.fecha_vencimiento_licencia) return false;
+                    const today = new Date(); today.setHours(0, 0, 0, 0);
+                    const parts = u.fecha_vencimiento_licencia.split('-').map(Number);
+                    const fecha = new Date(parts[0], parts[1] - 1, parts[2]);
+                    return fecha < today;
+                }
                 if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
                 if (filterAlert === 'sin_licencia') return u.sin_licencia === true;
                 if (filterAlert === 'falta_foto') return u.falta_foto === true;
@@ -238,8 +247,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0 };
+        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0 };
+        const today = new Date(); today.setHours(0, 0, 0, 0);
         return {
+            licencia_vencida: users.filter((u) => {
+                if (!u.fecha_vencimiento_licencia) return false;
+                const parts = u.fecha_vencimiento_licencia.split('-').map(Number);
+                return new Date(parts[0], parts[1] - 1, parts[2]) < today;
+            }).length,
             licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
             sin_licencia: users.filter((u) => u.sin_licencia).length,
             falta_foto: users.filter((u) => u.falta_foto).length,

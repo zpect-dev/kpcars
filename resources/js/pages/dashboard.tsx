@@ -330,6 +330,7 @@ active.inversion_id = inversionId;
         setFilterTitular('');
         setFilterVtv('');
         setFilterGnc('');
+        setOpenFilterSection({});
     }
 
     const hasActiveFilters = !!(
@@ -653,52 +654,30 @@ params.set('search', search.trim());
                                         </Button>
                                     </DialogTrigger>
                                 )}
-                                <DialogContent className="sm:max-w-[425px]">
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Importar Asignaciones
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Sube un archivo Excel (.xlsx, .csv)
-                                            con las columnas: patente, chofer,
-                                            fecha_inicio, fecha_fin.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <form
-                                        onSubmit={handleImport}
-                                        className="grid gap-4 py-4"
-                                    >
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="file">
-                                                Archivo
-                                            </Label>
+                                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
+                                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15">
+                                            <FileUp className="h-5 w-5 text-blue-500" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <DialogTitle className="text-base font-semibold">Importar asignaciones</DialogTitle>
+                                            <DialogDescription className="text-xs">Sube un archivo Excel (.xlsx, .csv) con las columnas: patente, chofer, fecha_inicio, fecha_fin.</DialogDescription>
+                                        </div>
+                                    </div>
+                                    <form onSubmit={handleImport} className="flex flex-col gap-4 px-5 py-5">
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="file">Archivo</Label>
                                             <Input
                                                 id="file"
                                                 type="file"
                                                 accept=".xlsx,.xls,.csv"
-                                                onChange={(e) =>
-                                                    importForm.setData(
-                                                        'file',
-                                                        e.target.files?.[0] ||
-                                                            null,
-                                                    )
-                                                }
+                                                onChange={(e) => importForm.setData('file', e.target.files?.[0] || null)}
                                             />
-                                            <InputError
-                                                message={importForm.errors.file}
-                                            />
+                                            <InputError message={importForm.errors.file} />
                                         </div>
-                                        <div className="flex justify-end pt-2">
-                                            <Button
-                                                type="submit"
-                                                disabled={
-                                                    importForm.processing ||
-                                                    !importForm.data.file
-                                                }
-                                            >
-                                                {importForm.processing
-                                                    ? 'Importando...'
-                                                    : 'Importar'}
+                                        <div className="flex justify-end">
+                                            <Button type="submit" disabled={importForm.processing || !importForm.data.file}>
+                                                {importForm.processing ? 'Importando...' : 'Importar'}
                                             </Button>
                                         </div>
                                     </form>
@@ -725,16 +704,20 @@ params.set('search', search.trim());
                                             </span>
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[420px]">
-                                        <DialogHeader>
-                                            <DialogTitle>Nueva inversión</DialogTitle>
-                                            <DialogDescription>
-                                                Se creará en la empresa activa
-                                                {empresaActivaNombre ? ` (${empresaActivaNombre})` : ''}.
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <form onSubmit={handleCreateInversion} className="grid gap-4 py-2">
-                                            <div className="grid gap-2">
+                                    <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
+                                        <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+                                                <Wallet className="h-5 w-5 text-emerald-500" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <DialogTitle className="text-base font-semibold">Nueva inversión</DialogTitle>
+                                                <DialogDescription className="text-xs">
+                                                    Se creará en la empresa activa{empresaActivaNombre ? ` (${empresaActivaNombre})` : ''}.
+                                                </DialogDescription>
+                                            </div>
+                                        </div>
+                                        <form onSubmit={handleCreateInversion} className="flex flex-col gap-4 px-5 py-5">
+                                            <div className="flex flex-col gap-1.5">
                                                 <Label htmlFor="inversion_nombre">Nombre</Label>
                                                 <Input
                                                     id="inversion_nombre"
@@ -747,17 +730,8 @@ params.set('search', search.trim());
                                                 <InputError message={inversionForm.errors.nombre} />
                                             </div>
                                             <div className="flex justify-end gap-2">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    onClick={() => setIsCreateInversionOpen(false)}
-                                                >
-                                                    Cancelar
-                                                </Button>
-                                                <Button
-                                                    type="submit"
-                                                    disabled={inversionForm.processing || inversionForm.data.nombre.trim() === ''}
-                                                >
+                                                <Button type="button" variant="outline" onClick={() => setIsCreateInversionOpen(false)}>Cancelar</Button>
+                                                <Button type="submit" disabled={inversionForm.processing || inversionForm.data.nombre.trim() === ''}>
                                                     {inversionForm.processing ? 'Creando...' : 'Crear inversión'}
                                                 </Button>
                                             </div>
@@ -768,7 +742,7 @@ params.set('search', search.trim());
 
                             <Dialog
                                 open={isCreateOpen}
-                                onOpenChange={setIsCreateOpen}
+                                onOpenChange={(o) => { setIsCreateOpen(o); if (!o) createForm.reset(); }}
                             >
                                 <DialogTrigger asChild>
                                     <Button size="sm">
@@ -1531,7 +1505,7 @@ params.set('search', search.trim());
             {/* Edit Dialog */}
             <Dialog
                 open={editingVehiculo !== null}
-                onOpenChange={(open) => !open && setEditingVehiculo(null)}
+                onOpenChange={(open) => { if (!open) { setEditingVehiculo(null); editForm.reset(); } }}
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
@@ -1562,28 +1536,21 @@ params.set('search', search.trim());
                 open={unassigningVehiculo !== null}
                 onOpenChange={(open) => !open && setUnassigningVehiculo(null)}
             >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Desasignar Conductor</DialogTitle>
-                        <DialogDescription>
-                            ¿Está seguro que desea desasignar al conductor{' '}
-                            <span className="font-semibold text-foreground">
-                                {unassigningVehiculo?.user?.name}
-                            </span>{' '}
-                            del vehículo{' '}
-                            <span className="font-semibold text-foreground">
-                                {unassigningVehiculo?.patente}
-                            </span>
-                            ?
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setUnassigningVehiculo(null)}>
-                            Cancelar
-                        </Button>
-                        <Button variant="destructive" onClick={handleUnassign}>
-                            Desasignar
-                        </Button>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                            <UserX className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Desasignar conductor</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Se desvinculará a <span className="font-semibold text-foreground">{unassigningVehiculo?.user?.name}</span> del vehículo <span className="font-semibold text-foreground">{unassigningVehiculo?.patente}</span>.
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setUnassigningVehiculo(null)}>Cancelar</Button>
+                        <Button variant="destructive" onClick={handleUnassign}>Desasignar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1593,24 +1560,21 @@ params.set('search', search.trim());
                 open={deletingVehiculo !== null}
                 onOpenChange={(open) => !open && setDeletingVehiculo(null)}
             >
-                <DialogContent className="sm:max-w-[425px]">
-                    <DialogHeader>
-                        <DialogTitle>Eliminar Vehículo</DialogTitle>
-                        <DialogDescription>
-                            ¿Está seguro que desea eliminar el vehículo{' '}
-                            <span className="font-semibold text-foreground">
-                                {deletingVehiculo?.patente}
-                            </span>
-                            ? Esta acción no se puede deshacer.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingVehiculo(null)}>
-                            Cancelar
-                        </Button>
-                        <Button variant="destructive" onClick={handleDelete}>
-                            Eliminar
-                        </Button>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
+                            <Trash2 className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Eliminar vehículo</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Se eliminará <span className="font-semibold text-foreground">{deletingVehiculo?.patente}</span> permanentemente. Esta acción no se puede deshacer.
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setDeletingVehiculo(null)}>Cancelar</Button>
+                        <Button variant="destructive" onClick={handleDelete}>Eliminar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1620,25 +1584,29 @@ params.set('search', search.trim());
                 open={estadoPatenteVehiculo !== null}
                 onOpenChange={(open) => !open && setEstadoPatenteVehiculo(null)}
             >
-                <DialogContent className="sm:max-w-[400px]">
-                    <DialogHeader>
-                        <DialogTitle>Estado de la patente</DialogTitle>
-                        <DialogDescription>
-                            {estadoPatenteVehiculo?.patente} — elegí el estado de la patente.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-2 py-2">
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[360px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                            <Car className="h-5 w-5 text-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Estado de la patente</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {estadoPatenteVehiculo?.patente} — {estadoPatenteVehiculo?.marca} {estadoPatenteVehiculo?.modelo}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-2 p-4">
                         {ESTADO_PATENTE_OPCIONES.map((opt) => {
                             const b = estadoPatenteBadge(opt.value);
                             const selected = estadoPatenteVehiculo?.estado_patente === opt.value;
-
                             return (
                                 <button
                                     key={opt.value}
                                     type="button"
                                     onClick={() => setEstadoPatente(opt.value)}
                                     className={cn(
-                                        'flex items-center justify-between rounded-md border px-4 py-3 text-sm font-medium transition-all',
+                                        'flex items-center justify-between rounded-xl border px-4 py-3 text-sm font-medium transition-all',
                                         selected
                                             ? 'border-primary bg-primary/10 text-foreground'
                                             : 'border-border bg-card text-muted-foreground hover:bg-muted',
