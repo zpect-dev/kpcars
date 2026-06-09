@@ -169,6 +169,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
 
         // PDFs/Excels financieros y de cierres
+        Route::get('pdf/recaudaciones-actuales', [PdfController::class, 'recaudacionesActuales'])->name('pdf.recaudaciones-actuales');
+        Route::get('excel/recaudaciones-actuales', [ExcelController::class, 'recaudacionesActuales'])->name('excel.recaudaciones-actuales');
         Route::get('pdf/recaudaciones-deudores', [PdfController::class, 'recaudacionesDeudores'])->name('pdf.recaudaciones-deudores');
         Route::get('pdf/recaudaciones-deudores/cierre/{cierreRecaudacion}', [PdfController::class, 'recaudacionesDeudoresCierre'])->name('pdf.recaudaciones-deudores-cierre');
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');

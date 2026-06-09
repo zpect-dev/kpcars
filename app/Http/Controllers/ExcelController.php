@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\BuildResumenIntegradoAction;
+use App\Models\AperturaRecaudacion;
 use App\Models\CierreGasto;
 use App\Models\CierreInversion;
 use App\Models\CierreInversionPago;
 use App\Models\Cobro;
 use App\Models\DeudaMovimiento;
+use App\Models\Recaudacion;
 use Illuminate\Http\Request;
 use Spatie\SimpleExcel\SimpleExcelWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -249,6 +251,46 @@ class ExcelController extends Controller
                 round((float) $row->subtotal, 2),
             ]);
         }
+
+        return $writer->toBrowser();
+    }
+
+    /**
+     * Excel del período actual de recaudaciones, agrupado por inversión.
+     */
+    public function recaudacionesActuales(Request $request): StreamedResponse
+    {
+        $apertura = AperturaRecaudacion::abierta()
+            ->with([
+                'recaudaciones.vehiculo:id,patente,inversion_id',
+                'recaudaciones.vehiculo.inversion:id,nombre',
+                'recaudaciones.chofer:id,name',
+            ])
+            ->latest()
+            ->first();
+
+        $filas = ($apertura?->recaudaciones ?? collect())
+            ->map(fn (Recaudacion $r) => [
+                'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente'   => $r->vehiculo?->patente ?? 'N/A',
+                'chofer'    => $r->chofer?->name ?? 'N/A',
+                'efectivo'  => round((float) $r->efectivo, 2),
+                'transf'    => round((float) $r->transferencia, 2),
+                'total'     => round((float) $r->total, 2),
+                'estado'    => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+            ])
+            ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
+            ->values();
+
+        $filename = 'recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.xlsx';
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Inversión', 'Patente', 'Chofer', 'Efectivo', 'Transferencia', 'Total', 'Estado']);
+
+        foreach ($filas as $f) {
+            $writer->addRow([$f['inversion'], $f['patente'], $f['chofer'], $f['efectivo'], $f['transf'], $f['total'], $f['estado']]);
+        }
+
+        $writer->addRow(['', '', 'TOTAL', $filas->sum('efectivo'), $filas->sum('transf'), $filas->sum('total'), '']);
 
         return $writer->toBrowser();
     }

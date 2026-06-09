@@ -16,6 +16,7 @@ use App\Models\CierreRecaudacion;
 use App\Models\Cobro;
 use App\Models\DeudaMovimiento;
 use App\Models\Recaudacion;
+use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
@@ -51,6 +52,44 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cierre-gastos-'.$cierre->id.'-'.$cierre->periodo_fin->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * PDF del período actual de recaudaciones, agrupado por inversión.
+     */
+    public function recaudacionesActuales(Request $request): Response
+    {
+        $apertura = AperturaRecaudacion::abierta()
+            ->with([
+                'recaudaciones.vehiculo:id,patente,inversion_id',
+                'recaudaciones.vehiculo.inversion:id,nombre',
+                'recaudaciones.chofer:id,name',
+            ])
+            ->latest()
+            ->first();
+
+        $filas = ($apertura?->recaudaciones ?? collect())
+            ->map(fn (Recaudacion $r) => [
+                'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente'   => $r->vehiculo?->patente ?? 'N/A',
+                'chofer'    => $r->chofer?->name ?? 'N/A',
+                'efectivo'  => (float) $r->efectivo,
+                'transf'    => (float) $r->transferencia,
+                'total'     => (float) $r->total,
+                'estado'    => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+            ])
+            ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
+            ->values();
+
+        $porInversion = $filas->groupBy('inversion')->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
+        $totalEfectivo = $filas->sum('efectivo');
+        $totalTransferencia = $filas->sum('transf');
+        $totalGeneral = $filas->sum('total');
+
+        $pdf = Pdf::loadView('pdf.recaudaciones-periodo-actual', compact('porInversion', 'totalEfectivo', 'totalTransferencia', 'totalGeneral'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**

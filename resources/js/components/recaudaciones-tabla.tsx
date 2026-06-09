@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail } from 'lucide-react';
+import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -200,10 +200,12 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
     }, [filas, search, estadoFiltro, sortKey, sortDir]);
 
     const stats = useMemo(() => ({
-        total:      filtradas.reduce((s, f) => s + Number(f.total), 0),
-        pagados:    filtradas.filter((f) => f.estado === 'pagado').length,
-        deudores:   filtradas.filter((f) => f.estado === 'deuda').length,
-        totalDeuda: filtradas.reduce((s, f) => s + Number(f.deuda), 0),
+        total:        filtradas.reduce((s, f) => s + Number(f.total), 0),
+        efectivo:     filtradas.reduce((s, f) => s + Number(f.efectivo), 0),
+        transferencia:filtradas.reduce((s, f) => s + Number(f.transferencia), 0),
+        pagados:      filtradas.filter((f) => f.estado === 'pagado').length,
+        deudores:     filtradas.filter((f) => f.estado === 'deuda').length,
+        totalDeuda:   filtradas.reduce((s, f) => s + Number(f.deuda), 0),
     }), [filtradas]);
 
     return (
@@ -256,14 +258,32 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
 
             {/* Stats */}
             {filtradas.length > 0 && (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                     <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                             <TrendingUp className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground">Recaudado</p>
+                            <p className="text-xs text-muted-foreground">Total</p>
                             <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.total)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 shadow-sm">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
+                            <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs text-emerald-700 dark:text-emerald-400">Efectivo</p>
+                            <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.efectivo)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 shadow-sm">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
+                            <ArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-xs text-blue-700 dark:text-blue-400">Transferencia</p>
+                            <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.transferencia)}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 px-4 py-3 shadow-sm">

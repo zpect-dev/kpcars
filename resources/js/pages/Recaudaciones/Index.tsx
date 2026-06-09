@@ -1,8 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import {
+    ChevronDown,
     ClipboardList,
     Coins,
+    Download,
     FileDown,
+    FileSpreadsheet,
     History,
     Lock,
     Unlock,
@@ -15,6 +18,12 @@ import {
     ResumenRecaudacionModal,
 } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -61,6 +70,7 @@ export default function RecaudacionesIndex({
         () => filas.some((f) => f.estado === 'deuda'),
         [filas],
     );
+
 
     function handleCierre() {
         setProcessingCierre(true);
@@ -143,20 +153,32 @@ export default function RecaudacionesIndex({
                                     <ClipboardList className="mr-1.5 h-4 w-4" />
                                     Resumen
                                 </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() =>
-                                        window.open(
-                                            '/pdf/recaudaciones-deudores',
-                                            '_blank',
-                                        )
-                                    }
-                                    disabled={!hayDeudores}
-                                >
-                                    <FileDown className="mr-1.5 h-4 w-4" />
-                                    Imprimir deudores
-                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" disabled={filas.length === 0}>
+                                            <Download className="mr-1.5 h-4 w-4" />
+                                            Exportar
+                                            <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => window.open('/pdf/recaudaciones-actuales', '_blank')}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            PDF período actual
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => window.open('/excel/recaudaciones-actuales', '_blank')}>
+                                            <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                            Excel período actual
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            onClick={() => window.open('/pdf/recaudaciones-deudores', '_blank')}
+                                            disabled={!hayDeudores}
+                                        >
+                                            <FileDown className="mr-2 h-4 w-4" />
+                                            PDF deudores
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                                 {isAdmin && (
                                     <Button
                                         size="sm"
