@@ -23,6 +23,21 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // La tabla de cierres puede faltar según el historial de migraciones de
+        // cada entorno (registro presente pero tabla ausente). Se asegura aquí
+        // para que esta migración sea auto-suficiente e idempotente.
+        if (! Schema::hasTable('cierres_gastos')) {
+            Schema::create('cierres_gastos', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('empresa_id')->nullable()->constrained('empresas')->nullOnDelete();
+                $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+                $table->dateTime('periodo_inicio')->nullable();
+                $table->dateTime('periodo_fin');
+                $table->decimal('total_general', 14, 2)->default(0);
+                $table->timestamps();
+            });
+        }
+
         Schema::table('gastos', function (Blueprint $table) {
             if (! Schema::hasColumn('gastos', 'cierre_gasto_id')) {
                 $table->foreignId('cierre_gasto_id')
@@ -40,21 +55,45 @@ return new class extends Migration
         });
 
         // Columnas de un diseño previo abandonado: el desglose ahora se deriva.
-        Schema::table('cierres_gastos', function (Blueprint $table) {
-            foreach (['tipo_cierre', 'empresa_nombre', 'lote'] as $col) {
-                if (Schema::hasColumn('cierres_gastos', $col)) {
-                    $table->dropColumn($col);
+        if (Schema::hasTable('cierres_gastos')) {
+            Schema::table('cierres_gastos', function (Blueprint $table) {
+                foreach (['tipo_cierre', 'empresa_nombre', 'lote'] as $col) {
+                    if (Schema::hasColumn('cierres_gastos', $col)) {
+                        $table->dropColumn($col);
+                    }
                 }
-            }
-        });
+            });
+        }
 
         Schema::dropIfExists('cierres_gastos_detalles');
         Schema::dropIfExists('gasto_distribuciones');
 
-        // Reset de la data de prueba para arrancar consistente: todos los gastos
-        // vuelven a "pendiente" y se descartan los cierres previos (sin histórico).
-        DB::table('gastos')->update(['cierre_gasto_id' => null]);
-        DB::table('cierres_gastos')->delete();
+        // En entornos donde `cierre_gasto_id` ya existía (intento previo) puede
+        // haber quedado sin la FK ON DELETE SET NULL, de la que depende reabrir
+        // un período al borrar su cierre. Se reasegura sólo en MySQL (en SQLite
+        // la FK se define al crear la columna y este bloque no aplica).
+        if (DB::getDriverName() === 'mysql') {
+            // Limpia vínculos a cierres inexistentes (vuelven a "pendiente")
+            // para no violar la integridad referencial al (re)crear la FK.
+            DB::statement('UPDATE gastos SET cierre_gasto_id = NULL WHERE cierre_gasto_id IS NOT NULL AND cierre_gasto_id NOT IN (SELECT id FROM cierres_gastos)');
+
+            $fkExiste = ! empty(DB::select(<<<'SQL'
+                SELECT 1 FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'gastos'
+                  AND COLUMN_NAME = 'cierre_gasto_id'
+                  AND REFERENCED_TABLE_NAME = 'cierres_gastos'
+                LIMIT 1
+            SQL));
+
+            if (! $fkExiste) {
+                Schema::table('gastos', function (Blueprint $table) {
+                    $table->foreign('cierre_gasto_id')
+                        ->references('id')->on('cierres_gastos')
+                        ->nullOnDelete();
+                });
+            }
+        }
     }
 
     public function down(): void
