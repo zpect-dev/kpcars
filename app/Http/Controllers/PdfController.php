@@ -34,17 +34,9 @@ class PdfController extends Controller
     public function cierreGasto(Request $request, CierreGasto $cierreGasto): Response
     {
         // Acceso: middleware role:administrador.
-        $cierreGasto->load(['user:id,name', 'detalles']);
+        $cierreGasto->load('user:id,name');
 
-        $porTipo = $cierreGasto->detalles
-            ->where('tipo', '!=', 'vehiculo')
-            ->sortBy('tipo')
-            ->values();
-
-        $porVehiculo = $cierreGasto->detalles
-            ->where('tipo', 'vehiculo')
-            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
-            ->values();
+        ['porTipo' => $porTipo, 'porVehiculo' => $porVehiculo] = $cierreGasto->desglose();
 
         $cierre = $cierreGasto;
 

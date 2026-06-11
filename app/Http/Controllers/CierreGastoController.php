@@ -22,7 +22,7 @@ class CierreGastoController extends Controller
         $this->authorize('viewAny', CierreGasto::class);
 
         $cierres = CierreGasto::with('user:id,name')
-            ->withCount('detalles')
+            ->withCount('gastos')
             ->orderByDesc('periodo_fin')
             ->paginate(20)
             ->through(fn (CierreGasto $c) => [
@@ -30,7 +30,7 @@ class CierreGastoController extends Controller
                 'periodo_inicio' => $c->periodo_inicio?->toIso8601String(),
                 'periodo_fin' => $c->periodo_fin?->toIso8601String(),
                 'total_general' => (float) $c->total_general,
-                'detalles_count' => $c->detalles_count,
+                'gastos_count' => $c->gastos_count,
                 'ejecutado_por' => $c->user?->name,
                 'created_at' => $c->created_at?->toIso8601String(),
             ]);
@@ -64,25 +64,14 @@ class CierreGastoController extends Controller
     {
         $this->authorize('view', $cierreGasto);
 
-        $cierreGasto->load(['user:id,name', 'detalles']);
+        $cierreGasto->load('user:id,name');
 
-        $porTipo = $cierreGasto->detalles
-            ->where('tipo', '!=', 'vehiculo')
-            ->sortBy('tipo')
-            ->values()
-            ->map(fn ($d) => [
-                'tipo' => $d->tipo,
-                'total' => (float) $d->total,
-            ]);
+        ['porTipo' => $porTipo, 'porVehiculo' => $porVehiculo] = $cierreGasto->desglose();
 
-        $porVehiculo = $cierreGasto->detalles
-            ->where('tipo', 'vehiculo')
-            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
-            ->values()
-            ->map(fn ($d) => [
-                'patente' => $d->patente ?? '—',
-                'total' => (float) $d->total,
-            ]);
+        $porVehiculo = $porVehiculo->map(fn (object $d) => (object) [
+            'patente' => $d->patente ?? '—',
+            'total' => $d->total,
+        ]);
 
         return Inertia::render('CierresGasto/Show', [
             'cierre' => [

@@ -84,26 +84,20 @@ class ExcelController extends Controller
     public function cierreGasto(Request $request, CierreGasto $cierreGasto): StreamedResponse
     {
         // Acceso: middleware role:administrador.
-        $cierreGasto->load('detalles');
+        ['porTipo' => $porTipo, 'porVehiculo' => $porVehiculo] = $cierreGasto->desglose();
 
         $filename = 'cierre-gastos-'.$cierreGasto->id.'-'.$cierreGasto->periodo_fin->format('Y-m-d').'.xlsx';
 
         $writer = SimpleExcelWriter::streamDownload($filename);
         $writer->addHeader(['Categoría', 'Detalle', 'Monto ARS']);
 
-        $cierreGasto->detalles
-            ->where('tipo', '!=', 'vehiculo')
-            ->sortBy('tipo')
-            ->each(function ($d) use ($writer) {
-                $writer->addRow([ucfirst($d->tipo), '', round((float) $d->total, 2)]);
-            });
+        $porTipo->each(function (object $d) use ($writer) {
+            $writer->addRow([ucfirst($d->tipo), '', round($d->total, 2)]);
+        });
 
-        $cierreGasto->detalles
-            ->where('tipo', 'vehiculo')
-            ->sortBy('patente', SORT_NATURAL | SORT_FLAG_CASE)
-            ->each(function ($d) use ($writer) {
-                $writer->addRow(['Vehículo', $d->patente ?? '—', round((float) $d->total, 2)]);
-            });
+        $porVehiculo->each(function (object $d) use ($writer) {
+            $writer->addRow(['Vehículo', $d->patente ?? '—', round($d->total, 2)]);
+        });
 
         $writer->addRow(['TOTAL', '', round((float) $cierreGasto->total_general, 2)]);
 

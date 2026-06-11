@@ -7,7 +7,7 @@ interface Cierre {
     periodo_inicio: string | null;
     periodo_fin: string;
     total_general: number;
-    detalles_count: number;
+    gastos_count: number;
     ejecutado_por: string | null;
     created_at: string | null;
 }

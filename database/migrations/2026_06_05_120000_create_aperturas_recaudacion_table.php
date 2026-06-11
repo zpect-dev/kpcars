@@ -56,11 +56,13 @@ return new class extends Migration
     {
         // Rellena el chofer snapshot de TODAS las recaudaciones (abiertas y cerradas)
         // a partir del chofer actual del vehículo, para coherencia del histórico.
+        // Subconsulta correlacionada (portable MySQL/SQLite) en vez de UPDATE..JOIN.
         DB::statement(<<<'SQL'
-            UPDATE recaudaciones r
-            JOIN vehiculos v ON v.id = r.vehiculo_id
-            SET r.user_id = v.user_id
-            WHERE r.user_id IS NULL
+            UPDATE recaudaciones
+            SET user_id = (
+                SELECT v.user_id FROM vehiculos v WHERE v.id = recaudaciones.vehiculo_id
+            )
+            WHERE user_id IS NULL
         SQL);
 
         // Por cada empresa con filas abiertas sin apertura, crea una apertura

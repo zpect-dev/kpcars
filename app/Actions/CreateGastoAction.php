@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Models\Gasto;
-use App\Models\GastoDistribucion;
 use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
@@ -33,17 +32,13 @@ class CreateGastoAction
         return DB::transaction(function () use ($data) {
             $gasto = Gasto::create($data);
 
-            $distribuciones = $this->calcularDistribuciones($gasto);
+            // El reparto entre inversores se congela en la propia fila del gasto
+            // (columna JSON). Así el histórico no cambia si luego varía el estado
+            // de deuda de los inversores.
+            $gasto->distribucion = $this->calcularDistribuciones($gasto);
+            $gasto->save();
 
-            foreach ($distribuciones as $userId => $monto) {
-                GastoDistribucion::create([
-                    'gasto_id' => $gasto->id,
-                    'user_id' => $userId,
-                    'monto' => $monto,
-                ]);
-            }
-
-            return $gasto->load('distribuciones.user:id,name', 'vehiculo:id,patente,marca,modelo');
+            return $gasto->load('vehiculo:id,patente,marca,modelo');
         });
     }
 

@@ -9,6 +9,7 @@ use App\Models\Empresa;
 use App\Models\Gasto;
 use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
+use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,11 +24,10 @@ class GastoController extends Controller
         $this->authorize('viewAny', Gasto::class);
 
         // Vista GLOBAL: ignora la empresa activa para mostrar en simultáneo los
-        // totales de todas las empresas. Cada gasto de vehículo se considera
-        // pendiente contra el cierre de su propia empresa (scopePendientesGlobal).
+        // totales de todas las empresas. Pendiente = gasto aún sin cierre.
         $gastosColl = Gasto::query()
             ->withoutGlobalScope(GastoTenantScope::class)
-            ->pendientesGlobal()
+            ->pendientes()
             ->with([
                 'user:id,name',
                 // Vehículo e inversión son globales aquí: hay que ignorar el
@@ -38,11 +38,28 @@ class GastoController extends Controller
                 'vehiculo.inversion' => fn ($q) => $q
                     ->withoutGlobalScope(TenantScope::class)
                     ->select('id', 'nombre'),
-                'distribuciones.user:id,name',
             ])
             ->latest('fecha')
             ->latest('id')
             ->get();
+
+        // Nombres de los inversores presentes en los repartos (un solo query).
+        $userIds = $gastosColl
+            ->flatMap(fn (Gasto $g) => array_keys($g->distribucion ?? []))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+        $nombres = $userIds === []
+            ? collect()
+            : User::whereIn('id', $userIds)->pluck('name', 'id');
+
+        $mapDistribucion = fn (?array $dist) => collect($dist ?? [])
+            ->map(fn ($monto, $userId) => [
+                'user_id' => (int) $userId,
+                'user_name' => $nombres[(int) $userId] ?? null,
+                'monto' => (float) $monto,
+            ])
+            ->values();
 
         $mapGasto = fn (Gasto $g) => [
             'id' => $g->id,
@@ -63,11 +80,7 @@ class GastoController extends Controller
                 ]
                 : null,
             'registrado_por' => $g->user?->name,
-            'distribuciones' => $g->distribuciones->map(fn ($d) => [
-                'user_id' => $d->user_id,
-                'user_name' => $d->user?->name,
-                'monto' => (float) $d->monto,
-            ])->values(),
+            'distribuciones' => $mapDistribucion($g->distribucion),
             'mi_monto' => null,
         ];
 

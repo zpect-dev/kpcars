@@ -66,20 +66,54 @@ it('crea un cierre con el snapshot por tipo y por patente', function () {
     expect($cierre)->not->toBeNull()
         ->and((float) $cierre->total_general)->toBe(3100.0);
 
-    $detalles = $cierre->detalles;
-    // 3 categorías + 2 vehículos
-    expect($detalles)->toHaveCount(5);
+    // Los gastos quedaron archivados (vinculados al cierre).
+    expect(Gasto::where('cierre_gasto_id', $cierre->id)->count())->toBe(6);
 
-    $porTipo = $detalles->where('tipo', '!=', 'vehiculo')->pluck('total', 'tipo')
-        ->map(fn ($v) => (float) $v);
-    expect($porTipo['galpon'])->toBe(1000.0)
-        ->and($porTipo['taller'])->toBe(500.0)
-        ->and($porTipo['oficina'])->toBe(200.0);
+    // El desglose se deriva de los gastos, sin tablas auxiliares.
+    ['porTipo' => $porTipo, 'porVehiculo' => $porVehiculo] = $cierre->desglose();
+    expect($porTipo)->toHaveCount(3)
+        ->and($porVehiculo)->toHaveCount(2);
 
-    $porPatente = $detalles->where('tipo', 'vehiculo')->pluck('total', 'patente')
-        ->map(fn ($v) => (float) $v);
-    expect($porPatente['AAA111'])->toBe(1000.0)
-        ->and($porPatente['BBB222'])->toBe(400.0);
+    $tipo = $porTipo->keyBy('tipo');
+    expect($tipo['galpon']->total)->toBe(1000.0)
+        ->and($tipo['taller']->total)->toBe(500.0)
+        ->and($tipo['oficina']->total)->toBe(200.0);
+
+    $patente = $porVehiculo->keyBy('patente');
+    expect($patente['AAA111']->total)->toBe(1000.0)
+        ->and($patente['BBB222']->total)->toBe(400.0);
+});
+
+it('al borrar un cierre, sus gastos vuelven a pendientes', function () {
+    gastoTest(['tipo' => 'galpon', 'monto' => 500]);
+
+    $this->post('/cierres-gasto')->assertRedirect();
+    $cierre = CierreGasto::first();
+    expect(Gasto::where('cierre_gasto_id', $cierre->id)->count())->toBe(1);
+
+    // Borrar el cierre libera los gastos (FK nullOnDelete).
+    $cierre->delete();
+
+    expect(Gasto::whereNull('cierre_gasto_id')->count())->toBe(1);
+    $this->get('/gastos')->assertInertia(fn (Assert $p) => $p->has('gastos', 1));
+});
+
+it('congela el reparto entre inversores en la columna distribucion al crear el gasto', function () {
+    $inversorA = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '60000001', 'inactivo' => false]);
+    $inversorB = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '60000002', 'inactivo' => false]);
+    $this->inversion->inversores()->attach([$inversorA->id => ['tiene_deuda' => false], $inversorB->id => ['tiene_deuda' => false]]);
+
+    $this->post('/gastos', [
+        'fecha' => now()->toDateString(),
+        'monto' => 1000,
+        'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'galpon',
+    ])->assertRedirect();
+
+    $gasto = Gasto::latest('id')->first();
+    expect($gasto->distribucion)->toBeArray()
+        ->and((float) array_sum($gasto->distribucion))->toBe(1000.0);
 });
 
 it('rechaza cerrar cuando no hay gastos pendientes', function () {
