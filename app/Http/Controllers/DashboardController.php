@@ -29,7 +29,8 @@ class DashboardController extends Controller
             ->where('patente', '!=', 'EXTERNO')
             ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
             ->orderBy('patente')
-            ->get();
+            ->get()
+            ->append('documentos');
 
         $inversiones = Inversion::orderBy('nombre')
             ->get(['id', 'nombre'])

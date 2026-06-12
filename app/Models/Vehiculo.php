@@ -6,14 +6,18 @@ namespace App\Models;
 
 use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'precio', 'estado_patente', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc'])]
+#[Fillable(['patente', 'marca', 'modelo', 'anio', 'propietario', 'precio', 'estado_patente', 'user_id', 'inversion_id', 'empresa_id', 'fecha_vencimiento_vtv', 'fecha_vencimiento_gnc', 'seguro_vencimiento', 'cedula_pdf_path', 'cedula_frente_path', 'cedula_dorso_path', 'titulo_pdf_path', 'titulo_frente_path', 'titulo_dorso_path', 'seguro_path'])]
+#[Hidden(['cedula_pdf_path', 'cedula_frente_path', 'cedula_dorso_path', 'titulo_pdf_path', 'titulo_frente_path', 'titulo_dorso_path', 'seguro_path'])]
 #[ScopedBy([TenantScope::class])]
 class Vehiculo extends Model
 {
@@ -29,7 +33,39 @@ class Vehiculo extends Model
             'precio' => 'decimal:2',
             'fecha_vencimiento_vtv' => 'date',
             'fecha_vencimiento_gnc' => 'date',
+            'seguro_vencimiento' => 'date',
         ];
+    }
+
+    /**
+     * URLs de los documentos del vehículo. Cédula y título se exponen como PDF
+     * o frente/dorso (sólo una modalidad por documento). El seguro es un único
+     * archivo (con flag es_pdf para saber cómo previsualizarlo) más su fecha de
+     * vencimiento.
+     *
+     * No se agrega a $appends global: se materializa con ->append('documentos')
+     * donde se necesita (dashboard de vehículos).
+     */
+    public function documentos(): Attribute
+    {
+        $url = fn (?string $path): ?string => $path ? Storage::url($path) : null;
+
+        return Attribute::get(fn (): array => [
+            'cedula' => [
+                'pdf'    => $url($this->cedula_pdf_path),
+                'frente' => $url($this->cedula_frente_path),
+                'dorso'  => $url($this->cedula_dorso_path),
+            ],
+            'titulo' => [
+                'pdf'    => $url($this->titulo_pdf_path),
+                'frente' => $url($this->titulo_frente_path),
+                'dorso'  => $url($this->titulo_dorso_path),
+            ],
+            'seguro' => [
+                'archivo' => $url($this->seguro_path),
+                'es_pdf'  => $this->seguro_path !== null && str_ends_with(strtolower($this->seguro_path), '.pdf'),
+            ],
+        ]);
     }
 
     /**

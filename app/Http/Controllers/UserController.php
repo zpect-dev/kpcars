@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\SaveUserDocumentsAction;
 use App\Enums\DepositoMoneda;
 use App\Enums\UserRole;
 use App\Models\Asignacion;
@@ -21,7 +22,28 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Inertia\Response;
 class UserController extends Controller
 {
-    public function store(Request $request)
+    /**
+     * Reglas de validación para los documentos (licencia y DNI).
+     *
+     * Por documento: o un PDF (con ambas caras) o dos imágenes (frente + dorso),
+     * nunca ambas modalidades. Si llega una imagen, deben llegar las dos.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function documentRules(): array
+    {
+        $rules = [];
+
+        foreach (['licencia', 'dni'] as $t) {
+            $rules["{$t}_pdf"]    = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
+            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_dorso"];
+            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_frente"];
+        }
+
+        return $rules;
+    }
+
+    public function store(Request $request, SaveUserDocumentsAction $documentos)
     {
         $this->authorize('create', User::class);
 
@@ -38,6 +60,7 @@ class UserController extends Controller
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
+            ...$this->documentRules(),
         ]);
 
         $photoPath = null;
@@ -79,6 +102,8 @@ class UserController extends Controller
                 $user->forceFill(['empresa_default_id' => (int) $empresaIds[0]])->save();
             }
         }
+
+        $documentos->execute($user, $request);
 
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
     }
@@ -131,8 +156,8 @@ class UserController extends Controller
         }
 
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'deposito', 'deposito_moneda'])
-            ->append('profile_photo_url');
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'estado_actualizado_en', 'created_at', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'deposito', 'deposito_moneda', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])
+            ->append(['profile_photo_url', 'documentos']);
 
         if ($isChoferFilter) {
             $today = now()->startOfDay();
@@ -211,7 +236,10 @@ class UserController extends Controller
         $newInactivoStatus = ! $user->inactivo;
 
         DB::transaction(function () use ($user, $newInactivoStatus) {
-            $user->update(['inactivo' => $newInactivoStatus]);
+            $user->update([
+                'inactivo' => $newInactivoStatus,
+                'estado_actualizado_en' => now(),
+            ]);
 
             // Si el usuario es desactivado, quitar asignaciones de vehículos
             if ($newInactivoStatus) {
@@ -234,7 +262,7 @@ class UserController extends Controller
         return redirect()->back()->with('success', $message);
     }
 
-    public function update(Request $request, User $user)
+    public function update(Request $request, User $user, SaveUserDocumentsAction $documentos)
     {
         $this->authorize('update', $user);
 
@@ -250,6 +278,7 @@ class UserController extends Controller
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
+            ...$this->documentRules(),
         ]);
 
         // Limpiar moneda si no hay depósito
@@ -264,6 +293,12 @@ class UserController extends Controller
             }
             $validated['profile_photo_path'] = $request->file('profile_photo')->store('profile-photos', 'public');
         }
+
+        // Los archivos de documentos los persiste la Action, no el mass-assignment.
+        unset(
+            $validated['licencia_pdf'], $validated['licencia_frente'], $validated['licencia_dorso'],
+            $validated['dni_pdf'], $validated['dni_frente'], $validated['dni_dorso'],
+        );
 
         // El campo empresas no se persiste directamente en el modelo.
         $empresaIds = $validated['empresas'] ?? null;
@@ -287,6 +322,8 @@ class UserController extends Controller
                 ])->save();
             }
         }
+
+        $documentos->execute($user, $request);
 
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
     }

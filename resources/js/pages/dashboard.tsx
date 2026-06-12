@@ -5,6 +5,7 @@ import {
     ChevronDown,
     FileDown,
     FileUp,
+    FileText,
     Filter,
     History,
     LayoutList,
@@ -52,6 +53,13 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { Empresa, Inversion, User, Vehiculo } from '@/types';
+import {
+    DocumentSection,
+    DocSingleDropzone,
+    DocPreviewDialog,
+    type DocMode,
+    type DocPreview,
+} from '@/components/documentos';
 
 type EstadoPatente = 'buen_estado' | 'mal_estado' | 'provisional' | 'no_posee' | null;
 
@@ -142,6 +150,7 @@ return null;
     const [filterTitular, setFilterTitular] = useState('');
     const [filterVtv, setFilterVtv] = useState('');
     const [filterGnc, setFilterGnc] = useState('');
+    const [filterSeguro, setFilterSeguro] = useState('');
     const [openFilterSection, setOpenFilterSection] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -159,6 +168,52 @@ return null;
     const [isCreateInversionOpen, setIsCreateInversionOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [estadoPatenteVehiculo, setEstadoPatenteVehiculo] = useState<Vehiculo | null>(null);
+
+    // Modal de documentos del vehículo (cédula, título y seguro).
+    const [docsVehiculo, setDocsVehiculo] = useState<Vehiculo | null>(null);
+    const [cedulaMode, setCedulaMode] = useState<DocMode>('imagenes');
+    const [tituloMode, setTituloMode] = useState<DocMode>('imagenes');
+    const [docPreview, setDocPreview] = useState<DocPreview | null>(null);
+    const docsForm = useForm({
+        cedula_pdf: null as File | null,
+        cedula_frente: null as File | null,
+        cedula_dorso: null as File | null,
+        titulo_pdf: null as File | null,
+        titulo_frente: null as File | null,
+        titulo_dorso: null as File | null,
+        seguro: null as File | null,
+        seguro_vencimiento: '' as string,
+    });
+
+    function openDocumentos(v: Vehiculo) {
+        docsForm.reset();
+        docsForm.clearErrors();
+        docsForm.setData('seguro_vencimiento', v.seguro_vencimiento ? v.seguro_vencimiento.split('T')[0].split(' ')[0] : '');
+        setCedulaMode(v.documentos?.cedula.pdf ? 'pdf' : 'imagenes');
+        setTituloMode(v.documentos?.titulo.pdf ? 'pdf' : 'imagenes');
+        setDocsVehiculo(v);
+    }
+
+    // Cambia la modalidad de un documento de doble cara y limpia los archivos
+    // de la otra modalidad, para no enviar PDF e imágenes juntos.
+    function applyDocMode(tipo: 'cedula' | 'titulo', setMode: (m: DocMode) => void, mode: DocMode) {
+        setMode(mode);
+        if (mode === 'pdf') {
+            docsForm.setData(`${tipo}_frente`, null);
+            docsForm.setData(`${tipo}_dorso`, null);
+        } else {
+            docsForm.setData(`${tipo}_pdf`, null);
+        }
+    }
+
+    function handleDocsSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!docsVehiculo) return;
+        docsForm.post(`/vehiculos/${docsVehiculo.id}/documentos`, {
+            preserveScroll: true,
+            onSuccess: () => setDocsVehiculo(null),
+        });
+    }
 
     function setEstadoPatente(estado: Exclude<EstadoPatente, null>) {
         if (!estadoPatenteVehiculo) {
@@ -250,8 +305,11 @@ continue;
         if (filterGnc === 'none') result = result.filter((v) => !v.fecha_vencimiento_gnc);
         else if (filterGnc) result = result.filter((v) => !!v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === filterGnc);
 
+        if (filterSeguro === 'none') result = result.filter((v) => !v.seguro_vencimiento);
+        else if (filterSeguro) result = result.filter((v) => !!v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === filterSeguro);
+
         return result;
-    }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc]);
+    }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro]);
 
     function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
         if (!showSearchDropdown || suggestions.length === 0) {
@@ -330,15 +388,16 @@ active.inversion_id = inversionId;
         setFilterTitular('');
         setFilterVtv('');
         setFilterGnc('');
+        setFilterSeguro('');
         setOpenFilterSection({});
     }
 
     const hasActiveFilters = !!(
         search || empresaId || inversionId || asignacionFiltro !== 'all' ||
-        filterEstadoPatente || filterTitular || filterVtv || filterGnc
+        filterEstadoPatente || filterTitular || filterVtv || filterGnc || filterSeguro
     );
 
-    const advancedFilterCount = [filterEstadoPatente, filterTitular, filterVtv, filterGnc].filter(Boolean).length;
+    const advancedFilterCount = [filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro].filter(Boolean).length;
 
     const vCounts = useMemo(() => ({
         estadoPatente: {
@@ -359,6 +418,12 @@ active.inversion_id = inversionId;
             warning: vehiculos.filter((v) => v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === 'warning').length,
             expired: vehiculos.filter((v) => v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === 'expired').length,
             none:    vehiculos.filter((v) => !v.fecha_vencimiento_gnc).length,
+        },
+        seguro: {
+            ok:      vehiculos.filter((v) => v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === 'ok').length,
+            warning: vehiculos.filter((v) => v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === 'warning').length,
+            expired: vehiculos.filter((v) => v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === 'expired').length,
+            none:    vehiculos.filter((v) => !v.seguro_vencimiento).length,
         },
     }), [vehiculos]);
 
@@ -487,6 +552,39 @@ return '';
         const [year, month] = datePart.split('-');
 
         return `${month}/${year}`;
+    }
+
+    // El seguro vence en una fecha exacta (no mes/año como VTV/GNC).
+    function seguroStatus(dateStr?: string | null): 'ok' | 'warning' | 'expired' | null {
+        if (!dateStr) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const datePart = dateStr.split('T')[0].split(' ')[0];
+        const [year, month, day] = datePart.split('-').map(Number);
+        const venc = new Date(year, month - 1, day);
+        venc.setHours(0, 0, 0, 0);
+
+        if (venc < today) return 'expired';
+        const oneMonth = new Date(today);
+        oneMonth.setMonth(oneMonth.getMonth() + 1);
+        if (venc <= oneMonth) return 'warning';
+        return 'ok';
+    }
+
+    function seguroColorClass(dateStr?: string | null): string {
+        switch (seguroStatus(dateStr)) {
+            case 'ok':      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+            case 'warning': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+            case 'expired': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            default:        return '';
+        }
+    }
+
+    function formatSeguro(dateStr?: string | null): string {
+        if (!dateStr) return '';
+        const datePart = dateStr.split('T')[0].split(' ')[0];
+        const [year, month, day] = datePart.split('-');
+        return `${day}/${month}/${year}`;
     }
 
     function openEdit(v: Vehiculo) {
@@ -625,6 +723,10 @@ params.set('search', search.trim());
 
                                     if (filterGnc) {
                                         params.set('gnc', filterGnc);
+                                    }
+
+                                    if (filterSeguro) {
+                                        params.set('seguro', filterSeguro);
                                     }
 
                                     const qs = params.toString();
@@ -1054,6 +1156,47 @@ params.set('search', search.trim());
                                             )}
                                         </div>
 
+                                        {/* Seguro */}
+                                        <div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFilterSection((s) => ({ ...s, seguro: !s.seguro }))}
+                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">Seguro</span>
+                                                    {filterSeguro && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                </div>
+                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openFilterSection.seguro && 'rotate-180')} />
+                                            </button>
+                                            {openFilterSection.seguro && (
+                                                <div className="px-1.5 pb-1.5">
+                                                    {[
+                                                        { value: 'ok',      label: 'Vigente',      desc: 'Vence en más de 1 mes',         count: vCounts.seguro.ok },
+                                                        { value: 'warning', label: 'Por vencer',   desc: 'Vence en los próximos 30 días', count: vCounts.seguro.warning },
+                                                        { value: 'expired', label: 'Vencido',      desc: 'Seguro ya expirado',            count: vCounts.seguro.expired },
+                                                        { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de seguro cargada',   count: vCounts.seguro.none },
+                                                    ].map((opt) => {
+                                                        const isActive = filterSeguro === opt.value;
+                                                        return (
+                                                            <button key={opt.value} type="button" onClick={() => setFilterSeguro(isActive ? '' : opt.value)}
+                                                                className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
+                                                            >
+                                                                <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>
+                                                                    {isActive && <Check className="h-3 w-3 text-background" />}
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                                    <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
+                                                                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
+                                                                </div>
+                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
                                     </PopoverContent>
                                 </Popover>
 
@@ -1106,6 +1249,9 @@ params.set('search', search.trim());
                                     <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
                                         GNC
                                     </th>
+                                    <th className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4">
+                                        Seguro
+                                    </th>
                                     <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6 sm:py-4">
                                         Acciones
                                     </th>
@@ -1115,7 +1261,7 @@ params.set('search', search.trim());
                                 {filteredVehiculos.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={hideEmpresa ? 7 : 8}
+                                            colSpan={hideEmpresa ? 8 : 9}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No hay vehículos que coincidan con
@@ -1230,6 +1376,21 @@ params.set('search', search.trim());
                                                     >
                                                         {formatVtv(
                                                             vehiculo.fecha_vencimiento_gnc,
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        N/A
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                {vehiculo.seguro_vencimiento ? (
+                                                    <span
+                                                        className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${seguroColorClass(vehiculo.seguro_vencimiento)}`}
+                                                    >
+                                                        {formatSeguro(
+                                                            vehiculo.seguro_vencimiento,
                                                         )}
                                                     </span>
                                                 ) : (
@@ -1495,6 +1656,20 @@ params.set('search', search.trim());
                                             <span className="italic">N/A</span>
                                         )}
                                     </div>
+                                    <div className="text-xs text-muted-foreground">
+                                        Seguro:{' '}
+                                        {vehiculo.seguro_vencimiento ? (
+                                            <span
+                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${seguroColorClass(vehiculo.seguro_vencimiento)}`}
+                                            >
+                                                {formatSeguro(
+                                                    vehiculo.seguro_vencimiento,
+                                                )}
+                                            </span>
+                                        ) : (
+                                            <span className="italic">N/A</span>
+                                        )}
+                                    </div>
                                 </li>
                             ))
                         )}
@@ -1523,6 +1698,7 @@ params.set('search', search.trim());
                         form={editForm}
                         onSubmit={handleEdit}
                         onCancel={() => setEditingVehiculo(null)}
+                        onDocumentos={editingVehiculo ? () => openDocumentos(editingVehiculo) : undefined}
                         empresas={empresas}
                         inversiones={inversiones}
                         users={users}
@@ -1623,6 +1799,90 @@ params.set('search', search.trim());
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {/* Documentos del vehículo */}
+            <Dialog
+                open={docsVehiculo !== null}
+                onOpenChange={(open) => { if (!open) { setDocsVehiculo(null); docsForm.reset(); } }}
+            >
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
+                            <FileText className="h-5 w-5 text-sky-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Documentos del vehículo</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {docsVehiculo?.patente} — {docsVehiculo?.marca} {docsVehiculo?.modelo}
+                            </DialogDescription>
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleDocsSubmit}>
+                        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
+                            <DocumentSection
+                                title="Cédula"
+                                mode={cedulaMode}
+                                onModeChange={(m) => applyDocMode('cedula', setCedulaMode, m)}
+                                pdfFile={docsForm.data.cedula_pdf}
+                                onPdfDrop={(f) => docsForm.setData('cedula_pdf', f[0])}
+                                frenteFile={docsForm.data.cedula_frente}
+                                onFrenteDrop={(f) => docsForm.setData('cedula_frente', f[0])}
+                                dorsoFile={docsForm.data.cedula_dorso}
+                                onDorsoDrop={(f) => docsForm.setData('cedula_dorso', f[0])}
+                                existing={docsVehiculo?.documentos?.cedula}
+                                onPreview={(url, name, type) => setDocPreview({ url, name, type })}
+                                error={docsForm.errors.cedula_pdf || docsForm.errors.cedula_frente || docsForm.errors.cedula_dorso}
+                            />
+                            <DocumentSection
+                                title="Título"
+                                mode={tituloMode}
+                                onModeChange={(m) => applyDocMode('titulo', setTituloMode, m)}
+                                pdfFile={docsForm.data.titulo_pdf}
+                                onPdfDrop={(f) => docsForm.setData('titulo_pdf', f[0])}
+                                frenteFile={docsForm.data.titulo_frente}
+                                onFrenteDrop={(f) => docsForm.setData('titulo_frente', f[0])}
+                                dorsoFile={docsForm.data.titulo_dorso}
+                                onDorsoDrop={(f) => docsForm.setData('titulo_dorso', f[0])}
+                                existing={docsVehiculo?.documentos?.titulo}
+                                onPreview={(url, name, type) => setDocPreview({ url, name, type })}
+                                error={docsForm.errors.titulo_pdf || docsForm.errors.titulo_frente || docsForm.errors.titulo_dorso}
+                            />
+
+                            <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
+                                <span className="text-sm font-medium text-foreground">Seguro</span>
+                                <DocSingleDropzone
+                                    title="Seguro"
+                                    file={docsForm.data.seguro}
+                                    existingUrl={docsVehiculo?.documentos?.seguro.archivo}
+                                    existingIsPdf={docsVehiculo?.documentos?.seguro.es_pdf}
+                                    onDrop={(f) => docsForm.setData('seguro', f[0])}
+                                    onPreview={(url, name, type) => setDocPreview({ url, name, type })}
+                                />
+                                <InputError message={docsForm.errors.seguro} />
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="seguro_vencimiento">Vencimiento del seguro</Label>
+                                    <Input
+                                        id="seguro_vencimiento"
+                                        type="date"
+                                        value={docsForm.data.seguro_vencimiento}
+                                        onChange={(e) => docsForm.setData('seguro_vencimiento', e.target.value)}
+                                    />
+                                    <InputError message={docsForm.errors.seguro_vencimiento} />
+                                </div>
+                            </div>
+                        </div>
+                        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                            <Button type="button" variant="outline" onClick={() => setDocsVehiculo(null)}>Cancelar</Button>
+                            <Button type="submit" disabled={docsForm.processing}>
+                                {docsForm.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar documentos</>}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <DocPreviewDialog preview={docPreview} onClose={() => setDocPreview(null)} />
         </>
     );
 }
@@ -1726,6 +1986,7 @@ interface VehiculoFormProps {
     >;
     onSubmit: (e: React.FormEvent) => void;
     onCancel?: () => void;
+    onDocumentos?: () => void;
     empresas: Pick<Empresa, 'id' | 'nombre'>[];
     inversiones: Pick<Inversion, 'id' | 'nombre'>[];
     users: Pick<User, 'id' | 'name'>[];
@@ -1736,6 +1997,7 @@ function VehiculoForm({
     form,
     onSubmit,
     onCancel,
+    onDocumentos,
     empresas,
     inversiones,
     users,
@@ -1938,15 +2200,22 @@ function VehiculoForm({
             </div>
 
         </div>
-        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-            {onCancel && (
-                <Button type="button" variant="outline" onClick={onCancel}>
-                    Cancelar
+        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4 sm:justify-between">
+            {onDocumentos && (
+                <Button type="button" variant="ghost" size="sm" onClick={onDocumentos}>
+                    <FileText className="h-4 w-4" /> Documentos
                 </Button>
             )}
-            <Button type="submit" disabled={!canSubmit}>
-                {form.processing ? 'Procesando...' : <><Check className="h-4 w-4" /> {submitLabel}</>}
-            </Button>
+            <div className="flex items-center gap-2">
+                {onCancel && (
+                    <Button type="button" variant="outline" onClick={onCancel}>
+                        Cancelar
+                    </Button>
+                )}
+                <Button type="submit" disabled={!canSubmit}>
+                    {form.processing ? 'Procesando...' : <><Check className="h-4 w-4" /> {submitLabel}</>}
+                </Button>
+            </div>
         </DialogFooter>
         </form>
     );

@@ -37,8 +37,10 @@ beforeEach(function () {
         'empresa_default_id' => $this->empresaA->id,
     ]);
 
-    $this->aceite = Articulo::create(['descripcion' => 'Aceite', 'stock' => 10, 'min_stock' => 1, 'precio' => 100]);
-    $this->filtro = Articulo::create(['descripcion' => 'Filtro', 'stock' => 5, 'min_stock' => 1, 'precio' => 200]);
+    // repuestos=true: son artículos que se facturan al vehículo (generan cobro).
+    // Los de galpón (repuestos=false) son consumo interno y no generan cobro.
+    $this->aceite = Articulo::create(['descripcion' => 'Aceite', 'stock' => 10, 'min_stock' => 1, 'precio' => 100, 'repuestos' => true]);
+    $this->filtro = Articulo::create(['descripcion' => 'Filtro', 'stock' => 5, 'min_stock' => 1, 'precio' => 200, 'repuestos' => true]);
 });
 
 it('procesa una salida múltiple: descuenta stock y genera cobros por línea', function () {

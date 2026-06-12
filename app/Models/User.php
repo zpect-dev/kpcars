@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'must_change_password', 'role', 'empresa_default_id', 'empresa_restringida_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'deposito', 'deposito_moneda'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'estado_actualizado_en', 'must_change_password', 'role', 'empresa_default_id', 'empresa_restringida_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'deposito', 'deposito_moneda', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])]
+#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -36,6 +36,7 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'inactivo' => 'boolean',
+            'estado_actualizado_en' => 'datetime',
             'empresa_default_id' => 'integer',
             'empresa_restringida_id' => 'integer',
             'must_change_password' => 'boolean',
@@ -54,6 +55,32 @@ class User extends Authenticatable
                     ? Storage::url($this->profile_photo_path)
                     : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&color=7F9CF5&background=EBF4FF';
         });
+    }
+
+    /**
+     * URLs de los documentos (licencia y DNI). Para cada uno se expone la URL
+     * del PDF (si se cargó como PDF) o las URLs de frente/dorso (si se cargó
+     * como imágenes). Sólo una modalidad estará presente por documento.
+     *
+     * No se agrega a $appends global: sólo se materializa donde se necesita
+     * (gestión de usuarios), vía ->append('documentos').
+     */
+    public function documentos(): Attribute
+    {
+        $url = fn (?string $path): ?string => $path ? Storage::url($path) : null;
+
+        return Attribute::get(fn (): array => [
+            'licencia' => [
+                'pdf'    => $url($this->licencia_pdf_path),
+                'frente' => $url($this->licencia_frente_path),
+                'dorso'  => $url($this->licencia_dorso_path),
+            ],
+            'dni' => [
+                'pdf'    => $url($this->dni_pdf_path),
+                'frente' => $url($this->dni_frente_path),
+                'dorso'  => $url($this->dni_dorso_path),
+            ],
+        ]);
     }
 
     protected $appends = [

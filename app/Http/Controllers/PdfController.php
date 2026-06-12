@@ -327,13 +327,14 @@ class PdfController extends Controller
         // Acceso: middleware role:administrador,administrativo.
         // Refleja TODOS los filtros del dashboard de vehículos, incluidos los
         // avanzados (estado de patente, titular, VTV y GNC).
-        $filters = $request->only(['inversion_id', 'search', 'asignacion', 'estado_patente', 'titular', 'vtv', 'gnc']);
+        $filters = $request->only(['inversion_id', 'search', 'asignacion', 'estado_patente', 'titular', 'vtv', 'gnc', 'seguro']);
         $search = trim((string) ($filters['search'] ?? ''));
         $asignacion = $filters['asignacion'] ?? null;
         $estadoPatente = $filters['estado_patente'] ?? null;
         $titular = trim((string) ($filters['titular'] ?? ''));
         $vtv = $filters['vtv'] ?? null;
         $gnc = $filters['gnc'] ?? null;
+        $seguro = $filters['seguro'] ?? null;
 
         $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
             ->where('patente', '!=', 'EXTERNO')
@@ -355,6 +356,7 @@ class PdfController extends Controller
             })
             ->when($vtv === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_vtv'))
             ->when($gnc === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_gnc'))
+            ->when($seguro === 'none', fn ($q) => $q->whereNull('seguro_vencimiento'))
             ->get();
 
         // VTV/GNC por estado (ok/warning/expired) se calcula sobre fin de mes,
@@ -367,6 +369,12 @@ class PdfController extends Controller
         if ($gnc && $gnc !== 'none') {
             $vehiculos = $vehiculos->filter(
                 fn (Vehiculo $v) => $this->vencimientoStatus($v->fecha_vencimiento_gnc) === $gnc
+            );
+        }
+        // El seguro vence en una fecha exacta (no fin de mes), igual que el dashboard.
+        if ($seguro && $seguro !== 'none') {
+            $vehiculos = $vehiculos->filter(
+                fn (Vehiculo $v) => $this->seguroVencimientoStatus($v->seguro_vencimiento) === $seguro
             );
         }
 
@@ -398,6 +406,30 @@ class PdfController extends Controller
         }
 
         $vence = Carbon::parse($fecha)->endOfMonth()->startOfDay();
+        $hoy = Carbon::now()->startOfDay();
+
+        if ($vence->lt($hoy)) {
+            return 'expired';
+        }
+
+        if ($vence->lte($hoy->copy()->addMonth())) {
+            return 'warning';
+        }
+
+        return 'ok';
+    }
+
+    /**
+     * Estado del seguro según su fecha de vencimiento exacta (no fin de mes).
+     * Replica `seguroStatus` del dashboard.
+     */
+    private function seguroVencimientoStatus($fecha): ?string
+    {
+        if (! $fecha) {
+            return null;
+        }
+
+        $vence = Carbon::parse($fecha)->startOfDay();
         $hoy = Carbon::now()->startOfDay();
 
         if ($vence->lt($hoy)) {

@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 
 import { index as usersIndex, updateRole, store } from '@/routes/users';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DocumentSection, DocPreviewDialog, type DocUrls, type DocMode } from '@/components/documentos';
 
 interface User {
     id: number;
@@ -25,6 +26,8 @@ interface User {
     dni: string;
     role: string;
     inactivo: boolean;
+    estado_actualizado_en?: string | null;
+    created_at?: string | null;
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
@@ -34,6 +37,10 @@ interface User {
     empresas?: { id: number; nombre: string }[];
     deposito?: string | null;
     deposito_moneda?: string | null;
+    documentos?: {
+        licencia: DocUrls;
+        dni: DocUrls;
+    };
     vehiculo?: { patente: string; marca: string; modelo: string } | null;
     licencia_por_vencer?: boolean;
     sin_licencia?: boolean;
@@ -208,6 +215,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     const [previewImage, setPreviewImage] = useState<{
         url: string;
         name: string;
+        type?: 'image' | 'pdf';
     } | null>(null);
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -292,7 +300,15 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         empresa_restringida_id: '' as string,
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
+        licencia_pdf: null as File | null,
+        licencia_frente: null as File | null,
+        licencia_dorso: null as File | null,
+        dni_pdf: null as File | null,
+        dni_frente: null as File | null,
+        dni_dorso: null as File | null,
     });
+    const [createLicMode, setCreateLicMode] = useState<DocMode>('imagenes');
+    const [createDniMode, setCreateDniMode] = useState<DocMode>('imagenes');
 
     const [userToEdit, setUserToEdit] = useState<User | null>(null);
     const editForm = useForm({
@@ -307,7 +323,15 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         empresa_restringida_id: '' as string,
         deposito: '' as string,
         deposito_moneda: 'USD' as string,
+        licencia_pdf: null as File | null,
+        licencia_frente: null as File | null,
+        licencia_dorso: null as File | null,
+        dni_pdf: null as File | null,
+        dni_frente: null as File | null,
+        dni_dorso: null as File | null,
     });
+    const [editLicMode, setEditLicMode] = useState<DocMode>('imagenes');
+    const [editDniMode, setEditDniMode] = useState<DocMode>('imagenes');
 
     function openEditModal(user: User) {
         setUserToEdit(user);
@@ -332,7 +356,16 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             empresa_restringida_id: user.empresa_restringida_id ? String(user.empresa_restringida_id) : '',
             deposito: user.deposito ?? '',
             deposito_moneda: user.deposito_moneda || 'USD',
+            licencia_pdf: null,
+            licencia_frente: null,
+            licencia_dorso: null,
+            dni_pdf: null,
+            dni_frente: null,
+            dni_dorso: null,
         });
+        // El modo arranca según lo ya cargado: PDF si hay PDF, si no imágenes.
+        setEditLicMode(user.documentos?.licencia.pdf ? 'pdf' : 'imagenes');
+        setEditDniMode(user.documentos?.dni.pdf ? 'pdf' : 'imagenes');
         editForm.clearErrors();
     }
 
@@ -355,6 +388,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         createForm.reset();
         createForm.setData('telefono', '+54 ');
         createForm.clearErrors();
+        setCreateLicMode('imagenes');
+        setCreateDniMode('imagenes');
         setShowCreateModal(true);
     }
 
@@ -369,6 +404,23 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             onSuccess: () => closeCreateModal(),
             preserveScroll: true,
         });
+    }
+
+    // Cambia la modalidad de un documento y limpia los archivos de la otra
+    // modalidad, para que nunca se envíe PDF e imágenes juntos.
+    function applyDocMode(
+        form: any,
+        tipo: 'licencia' | 'dni',
+        setMode: (m: DocMode) => void,
+        mode: DocMode,
+    ) {
+        setMode(mode);
+        if (mode === 'pdf') {
+            form.setData(`${tipo}_frente`, null);
+            form.setData(`${tipo}_dorso`, null);
+        } else {
+            form.setData(`${tipo}_pdf`, null);
+        }
     }
 
     function formatPhone(value: string) {
@@ -407,6 +459,24 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         const currency = user.deposito_moneda ?? 'ARS';
         const amount = Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
         return `${currency} ${amount}`;
+    }
+
+    // Fecha a mostrar en la columna Alta/Baja:
+    // - Inactivo (baja): el momento real en que se desactivó.
+    // - Activo (alta): el momento en que se (re)activó; si nunca pasó por el
+    //   toggle, su alta es la fecha de creación del chofer.
+    function estadoFecha(user: User): string | null {
+        if (user.inactivo) return user.estado_actualizado_en ?? null;
+        return user.estado_actualizado_en ?? user.created_at ?? null;
+    }
+
+    function formatEstadoFecha(fechaStr?: string | null): string | null {
+        if (!fechaStr) return null;
+        const fecha = new Date(fechaStr);
+        if (isNaN(fecha.getTime())) return null;
+        return fecha.toLocaleDateString('es-AR', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+        });
     }
 
     function parseLicenciaDate(fechaStr: string): Date {
@@ -678,6 +748,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             scope="col"
                                             className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
+                                            {filterStatus === 'inactivos' ? 'Baja' : 'Alta'}
+                                        </th>
+                                    )}
+                                    {filterRole === 'chofer' && (
+                                        <th
+                                            scope="col"
+                                            className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        >
                                             Depósito
                                         </th>
                                     )}
@@ -693,7 +771,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 {filteredUsers.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={filterRole === 'chofer' ? 7 : 6}
+                                            colSpan={filterRole === 'chofer' ? 8 : 6}
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No se encontraron usuarios que
@@ -817,6 +895,17 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     {user.inactivo ? 'Inactivo' : 'Activo'}
                                                 </button>
                                             </td>
+                                            {filterRole === 'chofer' && (
+                                                <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
+                                                    {formatEstadoFecha(estadoFecha(user)) ? (
+                                                        <span className="text-muted-foreground">
+                                                            {formatEstadoFecha(estadoFecha(user))}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/50 italic">—</span>
+                                                    )}
+                                                </td>
+                                            )}
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
                                                     {user.deposito ? (
@@ -987,7 +1076,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         )}
                                     </div>
 
-                                    <div className={cn('grid gap-3 text-xs', filterRole === 'chofer' ? 'grid-cols-3' : 'grid-cols-2')}>
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="flex flex-col gap-0.5">
                                             <span className="tracking-wider text-muted-foreground uppercase">
                                                 DNI
@@ -1031,6 +1120,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     <span className="text-muted-foreground/50 italic">
                                                         —
                                                     </span>
+                                                )}
+                                            </div>
+                                        )}
+                                        {filterRole === 'chofer' && (
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="tracking-wider text-muted-foreground uppercase">
+                                                    {filterStatus === 'inactivos' ? 'Baja' : 'Alta'}
+                                                </span>
+                                                {formatEstadoFecha(estadoFecha(user)) ? (
+                                                    <span className="text-foreground">
+                                                        {formatEstadoFecha(estadoFecha(user))}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">—</span>
                                                 )}
                                             </div>
                                         )}
@@ -1217,6 +1320,38 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 border-t border-border/60" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Documentación</span>
+                            <div className="flex-1 border-t border-border/60" />
+                        </div>
+                        <DocumentSection
+                            title="Licencia"
+                            mode={createLicMode}
+                            onModeChange={(m) => applyDocMode(createForm, 'licencia', setCreateLicMode, m)}
+                            pdfFile={createForm.data.licencia_pdf}
+                            onPdfDrop={(f) => createForm.setData('licencia_pdf', f[0])}
+                            frenteFile={createForm.data.licencia_frente}
+                            onFrenteDrop={(f) => createForm.setData('licencia_frente', f[0])}
+                            dorsoFile={createForm.data.licencia_dorso}
+                            onDorsoDrop={(f) => createForm.setData('licencia_dorso', f[0])}
+                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
+                            error={createForm.errors.licencia_pdf || createForm.errors.licencia_frente || createForm.errors.licencia_dorso}
+                        />
+                        <DocumentSection
+                            title="DNI"
+                            mode={createDniMode}
+                            onModeChange={(m) => applyDocMode(createForm, 'dni', setCreateDniMode, m)}
+                            pdfFile={createForm.data.dni_pdf}
+                            onPdfDrop={(f) => createForm.setData('dni_pdf', f[0])}
+                            frenteFile={createForm.data.dni_frente}
+                            onFrenteDrop={(f) => createForm.setData('dni_frente', f[0])}
+                            dorsoFile={createForm.data.dni_dorso}
+                            onDorsoDrop={(f) => createForm.setData('dni_dorso', f[0])}
+                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
+                            error={createForm.errors.dni_pdf || createForm.errors.dni_frente || createForm.errors.dni_dorso}
+                        />
+
                         </div>
                         <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
                             <Button type="button" variant="outline" onClick={closeCreateModal}>Cancelar</Button>
@@ -1345,6 +1480,40 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         </div>
 
+                        <div className="flex items-center gap-2">
+                            <div className="flex-1 border-t border-border/60" />
+                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Documentación</span>
+                            <div className="flex-1 border-t border-border/60" />
+                        </div>
+                        <DocumentSection
+                            title="Licencia"
+                            mode={editLicMode}
+                            onModeChange={(m) => applyDocMode(editForm, 'licencia', setEditLicMode, m)}
+                            pdfFile={editForm.data.licencia_pdf}
+                            onPdfDrop={(f) => editForm.setData('licencia_pdf', f[0])}
+                            frenteFile={editForm.data.licencia_frente}
+                            onFrenteDrop={(f) => editForm.setData('licencia_frente', f[0])}
+                            dorsoFile={editForm.data.licencia_dorso}
+                            onDorsoDrop={(f) => editForm.setData('licencia_dorso', f[0])}
+                            existing={userToEdit?.documentos?.licencia}
+                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
+                            error={editForm.errors.licencia_pdf || editForm.errors.licencia_frente || editForm.errors.licencia_dorso}
+                        />
+                        <DocumentSection
+                            title="DNI"
+                            mode={editDniMode}
+                            onModeChange={(m) => applyDocMode(editForm, 'dni', setEditDniMode, m)}
+                            pdfFile={editForm.data.dni_pdf}
+                            onPdfDrop={(f) => editForm.setData('dni_pdf', f[0])}
+                            frenteFile={editForm.data.dni_frente}
+                            onFrenteDrop={(f) => editForm.setData('dni_frente', f[0])}
+                            dorsoFile={editForm.data.dni_dorso}
+                            onDorsoDrop={(f) => editForm.setData('dni_dorso', f[0])}
+                            existing={userToEdit?.documentos?.dni}
+                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
+                            error={editForm.errors.dni_pdf || editForm.errors.dni_frente || editForm.errors.dni_dorso}
+                        />
+
                         </div>
                         <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">
                             {userToEdit && (
@@ -1406,25 +1575,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 </DialogContent>
             </Dialog>
 
-            <Dialog
-                open={!!previewImage}
-                onOpenChange={(open) => !open && setPreviewImage(null)}
-            >
-                <DialogContent className="max-w-3xl border-none bg-transparent p-0 shadow-none">
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>
-                            {previewImage?.name ?? 'Imagen'}
-                        </DialogTitle>
-                    </DialogHeader>
-                    {previewImage && (
-                        <img
-                            src={previewImage.url}
-                            alt={previewImage.name}
-                            className="max-h-[85vh] w-full rounded-lg object-contain"
-                        />
-                    )}
-                </DialogContent>
-            </Dialog>
+            <DocPreviewDialog preview={previewImage} onClose={() => setPreviewImage(null)} />
         </>
     );
 }

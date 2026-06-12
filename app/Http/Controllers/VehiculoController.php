@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\SaveVehiculoDocumentsAction;
 use App\Models\Asignacion;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
@@ -152,6 +153,40 @@ class VehiculoController extends Controller
         });
 
         return redirect()->back()->with('success', "Vehículo {$validated['patente']} actualizado correctamente.");
+    }
+
+    /**
+     * Guarda los documentos del vehículo (cédula, título y seguro) más la
+     * fecha de vencimiento del seguro. Los archivos los procesa la Action.
+     */
+    public function updateDocumentos(Request $request, Vehiculo $vehiculo, SaveVehiculoDocumentsAction $documentos): RedirectResponse
+    {
+        $this->authorize('update', $vehiculo);
+
+        $rules = [
+            'seguro' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'seguro_vencimiento' => ['nullable', 'date'],
+        ];
+
+        // Cédula y título: PDF (ambas caras) o dos imágenes (frente + dorso),
+        // mutuamente excluyentes; si llega una imagen, deben llegar las dos.
+        foreach (['cedula', 'titulo'] as $t) {
+            $rules["{$t}_pdf"]    = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
+            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_dorso"];
+            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_frente"];
+        }
+
+        $request->validate($rules);
+
+        $documentos->execute($vehiculo, $request);
+
+        // La fecha de vencimiento del seguro es un campo simple: puede setearse
+        // o limpiarse sin necesidad de subir un archivo.
+        if ($request->has('seguro_vencimiento')) {
+            $vehiculo->update(['seguro_vencimiento' => $request->input('seguro_vencimiento') ?: null]);
+        }
+
+        return redirect()->back()->with('success', "Documentos del vehículo {$vehiculo->patente} actualizados.");
     }
 
     /**

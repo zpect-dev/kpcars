@@ -460,6 +460,7 @@ it('Inventario es GLOBAL: egreso a un carro de otra empresa enruta el cobro a la
         'stock' => 10,
         'min_stock' => 1,
         'precio' => 500,
+        'repuestos' => true, // se factura al vehículo (genera cobro)
     ]);
 
     $this->actingAs($admin);

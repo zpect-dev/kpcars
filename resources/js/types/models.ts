@@ -28,6 +28,12 @@ export interface Vehiculo {
     empresa_id: number | null;
     fecha_vencimiento_vtv?: string | null;
     fecha_vencimiento_gnc?: string | null;
+    seguro_vencimiento?: string | null;
+    documentos?: {
+        cedula: { pdf: string | null; frente: string | null; dorso: string | null };
+        titulo: { pdf: string | null; frente: string | null; dorso: string | null };
+        seguro: { archivo: string | null; es_pdf: boolean };
+    };
     user?: User | null;
     inversion?: Inversion | null;
     empresa?: Empresa | null;
