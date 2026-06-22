@@ -162,6 +162,41 @@ interface RecaudacionesTablaProps {
     emptyMessage?: string;
 }
 
+function useRecaudacionForm(fila: RecaudacionFila, endpoint: (fila: RecaudacionFila) => string, editable: boolean) {
+    const form = useForm({
+        efectivo:      fila.efectivo > 0      ? String(fila.efectivo)      : '',
+        transferencia: fila.transferencia > 0 ? String(fila.transferencia) : '',
+        descuento:     fila.descuento > 0     ? String(fila.descuento)     : '',
+        descripcion:   fila.descripcion ?? '',
+    });
+
+    const efectivo      = parseFloat(form.data.efectivo)      || 0;
+    const transferencia = parseFloat(form.data.transferencia) || 0;
+    const descuento     = parseFloat(form.data.descuento)     || 0;
+    const total         = efectivo + transferencia;
+    const precioEfectivo = Math.max(Number(fila.precio) - descuento, 0);
+    const excede        = total > precioEfectivo;
+    const estado: 'pagado' | 'deuda' = total >= precioEfectivo ? 'pagado' : 'deuda';
+    const deuda         = Math.max(precioEfectivo - total, 0);
+
+    function save() {
+        if (excede) return;
+        form.transform((data) => ({
+            efectivo:      parseFloat(data.efectivo)      || 0,
+            transferencia: parseFloat(data.transferencia) || 0,
+            descuento:     parseFloat(data.descuento)     || 0,
+            descripcion:   data.descripcion,
+        }));
+        form.patch(endpoint(fila), { preserveScroll: true });
+    }
+
+    function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        if (e.key === 'Enter') { e.preventDefault(); save(); }
+    }
+
+    return { form, efectivo, transferencia, descuento, total, precioEfectivo, excede, estado, deuda, save, onKeyDown };
+}
+
 export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: RecaudacionesTablaProps) {
     const [search, setSearch] = useState('');
     const [estadoFiltro, setEstadoFiltro] = useState<'all' | 'pagado' | 'deuda'>('all');
@@ -191,7 +226,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                 if (sortKey === 'chofer')    cmp = a.chofer.localeCompare(b.chofer, 'es');
                 if (sortKey === 'inversion') cmp = a.inversion_nombre.localeCompare(b.inversion_nombre, 'es', { numeric: true });
                 if (sortKey === 'total')     cmp = Number(a.total) - Number(b.total);
-                if (sortKey === 'estado')    cmp = a.estado.localeCompare(b.estado); // deuda < pagado
+                if (sortKey === 'estado')    cmp = a.estado.localeCompare(b.estado);
                 return sortDir === 'asc' ? cmp : -cmp;
             });
         }
@@ -258,107 +293,336 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
 
             {/* Stats */}
             {filtradas.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-                    <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                            <TrendingUp className="h-4 w-4 text-primary" />
+                <>
+                    {/* Mobile: 3 grupos como lista */}
+                    <div className="flex flex-col gap-3 sm:hidden">
+                        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                            <div className="flex items-center justify-between px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <TrendingUp className="h-4 w-4 text-primary" />
+                                    <span className="text-sm text-muted-foreground">Total</span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">{formatARS(stats.total)}</span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-border px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <Banknote className="h-4 w-4 text-emerald-500" />
+                                    <span className="text-sm text-emerald-700 dark:text-emerald-400">Efectivo</span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">{formatARS(stats.efectivo)}</span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-border px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <ArrowLeftRight className="h-4 w-4 text-blue-500" />
+                                    <span className="text-sm text-blue-700 dark:text-blue-400">Transferencia</span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">{formatARS(stats.transferencia)}</span>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-xs text-muted-foreground">Total</p>
-                            <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.total)}</p>
+                        <div className="overflow-hidden rounded-xl border border-green-500/20 bg-green-500/5 shadow-sm">
+                            <div className="flex items-center justify-between px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <Users className="h-4 w-4 text-green-500" />
+                                    <span className="text-sm text-green-700 dark:text-green-400">Pagados</span>
+                                </div>
+                                <span className="font-bold text-foreground">
+                                    {stats.pagados}
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between border-t border-green-500/20 px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <span className="text-sm text-red-700 dark:text-red-400">Deben</span>
+                                </div>
+                                <span className="font-bold text-foreground">
+                                    {stats.deudores}
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div className="overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5 shadow-sm">
+                            <div className="flex items-center justify-between px-4 py-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <span className="text-sm text-red-700 dark:text-red-400">Monto deuda</span>
+                                </div>
+                                <span className="font-bold tabular-nums text-foreground">
+                                    {stats.deudores > 0 ? formatARS(stats.totalDeuda) : '—'}
+                                </span>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 shadow-sm">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
-                            <Banknote className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+
+                    {/* Desktop: 3 grupos con cards individuales */}
+                    <div className="hidden gap-4 sm:flex sm:items-stretch">
+                        {/* Grupo 1: montos cobrados */}
+                        <div className="flex flex-1 overflow-hidden rounded-xl border border-border bg-card shadow-sm divide-x divide-border">
+                            <div className="flex flex-1 flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <TrendingUp className="h-4 w-4 text-primary" />
+                                    <p className="text-xs text-muted-foreground">Total</p>
+                                </div>
+                                <p className="font-bold tabular-nums text-foreground">{formatARS(stats.total)}</p>
+                            </div>
+                            <div className="flex flex-1 flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <Banknote className="h-4 w-4 text-emerald-500" />
+                                    <p className="text-xs text-emerald-700 dark:text-emerald-400">Efectivo</p>
+                                </div>
+                                <p className="font-bold tabular-nums text-foreground">{formatARS(stats.efectivo)}</p>
+                            </div>
+                            <div className="flex flex-1 flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <ArrowLeftRight className="h-4 w-4 text-blue-500" />
+                                    <p className="text-xs text-blue-700 dark:text-blue-400">Transferencia</p>
+                                </div>
+                                <p className="font-bold tabular-nums text-foreground">{formatARS(stats.transferencia)}</p>
+                            </div>
                         </div>
-                        <div className="min-w-0">
-                            <p className="text-xs text-emerald-700 dark:text-emerald-400">Efectivo</p>
-                            <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.efectivo)}</p>
+
+                        {/* Grupo 2: conteo pagados / deben */}
+                        <div className="flex overflow-hidden rounded-xl border border-green-500/20 bg-green-500/5 shadow-sm divide-x divide-green-500/20">
+                            <div className="flex flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <Users className="h-4 w-4 text-green-500" />
+                                    <p className="text-xs text-green-700 dark:text-green-400">Pagados</p>
+                                </div>
+                                <p className="font-bold text-foreground">
+                                    {stats.pagados}
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <p className="text-xs text-red-700 dark:text-red-400">Deben</p>
+                                </div>
+                                <p className="font-bold text-foreground">
+                                    {stats.deudores}
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Grupo 3: monto deuda */}
+                        <div className="flex overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5 shadow-sm">
+                            <div className="flex flex-col gap-1 px-4 py-3">
+                                <div className="flex items-center gap-1.5">
+                                    <AlertCircle className="h-4 w-4 text-red-500" />
+                                    <p className="text-xs text-red-700 dark:text-red-400">Monto deuda</p>
+                                </div>
+                                <p className="font-bold tabular-nums text-foreground">
+                                    {stats.deudores > 0 ? formatARS(stats.totalDeuda) : '—'}
+                                </p>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 rounded-xl border border-blue-500/20 bg-blue-500/5 px-4 py-3 shadow-sm">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15">
-                            <ArrowLeftRight className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-xs text-blue-700 dark:text-blue-400">Transferencia</p>
-                            <p className="truncate font-bold tabular-nums text-foreground">{formatARS(stats.transferencia)}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-xl border border-green-500/20 bg-green-500/5 px-4 py-3 shadow-sm">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-500/15">
-                            <Users className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div>
-                            <p className="text-xs text-green-700 dark:text-green-400">Pagados</p>
-                            <p className="font-bold text-foreground">
-                                {stats.pagados}
-                                <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-500/15">
-                            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-xs text-red-700 dark:text-red-400">Deben</p>
-                            <p className="truncate font-bold text-foreground">
-                                {stats.deudores > 0 ? formatARS(stats.totalDeuda) : '—'}
-                            </p>
-                        </div>
-                    </div>
-                </div>
+                </>
             )}
 
-            {/* Tabla */}
+            {/* Lista */}
             {filtradas.length === 0 ? (
                 <div className="rounded-xl border border-border bg-card p-10 text-center text-sm text-muted-foreground shadow-sm">
                     {emptyMessage ?? 'No hay vehículos que coincidan con la búsqueda.'}
                 </div>
             ) : (
-                <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="overflow-x-auto">
-                        <table className="w-full table-fixed text-left text-sm">
-                            <colgroup>
-                                <col className="w-1" />
-                                <col className="w-48" />
-                                <col className="w-28" />
-                                <col className="w-28" />
-                                <col className="w-28" />
-                                <col className="w-24" />
-                                <col className="w-44" />
-                                <col className="w-28" />
-                                <col className="w-28" />
-                            </colgroup>
-                            <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
-                                <tr>
-                                    <th className="w-1 p-0" />
-                                    <SortHeader label="Chofer"    col="chofer"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <SortHeader label="Inversión" col="inversion" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                    <th className="px-3 py-3 font-medium tracking-wider">Efectivo</th>
-                                    <th className="px-3 py-3 font-medium tracking-wider">Transf.</th>
-                                    <th className="px-3 py-3 font-medium tracking-wider">Dcto.</th>
-                                    <th className="px-3 py-3 font-medium tracking-wider">Descripción</th>
-                                    <SortHeader label="Total"     col="total"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right" />
-                                    <SortHeader label="Estado"    col="estado"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {filtradas.map((fila) => (
-                                    <RecaudacionRow
-                                        key={fila.id ?? fila.vehiculo_id}
-                                        fila={fila}
-                                        editable={editable}
-                                        endpoint={endpoint}
-                                    />
-                                ))}
-                            </tbody>
-                        </table>
+                <>
+                    {/* Tarjetas mobile */}
+                    <div className="flex flex-col gap-3 md:hidden">
+                        {filtradas.map((fila) => (
+                            <RecaudacionCard
+                                key={fila.id ?? fila.vehiculo_id}
+                                fila={fila}
+                                editable={editable}
+                                endpoint={endpoint}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Tabla desktop */}
+                    <div className="hidden w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
+                        <div className="overflow-x-auto">
+                            <table className="w-full table-fixed text-left text-sm">
+                                <colgroup>
+                                    <col className="w-1" />
+                                    <col className="w-48" />
+                                    <col className="w-28" />
+                                    <col className="w-28" />
+                                    <col className="w-28" />
+                                    <col className="w-24" />
+                                    <col className="w-44" />
+                                    <col className="w-28" />
+                                    <col className="w-28" />
+                                </colgroup>
+                                <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="w-1 p-0" />
+                                        <SortHeader label="Chofer"    col="chofer"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                        <SortHeader label="Inversión" col="inversion" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                        <th className="px-3 py-3 font-medium tracking-wider">Efectivo</th>
+                                        <th className="px-3 py-3 font-medium tracking-wider">Transf.</th>
+                                        <th className="px-3 py-3 font-medium tracking-wider">Dcto.</th>
+                                        <th className="px-3 py-3 font-medium tracking-wider">Descripción</th>
+                                        <SortHeader label="Total"     col="total"     sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} className="text-right" />
+                                        <SortHeader label="Estado"    col="estado"    sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {filtradas.map((fila) => (
+                                        <RecaudacionRow
+                                            key={fila.id ?? fila.vehiculo_id}
+                                            fila={fila}
+                                            editable={editable}
+                                            endpoint={endpoint}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+function RecaudacionCard({
+    fila,
+    editable,
+    endpoint,
+}: {
+    fila: RecaudacionFila;
+    editable: boolean;
+    endpoint: (fila: RecaudacionFila) => string;
+}) {
+    const { form, total, excede, estado, deuda, save, onKeyDown } = useRecaudacionForm(fila, endpoint, editable);
+
+    return (
+        <div className={cn(
+            'rounded-xl border bg-card shadow-sm overflow-hidden',
+            form.processing && 'opacity-60',
+        )}>
+            {/* Barra de estado superior */}
+            <div className={cn('h-1 w-full', estado === 'pagado' ? 'bg-green-500' : 'bg-red-500')} />
+
+            <div className="p-4">
+                {/* Encabezado: chofer + estado */}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <button type="button" className="flex items-center gap-2 text-left hover:opacity-80 transition-opacity">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                                    {getInitials(fila.chofer)}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-foreground">{fila.chofer}</p>
+                                    <p className="font-mono text-[10px] text-muted-foreground">{fila.patente}</p>
+                                </div>
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent align="start" className="w-64 p-0">
+                            <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-bold text-foreground">
+                                    {getInitials(fila.chofer)}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="truncate font-semibold text-foreground">{fila.chofer}</p>
+                                    <p className="font-mono text-xs text-muted-foreground">{fila.patente}</p>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-0 p-1">
+                                {fila.chofer_telefono ? (
+                                    <a href={`tel:${fila.chofer_telefono}`} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted">
+                                        <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <span className="text-foreground">{fila.chofer_telefono}</span>
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                        <Phone className="h-4 w-4 shrink-0" />
+                                        <span className="italic">Sin teléfono</span>
+                                    </div>
+                                )}
+                                {fila.chofer_correo ? (
+                                    <a href={`mailto:${fila.chofer_correo}`} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted">
+                                        <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <span className="truncate text-foreground">{fila.chofer_correo}</span>
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                        <Mail className="h-4 w-4 shrink-0" />
+                                        <span className="italic">Sin correo</span>
+                                    </div>
+                                )}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
+                    <EstadoBadge estado={estado} deuda={deuda} />
+                </div>
+
+                {/* Inversión */}
+                <p className="mb-3 text-xs text-muted-foreground">{fila.inversion_nombre}</p>
+
+                {/* Inputs en grid 2x2 */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="flex flex-col gap-1">
+                        <Label className="text-xs">Efectivo</Label>
+                        <Input
+                            type="number" min="0" step="0.01" placeholder="0"
+                            className={cn('h-8 text-sm', excede && 'border-red-500')}
+                            value={form.data.efectivo}
+                            onChange={(e) => form.setData('efectivo', e.target.value)}
+                            onKeyDown={onKeyDown}
+                            onBlur={editable ? save : undefined}
+                            disabled={!editable}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <Label className="text-xs">Transferencia</Label>
+                        <Input
+                            type="number" min="0" step="0.01" placeholder="0"
+                            className={cn('h-8 text-sm', excede && 'border-red-500')}
+                            value={form.data.transferencia}
+                            onChange={(e) => form.setData('transferencia', e.target.value)}
+                            onKeyDown={onKeyDown}
+                            onBlur={editable ? save : undefined}
+                            disabled={!editable}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <Label className="text-xs">Descuento</Label>
+                        <Input
+                            type="number" min="0" step="0.01" placeholder="0"
+                            className="h-8 text-sm"
+                            value={form.data.descuento}
+                            onChange={(e) => form.setData('descuento', e.target.value)}
+                            onKeyDown={onKeyDown}
+                            onBlur={editable ? save : undefined}
+                            disabled={!editable}
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <Label className="text-xs">Descripción</Label>
+                        <Input
+                            type="text" placeholder="Opcional..."
+                            className="h-8 text-sm"
+                            value={form.data.descripcion}
+                            onChange={(e) => form.setData('descripcion', e.target.value)}
+                            onKeyDown={onKeyDown}
+                            onBlur={editable ? save : undefined}
+                            disabled={!editable}
+                        />
                     </div>
                 </div>
-            )}
+
+                {/* Total */}
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                    <span className="text-xs text-muted-foreground">Total</span>
+                    <span className={cn('text-base font-bold tabular-nums', excede ? 'text-red-500' : 'text-foreground')}>
+                        {formatARS(total)}
+                    </span>
+                </div>
+            </div>
         </div>
     );
 }
@@ -372,36 +636,7 @@ function RecaudacionRow({
     editable: boolean;
     endpoint: (fila: RecaudacionFila) => string;
 }) {
-    const form = useForm({
-        efectivo:      fila.efectivo > 0      ? String(fila.efectivo)      : '',
-        transferencia: fila.transferencia > 0 ? String(fila.transferencia) : '',
-        descuento:     fila.descuento > 0     ? String(fila.descuento)     : '',
-        descripcion:   fila.descripcion ?? '',
-    });
-
-    const efectivo      = parseFloat(form.data.efectivo)      || 0;
-    const transferencia = parseFloat(form.data.transferencia) || 0;
-    const descuento     = parseFloat(form.data.descuento)     || 0;
-    const total         = efectivo + transferencia;
-    const precioEfectivo = Math.max(Number(fila.precio) - descuento, 0);
-    const excede        = total > precioEfectivo;
-    const estado: 'pagado' | 'deuda' = total >= precioEfectivo ? 'pagado' : 'deuda';
-    const deuda         = Math.max(precioEfectivo - total, 0);
-
-    function save() {
-        if (excede) return;
-        form.transform((data) => ({
-            efectivo:      parseFloat(data.efectivo)      || 0,
-            transferencia: parseFloat(data.transferencia) || 0,
-            descuento:     parseFloat(data.descuento)     || 0,
-            descripcion:   data.descripcion,
-        }));
-        form.patch(endpoint(fila), { preserveScroll: true });
-    }
-
-    function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (e.key === 'Enter') { e.preventDefault(); save(); }
-    }
+    const { form, total, excede, estado, deuda, save, onKeyDown } = useRecaudacionForm(fila, endpoint, editable);
 
     return (
         <tr className={cn('transition-colors hover:bg-muted/30', form.processing && 'opacity-60')}>
