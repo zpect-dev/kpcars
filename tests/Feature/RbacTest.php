@@ -146,9 +146,9 @@ it('ArticuloPolicy: mecánico puede ver/movimentar inventario, sólo admin toca 
 
     expect($this->mecanico->can('view', $articulo))->toBeTrue()
         ->and($this->mecanico->can('storeMovement', \App\Models\Articulo::class))->toBeTrue()
-        ->and($this->mecanico->can('updatePrecio', $articulo))->toBeFalse()
-        ->and($this->administrativo->can('updatePrecio', $articulo))->toBeFalse()
-        ->and($this->admin->can('updatePrecio', $articulo))->toBeTrue();
+        ->and($this->mecanico->can('updateCosto', $articulo))->toBeFalse()
+        ->and($this->administrativo->can('updateCosto', $articulo))->toBeFalse()
+        ->and($this->admin->can('updateCosto', $articulo))->toBeTrue();
 });
 
 it('UserPolicy: nadie puede modificar su propio rol o estado', function () {

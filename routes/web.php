@@ -166,8 +166,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Importación de asignaciones (operación masiva)
         Route::post('asignaciones/import', [AsignacionController::class, 'import'])->name('asignaciones.import');
 
-        // Precios de inventario (decisión comercial)
-        Route::patch('articulos/{articulo}/precio', [ArticuloController::class, 'updatePrecio'])->name('articulos.update-precio');
+        // Costo de inventario (el precio de venta se calcula con +45%)
+        Route::patch('articulos/{articulo}/costo', [ArticuloController::class, 'updateCosto'])->name('articulos.update-costo');
 
         // PDFs/Excels financieros y de cierres
         Route::get('pdf/recaudaciones-actuales', [PdfController::class, 'recaudacionesActuales'])->name('pdf.recaudaciones-actuales');

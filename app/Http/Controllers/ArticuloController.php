@@ -51,7 +51,7 @@ class ArticuloController extends Controller
             'repuestos' => ['nullable', 'boolean'],
             'stock' => ['required', 'integer', 'min:0'],
             'min_stock' => ['required', 'integer', 'min:0'],
-            'precio' => ['nullable', 'numeric', 'min:0'],
+            'costo' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $descripcion = trim($validated['descripcion']);
@@ -72,18 +72,29 @@ class ArticuloController extends Controller
                 if (array_key_exists('repuestos', $validated) && (bool) $validated['repuestos'] !== (bool) $articulo->repuestos) {
                     $updateData['repuestos'] = (bool) $validated['repuestos'];
                 }
+                // Si se reingresa un costo, recalcular el precio (costo * 1.45).
+                if (isset($validated['costo']) && $validated['costo'] !== '') {
+                    $costo = (float) $validated['costo'];
+                    $updateData['costo'] = $costo;
+                    $updateData['precio'] = Articulo::precioDesdeCosto($costo);
+                }
                 if (! empty($updateData)) {
                     $articulo->update($updateData);
                 }
             } else {
-                // Create item with stock 0 initially
+                // Create item with stock 0 initially. Si hay costo, el precio se
+                // calcula automáticamente sumándole el 45%.
+                $hasCosto = isset($validated['costo']) && $validated['costo'] !== '';
+                $costo = $hasCosto ? (float) $validated['costo'] : null;
+
                 $articulo = Articulo::create([
                     'descripcion' => $descripcion,
                     'codigo' => $validated['codigo'] ?? null,
                     'repuestos' => (bool) ($validated['repuestos'] ?? false),
                     'stock' => 0,
                     'min_stock' => $validated['min_stock'],
-                    'precio' => $validated['precio'] ?? 0,
+                    'costo' => $costo,
+                    'precio' => $hasCosto ? Articulo::precioDesdeCosto($costo) : 0,
                 ]);
                 $isNew = true;
             }
@@ -180,18 +191,24 @@ class ArticuloController extends Controller
     }
 
     /**
-     * Update the price for a given item.
+     * Update the cost for a given item. El precio de venta se recalcula
+     * automáticamente sumándole el 45% al costo (precio = costo * 1.45).
      */
-    public function updatePrecio(Request $request, Articulo $articulo): RedirectResponse
+    public function updateCosto(Request $request, Articulo $articulo): RedirectResponse
     {
-        $this->authorize('updatePrecio', $articulo);
+        $this->authorize('updateCosto', $articulo);
 
         $validated = $request->validate([
-            'precio' => ['required', 'numeric', 'min:0'],
+            'costo' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $articulo->update(['precio' => $validated['precio']]);
+        $costo = (float) $validated['costo'];
 
-        return redirect()->back()->with('success', "Precio actualizado para \"{$articulo->descripcion}\".");
+        $articulo->update([
+            'costo' => $costo,
+            'precio' => Articulo::precioDesdeCosto($costo),
+        ]);
+
+        return redirect()->back()->with('success', "Costo actualizado para \"{$articulo->descripcion}\".");
     }
 }

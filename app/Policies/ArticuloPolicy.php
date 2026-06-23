@@ -40,7 +40,7 @@ class ArticuloPolicy
         return $user->isAdminOrAdministrativo() || $user->isMechanic();
     }
 
-    public function updatePrecio(User $user, Articulo $articulo): bool
+    public function updateCosto(User $user, Articulo $articulo): bool
     {
         return $user->isAdmin();
     }

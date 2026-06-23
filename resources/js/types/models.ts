@@ -48,6 +48,7 @@ export interface Articulo {
     repuestos: boolean;
     stock: number;
     min_stock: number;
+    costo: number | null;
     precio: number;
     created_at?: string;
     updated_at?: string;

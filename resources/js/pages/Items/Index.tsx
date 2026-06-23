@@ -32,7 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { index, salidaMultiple, store, updatePrecio } from '@/routes/articulos';
+import { index, salidaMultiple, store, updateCosto } from '@/routes/articulos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -52,6 +52,13 @@ type InventarioTab = 'repuestos' | 'galpon';
 
 // Descripción automática para los egresos de artículos del galpón.
 const GALPON_DESC = 'Artículos para galpón';
+
+// Markup de venta: el precio se calcula sumándole un 45% al costo.
+const MARKUP = 1.45;
+
+function precioDesdeCosto(costo: number): number {
+    return Math.round(costo * MARKUP * 100) / 100;
+}
 
 function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
@@ -94,37 +101,37 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         [items],
     );
 
-    // ─── Edición inline de precio ────────────────────────────────────────────
-    const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
-    const [editingPriceValue, setEditingPriceValue] = useState('');
-    const [savingPriceId, setSavingPriceId] = useState<number | null>(null);
+    // ─── Edición inline de costo (el precio se calcula con +45%) ──────────────
+    const [editingCostId, setEditingCostId] = useState<number | null>(null);
+    const [editingCostValue, setEditingCostValue] = useState('');
+    const [savingCostId, setSavingCostId] = useState<number | null>(null);
 
-    function startEditPrice(item: Articulo) {
-        setEditingPriceId(item.id);
-        setEditingPriceValue(String(item.precio));
+    function startEditCost(item: Articulo) {
+        setEditingCostId(item.id);
+        setEditingCostValue(item.costo != null ? String(item.costo) : '');
     }
 
-    function cancelEditPrice() {
-        setEditingPriceId(null);
-        setEditingPriceValue('');
+    function cancelEditCost() {
+        setEditingCostId(null);
+        setEditingCostValue('');
     }
 
-    function submitPrice(item: Articulo) {
-        const precio = Number(editingPriceValue);
+    function submitCost(item: Articulo) {
+        const costo = Number(editingCostValue);
 
-        if (isNaN(precio) || precio < 0) {
+        if (editingCostValue === '' || isNaN(costo) || costo < 0) {
             return;
         }
 
-        setSavingPriceId(item.id);
+        setSavingCostId(item.id);
         router.patch(
-            updatePrecio.url(item.id),
-            { precio },
+            updateCosto.url(item.id),
+            { costo },
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => cancelEditPrice(),
-                onFinish: () => setSavingPriceId(null),
+                onSuccess: () => cancelEditCost(),
+                onFinish: () => setSavingCostId(null),
             },
         );
     }
@@ -297,7 +304,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         repuestos: false as boolean,
         stock: '0',
         min_stock: '0',
-        precio: '0',
+        costo: '',
     });
 
     const suggestions = useMemo(() => {
@@ -346,7 +353,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             repuestos: activeTab === 'repuestos',
             stock: '0',
             min_stock: '0',
-            precio: '0',
+            costo: '',
         });
         setTimeout(() => descripcionRef.current?.focus(), 50);
     }
@@ -403,7 +410,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             repuestos: Boolean(item.repuestos),
             stock: '0',
             min_stock: String(item.min_stock),
-            precio: String(item.precio ?? 0),
+            costo: item.costo != null ? String(item.costo) : '',
         });
         setShowSuggestions(false);
     }
@@ -531,15 +538,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="w-[38%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[34%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
-                                    </th>
-                                    <th
-                                        scope="col"
-                                        className="w-[14%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
-                                    >
-                                        Código
                                     </th>
                                     <th
                                         scope="col"
@@ -555,7 +556,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     </th>
                                     <th
                                         scope="col"
-                                        className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[19%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Costo
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[19%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Precio
                                     </th>
@@ -599,9 +606,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         {item.descripcion}
                                                     </span>
                                                 </td>
-                                                <td className="truncate px-4 py-3 text-xs text-muted-foreground sm:px-6 sm:py-4">
-                                                    {item.codigo || '—'}
-                                                </td>
                                                 <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
                                                     <span
                                                         className={
@@ -617,7 +621,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     {item.min_stock}
                                                 </td>
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
-                                                    {editingPriceId ===
+                                                    {editingCostId ===
                                                     item.id ? (
                                                         <div className="flex items-center gap-1">
                                                             <Input
@@ -625,10 +629,10 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                 min="0"
                                                                 step="0.01"
                                                                 value={
-                                                                    editingPriceValue
+                                                                    editingCostValue
                                                                 }
                                                                 onChange={(e) =>
-                                                                    setEditingPriceValue(
+                                                                    setEditingCostValue(
                                                                         e.target
                                                                             .value,
                                                                     )
@@ -640,7 +644,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                         e.key ===
                                                                         'Enter'
                                                                     ) {
-                                                                        submitPrice(
+                                                                        submitCost(
                                                                             item,
                                                                         );
                                                                     }
@@ -649,7 +653,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                         e.key ===
                                                                         'Escape'
                                                                     ) {
-                                                                        cancelEditPrice();
+                                                                        cancelEditCost();
                                                                     }
                                                                 }}
                                                                 className="h-7 w-24 text-xs"
@@ -658,17 +662,17 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             <button
                                                                 type="button"
                                                                 onClick={() =>
-                                                                    submitPrice(
+                                                                    submitCost(
                                                                         item,
                                                                     )
                                                                 }
                                                                 disabled={
-                                                                    savingPriceId ===
+                                                                    savingCostId ===
                                                                     item.id
                                                                 }
                                                                 className="text-foreground hover:text-foreground/80 disabled:cursor-default"
                                                             >
-                                                                {savingPriceId ===
+                                                                {savingCostId ===
                                                                 item.id ? (
                                                                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                                 ) : (
@@ -678,7 +682,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             <button
                                                                 type="button"
                                                                 onClick={
-                                                                    cancelEditPrice
+                                                                    cancelEditCost
                                                                 }
                                                                 className="text-muted-foreground hover:text-foreground"
                                                             >
@@ -695,21 +699,28 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             )}
                                                             onClick={() =>
                                                                 isAdmin &&
-                                                                startEditPrice(
+                                                                startEditCost(
                                                                     item,
                                                                 )
                                                             }
                                                             disabled={!isAdmin}
                                                         >
-                                                            {formatARS(
-                                                                Number(
-                                                                    item.precio,
-                                                                ),
-                                                            )}
+                                                            {item.costo != null
+                                                                ? formatARS(
+                                                                      Number(
+                                                                          item.costo,
+                                                                      ),
+                                                                  )
+                                                                : '—'}
                                                             {isAdmin && (
                                                                 <Pencil className="h-3 w-3 text-muted-foreground" />
                                                             )}
                                                         </button>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
+                                                    {formatARS(
+                                                        Number(item.precio),
                                                     )}
                                                 </td>
                                             </tr>
@@ -750,13 +761,6 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         >
                                             {item.descripcion}
                                         </p>
-                                        {item.codigo && (
-                                            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-                                                <span className="inline-flex items-center rounded bg-muted px-1.5 py-0.5 font-mono text-muted-foreground">
-                                                    {item.codigo}
-                                                </span>
-                                            </div>
-                                        )}
                                         <div className="flex items-baseline gap-4 text-xs">
                                             <span>
                                                 Stock:{' '}
@@ -775,6 +779,16 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 Mín:{' '}
                                                 <span className="font-medium">
                                                     {item.min_stock}
+                                                </span>
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                Costo:{' '}
+                                                <span className="font-medium">
+                                                    {item.costo != null
+                                                        ? formatARS(
+                                                              Number(item.costo),
+                                                          )
+                                                        : '—'}
                                                 </span>
                                             </span>
                                             <span className="text-muted-foreground">
@@ -805,7 +819,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
                     {/* Header */}
-                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                    <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
                             <ArrowUpCircle className="h-5 w-5 text-red-500" />
                         </div>
@@ -825,7 +839,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
                     <form
                         onSubmit={handleSalidaSubmit}
-                        className="flex flex-col gap-5 p-5"
+                        className="flex flex-col gap-5 p-4 sm:p-5"
                     >
                         {/* Artículos */}
                         <div className="flex flex-col gap-2">
@@ -919,18 +933,27 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     >
                                                         <Minus className="h-3 w-3" />
                                                     </button>
-                                                    <span
+                                                    <input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        min="1"
+                                                        max={item.stock}
+                                                        value={line.cantidad}
+                                                        onChange={(e) =>
+                                                            updateCantidad(
+                                                                line.articulo_id,
+                                                                e.target.value,
+                                                            )
+                                                        }
                                                         className={cn(
-                                                            'flex h-8 w-8 items-center justify-center bg-card text-sm font-bold tabular-nums',
+                                                            'h-8 w-12 bg-card text-center text-sm font-bold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
                                                             lineErrors[
                                                                 line.articulo_id
                                                             ]
                                                                 ? 'text-destructive'
                                                                 : 'text-foreground',
                                                         )}
-                                                    >
-                                                        {line.cantidad}
-                                                    </span>
+                                                    />
                                                     <button
                                                         type="button"
                                                         onClick={() =>
@@ -1011,9 +1034,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         );
 
                                         return (
-                                            <div className="flex items-center justify-between rounded-xl border border-amber-500/50 bg-amber-500/5 px-4 py-3">
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="flex items-baseline gap-2">
+                                            <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/50 bg-amber-500/5 px-4 py-3">
+                                                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                                         <p className="font-mono text-sm font-bold tracking-widest text-foreground uppercase">
                                                             {
                                                                 salidaForm.data
@@ -1021,14 +1044,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             }
                                                         </p>
                                                         {v && (
-                                                            <span className="text-xs text-muted-foreground">
+                                                            <span className="text-xs break-words text-muted-foreground">
                                                                 {v.marca}{' '}
                                                                 {v.modelo}
                                                             </span>
                                                         )}
                                                     </div>
                                                     {v?.user?.name && (
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex min-w-0 items-center gap-1.5">
                                                             <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-foreground">
                                                                 {v.user.name
                                                                     .split(' ')
@@ -1042,7 +1065,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                     .slice(0, 2)
                                                                     .toUpperCase()}
                                                             </div>
-                                                            <span className="text-xs text-muted-foreground">
+                                                            <span className="truncate text-xs text-muted-foreground">
                                                                 {v.user.name}
                                                             </span>
                                                         </div>
@@ -1056,7 +1079,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                             '',
                                                         )
                                                     }
-                                                    className="text-muted-foreground transition-colors hover:text-foreground"
+                                                    className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                                                 >
                                                     <X className="h-4 w-4" />
                                                 </button>
@@ -1126,7 +1149,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </div>
                         )}
 
-                        <DialogFooter className="flex-row items-center border-t border-border pt-4">
+                        <DialogFooter className="flex-row flex-wrap items-center gap-2 border-t border-border pt-4">
                             <div className="mr-auto flex items-center gap-2">
                                 {salidaValida ? (
                                     <span className="relative flex h-2.5 w-2.5">
@@ -1180,7 +1203,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
                     {/* Header */}
-                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                    <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
                             <ArrowDownCircle className="h-5 w-5 text-orange-500" />
                         </div>
@@ -1229,7 +1252,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
                     <form
                         onSubmit={handleCreateSubmit}
-                        className="flex flex-col gap-5 p-5"
+                        className="flex flex-col gap-5 p-4 sm:p-5"
                     >
                         {/* Artículo */}
                         <div className="flex flex-col gap-1.5">
@@ -1365,45 +1388,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
                         {/* Cantidad */}
                         <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                                 <Label className="text-sm font-medium">
                                     {isNewMode
                                         ? 'Stock inicial'
                                         : 'Cantidad que ingresa'}
                                 </Label>
-                                {!isNewMode && (
-                                    <div className="flex items-center gap-1">
-                                        <span className="mr-0.5 text-xs text-muted-foreground">
-                                            Sumar
-                                        </span>
-                                        {[1, 5, 10, 25].map((n) => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() =>
-                                                    createForm.setData(
-                                                        'stock',
-                                                        String(
-                                                            Math.max(
-                                                                0,
-                                                                Number(
-                                                                    createForm
-                                                                        .data
-                                                                        .stock,
-                                                                ) + n,
-                                                            ),
-                                                        ),
-                                                    )
-                                                }
-                                                className="h-6 rounded-full border border-border bg-card px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted"
-                                            >
-                                                +{n}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
-                            <div className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-3">
+                            <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card px-4 py-3">
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
@@ -1425,9 +1417,19 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     >
                                         <Minus className="h-3.5 w-3.5" />
                                     </button>
-                                    <span className="w-12 text-center text-2xl font-semibold text-foreground tabular-nums">
-                                        {createForm.data.stock}
-                                    </span>
+                                    <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        min="0"
+                                        value={createForm.data.stock}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'stock',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="w-16 bg-transparent text-center text-2xl font-semibold text-foreground tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    />
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -1568,72 +1570,70 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         </button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label htmlFor="codigo">Código</Label>
-                                        <Input
-                                            id="codigo"
-                                            type="text"
-                                            value={createForm.data.codigo}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'codigo',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Opcional"
-                                        />
-                                        <InputError
-                                            message={createForm.errors.codigo}
-                                        />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label htmlFor="min_stock">
-                                            Stock mínimo
-                                        </Label>
-                                        <Input
-                                            id="min_stock"
-                                            type="number"
-                                            min="0"
-                                            value={createForm.data.min_stock}
-                                            onChange={(e) =>
-                                                createForm.setData(
-                                                    'min_stock',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        <InputError
-                                            message={
-                                                createForm.errors.min_stock
-                                            }
-                                        />
-                                    </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="min_stock">
+                                        Stock mínimo
+                                    </Label>
+                                    <Input
+                                        id="min_stock"
+                                        type="number"
+                                        min="0"
+                                        value={createForm.data.min_stock}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'min_stock',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={createForm.errors.min_stock}
+                                    />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="precio">Precio (ARS)</Label>
+                                    <Label htmlFor="costo">Costo (ARS)</Label>
                                     <Input
-                                        id="precio"
+                                        id="costo"
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        value={createForm.data.precio}
+                                        value={createForm.data.costo}
                                         onChange={(e) =>
                                             createForm.setData(
-                                                'precio',
+                                                'costo',
                                                 e.target.value,
                                             )
                                         }
                                         placeholder="0.00"
                                     />
+                                    <p className="text-xs text-muted-foreground">
+                                        {createForm.data.costo &&
+                                        Number(createForm.data.costo) > 0 ? (
+                                            <>
+                                                Precio de venta (+45%):{' '}
+                                                <span className="font-semibold text-foreground">
+                                                    {formatARS(
+                                                        precioDesdeCosto(
+                                                            Number(
+                                                                createForm.data
+                                                                    .costo,
+                                                            ),
+                                                        ),
+                                                    )}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            'El precio de venta se calcula sumando 45% al costo.'
+                                        )}
+                                    </p>
                                     <InputError
-                                        message={createForm.errors.precio}
+                                        message={createForm.errors.costo}
                                     />
                                 </div>
                             </>
                         )}
 
-                        <DialogFooter className="flex-row items-center border-t border-border pt-4">
+                        <DialogFooter className="flex-row flex-wrap items-center gap-2 border-t border-border pt-4">
                             {isRestock && Number(createForm.data.stock) > 0 && (
                                 <div className="mr-auto flex items-center gap-2 text-sm font-medium text-emerald-500">
                                     <span className="relative flex h-2.5 w-2.5">

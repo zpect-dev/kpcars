@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Articulo extends Model
 {
+    /**
+     * Markup de venta aplicado sobre el costo: precio = costo * 1.45.
+     */
+    public const MARKUP = 1.45;
+
     protected $table = 'articulos';
 
     protected $fillable = [
@@ -17,6 +22,7 @@ class Articulo extends Model
         'repuestos',
         'stock',
         'min_stock',
+        'costo',
         'precio',
     ];
 
@@ -30,9 +36,18 @@ class Articulo extends Model
         return [
             'stock' => 'integer',
             'min_stock' => 'integer',
+            'costo' => 'decimal:2',
             'precio' => 'decimal:2',
             'repuestos' => 'boolean',
         ];
+    }
+
+    /**
+     * Precio de venta calculado a partir de un costo aplicando el markup.
+     */
+    public static function precioDesdeCosto(float $costo): float
+    {
+        return round($costo * self::MARKUP, 2);
     }
 
     /**
