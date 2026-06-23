@@ -37,6 +37,7 @@ class CobroController extends Controller
                 inversiones.nombre as inversion_nombre,
                 empresas.nombre as empresa_nombre,
                 SUM(articulos.precio * transacciones.cantidad) as total,
+                SUM((articulos.precio - COALESCE(articulos.costo, articulos.precio / 1.45)) * transacciones.cantidad) as ganancia,
                 COUNT(cobros.id) as transacciones_count
             ')
             ->groupBy('cobros.inversion_id', 'cobros.empresa_id', 'inversiones.nombre', 'empresas.nombre')
@@ -46,6 +47,7 @@ class CobroController extends Controller
             ->values();
 
         $totalGeneral = $resumen->sum('total');
+        $totalGanancia = $resumen->sum('ganancia');
 
         // Get the last cierre info
         $ultimoCierre = CierreCaja::with('user:id,name')
@@ -99,6 +101,7 @@ class CobroController extends Controller
         return Inertia::render('Cobros/Index', [
             'resumen' => $resumen,
             'totalGeneral' => $totalGeneral,
+            'totalGanancia' => $totalGanancia,
             'ultimoCierre' => $ultimoCierre,
             'historialCierres' => $historialCierres,
             'resumenIntegrado' => $resumenIntegrado,

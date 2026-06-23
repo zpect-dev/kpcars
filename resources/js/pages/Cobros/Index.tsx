@@ -10,6 +10,7 @@ import {
     FileSpreadsheet,
     Lock,
     Receipt,
+    TrendingUp,
     User,
 } from 'lucide-react';
 import { Fragment, useState } from 'react';
@@ -52,6 +53,7 @@ function formatDate(date: string): string {
 interface Props {
     resumen: CobroResumenInversion[];
     totalGeneral: number;
+    totalGanancia: number;
     ultimoCierre: {
         id: number;
         user: { id: number; name: string };
@@ -65,6 +67,7 @@ interface Props {
 export default function CobrosIndex({
     resumen,
     totalGeneral,
+    totalGanancia,
     ultimoCierre,
     historialCierres,
     resumenIntegrado,
@@ -279,19 +282,37 @@ export default function CobrosIndex({
                     </div>
                 </div>
 
-                {/* Total General Card */}
-                <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                            <CircleDollarSign className="h-5 w-5 text-muted-foreground" />
+                {/* Total General + Ganancia */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                <CircleDollarSign className="h-5 w-5 text-muted-foreground" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                    Total de la semana actual
+                                </p>
+                                <p className="text-2xl font-bold text-foreground">
+                                    {formatARS(totalGeneral)}
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                Total de la semana actual
-                            </p>
-                            <p className="text-2xl font-bold text-foreground">
-                                {formatARS(totalGeneral)}
-                            </p>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
+                                <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+                                    Ganancia de la semana
+                                </p>
+                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                    {formatARS(totalGanancia)}
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
