@@ -41,7 +41,7 @@ interface User {
         licencia: DocUrls;
         dni: DocUrls;
     };
-    vehiculo?: { patente: string; marca: string; modelo: string } | null;
+    vehiculo?: { patente: string; marca: string; modelo: string; precio?: number } | null;
     licencia_por_vencer?: boolean;
     sin_licencia?: boolean;
     falta_foto?: boolean;
@@ -123,7 +123,7 @@ function AvatarDropzone({
     );
 }
 
-type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito';
+type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito' | 'deposito_bajo';
 
 const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     all:                  'Todos',
@@ -134,6 +134,7 @@ const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     falta_telefono:       'Sin teléfono',
     falta_correo:         'Sin correo',
     falta_deposito:       'Sin depósito',
+    deposito_bajo:        'Depósito bajo',
 };
 
 const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: string; desc: string }[] }[] = [
@@ -156,7 +157,8 @@ const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: s
     {
         label: 'Garantía',
         items: [
-            { val: 'falta_deposito', label: 'Sin depósito', desc: 'Sin garantía registrada' },
+            { val: 'falta_deposito', label: 'Sin depósito',  desc: 'Sin garantía registrada' },
+            { val: 'deposito_bajo',  label: 'Depósito bajo', desc: 'ARS inferior a 1.5× el valor semanal del vehículo' },
         ],
     },
 ];
@@ -246,6 +248,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'falta_telefono') return !u.telefono;
                 if (filterAlert === 'falta_correo') return !u.correo;
                 if (filterAlert === 'falta_deposito') return !u.deposito;
+                if (filterAlert === 'deposito_bajo') {
+                    if (!u.vehiculo?.precio) return false;
+                    if (!u.deposito) return true;
+                    if (u.deposito_moneda === 'USD') return false;
+                    return Number(u.deposito) < 1.5 * u.vehiculo.precio;
+                }
                 return true;
             });
         }
@@ -253,7 +261,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0 };
+        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0, deposito_bajo: 0 };
         const today = new Date(); today.setHours(0, 0, 0, 0);
         return {
             licencia_vencida: users.filter((u) => {
@@ -266,6 +274,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             falta_telefono: users.filter((u) => !u.telefono).length,
             falta_correo: users.filter((u) => !u.correo).length,
             falta_deposito: users.filter((u) => !u.deposito).length,
+            deposito_bajo: users.filter((u) => {
+                if (!u.vehiculo?.precio) return false;
+                if (!u.deposito) return true;
+                if (u.deposito_moneda === 'USD') return false;
+                return Number(u.deposito) < 1.5 * u.vehiculo.precio;
+            }).length,
         };
     }, [users, filterRole]);
 

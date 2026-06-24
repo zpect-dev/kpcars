@@ -170,6 +170,7 @@ class UserController extends Controller
                     'patente' => $vehiculo->patente,
                     'marca'   => $vehiculo->marca,
                     'modelo'  => $vehiculo->modelo,
+                    'precio'  => $vehiculo->precio,
                 ] : null;
                 $arr['licencia_por_vencer'] = $vencimientoLicencia !== null
                     && $vencimientoLicencia->gte($today)
