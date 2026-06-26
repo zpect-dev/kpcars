@@ -70,6 +70,14 @@ class RecaudacionController extends Controller
 
         $ultimo = CierreRecaudacion::with('user:id,name')->latest()->first();
 
+        // Ganancia potencial: lo que recaudaría la empresa si TODOS los autos de la
+        // flota estuvieran alquilados (con chofer). Suma el precio de cada vehículo
+        // de la empresa activa, excluyendo el ficticio EXTERNO. El TenantScope lo
+        // limita a la empresa activa.
+        $gananciaPotencial = (float) Vehiculo::query()
+            ->where('patente', '!=', 'EXTERNO')
+            ->sum('precio');
+
         return Inertia::render('Recaudaciones/Index', [
             'abierta' => $apertura !== null,
             'apertura' => $apertura
@@ -77,6 +85,7 @@ class RecaudacionController extends Controller
                 : null,
             'filas' => $filas,
             'totalGeneral' => $filas->sum('total'),
+            'gananciaPotencial' => $gananciaPotencial,
             'ultimoCierre' => $ultimo
                 ? ['id' => $ultimo->id, 'user' => $ultimo->user, 'created_at' => $ultimo->created_at]
                 : null,

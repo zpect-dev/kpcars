@@ -8,6 +8,7 @@ import {
     FileSpreadsheet,
     History,
     Lock,
+    Target,
     Unlock,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -32,6 +33,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import type { RecaudacionFila } from '@/types';
 
 interface Props {
@@ -43,6 +49,7 @@ interface Props {
     } | null;
     filas: RecaudacionFila[];
     totalGeneral: number;
+    gananciaPotencial: number;
     ultimoCierre: {
         id: number;
         user: { id: number; name: string } | null;
@@ -55,6 +62,7 @@ export default function RecaudacionesIndex({
     apertura,
     filas,
     totalGeneral,
+    gananciaPotencial,
     ultimoCierre,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -70,6 +78,12 @@ export default function RecaudacionesIndex({
         () => filas.some((f) => f.estado === 'deuda'),
         [filas],
     );
+
+    // Porcentaje del potencial de la flota que ya está recaudado en este período.
+    const porcentajeAlcanzado =
+        gananciaPotencial > 0
+            ? Math.round((totalGeneral / gananciaPotencial) * 100)
+            : 0;
 
 
     function handleCierre() {
@@ -153,6 +167,60 @@ export default function RecaudacionesIndex({
                                     <ClipboardList className="mr-1.5 h-4 w-4" />
                                     Resumen
                                 </Button>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" size="sm">
+                                            <Target className="mr-1.5 h-4 w-4 text-indigo-500" />
+                                            Potencial
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" className="w-72 p-0">
+                                        <div className="flex items-start gap-3 border-b border-border px-4 py-3">
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15">
+                                                <Target className="h-5 w-5 text-indigo-500" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-semibold text-foreground">
+                                                    Ganancia potencial
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Si todos los autos estuvieran alquilados.
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="px-4 py-3">
+                                            <p className="text-2xl font-bold tabular-nums text-foreground">
+                                                {formatARS(gananciaPotencial)}
+                                            </p>
+                                            <div className="mt-3 flex flex-col gap-1.5">
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-muted-foreground">
+                                                        Recaudado
+                                                    </span>
+                                                    <span className="font-medium tabular-nums text-foreground">
+                                                        {formatARS(totalGeneral)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-muted-foreground">
+                                                        Alcanzado
+                                                    </span>
+                                                    <span className="font-medium tabular-nums text-foreground">
+                                                        {porcentajeAlcanzado}%
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full rounded-full bg-indigo-500 transition-all"
+                                                        style={{
+                                                            width: `${Math.min(porcentajeAlcanzado, 100)}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <Button variant="outline" size="sm" disabled={filas.length === 0}>
