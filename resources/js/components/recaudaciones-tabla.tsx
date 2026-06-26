@@ -64,55 +64,157 @@ export function ResumenRecaudacionModal({
     filas: RecaudacionFila[];
     totalGeneral: number;
 }) {
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
     const resumen = useMemo(() => {
-        const map = new Map<string, number>();
+        const map = new Map<string, { total: number; filas: RecaudacionFila[] }>();
         for (const f of filas) {
-            map.set(f.inversion_nombre, (map.get(f.inversion_nombre) ?? 0) + Number(f.total));
+            if (!map.has(f.inversion_nombre)) map.set(f.inversion_nombre, { total: 0, filas: [] });
+            const entry = map.get(f.inversion_nombre)!;
+            entry.total += Number(f.total);
+            entry.filas.push(f);
         }
         return Array.from(map.entries())
-            .map(([inversion_nombre, total]) => ({ inversion_nombre, total }))
+            .map(([inversion_nombre, { total, filas: inv_filas }]) => ({ inversion_nombre, total, filas: inv_filas }))
             .sort((a, b) => a.inversion_nombre.localeCompare(b.inversion_nombre, 'es', { numeric: true }));
     }, [filas]);
 
+    function toggleExpand(nombre: string) {
+        setExpanded((prev) => {
+            const next = new Set(prev);
+            if (next.has(nombre)) next.delete(nombre);
+            else next.add(nombre);
+            return next;
+        });
+    }
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[520px]">
                 <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
                         <TrendingUp className="h-5 w-5 text-teal-500" />
                     </div>
                     <div className="flex-1">
                         <DialogTitle className="text-base font-semibold">Resumen de recaudaciones</DialogTitle>
-                        <DialogDescription className="text-xs">Total recaudado por inversión.</DialogDescription>
+                        <DialogDescription className="text-xs">Total recaudado por inversión. Expandí cada una para ver el detalle.</DialogDescription>
                     </div>
                 </div>
                 <div className="max-h-[60vh] overflow-y-auto">
                 {resumen.length === 0 ? (
                     <p className="py-8 text-center text-sm text-muted-foreground">No hay recaudaciones cargadas.</p>
                 ) : (
-                    <div className="overflow-hidden rounded-xl border border-border">
-                        <table className="w-full text-left text-sm">
-                            <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
-                                <tr>
-                                    <th className="px-4 py-2.5 font-medium tracking-wider">Inversión</th>
-                                    <th className="px-4 py-2.5 text-right font-medium tracking-wider">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {resumen.map((inv) => (
-                                    <tr key={inv.inversion_nombre} className="hover:bg-muted/40">
-                                        <td className="px-4 py-2.5 text-foreground">{inv.inversion_nombre}</td>
-                                        <td className="px-4 py-2.5 text-right font-medium text-foreground tabular-nums">{formatARS(inv.total)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                            <tfoot className="border-t-2 border-border bg-muted/30">
-                                <tr>
-                                    <td className="px-4 py-3 font-semibold text-foreground">Total general</td>
-                                    <td className="px-4 py-3 text-right text-base font-bold text-foreground tabular-nums">{formatARS(totalGeneral)}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                    <div className="divide-y divide-border">
+                        {resumen.map((inv) => {
+                            const isOpen = expanded.has(inv.inversion_nombre);
+                            const pagados  = inv.filas.filter((f) => f.estado === 'pagado').length;
+                            const deudores = inv.filas.filter((f) => f.estado === 'deuda').length;
+                            return (
+                                <div key={inv.inversion_nombre}>
+                                    {/* Fila de inversión — clickeable */}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleExpand(inv.inversion_nombre)}
+                                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
+                                    >
+                                        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', isOpen && 'rotate-180')} />
+                                        <span className="flex-1 text-sm font-medium text-foreground">{inv.inversion_nombre}</span>
+                                        <span className="text-xs text-muted-foreground tabular-nums">
+                                            {inv.filas.length} auto{inv.filas.length !== 1 ? 's' : ''}
+                                        </span>
+                                        <span className="min-w-[90px] text-right text-sm font-semibold tabular-nums text-foreground">
+                                            {formatARS(inv.total)}
+                                        </span>
+                                    </button>
+
+                                    {/* Mini resumen expandible */}
+                                    {isOpen && (
+                                        <div className="border-t border-border bg-muted/20 px-4 pb-3 pt-2">
+                                            {/* Badges de resumen rápido */}
+                                            <div className="mb-2 flex gap-2">
+                                                {pagados > 0 && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                        <Check className="h-3 w-3" /> {pagados} pagado{pagados !== 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                                {deudores > 0 && (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                        {deudores} deben
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Tabla de autos — solo los que pagaron */}
+                                            {pagados > 0 ? (
+                                                <div className="overflow-hidden rounded-lg border border-border">
+                                                    <table className="w-full text-left text-xs">
+                                                        <thead className="border-b border-border bg-muted/60 text-muted-foreground">
+                                                            <tr>
+                                                                <th className="px-3 py-1.5 font-medium">Patente</th>
+                                                                <th className="px-3 py-1.5 font-medium">Chofer</th>
+                                                                <th className="px-3 py-1.5 text-right font-medium">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-border">
+                                                            {inv.filas
+                                                                .filter((f) => f.estado === 'pagado')
+                                                                .sort((a, b) => a.patente.localeCompare(b.patente, 'es', { numeric: true }))
+                                                                .map((f) => (
+                                                                    <tr key={f.id ?? f.vehiculo_id} className="bg-card">
+                                                                        <td className="px-3 py-1.5 font-mono font-medium text-foreground">{f.patente}</td>
+                                                                        <td className="px-3 py-1.5 text-muted-foreground">{f.chofer}</td>
+                                                                        <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-foreground">{formatARS(Number(f.total))}</td>
+                                                                    </tr>
+                                                                ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground italic">Ningún auto pagó todavía.</p>
+                                            )}
+
+                                            {/* Tabla de descuentos */}
+                                            {inv.filas.some((f) => Number(f.descuento) > 0) && (
+                                                <div className="mt-3">
+                                                    <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">Descuentos</p>
+                                                    <div className="overflow-hidden rounded-lg border border-amber-200 dark:border-amber-900/40">
+                                                        <table className="w-full text-left text-xs">
+                                                            <thead className="border-b border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-400">
+                                                                <tr>
+                                                                    <th className="px-3 py-1.5 font-medium">Patente</th>
+                                                                    <th className="px-3 py-1.5 font-medium">Chofer</th>
+                                                                    <th className="px-3 py-1.5 text-right font-medium">Descuento</th>
+                                                                    <th className="px-3 py-1.5 font-medium">Descripción</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-amber-100 dark:divide-amber-900/30">
+                                                                {inv.filas
+                                                                    .filter((f) => Number(f.descuento) > 0)
+                                                                    .sort((a, b) => a.patente.localeCompare(b.patente, 'es', { numeric: true }))
+                                                                    .map((f) => (
+                                                                        <tr key={f.id ?? f.vehiculo_id} className="bg-card">
+                                                                            <td className="px-3 py-1.5 font-mono font-medium text-foreground">{f.patente}</td>
+                                                                            <td className="px-3 py-1.5 text-muted-foreground">{f.chofer}</td>
+                                                                            <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-amber-700 dark:text-amber-400">{formatARS(Number(f.descuento))}</td>
+                                                                            <td className="px-3 py-1.5 text-muted-foreground">{f.descripcion || <span className="italic">—</span>}</td>
+                                                                        </tr>
+                                                                    ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {/* Footer total general */}
+                        <div className="flex items-center justify-between bg-muted/30 px-4 py-3">
+                            <span className="text-sm font-semibold text-foreground">Total general</span>
+                            <span className="text-base font-bold tabular-nums text-foreground">{formatARS(totalGeneral)}</span>
+                        </div>
                     </div>
                 )}
                 </div>

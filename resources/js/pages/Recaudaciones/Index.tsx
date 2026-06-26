@@ -8,6 +8,7 @@ import {
     FileSpreadsheet,
     History,
     Lock,
+    Percent,
     Target,
     Unlock,
 } from 'lucide-react';
@@ -71,12 +72,25 @@ export default function RecaudacionesIndex({
     const [showCierreModal, setShowCierreModal] = useState(false);
     const [showAbrirModal, setShowAbrirModal] = useState(false);
     const [showResumenModal, setShowResumenModal] = useState(false);
+    const [showDescuentosModal, setShowDescuentosModal] = useState(false);
     const [processingCierre, setProcessingCierre] = useState(false);
     const [processingAbrir, setProcessingAbrir] = useState(false);
 
     const hayDeudores = useMemo(
         () => filas.some((f) => f.estado === 'deuda'),
         [filas],
+    );
+
+    const filasConDescuento = useMemo(
+        () => filas
+            .filter((f) => Number(f.descuento) > 0)
+            .sort((a, b) => a.patente.localeCompare(b.patente, 'es', { numeric: true })),
+        [filas],
+    );
+
+    const totalDescuentos = useMemo(
+        () => filasConDescuento.reduce((s, f) => s + Number(f.descuento), 0),
+        [filasConDescuento],
     );
 
     // Porcentaje del potencial de la flota que ya está recaudado en este período.
@@ -167,6 +181,16 @@ export default function RecaudacionesIndex({
                                     <ClipboardList className="mr-1.5 h-4 w-4" />
                                     Resumen
                                 </Button>
+                                {filasConDescuento.length > 0 && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowDescuentosModal(true)}
+                                    >
+                                        <Percent className="mr-1.5 h-4 w-4 text-amber-500" />
+                                        Descuentos
+                                    </Button>
+                                )}
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" size="sm">
@@ -299,6 +323,55 @@ export default function RecaudacionesIndex({
                     />
                 )}
             </div>
+
+            {/* Modal descuentos */}
+            <Dialog open={showDescuentosModal} onOpenChange={setShowDescuentosModal}>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[560px]">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+                            <Percent className="h-5 w-5 text-amber-500" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Descuentos del período</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {filasConDescuento.length} auto{filasConDescuento.length !== 1 ? 's' : ''} con descuento — total {formatARS(totalDescuentos)}
+                            </DialogDescription>
+                        </div>
+                    </div>
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
+                                <tr>
+                                    <th className="px-4 py-2.5 font-medium tracking-wider">Patente</th>
+                                    <th className="px-4 py-2.5 font-medium tracking-wider">Chofer</th>
+                                    <th className="px-4 py-2.5 text-right font-medium tracking-wider">Descuento</th>
+                                    <th className="px-4 py-2.5 font-medium tracking-wider">Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {filasConDescuento.map((f) => (
+                                    <tr key={f.id ?? f.vehiculo_id} className="bg-card hover:bg-muted/40">
+                                        <td className="px-4 py-2.5 font-mono font-medium text-foreground">{f.patente}</td>
+                                        <td className="px-4 py-2.5 text-foreground">{f.chofer}</td>
+                                        <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(Number(f.descuento))}</td>
+                                        <td className="px-4 py-2.5 text-muted-foreground">{f.descripcion || <span className="italic">—</span>}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot className="border-t-2 border-border bg-muted/30">
+                                <tr>
+                                    <td colSpan={2} className="px-4 py-3 font-semibold text-foreground">Total descuentos</td>
+                                    <td className="px-4 py-3 text-right text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(totalDescuentos)}</td>
+                                    <td />
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <DialogFooter className="border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setShowDescuentosModal(false)}>Cerrar</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Modal resumen por inversión */}
             <ResumenRecaudacionModal
