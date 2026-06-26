@@ -11,6 +11,7 @@ use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
+use App\Http\Controllers\HistorialController;
 use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
@@ -104,6 +105,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Transacciones (vista)
         Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+
+        // Historial de movimientos de personal (altas/bajas de choferes y cambios
+        // de vehículo) con stats, filtros y ajuste de fechas inline.
+        Route::get('historial', [HistorialController::class, 'index'])->name('historial.index');
+        Route::patch('historial/chofer-evento/{choferEvento}', [HistorialController::class, 'updateChoferEvento'])->name('historial.chofer-evento.update');
+        Route::patch('historial/asignacion/{asignacion}', [HistorialController::class, 'updateAsignacion'])->name('historial.asignacion.update');
 
         // PDFs operativos
         Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');

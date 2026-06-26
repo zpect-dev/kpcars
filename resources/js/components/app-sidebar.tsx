@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, Package, Receipt, Users, Wallet } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Users, Wallet } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -93,6 +93,10 @@ setOpenMobile(false);
                 { title: 'Inversores', href: '/users?role=inversor', isActive: currentRole === 'inversor' },
             ],
         });
+    }
+
+    if (perms.can_view_historial) {
+        gestionItems.push({ title: 'Historial', href: '/historial', icon: History });
     }
 
     // ── Grupo Inversiones (admin only) ──────────────────────────────────

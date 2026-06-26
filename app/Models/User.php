@@ -173,6 +173,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Eventos de alta/baja del chofer (auditoría para el reporte de personal).
+     */
+    public function choferEventos(): HasMany
+    {
+        return $this->hasMany(ChoferEvento::class);
+    }
+
+    /**
      * Inversiones en las que el usuario participa como inversor.
      */
     public function inversiones(): \Illuminate\Database\Eloquent\Relations\BelongsToMany

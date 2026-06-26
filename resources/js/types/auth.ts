@@ -47,6 +47,7 @@ export type Permissions = Partial<{
     can_manage_service: boolean;
     can_view_personal: boolean;
     can_manage_users: boolean;
+    can_view_historial: boolean;
     can_view_cobros: boolean;
     can_manage_cobros: boolean;
     can_view_recaudaciones: boolean;

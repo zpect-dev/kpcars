@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\SaveUserDocumentsAction;
+use App\Enums\ChoferEventoTipo;
 use App\Enums\DepositoMoneda;
 use App\Enums\UserRole;
 use App\Models\Asignacion;
+use App\Models\ChoferEvento;
 use App\Models\Empresa;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -105,6 +107,15 @@ class UserController extends Controller
 
         $documentos->execute($user, $request);
 
+        // Auditoría: registra el alta del chofer para el reporte de movimientos.
+        if ($user->isChofer()) {
+            ChoferEvento::create([
+                'user_id' => $user->id,
+                'tipo' => ChoferEventoTipo::ALTA,
+                'registrado_por' => auth()->id(),
+            ]);
+        }
+
         return redirect()->back()->with('success', 'Usuario creado correctamente.');
     }
 
@@ -148,6 +159,7 @@ class UserController extends Controller
             // vehiculoAsignado (vehiculos.user_id) — misma fuente que el dashboard.
             $query->with([
                 'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+                'choferEventos' => fn ($q) => $q->orderByDesc('created_at')->orderByDesc('id'),
             ]);
         }
 
@@ -162,7 +174,7 @@ class UserController extends Controller
         if ($isChoferFilter) {
             $today = now()->startOfDay();
             $users = $users->map(function (User $user) use ($today) {
-                $arr = collect($user->toArray())->except(['vehiculo_asignado'])->all();
+                $arr = collect($user->toArray())->except(['vehiculo_asignado', 'chofer_eventos'])->all();
                 $vehiculo = $user->vehiculoAsignado;
                 $vencimientoLicencia = $user->fecha_vencimiento_licencia;
 
@@ -177,6 +189,12 @@ class UserController extends Controller
                     && $vencimientoLicencia->lte($today->copy()->addDays(30));
                 $arr['sin_licencia'] = $vencimientoLicencia === null;
                 $arr['falta_foto'] = $user->profile_photo_path === null;
+
+                // Fechas de alta/baja desde la auditoría (chofer_eventos), misma
+                // fuente que el reporte. Se toma el último evento de cada tipo.
+                $eventos = $user->choferEventos; // ya ordenados desc por la relación
+                $arr['alta_fecha'] = $eventos->firstWhere('tipo', \App\Enums\ChoferEventoTipo::ALTA)?->created_at?->toISOString();
+                $arr['baja_fecha'] = $eventos->firstWhere('tipo', \App\Enums\ChoferEventoTipo::BAJA)?->created_at?->toISOString();
 
                 return $arr;
             });
@@ -242,6 +260,16 @@ class UserController extends Controller
                 'estado_actualizado_en' => now(),
             ]);
 
+            // Auditoría: registra alta (reactivación) o baja (desactivación) del
+            // chofer para el reporte de movimientos de personal.
+            if ($user->isChofer()) {
+                ChoferEvento::create([
+                    'user_id' => $user->id,
+                    'tipo' => $newInactivoStatus ? ChoferEventoTipo::BAJA : ChoferEventoTipo::ALTA,
+                    'registrado_por' => auth()->id(),
+                ]);
+            }
+
             // Si el usuario es desactivado, quitar asignaciones de vehículos
             if ($newInactivoStatus) {
                 // Cerrar las asignaciones activas en el historial
@@ -279,8 +307,16 @@ class UserController extends Controller
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
             'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
+            'alta_fecha' => ['nullable', 'date'],
+            'baja_fecha' => ['nullable', 'date'],
             ...$this->documentRules(),
         ]);
+
+        // Las fechas de alta/baja no son columnas del usuario: se aplican a la
+        // auditoría (chofer_eventos) más abajo, no al mass-assignment.
+        $altaFecha = $validated['alta_fecha'] ?? null;
+        $bajaFecha = $validated['baja_fecha'] ?? null;
+        unset($validated['alta_fecha'], $validated['baja_fecha']);
 
         // Limpiar moneda si no hay depósito
         if (empty($validated['deposito'])) {
@@ -326,7 +362,48 @@ class UserController extends Controller
 
         $documentos->execute($user, $request);
 
+        // Ajuste manual de las fechas de alta/baja (auditoría del reporte). Sólo
+        // para choferes; modifica el último evento de cada tipo conservando la
+        // hora original. Si no existe un evento de alta, se crea.
+        if ($user->isChofer() && ($altaFecha !== null || $bajaFecha !== null)) {
+            $this->ajustarFechaEvento($user, ChoferEventoTipo::ALTA, $altaFecha, crearSiFalta: true);
+            $this->ajustarFechaEvento($user, ChoferEventoTipo::BAJA, $bajaFecha, crearSiFalta: false);
+        }
+
         return redirect()->back()->with('success', 'Usuario actualizado correctamente.');
+    }
+
+    /**
+     * Reescribe la fecha (created_at) del último evento de auditoría del tipo dado
+     * para un chofer, conservando la hora original. Si no existe y $crearSiFalta es
+     * true, lo crea con la fecha indicada. Valores null no hacen nada.
+     */
+    private function ajustarFechaEvento(User $user, ChoferEventoTipo $tipo, ?string $fecha, bool $crearSiFalta): void
+    {
+        if ($fecha === null) {
+            return;
+        }
+
+        $evento = $user->choferEventos()
+            ->where('tipo', $tipo)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($evento === null) {
+            if (! $crearSiFalta) {
+                return;
+            }
+            $evento = new ChoferEvento(['user_id' => $user->id, 'tipo' => $tipo, 'registrado_por' => auth()->id()]);
+            $evento->user_id = $user->id;
+        }
+
+        // Conserva la hora del evento existente; para uno nuevo usa la hora actual.
+        $hora = ($evento->created_at ?? now())->format('H:i:s');
+        $nuevaFecha = \Illuminate\Support\Carbon::parse($fecha)->setTimeFromTimeString($hora);
+
+        $evento->created_at = $nuevaFecha;
+        $evento->save();
     }
 
     public function asignaciones(User $user): Response

@@ -28,6 +28,8 @@ interface User {
     inactivo: boolean;
     estado_actualizado_en?: string | null;
     created_at?: string | null;
+    alta_fecha?: string | null;
+    baja_fecha?: string | null;
     correo?: string | null;
     telefono?: string | null;
     fecha_vencimiento_licencia?: string | null;
@@ -332,6 +334,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         correo: '',
         telefono: '',
         fecha_vencimiento_licencia: '',
+        alta_fecha: '' as string,
+        baja_fecha: '' as string,
         profile_photo: null as File | null,
         empresas: [] as number[],
         empresa_restringida_id: '' as string,
@@ -358,6 +362,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 .split(' ')[0];
         }
 
+        const toDateInput = (v?: string | null) => (v ? v.split('T')[0].split(' ')[0] : '');
+
         editForm.setData({
             _method: 'put',
             name: user.name,
@@ -365,6 +371,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             correo: user.correo || '',
             telefono: user.telefono || '+54 ',
             fecha_vencimiento_licencia: formattedDate,
+            alta_fecha: toDateInput(user.alta_fecha),
+            baja_fecha: toDateInput(user.baja_fecha),
             profile_photo: null,
             empresas: (user.empresas ?? []).map((e) => e.id),
             empresa_restringida_id: user.empresa_restringida_id ? String(user.empresa_restringida_id) : '',
@@ -475,13 +483,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         return `${currency} ${amount}`;
     }
 
-    // Fecha a mostrar en la columna Alta/Baja:
-    // - Inactivo (baja): el momento real en que se desactivó.
-    // - Activo (alta): el momento en que se (re)activó; si nunca pasó por el
-    //   toggle, su alta es la fecha de creación del chofer.
+    // Fecha a mostrar en la columna Alta/Baja, tomada de la auditoría
+    // (chofer_eventos) — misma fuente que el reporte y editable desde el modal.
+    // Fallback a los campos del usuario por si un chofer no tuviera eventos.
     function estadoFecha(user: User): string | null {
-        if (user.inactivo) return user.estado_actualizado_en ?? null;
-        return user.estado_actualizado_en ?? user.created_at ?? null;
+        if (user.inactivo) return user.baja_fecha ?? user.estado_actualizado_en ?? null;
+        return user.alta_fecha ?? user.created_at ?? null;
     }
 
     function formatEstadoFecha(fechaStr?: string | null): string | null {
@@ -1472,6 +1479,30 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 <InputError message={editForm.errors.fecha_vencimiento_licencia} />
                             </div>
                         </div>
+
+                        {userToEdit?.role === 'chofer' && (
+                            <>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex-1 border-t border-border/60" />
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Alta y baja</span>
+                                    <div className="flex-1 border-t border-border/60" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="edit-alta_fecha">Fecha de alta</Label>
+                                        <Input id="edit-alta_fecha" type="date" value={editForm.data.alta_fecha} onChange={(e) => editForm.setData('alta_fecha', e.target.value)} />
+                                        <InputError message={editForm.errors.alta_fecha} />
+                                    </div>
+                                    {userToEdit?.inactivo && (
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="edit-baja_fecha">Fecha de baja</Label>
+                                            <Input id="edit-baja_fecha" type="date" value={editForm.data.baja_fecha} onChange={(e) => editForm.setData('baja_fecha', e.target.value)} />
+                                            <InputError message={editForm.errors.baja_fecha} />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
 
                         <div className="flex items-center gap-2">
                             <div className="flex-1 border-t border-border/60" />

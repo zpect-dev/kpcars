@@ -82,6 +82,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('view-personal', fn (User $user) => $user->isAdminOrAdministrativo());
         Gate::define('manage-users', fn (User $user) => $user->isAdminOrAdministrativo());
 
+        // Historial de movimientos de personal (altas/bajas de choferes y cambios
+        // de vehículo): global, mismo alcance que Personal. `manage` habilita la
+        // edición de fechas.
+        Gate::define('view-historial', fn (User $user) => $user->isAdminOrAdministrativo());
+        Gate::define('manage-historial', fn (User $user) => $user->isAdminOrAdministrativo());
+
         // Áreas exclusivas del Administrador puro.
         Gate::define('view-cobros', fn (User $user) => $user->isAdmin());
         Gate::define('manage-cobros', fn (User $user) => $user->isAdmin());

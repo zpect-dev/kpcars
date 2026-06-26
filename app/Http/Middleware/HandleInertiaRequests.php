@@ -22,6 +22,7 @@ class HandleInertiaRequests extends Middleware
         'view-revisiones', 'manage-revisiones',
         'view-service', 'manage-service',
         'view-personal', 'manage-users',
+        'view-historial',
         'view-cobros', 'manage-cobros',
         'view-recaudaciones', 'manage-recaudaciones',
         'view-gastos', 'manage-gastos',

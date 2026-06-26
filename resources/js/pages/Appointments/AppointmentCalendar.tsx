@@ -15,6 +15,8 @@ interface AppointmentCalendarProps {
     className?: string;
     isFilterMode?: boolean;
     viewMode?: 'month' | 'week';
+    /** Muestra la leyenda de cupos. Off para filtros ajenos a turnos (ej. Historial). */
+    showLegend?: boolean;
 }
 
 export function AppointmentCalendar({
@@ -30,6 +32,7 @@ export function AppointmentCalendar({
     className,
     isFilterMode = false,
     viewMode = 'month',
+    showLegend = true,
 }: AppointmentCalendarProps) {
     // Current month/year being viewed
     const [viewDate, setViewDate] = useState(() => {
@@ -243,7 +246,7 @@ export function AppointmentCalendar({
                 </div>
 
                 {/* Legend */}
-                {viewMode !== 'week' && (
+                {showLegend && viewMode !== 'week' && (
                     <div className={cn("flex flex-wrap items-center gap-3 text-[10px] sm:text-xs font-medium text-muted-foreground", viewMode === 'week' ? "mt-4" : "mt-8")}>
                         {!isFilterMode ? (
                             <>
