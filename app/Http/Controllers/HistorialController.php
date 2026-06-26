@@ -46,14 +46,7 @@ class HistorialController extends Controller
             ->when($choferId, fn ($q) => $q->where('user_id', $choferId))
             ->orderByDesc('created_at')
             ->orderByDesc('id')
-            ->get()
-            ->map(fn (ChoferEvento $e) => [
-                'id' => $e->id,
-                'tipo' => $e->tipo->value,
-                'chofer' => $e->chofer?->name ?? 'N/A',
-                'chofer_dni' => $e->chofer?->dni,
-                'fecha' => $e->created_at?->toISOString(),
-            ]);
+            ->get();
 
         // Cambios de vehículo (asignaciones que son cambios reales de un carro a otro).
         $cambiosRaw = Asignacion::query()
@@ -68,7 +61,13 @@ class HistorialController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $conductorIds = $cambiosRaw->pluck('conductor_id')->filter()->unique()->all();
+        // Historial completo de asignaciones de los choferes involucrados (eventos
+        // + cambios), ordenado ascendente, para resolver patentes.
+        $conductorIds = $eventos->pluck('user_id')
+            ->merge($cambiosRaw->pluck('conductor_id'))
+            ->filter()
+            ->unique()
+            ->all();
 
         $historial = Asignacion::query()
             ->whereIn('conductor_id', $conductorIds)
@@ -77,6 +76,30 @@ class HistorialController extends Controller
             ->orderBy('id')
             ->get()
             ->groupBy('conductor_id');
+
+        // Alta: patente de la primera asignación (en o después del día del alta).
+        // Baja: patente del carro que tenían al momento de la baja (última
+        // asignación iniciada en o antes de ese día).
+        $eventos = $eventos->map(function (ChoferEvento $e) use ($historial, $fmtVehiculo) {
+            $hist = $historial[$e->user_id] ?? collect();
+
+            if ($e->tipo->value === 'alta') {
+                $fechaAlta = $e->created_at?->startOfDay();
+                $asig = $hist->first(fn (Asignacion $h) => $fechaAlta === null || $h->fecha_inicio >= $fechaAlta);
+            } else {
+                $fechaBaja = $e->created_at?->endOfDay();
+                $asig = $hist->filter(fn (Asignacion $h) => $fechaBaja === null || $h->fecha_inicio <= $fechaBaja)->last();
+            }
+
+            return [
+                'id' => $e->id,
+                'tipo' => $e->tipo->value,
+                'chofer' => $e->chofer?->name ?? 'N/A',
+                'chofer_dni' => $e->chofer?->dni,
+                'fecha' => $e->created_at?->toISOString(),
+                'vehiculo' => $fmtVehiculo($asig),
+            ];
+        });
 
         $cambios = $cambiosRaw->map(function (Asignacion $a) use ($historial, $fmtVehiculo) {
             $previa = ($historial[$a->conductor_id] ?? collect())

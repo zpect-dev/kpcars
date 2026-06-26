@@ -30,6 +30,7 @@ interface ChoferEvento {
     chofer: string;
     chofer_dni?: string | null;
     fecha: string;
+    vehiculo?: Vehiculo | null;
 }
 
 interface Cambio {
@@ -72,17 +73,11 @@ function getInitials(name: string): string {
 
 function VehiculoChip({ vehiculo }: { vehiculo: Vehiculo | null }) {
     if (!vehiculo) {
-        return (
-            <span className="inline-flex items-center rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Sin vehículo
-            </span>
-        );
+        return <span className="text-xs italic text-muted-foreground/50">Sin vehículo</span>;
     }
     return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-            <Car className="h-3 w-3" />
-            <span className="font-mono font-bold uppercase tracking-wide">{vehiculo.patente}</span>
-            <span className="font-normal text-indigo-600/80 dark:text-indigo-400/80">{vehiculo.marca} {vehiculo.modelo}</span>
+        <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wide text-foreground">
+            {vehiculo.patente}
         </span>
     );
 }
@@ -119,8 +114,11 @@ function EventoRow({ e }: { e: ChoferEvento }) {
             )}>
                 {esAlta ? <UserPlus className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}
             </div>
-            <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate text-sm font-semibold text-foreground">{e.chofer}</span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-foreground">{e.chofer}</span>
+                    <VehiculoChip vehiculo={e.vehiculo ?? null} />
+                </div>
                 {e.chofer_dni && <span className="font-mono text-xs text-muted-foreground">DNI {e.chofer_dni}</span>}
             </div>
             <InlineDate value={e.fecha} onSave={save} />
