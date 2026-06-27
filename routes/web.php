@@ -16,6 +16,7 @@ use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
+use App\Http\Controllers\RevisionMecanicaController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
@@ -86,6 +87,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('vehiculos/{vehiculo}', [VehiculoController::class, 'destroy'])->name('vehiculos.destroy');
         Route::get('vehiculos/{vehiculo}/asignaciones', [AsignacionController::class, 'index'])->name('vehiculos.asignaciones');
         Route::get('vehiculos/{vehiculo}/asignaciones/pdf', [AsignacionController::class, 'pdf'])->name('vehiculos.asignaciones.pdf');
+
+        // Revisión mecánica (dashboard de prioridad de reparación)
+        Route::get('revision-mecanica', [RevisionMecanicaController::class, 'index'])->name('revision-mecanica.index');
+        Route::post('revision-mecanica/{vehiculo}', [RevisionMecanicaController::class, 'store'])->name('revision-mecanica.store');
 
         // Revisiones
         Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');

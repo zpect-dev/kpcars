@@ -74,6 +74,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('view-revisiones', fn (User $user) => $user->isAdminOrAdministrativo());
         Gate::define('manage-revisiones', fn (User $user) => $user->isAdminOrAdministrativo());
 
+        // Revisión mecánica: global, mismo alcance que Revisiones.
+        Gate::define('view-revision-mecanica', fn (User $user) => $user->isAdminOrAdministrativo());
+        Gate::define('manage-revision-mecanica', fn (User $user) => $user->isAdminOrAdministrativo());
+
         // Service: global. Incluye al mecánico (es quien realiza el service).
         Gate::define('view-service', fn (User $user) => $user->isAdminOrAdministrativo() || $user->isMechanic());
         Gate::define('manage-service', fn (User $user) => $user->isAdminOrAdministrativo() || $user->isMechanic());

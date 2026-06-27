@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Users, Wallet } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -51,6 +51,10 @@ setOpenMobile(false);
 
     if (perms.can_view_revisiones) {
         tallerItems.push({ title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck });
+    }
+
+    if (perms.can_view_revision_mecanica) {
+        tallerItems.push({ title: 'Revisión Mecánica', href: '/revision-mecanica', icon: Wrench });
     }
 
     if (perms.can_view_service) {

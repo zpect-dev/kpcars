@@ -27,6 +27,12 @@ class HistorialController extends Controller
 
         $filters = $request->only(['from', 'to', 'chofer']);
 
+        // Por defecto (sin filtro de fecha explícito), la semana actual.
+        if (! $request->has('from') && ! $request->has('to')) {
+            $filters['from'] = now()->startOfWeek()->toDateString();
+            $filters['to'] = now()->endOfWeek()->toDateString();
+        }
+
         $from = ! empty($filters['from']) ? Carbon::parse($filters['from'])->startOfDay() : null;
         $to = ! empty($filters['to']) ? Carbon::parse($filters['to'])->endOfDay() : null;
         $choferId = ! empty($filters['chofer']) ? (int) $filters['chofer'] : null;
