@@ -12,6 +12,7 @@ use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\HistorialController;
+use App\Http\Controllers\MultaController;
 use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
@@ -107,6 +108,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
         Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
+
+        // Multas (registro manual + dashboard de deuda por vehículo / por chofer)
+        Route::get('multas', [MultaController::class, 'index'])->name('multas.index');
+        Route::post('multas', [MultaController::class, 'store'])->name('multas.store');
+        Route::patch('multas/{multa}/pago', [MultaController::class, 'togglePago'])->name('multas.pago');
 
         // Transacciones (vista)
         Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');

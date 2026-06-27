@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -74,6 +74,10 @@ setOpenMobile(false);
 
     if (perms.can_view_gastos) {
         gestionItems.push({ title: 'Gastos', href: gastosIndex.url(), icon: HandCoins });
+    }
+
+    if (perms.can_view_multas) {
+        gestionItems.push({ title: 'Multas', href: '/multas', icon: Siren });
     }
 
     if (perms.can_view_inventario) {
