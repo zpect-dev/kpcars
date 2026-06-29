@@ -52,6 +52,7 @@ class RevisionMecanicaController extends Controller
                     'promedio' => (float) $r->promedio,
                     'prioridad' => $r->prioridad->value,
                     'items' => $r->items,
+                    'observaciones' => $r->observaciones,
                     'revisor' => $r->revisor?->name,
                     'fecha' => $r->created_at?->toISOString(),
                 ] : null,
@@ -78,7 +79,10 @@ class RevisionMecanicaController extends Controller
 
         $keys = array_keys(RevisionMecanica::ITEMS);
 
-        $rules = ['items' => ['required', 'array']];
+        $rules = [
+            'items' => ['required', 'array'],
+            'observaciones' => ['nullable', 'string', 'max:2000'],
+        ];
         foreach ($keys as $k) {
             $rules["items.{$k}.gravedad"] = ['required', 'integer', 'min:1', 'max:5'];
             $rules["items.{$k}.descripcion"] = ['nullable', 'string', 'max:1000'];
@@ -106,6 +110,7 @@ class RevisionMecanicaController extends Controller
             'promedio' => $promedio,
             'prioridad' => $prioridad,
             'items' => $items,
+            'observaciones' => $validated['observaciones'] ?? null,
         ]);
 
         return redirect()->back()->with('success', "Revisión mecánica registrada para {$veh->patente} (prioridad {$prioridad->label()}).");

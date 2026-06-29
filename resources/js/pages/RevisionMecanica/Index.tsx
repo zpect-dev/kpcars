@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Check, Search, Wrench, X } from 'lucide-react';
+import { Check, MessageSquareText, Search, Wrench, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 type Prioridad = 'baja' | 'media' | 'alta';
@@ -30,6 +31,7 @@ interface Revision {
     promedio: number;
     prioridad: Prioridad;
     items: Record<string, RevisionItem>;
+    observaciones?: string | null;
     revisor?: string | null;
     fecha: string;
 }
@@ -247,6 +249,18 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                                         <span className="text-[11px] text-muted-foreground tabular-nums">{formatDateTime(f.revision.fecha)}</span>
                                     </div>
                                 )}
+                                {f.revision?.observaciones && (
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="shrink-0 text-muted-foreground">
+                                                <MessageSquareText className="h-4 w-4" />
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-xs whitespace-pre-wrap">
+                                            {f.revision.observaciones}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )}
                                 <div className="shrink-0">
                                     {f.revision
                                         ? <PrioridadBadge prioridad={f.revision.prioridad} />
@@ -269,6 +283,7 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
 
 function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: ItemDef[]; onClose: () => void }) {
     const [valores, setValores] = useState<Record<string, RevisionItem>>({});
+    const [observaciones, setObservaciones] = useState('');
     const [processing, setProcessing] = useState(false);
 
     // Reinicia el form cada vez que se abre (o cambia de vehículo), tomando la
@@ -283,6 +298,7 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
             init[it.key] = { gravedad: prev?.gravedad ?? 1, descripcion: prev?.descripcion ?? '' };
         }
         setValores(init);
+        setObservaciones(fila.revision?.observaciones ?? '');
         setLastId(fila.vehiculo_id);
     }
 
@@ -301,7 +317,7 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
     function submit() {
         if (!fila) return;
         setProcessing(true);
-        router.post(`/revision-mecanica/${fila.vehiculo_id}`, { items: valores } as never, {
+        router.post(`/revision-mecanica/${fila.vehiculo_id}`, { items: valores, observaciones } as never, {
             preserveScroll: true,
             onSuccess: () => onClose(),
             onFinish: () => setProcessing(false),
@@ -347,6 +363,19 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
                             />
                         </div>
                     ))}
+
+                    {/* Observaciones generales */}
+                    <div className="flex flex-col gap-2 px-5 py-3">
+                        <Label className="text-sm font-medium">Observaciones</Label>
+                        <textarea
+                            rows={3}
+                            placeholder="Observaciones generales (opcional)..."
+                            value={observaciones}
+                            onChange={(e) => setObservaciones(e.target.value)}
+                            maxLength={2000}
+                            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                    </div>
                 </div>
 
                 <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">

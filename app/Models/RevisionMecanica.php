@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * reparación (baja/media/alta). Es global (sin TenantScope): la flota se revisa
  * sin importar la empresa, igual que Revisiones.
  */
-#[Fillable(['vehiculo_id', 'revisado_por', 'promedio', 'prioridad', 'items'])]
+#[Fillable(['vehiculo_id', 'revisado_por', 'promedio', 'prioridad', 'items', 'observaciones'])]
 class RevisionMecanica extends Model
 {
     protected $table = 'revisiones_mecanicas';
