@@ -1272,7 +1272,8 @@ params.set('search', search.trim());
                                     filteredVehiculos.map((vehiculo) => (
                                         <tr
                                             key={vehiculo.id}
-                                            className="bg-card transition-colors hover:bg-muted/40"
+                                            onClick={() => !isInversor && openEdit(vehiculo)}
+                                            className={cn('bg-card transition-colors hover:bg-muted/40', !isInversor && 'cursor-pointer')}
                                         >
                                             <td
                                                 className="truncate px-4 py-3 font-semibold text-foreground sm:px-6 sm:py-4"
@@ -1286,7 +1287,7 @@ params.set('search', search.trim());
                                                         return (
                                                             <button
                                                                 type="button"
-                                                                onClick={() => setEstadoPatenteVehiculo(vehiculo)}
+                                                                onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
                                                                 title="Editar estado de la patente"
                                                                 className={cn(
                                                                     'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
@@ -1399,7 +1400,7 @@ params.set('search', search.trim());
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4">
+                                            <td className="truncate px-4 py-3 text-right sm:px-6 sm:py-4" onClick={(e) => e.stopPropagation()}>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger
                                                         asChild
@@ -1491,7 +1492,8 @@ params.set('search', search.trim());
                             filteredVehiculos.map((vehiculo) => (
                                 <li
                                     key={vehiculo.id}
-                                    className="flex flex-col gap-2 p-4"
+                                    onClick={() => !isInversor && openEdit(vehiculo)}
+                                    className={cn('flex flex-col gap-2 p-4', !isInversor && 'cursor-pointer hover:bg-muted/40 transition-colors')}
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="flex flex-col items-start gap-1">
@@ -1504,7 +1506,7 @@ params.set('search', search.trim());
                                                 return (
                                                     <button
                                                         type="button"
-                                                        onClick={() => setEstadoPatenteVehiculo(vehiculo)}
+                                                        onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
                                                         title="Editar estado de la patente"
                                                         className={cn(
                                                             'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
@@ -1523,6 +1525,7 @@ params.set('search', search.trim());
                                                     variant="ghost"
                                                     size="icon"
                                                     className="-mt-1 -mr-2 shrink-0"
+                                                    onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <MoreHorizontal className="h-4 w-4" />
                                                     <span className="sr-only">

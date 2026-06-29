@@ -84,6 +84,38 @@ class PdfController extends Controller
         return $pdf->download('recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.pdf');
     }
 
+    public function recaudacionesDescuentos(): Response
+    {
+        $apertura = AperturaRecaudacion::abierta()
+            ->with([
+                'recaudaciones.vehiculo:id,patente,inversion_id',
+                'recaudaciones.vehiculo.inversion:id,nombre',
+                'recaudaciones.chofer:id,name',
+            ])
+            ->latest()
+            ->first();
+
+        $filas = ($apertura?->recaudaciones ?? collect())
+            ->filter(fn (Recaudacion $r) => (float) $r->descuento > 0)
+            ->map(fn (Recaudacion $r) => [
+                'inversion'   => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente'     => $r->vehiculo?->patente ?? 'N/A',
+                'chofer'      => $r->chofer?->name ?? 'N/A',
+                'descuento'   => (float) $r->descuento,
+                'descripcion' => $r->descripcion ?? '',
+                'estado'      => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+            ])
+            ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
+            ->groupBy('inversion');
+
+        $totalDescuentos = $filas->flatten(1)->sum('descuento');
+
+        $pdf = Pdf::loadView('pdf.recaudaciones-descuentos', compact('filas', 'totalDescuentos'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('recaudaciones-descuentos-'.now()->format('Y-m-d').'.pdf');
+    }
+
     /**
      * Generate PDF with current stock of all articles.
      */

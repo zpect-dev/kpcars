@@ -288,4 +288,41 @@ class ExcelController extends Controller
 
         return $writer->toBrowser();
     }
+
+    public function recaudacionesDescuentos(): StreamedResponse
+    {
+        $apertura = AperturaRecaudacion::abierta()
+            ->with([
+                'recaudaciones.vehiculo:id,patente,inversion_id',
+                'recaudaciones.vehiculo.inversion:id,nombre',
+                'recaudaciones.chofer:id,name',
+            ])
+            ->latest()
+            ->first();
+
+        $filas = ($apertura?->recaudaciones ?? collect())
+            ->filter(fn (Recaudacion $r) => (float) $r->descuento > 0)
+            ->map(fn (Recaudacion $r) => [
+                'inversion'   => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente'     => $r->vehiculo?->patente ?? 'N/A',
+                'chofer'      => $r->chofer?->name ?? 'N/A',
+                'descuento'   => round((float) $r->descuento, 2),
+                'descripcion' => $r->descripcion ?? '',
+                'estado'      => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+            ])
+            ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
+            ->values();
+
+        $filename = 'recaudaciones-descuentos-'.now()->format('Y-m-d').'.xlsx';
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Inversión', 'Patente', 'Chofer', 'Descuento', 'Descripción', 'Estado']);
+
+        foreach ($filas as $f) {
+            $writer->addRow([$f['inversion'], $f['patente'], $f['chofer'], $f['descuento'], $f['descripcion'], $f['estado']]);
+        }
+
+        $writer->addRow(['', '', 'TOTAL', $filas->sum('descuento'), '', '']);
+
+        return $writer->toBrowser();
+    }
 }

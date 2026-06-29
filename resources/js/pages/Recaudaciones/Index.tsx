@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
+    EstadoBadge,
     formatARS,
     formatDate,
     RecaudacionesTabla,
@@ -73,6 +74,7 @@ export default function RecaudacionesIndex({
     const [showAbrirModal, setShowAbrirModal] = useState(false);
     const [showResumenModal, setShowResumenModal] = useState(false);
     const [showDescuentosModal, setShowDescuentosModal] = useState(false);
+    const [filterInversionDescuento, setFilterInversionDescuento] = useState('');
     const [processingCierre, setProcessingCierre] = useState(false);
     const [processingAbrir, setProcessingAbrir] = useState(false);
 
@@ -88,9 +90,21 @@ export default function RecaudacionesIndex({
         [filas],
     );
 
-    const totalDescuentos = useMemo(
-        () => filasConDescuento.reduce((s, f) => s + Number(f.descuento), 0),
+    const inversionesConDescuento = useMemo(
+        () => [...new Set(filasConDescuento.map((f) => f.inversion_nombre))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
         [filasConDescuento],
+    );
+
+    const filasConDescuentoFiltradas = useMemo(
+        () => filterInversionDescuento
+            ? filasConDescuento.filter((f) => f.inversion_nombre === filterInversionDescuento)
+            : filasConDescuento,
+        [filasConDescuento, filterInversionDescuento],
+    );
+
+    const totalDescuentos = useMemo(
+        () => filasConDescuentoFiltradas.reduce((s, f) => s + Number(f.descuento), 0),
+        [filasConDescuentoFiltradas],
     );
 
     // Porcentaje del potencial de la flota que ya está recaudado en este período.
@@ -325,8 +339,8 @@ export default function RecaudacionesIndex({
             </div>
 
             {/* Modal descuentos */}
-            <Dialog open={showDescuentosModal} onOpenChange={setShowDescuentosModal}>
-                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[560px]">
+            <Dialog open={showDescuentosModal} onOpenChange={(v) => { setShowDescuentosModal(v); if (!v) setFilterInversionDescuento(''); }}>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[600px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
                             <Percent className="h-5 w-5 text-amber-500" />
@@ -334,11 +348,37 @@ export default function RecaudacionesIndex({
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Descuentos del período</DialogTitle>
                             <DialogDescription className="text-xs">
-                                {filasConDescuento.length} auto{filasConDescuento.length !== 1 ? 's' : ''} con descuento — total {formatARS(totalDescuentos)}
+                                {filasConDescuento.length} auto{filasConDescuento.length !== 1 ? 's' : ''} con descuento — total {formatARS(filasConDescuento.reduce((s, f) => s + Number(f.descuento), 0))}
                             </DialogDescription>
                         </div>
                     </div>
-                    <div className="max-h-[60vh] overflow-y-auto">
+
+                    {/* Filtro por inversión */}
+                    {inversionesConDescuento.length > 1 && (
+                        <div className="border-b border-border px-5 py-3">
+                            <div className="flex flex-wrap gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setFilterInversionDescuento('')}
+                                    className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === '' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                                >
+                                    Todas
+                                </button>
+                                {inversionesConDescuento.map((inv) => (
+                                    <button
+                                        key={inv}
+                                        type="button"
+                                        onClick={() => setFilterInversionDescuento(inv === filterInversionDescuento ? '' : inv)}
+                                        className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === inv ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                                    >
+                                        {inv}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="max-h-[55vh] overflow-y-auto">
                         <table className="w-full text-left text-sm">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
@@ -346,15 +386,17 @@ export default function RecaudacionesIndex({
                                     <th className="px-4 py-2.5 font-medium tracking-wider">Chofer</th>
                                     <th className="px-4 py-2.5 text-right font-medium tracking-wider">Descuento</th>
                                     <th className="px-4 py-2.5 font-medium tracking-wider">Descripción</th>
+                                    <th className="px-4 py-2.5 font-medium tracking-wider">Estado</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {filasConDescuento.map((f) => (
+                                {filasConDescuentoFiltradas.map((f) => (
                                     <tr key={f.id ?? f.vehiculo_id} className="bg-card hover:bg-muted/40">
                                         <td className="px-4 py-2.5 font-mono font-medium text-foreground">{f.patente}</td>
                                         <td className="px-4 py-2.5 text-foreground">{f.chofer}</td>
                                         <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(Number(f.descuento))}</td>
                                         <td className="px-4 py-2.5 text-muted-foreground">{f.descripcion || <span className="italic">—</span>}</td>
+                                        <td className="px-4 py-2.5"><EstadoBadge estado={f.estado} deuda={Number(f.deuda)} /></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -362,13 +404,22 @@ export default function RecaudacionesIndex({
                                 <tr>
                                     <td colSpan={2} className="px-4 py-3 font-semibold text-foreground">Total descuentos</td>
                                     <td className="px-4 py-3 text-right text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(totalDescuentos)}</td>
-                                    <td />
+                                    <td colSpan={2} />
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
-                    <DialogFooter className="border-t border-border px-5 py-4">
-                        <Button variant="outline" onClick={() => setShowDescuentosModal(false)}>Cerrar</Button>
+
+                    <DialogFooter className="flex-wrap gap-2 border-t border-border px-5 py-4">
+                        <Button variant="outline" size="sm" onClick={() => window.open('/pdf/recaudaciones-descuentos', '_blank')}>
+                            <FileDown className="mr-1.5 h-4 w-4" />
+                            PDF
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => window.open('/excel/recaudaciones-descuentos', '_blank')}>
+                            <FileSpreadsheet className="mr-1.5 h-4 w-4" />
+                            Excel
+                        </Button>
+                        <Button variant="outline" onClick={() => { setShowDescuentosModal(false); setFilterInversionDescuento(''); }}>Cerrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
