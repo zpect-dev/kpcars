@@ -92,6 +92,7 @@ class RevisionMecanicaController extends Controller
 
         $items = [];
         $suma = 0;
+        $maximo = 1;
         foreach ($keys as $k) {
             $gravedad = (int) $validated['items'][$k]['gravedad'];
             $items[$k] = [
@@ -99,10 +100,11 @@ class RevisionMecanicaController extends Controller
                 'descripcion' => $validated['items'][$k]['descripcion'] ?? null,
             ];
             $suma += $gravedad;
+            if ($gravedad > $maximo) $maximo = $gravedad;
         }
 
         $promedio = round($suma / count($keys), 2);
-        $prioridad = PrioridadReparacion::fromPromedio($promedio);
+        $prioridad = PrioridadReparacion::fromMaximo($maximo);
 
         RevisionMecanica::create([
             'vehiculo_id' => $veh->id,

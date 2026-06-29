@@ -32,14 +32,14 @@ enum PrioridadReparacion: string
     }
 
     /**
-     * Determina la prioridad de reparación a partir del promedio de gravedad
-     * (escala 1–5): <2 Baja, 2–3.5 Media, >3.5 Alta.
+     * Determina la prioridad de reparación a partir del ítem más grave
+     * (escala 1–5): 1–2 Baja, 3 Media, 4–5 Alta.
      */
-    public static function fromPromedio(float $promedio): self
+    public static function fromMaximo(int $maximo): self
     {
         return match (true) {
-            $promedio < 2.0 => self::BAJA,
-            $promedio <= 3.5 => self::MEDIA,
+            $maximo <= 2 => self::BAJA,
+            $maximo === 3 => self::MEDIA,
             default => self::ALTA,
         };
     }

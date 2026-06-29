@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Car, Check, ChevronDown, FileText, Pencil, Plus, Search, Siren, User as UserIcon, X } from 'lucide-react';
+import { AlertTriangle, Building2, CalendarDays, Car, Check, ChevronDown, Download, FileText, Medal, Pencil, Plus, Search, Siren, Trash2, User as UserIcon, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
@@ -35,7 +35,7 @@ interface Multa {
     cobrado: boolean;
 }
 
-/** Una multa está pendiente mientras no esté pagada al organismo o no esté cobrada al chofer. */
+/** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
 function pendiente(m: Multa): boolean {
     return !m.pagado || !m.cobrado;
 }
@@ -52,7 +52,7 @@ interface Props {
     vehiculos: VehiculoOpt[];
 }
 
-type Tab = 'vehiculo' | 'chofer';
+type Tab = 'vehiculo' | 'chofer' | 'ranking';
 
 function formatFecha(d: string): string {
     const [y, m, day] = d.slice(0, 10).split('-');
@@ -60,6 +60,14 @@ function formatFecha(d: string): string {
 }
 
 const HOY = new Date().toISOString().slice(0, 10);
+const _d3 = new Date(); _d3.setDate(_d3.getDate() + 3);
+const HOY_PLUS_3 = _d3.toISOString().slice(0, 10);
+const _d7 = new Date(); _d7.setDate(_d7.getDate() + 7);
+const HOY_PLUS_7 = _d7.toISOString().slice(0, 10);
+
+function diasHastaVenc(v: string): number {
+    return Math.round((new Date(v).getTime() - new Date(HOY).getTime()) / 86_400_000);
+}
 
 /**
  * Antes (o el mismo día) del vencimiento la multa tiene un 50% de descuento.
@@ -76,6 +84,7 @@ function montoEfectivo(m: Multa): number {
 
 interface Grupo {
     key: string;
+    id: number | null;
     titulo: string;
     sub: string;
     multas: Multa[];
@@ -83,42 +92,149 @@ interface Grupo {
     total: number;
 }
 
+type FiltroEstado = '' | 'si' | 'no';
+type FiltroJurisdiccion = '' | 'CABA' | 'GBA';
+type FiltroPeriodo = '' | 'mes' | 'mes-ant' | '3m' | 'año';
+
+function periodoRango(p: FiltroPeriodo): { desde: string; hasta: string } {
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    if (p === 'mes') return {
+        desde: iso(new Date(now.getFullYear(), now.getMonth(), 1)),
+        hasta: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+    if (p === 'mes-ant') return {
+        desde: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+        hasta: iso(new Date(now.getFullYear(), now.getMonth(), 0)),
+    };
+    if (p === '3m') {
+        const d = new Date(now); d.setMonth(d.getMonth() - 3);
+        return { desde: iso(d), hasta: iso(now) };
+    }
+    if (p === 'año') return { desde: `${now.getFullYear()}-01-01`, hasta: iso(now) };
+    return { desde: '', hasta: '' };
+}
+
 export default function MultasIndex({ multas, vehiculos }: Props) {
     const [tab, setTab] = useState<Tab>('vehiculo');
     const [search, setSearch] = useState('');
-    const [soloPendientes, setSoloPendientes] = useState(false);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Multa | null>(null);
 
-    const stats = useMemo(() => ({
-        total: multas.length,
-        pagadas: multas.filter((m) => m.pagado).length,
-        noPagadas: multas.filter((m) => !m.pagado).length,
-        cobradas: multas.filter((m) => m.cobrado).length,
-        noCobradas: multas.filter((m) => !m.cobrado).length,
-    }), [multas]);
+    // Filtros
+    const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>('');
+    const [fSistema, setFSistema] = useState<FiltroEstado>('');
+    const [fChofer, setFChofer] = useState<FiltroEstado>('');
+    const [fPuntoRojo, setFPuntoRojo] = useState(false);
+    const [fVencimiento, setFVencimiento] = useState<'' | 'vencida' | 'no-vencida'>('');
+    const [fDesde, setFDesde] = useState('');
+    const [fHasta, setFHasta] = useState('');
+
+    // Periodo activo: se deriva comparando fechas con cada preset
+    const fPeriodoActivo = useMemo<FiltroPeriodo>(() => {
+        for (const p of ['mes', 'mes-ant', '3m', 'año'] as FiltroPeriodo[]) {
+            const r = periodoRango(p);
+            if (r.desde === fDesde && r.hasta === fHasta) return p;
+        }
+        return '';
+    }, [fDesde, fHasta]);
+
+    function setPeriodo(p: FiltroPeriodo) {
+        const r = periodoRango(p);
+        setFDesde(r.desde);
+        setFHasta(r.hasta);
+    }
+
+    const filtrosActivos = [fJurisdiccion, fSistema, fChofer, fVencimiento].filter(Boolean).length
+        + (fPuntoRojo ? 1 : 0) + (fDesde ? 1 : 0) + (fHasta ? 1 : 0);
+
+    function limpiarFiltros() {
+        setFJurisdiccion(''); setFSistema(''); setFChofer('');
+        setFPuntoRojo(false); setFVencimiento('');
+        setFDesde(''); setFHasta('');
+    }
+
+    function buildPdfUrl() {
+        const tipo = tab === 'ranking' ? 'vehiculo' : tab;
+        const p = new URLSearchParams({ tipo });
+        if (search) p.set('q', search);
+        if (fJurisdiccion) p.set('jurisdiccion', fJurisdiccion);
+        if (fSistema) p.set('sistema', fSistema);
+        if (fChofer) p.set('chofer', fChofer);
+        if (fPuntoRojo) p.set('punto_rojo', '1');
+        if (fVencimiento) p.set('vencimiento', fVencimiento);
+        if (fDesde) p.set('desde', fDesde);
+        if (fHasta) p.set('hasta', fHasta);
+        return `/multas/pdf?${p.toString()}`;
+    }
+
+    const stats = useMemo(() => {
+        const conMonto = multas.filter((m) => !m.punto_rojo);
+        const proximasVencer = multas.filter(
+            (m) => m.fecha_vencimiento && !m.cobrado && !m.punto_rojo
+                && m.fecha_vencimiento >= HOY && m.fecha_vencimiento <= HOY_PLUS_7,
+        );
+        return {
+            total: multas.length,
+            deudaSistema: conMonto.filter((m) => !m.pagado).reduce((s, m) => s + montoEfectivo(m), 0),
+            cntSinPagar: conMonto.filter((m) => !m.pagado).length,
+            porCobrar: conMonto.filter((m) => !m.cobrado).reduce((s, m) => s + montoEfectivo(m), 0),
+            cntSinCobrar: conMonto.filter((m) => !m.cobrado).length,
+            pagado: conMonto.filter((m) => m.pagado).reduce((s, m) => s + m.monto, 0),
+            cobrado: conMonto.filter((m) => m.cobrado).reduce((s, m) => s + m.monto, 0),
+            proximasVencer,
+        };
+    }, [multas]);
+
+    const ranking = useMemo(() => {
+        const map = new Map<string, { id: number; nombre: string; cnt: number; total: number; pagado: number; adeudado: number }>();
+        for (const m of multas) {
+            if (m.punto_rojo) continue;
+            const key = m.conductor_id ? `c${m.conductor_id}` : 'sin';
+            if (!map.has(key)) map.set(key, { id: m.conductor_id ?? 0, nombre: m.conductor ?? 'Sin chofer', cnt: 0, total: 0, pagado: 0, adeudado: 0 });
+            const e = map.get(key)!;
+            e.cnt++;
+            e.total += m.monto;
+            if (m.cobrado) e.pagado += m.monto;
+            else e.adeudado += montoEfectivo(m);
+        }
+        return Array.from(map.values()).sort((a, b) => b.adeudado - a.adeudado || b.total - a.total);
+    }, [multas]);
 
     const grupos = useMemo<Grupo[]>(() => {
         const q = search.toLowerCase().trim();
+
         const visibles = multas.filter((m) => {
-            if (!q) return true;
-            return m.patente.toLowerCase().includes(q) || (m.conductor ?? '').toLowerCase().includes(q);
+            if (q && !m.patente.toLowerCase().includes(q) && !(m.conductor ?? '').toLowerCase().includes(q)) return false;
+            if (fJurisdiccion && m.jurisdiccion !== fJurisdiccion) return false;
+            if (fSistema === 'si' && !m.pagado) return false;
+            if (fSistema === 'no' && m.pagado) return false;
+            if (fChofer === 'si' && !m.cobrado) return false;
+            if (fChofer === 'no' && m.cobrado) return false;
+            if (fPuntoRojo && !m.punto_rojo) return false;
+            if (fVencimiento === 'no-vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento >= HOY)) return false;
+            if (fVencimiento === 'vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento < HOY)) return false;
+            if (fDesde && m.fecha < fDesde) return false;
+            if (fHasta && m.fecha > fHasta) return false;
+            return true;
         });
 
         const map = new Map<string, Grupo>();
         for (const m of visibles) {
-            let key: string, titulo: string, sub: string;
+            let key: string, id: number | null, titulo: string, sub: string;
             if (tab === 'vehiculo') {
                 key = String(m.vehiculo_id);
+                id = m.vehiculo_id;
                 titulo = m.patente;
                 sub = [m.marca, m.modelo].filter(Boolean).join(' ');
             } else {
                 key = m.conductor_id ? `c${m.conductor_id}` : 'sin';
+                id = m.conductor_id;
                 titulo = m.conductor ?? 'Sin chofer';
                 sub = '';
             }
-            if (!map.has(key)) map.set(key, { key, titulo, sub, multas: [], pendientes: 0, total: 0 });
+            if (!map.has(key)) map.set(key, { key, id: id ?? 0, titulo, sub, multas: [], pendientes: 0, total: 0 });
             map.get(key)!.multas.push(m);
         }
 
@@ -128,9 +244,8 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 pendientes: g.multas.filter(pendiente).length,
                 total: g.multas.reduce((s, m) => s + montoEfectivo(m), 0),
             }))
-            .filter((g) => !soloPendientes || g.pendientes > 0)
             .sort((a, b) => b.pendientes - a.pendientes || b.total - a.total || a.titulo.localeCompare(b.titulo, 'es', { numeric: true }));
-    }, [multas, tab, search, soloPendientes]);
+    }, [multas, tab, search, fJurisdiccion, fSistema, fChofer, fPuntoRojo, fVencimiento, fDesde, fHasta]);
 
     function toggleExpand(key: string) {
         setExpanded((prev) => {
@@ -148,6 +263,10 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
         router.patch(`/multas/${id}/cobrado`, {}, { preserveScroll: true, preserveState: true });
     }
 
+    function deleteMulta(id: number) {
+        router.delete(`/multas/${id}`, { preserveScroll: true });
+    }
+
     return (
         <>
             <Head title="Multas" />
@@ -161,42 +280,82 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                             La multa se imputa al chofer que tenía el vehículo en la fecha de la infracción.
                         </p>
                     </div>
-                    <Button size="sm" onClick={() => setShowModal(true)} className="shrink-0">
-                        <Plus className="h-4 w-4" />
-                        <span className="hidden sm:inline">Registrar multa</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={buildPdfUrl()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </a>
+                        <Button size="sm" onClick={() => setShowModal(true)} className="shrink-0">
+                            <Plus className="h-4 w-4" />
+                            <span className="hidden sm:inline">Registrar multa</span>
+                        </Button>
+                    </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <div className="flex items-center gap-2.5">
-                            <Siren className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">Total de multas</span>
-                        </div>
-                        <span className="text-lg font-bold tabular-nums text-foreground">{stats.total}</span>
-                    </div>
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <span className="text-sm text-muted-foreground">Pagadas al organismo</span>
-                        <span className="text-sm font-semibold tabular-nums">
-                            <span className="text-green-600 dark:text-green-400">{stats.pagadas}</span>
-                            <span className="text-muted-foreground"> / {stats.noPagadas} sin pagar</span>
+                {/* Mini dashboard */}
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="flex flex-col gap-1 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                            <Building2 className="h-3.5 w-3.5" /> Deuda al sistema
                         </span>
+                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.deudaSistema)}</span>
+                        <span className="text-xs text-muted-foreground">{stats.cntSinPagar} multa{stats.cntSinPagar !== 1 ? 's' : ''} sin pagar</span>
                     </div>
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <span className="text-sm text-muted-foreground">Cobradas al chofer</span>
-                        <span className="text-sm font-semibold tabular-nums">
-                            <span className="text-green-600 dark:text-green-400">{stats.cobradas}</span>
-                            <span className="text-muted-foreground"> / {stats.noCobradas} sin cobrar</span>
+                    <div className="flex flex-col gap-1 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                            <UserIcon className="h-3.5 w-3.5" /> Por cobrar a choferes
                         </span>
+                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.porCobrar)}</span>
+                        <span className="text-xs text-muted-foreground">{stats.cntSinCobrar} multa{stats.cntSinCobrar !== 1 ? 's' : ''} sin cobrar</span>
+                    </div>
+                    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                            <Building2 className="h-3.5 w-3.5" /> Pagado al sistema
+                        </span>
+                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.pagado)}</span>
+                        <span className="text-xs text-muted-foreground">acumulado histórico</span>
+                    </div>
+                    <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                            <UserIcon className="h-3.5 w-3.5" /> Cobrado a choferes
+                        </span>
+                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.cobrado)}</span>
+                        <span className="text-xs text-muted-foreground">acumulado histórico</span>
                     </div>
                 </div>
+
+                {/* Alerta de vencimientos próximos */}
+                {stats.proximasVencer.length > 0 && (
+                    <div className="flex items-start gap-3 rounded-xl border border-orange-400/30 bg-orange-500/5 px-4 py-3">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                                {stats.proximasVencer.length} multa{stats.proximasVencer.length !== 1 ? 's' : ''} pierden el descuento en los próximos 7 días
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                {stats.proximasVencer
+                                    .sort((a, b) => a.fecha_vencimiento!.localeCompare(b.fecha_vencimiento!))
+                                    .map((m) => {
+                                        const dias = diasHastaVenc(m.fecha_vencimiento!);
+                                        return `${m.patente} (${dias === 0 ? 'hoy' : `${dias}d`})`;
+                                    })
+                                    .join(' · ')}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex gap-1.5">
                     {([
                         { val: 'vehiculo', label: 'Por vehículo', icon: Car },
                         { val: 'chofer',   label: 'Por chofer',   icon: UserIcon },
+                        { val: 'ranking',  label: 'Ranking',      icon: Medal },
                     ] as const).map(({ val, label, icon: Icon }) => (
                         <button
                             key={val}
@@ -215,40 +374,155 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                     ))}
                 </div>
 
-                {/* Buscador + filtro */}
-                <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div className="flex w-full flex-col gap-2 lg:min-w-[240px] lg:flex-1">
-                            <Label htmlFor="multa-search">Buscar</Label>
-                            <div className="relative">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    id="multa-search"
-                                    type="text"
-                                    placeholder="Buscar patente o chofer..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                            </div>
+                {/* Ranking */}
+                {tab === 'ranking' && (
+                    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                        <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
+                            <Medal className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-foreground">Ranking de choferes por deuda pendiente</span>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setSoloPendientes((v) => !v)}
-                            className={cn(
-                                'flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all active:scale-[0.97]',
-                                soloPendientes
-                                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
-                            )}
-                        >
-                            Solo pendientes
-                        </button>
+                        {ranking.length === 0 ? (
+                            <p className="py-10 text-center text-sm text-muted-foreground">Sin datos.</p>
+                        ) : (
+                            <div>
+                                {/* Header desktop */}
+                                <div className="hidden items-center gap-4 border-b border-border px-4 py-2 sm:flex">
+                                    <span className="w-6 shrink-0 text-[11px] font-medium text-muted-foreground">#</span>
+                                    <span className="flex-1 text-[11px] font-medium text-muted-foreground">Conductor</span>
+                                    <span className="w-16 shrink-0 text-center text-[11px] font-medium text-muted-foreground">Multas</span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Total</span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Pagado</span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Adeuda</span>
+                                    <span className="w-24 shrink-0 text-[11px] font-medium text-muted-foreground">% pagado</span>
+                                </div>
+                                {ranking.map((r, i) => {
+                                    const pct = r.total > 0 ? Math.round((r.pagado / r.total) * 100) : 0;
+                                    return (
+                                        <div key={r.id} className={cn('flex items-center gap-4 px-4 py-3 text-sm', i % 2 === 1 && 'bg-muted/20', i < ranking.length - 1 && 'border-b border-border')}>
+                                            <span className={cn('w-6 shrink-0 text-xs font-bold tabular-nums',
+                                                i === 0 ? 'text-yellow-500' : i === 1 ? 'text-zinc-400' : i === 2 ? 'text-amber-700' : 'text-muted-foreground/50',
+                                            )}>
+                                                {i + 1}
+                                            </span>
+                                            <span className="flex-1 truncate font-medium">{r.nombre}</span>
+                                            <span className="w-16 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{r.cnt}</span>
+                                            <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatARS(r.total)}</span>
+                                            <span className="w-28 shrink-0 text-right text-xs font-semibold tabular-nums text-green-600 dark:text-green-400">{formatARS(r.pagado)}</span>
+                                            <span className={cn('w-28 shrink-0 text-right text-xs font-semibold tabular-nums', r.adeudado > 0 ? 'text-red-500' : 'text-muted-foreground')}>
+                                                {formatARS(r.adeudado)}
+                                            </span>
+                                            <div className="w-24 shrink-0">
+                                                <div className="flex items-center gap-1.5">
+                                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                                        <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                                                    </div>
+                                                    <span className="w-7 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{pct}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                </div>
+                )}
+
+                {/* Filtros */}
+                {tab !== 'ranking' && <div className="rounded-xl border border-border bg-card shadow-sm">
+                    {/* Buscador */}
+                    <div className="flex items-center gap-2 px-3 py-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Buscar patente o chofer..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+                        {(filtrosActivos > 0 || search) && (
+                            <button
+                                type="button"
+                                onClick={() => { limpiarFiltros(); setSearch(''); }}
+                                className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                Limpiar
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Fila 2: estado */}
+                    <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5">
+                        <Chip activo={fJurisdiccion === 'CABA'} onClick={() => setFJurisdiccion((v) => v === 'CABA' ? '' : 'CABA')}>CABA</Chip>
+                        <Chip activo={fJurisdiccion === 'GBA'} onClick={() => setFJurisdiccion((v) => v === 'GBA' ? '' : 'GBA')}>GBA</Chip>
+                        <div className="h-4 w-px bg-border" />
+                        <Chip activo={fSistema === 'no'} onClick={() => setFSistema((v) => v === 'no' ? '' : 'no')}>
+                            <Building2 className="h-3 w-3" /> Sin pagar al sistema
+                        </Chip>
+                        <Chip activo={fSistema === 'si'} onClick={() => setFSistema((v) => v === 'si' ? '' : 'si')}>
+                            <Building2 className="h-3 w-3" /> Pagada al sistema
+                        </Chip>
+                        <div className="h-4 w-px bg-border" />
+                        <Chip activo={fChofer === 'no'} onClick={() => setFChofer((v) => v === 'no' ? '' : 'no')}>
+                            <UserIcon className="h-3 w-3" /> Sin cobrar
+                        </Chip>
+                        <Chip activo={fChofer === 'si'} onClick={() => setFChofer((v) => v === 'si' ? '' : 'si')}>
+                            <UserIcon className="h-3 w-3" /> Cobrada
+                        </Chip>
+                        <div className="h-4 w-px bg-border" />
+                        <Chip activo={fPuntoRojo} onClick={() => setFPuntoRojo((v) => !v)}>
+                            <span className="h-2 w-2 rounded-full bg-red-500" /> Punto rojo
+                        </Chip>
+                        <Chip activo={fVencimiento === 'no-vencida'} onClick={() => setFVencimiento((v) => v === 'no-vencida' ? '' : 'no-vencida')}>
+                            No vencida
+                        </Chip>
+                        <Chip activo={fVencimiento === 'vencida'} onClick={() => setFVencimiento((v) => v === 'vencida' ? '' : 'vencida')}>
+                            Vencida
+                        </Chip>
+                    </div>
+
+                    {/* Fila 3: período */}
+                    <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-3 py-2.5">
+                        <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                            <CalendarDays className="h-3.5 w-3.5" /> Período
+                        </span>
+                        <div className="h-4 w-px bg-border" />
+                        {([
+                            { val: 'mes',     label: 'Este mes' },
+                            { val: 'mes-ant', label: 'Mes anterior' },
+                            { val: '3m',      label: 'Últimos 3 meses' },
+                            { val: 'año',     label: 'Este año' },
+                        ] as { val: FiltroPeriodo; label: string }[]).map(({ val, label }) => (
+                            <Chip
+                                key={val}
+                                activo={fPeriodoActivo === val}
+                                onClick={() => fPeriodoActivo === val ? (setFDesde(''), setFHasta('')) : setPeriodo(val)}
+                            >
+                                {label}
+                            </Chip>
+                        ))}
+                        <div className="ml-auto flex items-center gap-1.5">
+                            <Input
+                                type="date"
+                                value={fDesde}
+                                onChange={(e) => setFDesde(e.target.value)}
+                                className="h-8 w-[130px] text-xs"
+                            />
+                            <span className="text-xs text-muted-foreground">–</span>
+                            <Input
+                                type="date"
+                                value={fHasta}
+                                min={fDesde}
+                                onChange={(e) => setFHasta(e.target.value)}
+                                className="h-8 w-[130px] text-xs"
+                            />
+                        </div>
+                    </div>
+                </div>}
 
                 {/* Lista agrupada */}
-                {grupos.length === 0 ? (
+                {tab !== 'ranking' && (grupos.length === 0 ? (
                     <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
                         {multas.length === 0 ? 'Todavía no hay multas registradas.' : 'No hay multas que coincidan con los filtros.'}
                     </div>
@@ -257,105 +531,229 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                         {grupos.map((g) => {
                             const isOpen = expanded.has(g.key);
                             return (
-                                <div key={g.key} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleExpand(g.key)}
-                                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40"
-                                    >
-                                        <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', isOpen && 'rotate-180')} />
-                                        {tab === 'vehiculo' ? (
-                                            <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold uppercase tracking-wide text-foreground">
-                                                {g.titulo}
+                                <div key={g.key} className="group/card overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                                    <div className="flex items-center transition-colors hover:bg-muted/40">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleExpand(g.key)}
+                                            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
+                                        >
+                                            <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', isOpen && 'rotate-180')} />
+                                            {tab === 'vehiculo' ? (
+                                                <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold uppercase tracking-wide text-foreground">
+                                                    {g.titulo}
+                                                </span>
+                                            ) : (
+                                                <span className="truncate text-sm font-semibold text-foreground">{g.titulo}</span>
+                                            )}
+                                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{g.sub}</span>
+                                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                                                {g.multas.length} multa{g.multas.length !== 1 ? 's' : ''}
                                             </span>
-                                        ) : (
-                                            <span className="truncate text-sm font-semibold text-foreground">{g.titulo}</span>
+                                            {g.pendientes > 0 ? (
+                                                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    {g.pendientes} pendiente{g.pendientes !== 1 ? 's' : ''}
+                                                </span>
+                                            ) : (
+                                                <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                    Al día
+                                                </span>
+                                            )}
+                                            <span className="min-w-[90px] shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
+                                                {formatARS(g.total)}
+                                            </span>
+                                        </button>
+                                        {g.id !== null && (
+                                            <a
+                                                href={`/multas/pdf?tipo=${tab}&id=${g.id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                title="Descargar PDF"
+                                                className="mr-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 opacity-0 transition-all group-hover/card:opacity-100 hover:!text-foreground hover:bg-muted"
+                                            >
+                                                <Download className="h-3.5 w-3.5" />
+                                            </a>
                                         )}
-                                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{g.sub}</span>
-                                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                                            {g.multas.length} multa{g.multas.length !== 1 ? 's' : ''}
-                                        </span>
-                                        {g.pendientes > 0 ? (
-                                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                                {g.pendientes} pendiente{g.pendientes !== 1 ? 's' : ''}
-                                            </span>
-                                        ) : (
-                                            <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                Al día
-                                            </span>
-                                        )}
-                                        <span className="min-w-[90px] shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
-                                            {formatARS(g.total)}
-                                        </span>
-                                    </button>
+                                    </div>
 
                                     {isOpen && (
-                                        <div className="divide-y divide-border border-t border-border">
+                                        <div className="border-t border-border">
+                                            {/* Header — solo desktop */}
+                                            <div className="hidden items-center gap-4 border-b border-border bg-muted/30 px-4 py-2 sm:flex">
+                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">Fecha inf.</span>
+                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">Vencimiento</span>
+                                                <span className="w-[72px] shrink-0 text-[11px] font-medium text-muted-foreground">Jurisd.</span>
+                                                <span className="w-32 shrink-0 text-[11px] font-medium text-muted-foreground">{tab === 'vehiculo' ? 'Conductor' : 'Patente'}</span>
+                                                <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">Descripción</span>
+                                                <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Monto</span>
+                                                <span className="w-[196px] shrink-0 text-[11px] font-medium text-muted-foreground">Estado</span>
+                                                <span className="w-[60px] shrink-0" />
+                                            </div>
+
                                             {g.multas.map((m) => {
                                                 const conDesc = tieneDescuento(m);
-                                                return (
-                                                <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:flex-nowrap">
-                                                    <span className="flex w-20 shrink-0 flex-col text-xs tabular-nums">
-                                                        <span className="text-muted-foreground">{formatFecha(m.fecha)}</span>
-                                                        {m.fecha_vencimiento && (
-                                                            <span className="text-[10px] text-muted-foreground/70" title="Vencimiento">
-                                                                vto {formatFecha(m.fecha_vencimiento)}
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                    {m.punto_rojo && (
-                                                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" title="Punto rojo" />
-                                                    )}
-                                                    {m.jurisdiccion && (
-                                                        <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                            {m.jurisdiccion}
+                                                const vencida = !!m.fecha_vencimiento && HOY > m.fecha_vencimiento;
+                                                const dias = m.fecha_vencimiento && !m.cobrado ? diasHastaVenc(m.fecha_vencimiento) : null;
+                                                const vencUrgente = dias !== null && dias >= 0 && dias <= 3;
+                                                const vencProximo = dias !== null && dias > 3 && dias <= 7;
+
+                                                const montoNode = m.punto_rojo ? (
+                                                    <span className="text-sm text-muted-foreground">—</span>
+                                                ) : (
+                                                    <div className="flex flex-col items-end gap-0.5">
+                                                        <span className={cn('text-sm font-semibold tabular-nums', (m.cobrado || conDesc) ? 'text-muted-foreground line-through' : 'text-foreground')}>
+                                                            {formatARS(m.monto)}
                                                         </span>
-                                                    )}
-                                                    {tab === 'vehiculo' ? (
-                                                        <span className="shrink-0 text-xs text-muted-foreground">
-                                                            {m.conductor ?? <span className="italic text-muted-foreground/60">Sin chofer</span>}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-foreground">
-                                                            {m.patente}
-                                                        </span>
-                                                    )}
-                                                    <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={m.descripcion}>{m.descripcion}</span>
-                                                    <span className="flex shrink-0 flex-col items-end leading-tight">
-                                                        {m.punto_rojo ? (
-                                                            <span className="text-sm font-medium text-muted-foreground" title="Punto rojo — sin importe">—</span>
-                                                        ) : (
-                                                            <span className={cn('text-sm font-semibold tabular-nums', m.pagado ? 'text-muted-foreground line-through' : 'text-foreground')}>
+                                                        {conDesc && !m.cobrado && (
+                                                            <span className="text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">
                                                                 {formatARS(montoEfectivo(m))}
                                                             </span>
                                                         )}
-                                                        {conDesc && (
-                                                            <span className="text-[10px] font-medium text-green-600 dark:text-green-400" title={`Monto total ${formatARS(m.monto)} — 50% por pago antes del vencimiento`}>
-                                                                -50% (${formatARS(m.monto)})
-                                                            </span>
-                                                        )}
-                                                    </span>
+                                                    </div>
+                                                );
+
+                                                const estadosNode = (extraClass = '') => (
+                                                    <div className={cn('flex gap-1.5', extraClass)}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => togglePagado(m.id)}
+                                                            title={m.pagado ? 'Marcar como no pagada en el sistema de infracciones' : 'Marcar como pagada en el sistema de infracciones'}
+                                                            className={cn(
+                                                                'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                m.pagado
+                                                                    ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                                            )}
+                                                        >
+                                                            <Building2 className="h-3 w-3 shrink-0" />
+                                                            {m.pagado ? 'Pagada' : 'Sin pagar'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleCobrado(m.id)}
+                                                            title={m.cobrado ? 'Marcar como no cobrada al chofer' : 'Marcar como cobrada al chofer'}
+                                                            className={cn(
+                                                                'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                m.cobrado
+                                                                    ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                    : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                                                            )}
+                                                        >
+                                                            <UserIcon className="h-3 w-3 shrink-0" />
+                                                            {m.cobrado ? 'Cobrada' : 'Sin cobrar'}
+                                                        </button>
+                                                    </div>
+                                                );
+
+                                                const editBtn = (
                                                     <button
                                                         type="button"
-                                                        onClick={(e) => { e.stopPropagation(); setEditing(m); }}
-                                                        title="Editar multa"
-                                                        className="inline-flex shrink-0 items-center rounded-md border border-border px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                        onClick={() => setEditing(m)}
+                                                        title="Editar"
+                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                     >
-                                                        <Pencil className="h-3 w-3" />
+                                                        <Pencil className="h-3.5 w-3.5" />
                                                     </button>
-                                                    <MultaPdf pdfUrl={m.pdf_url} />
-                                                    <EstadoToggle activo={m.pagado} onToggle={() => togglePagado(m.id)} labelOn="Pagada" labelOff="No pagada" />
-                                                    <EstadoToggle activo={m.cobrado} onToggle={() => toggleCobrado(m.id)} labelOn="Cobrada" labelOff="No cobrada" />
+                                                );
+
+                                                return (
+                                                <div key={m.id} className="divide-y divide-border border-b border-border last:border-b-0">
+                                                    {/* ── MOBILE ── */}
+                                                    <div className="flex flex-col gap-3 px-4 py-3 sm:hidden">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="flex min-w-0 flex-col gap-1">
+                                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                                    {m.punto_rojo && <span className="h-2 w-2 rounded-full bg-red-500" title="Punto rojo" />}
+                                                                    {m.jurisdiccion && (
+                                                                        <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                            {m.jurisdiccion}
+                                                                        </span>
+                                                                    )}
+                                                                    <span className="text-xs tabular-nums text-muted-foreground">{formatFecha(m.fecha)}</span>
+                                                                    {m.fecha_vencimiento && (
+                                                                        <span className={cn('text-xs tabular-nums',
+                                                                            vencida ? 'text-muted-foreground/40 line-through'
+                                                                            : vencUrgente ? 'font-semibold text-red-500'
+                                                                            : vencProximo ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                                            : 'text-muted-foreground/70',
+                                                                        )}>
+                                                                            vto {formatFecha(m.fecha_vencimiento)}{vencUrgente && dias !== null && ` (${dias === 0 ? 'hoy' : `${dias}d`})`}
+                                                                        </span>
+                                                                    )}
+                                                                    {tab === 'chofer' && (
+                                                                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-foreground">
+                                                                            {m.patente}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-sm font-medium text-foreground">{m.descripcion}</p>
+                                                                {tab === 'vehiculo' && (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                                {montoNode}
+                                                                {editBtn}
+                                                            </div>
+                                                        </div>
+                                                        {estadosNode('w-full')}
+                                                    </div>
+
+                                                    {/* ── DESKTOP ── */}
+                                                    <div className="hidden items-center gap-4 px-4 py-2.5 sm:flex">
+                                                        <span className="w-[80px] shrink-0 text-xs tabular-nums text-muted-foreground">{formatFecha(m.fecha)}</span>
+                                                        <span className={cn('w-[80px] shrink-0 text-xs tabular-nums',
+                                                            !m.fecha_vencimiento ? 'text-muted-foreground/30'
+                                                            : vencida ? 'text-muted-foreground/40 line-through'
+                                                            : vencUrgente ? 'font-semibold text-red-500'
+                                                            : vencProximo ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                            : 'text-muted-foreground',
+                                                        )}>
+                                                            {m.fecha_vencimiento ? formatFecha(m.fecha_vencimiento) : '—'}
+                                                            {vencUrgente && dias !== null && (
+                                                                <span className="ml-1 text-[10px] opacity-80">{dias === 0 ? 'hoy' : `${dias}d`}</span>
+                                                            )}
+                                                        </span>
+                                                        <div className="flex w-[72px] shrink-0 items-center gap-1.5">
+                                                            {m.punto_rojo && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" title="Punto rojo" />}
+                                                            {m.jurisdiccion && (
+                                                                <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                    {m.jurisdiccion}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="w-32 shrink-0">
+                                                            {tab === 'vehiculo' ? (
+                                                                <span className="block truncate text-xs text-muted-foreground">
+                                                                    {m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-foreground">
+                                                                    {m.patente}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="min-w-0 flex-1 truncate text-sm text-foreground" title={m.descripcion}>{m.descripcion}</p>
+                                                        <div className="w-28 shrink-0 text-right">{montoNode}</div>
+                                                        {estadosNode('w-[196px] shrink-0')}
+                                                        <div className="flex w-[60px] shrink-0 items-center justify-end gap-1">
+                                                            {editBtn}
+                                                            <MultaPdf pdfUrl={m.pdf_url} />
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 );
                                             })}
+
                                         </div>
                                     )}
                                 </div>
                             );
                         })}
                     </div>
-                )}
+                ))}
             </div>
 
             <RegistrarMultaModal
@@ -367,47 +765,27 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
             <EditarMultaModal
                 multa={editing}
                 onClose={() => setEditing(null)}
+                onDelete={deleteMulta}
             />
         </>
     );
 }
 
-/** Link para ver el PDF de la multa (el cambio se hace desde el modal de editar). */
 function MultaPdf({ pdfUrl }: { pdfUrl: string | null }) {
     if (!pdfUrl) return null;
-
     return (
         <a
             href={pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            title="Ver PDF de la multa"
-            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            title="Ver PDF"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-            <FileText className="h-3 w-3" /> PDF
+            <FileText className="h-3.5 w-3.5" />
         </a>
     );
 }
 
-/** Toggle de un estado booleano (pagada / cobrada) con su opuesto. */
-function EstadoToggle({ activo, onToggle, labelOn, labelOff }: { activo: boolean; onToggle: () => void; labelOn: string; labelOff: string }) {
-    return (
-        <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggle(); }}
-            className={cn(
-                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
-                activo
-                    ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
-            )}
-            title={activo ? `Marcar como ${labelOff.toLowerCase()}` : `Marcar como ${labelOn.toLowerCase()}`}
-        >
-            {activo ? <><Check className="h-3 w-3" /> {labelOn}</> : labelOff}
-        </button>
-    );
-}
 
 function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onClose: () => void; vehiculos: VehiculoOpt[] }) {
     const today = new Date().toISOString().slice(0, 10);
@@ -612,17 +990,18 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
 }
 
 /** Modal para editar el monto y la fecha de vencimiento de una multa. */
-function EditarMultaModal({ multa, onClose }: { multa: Multa | null; onClose: () => void }) {
+function EditarMultaModal({ multa, onClose, onDelete }: { multa: Multa | null; onClose: () => void; onDelete: (id: number) => void }) {
     return (
         <Dialog open={!!multa} onOpenChange={(o) => { if (!o) onClose(); }}>
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                {multa && <EditarMultaForm key={multa.id} multa={multa} onClose={onClose} />}
+                {multa && <EditarMultaForm key={multa.id} multa={multa} onClose={onClose} onDelete={onDelete} />}
             </DialogContent>
         </Dialog>
     );
 }
 
-function EditarMultaForm({ multa, onClose }: { multa: Multa; onClose: () => void }) {
+function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: () => void; onDelete: (id: number) => void }) {
+    const [confirmDelete, setConfirmDelete] = useState(false);
     const form = useForm({
         monto: String(multa.monto),
         fecha_vencimiento: multa.fecha_vencimiento ?? '',
@@ -717,15 +1096,53 @@ function EditarMultaForm({ multa, onClose }: { multa: Multa; onClose: () => void
                 </div>
 
                 <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        <X className="h-4 w-4" /> Cancelar
-                    </Button>
-                    <Button type="submit" disabled={!camposOk || form.processing}>
-                        {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar</>}
-                    </Button>
+                    {confirmDelete ? (
+                        <>
+                            <span className="mr-auto text-xs text-muted-foreground">¿Seguro que querés eliminarla?</span>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+                                No
+                            </Button>
+                            <Button type="button" size="sm" className="bg-red-500 hover:bg-red-600" onClick={() => onDelete(multa.id)}>
+                                <Trash2 className="h-3.5 w-3.5" /> Sí, eliminar
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setConfirmDelete(true)}
+                                className="mr-auto text-xs text-muted-foreground/60 underline-offset-2 transition-colors hover:text-red-500 hover:underline"
+                            >
+                                Eliminar multa
+                            </button>
+                            <Button type="button" variant="outline" onClick={onClose}>
+                                <X className="h-4 w-4" /> Cancelar
+                            </Button>
+                            <Button type="submit" disabled={!camposOk || form.processing}>
+                                {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar</>}
+                            </Button>
+                        </>
+                    )}
                 </DialogFooter>
             </form>
         </>
+    );
+}
+
+function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className={cn(
+                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97]',
+                activo
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+            )}
+        >
+            {children}
+        </button>
     );
 }
 

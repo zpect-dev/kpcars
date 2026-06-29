@@ -67,8 +67,9 @@ const PRIORIDAD: Record<Prioridad, { label: string; badge: string; dot: string }
 
 const PESO: Record<Prioridad, number> = { alta: 3, media: 2, baja: 1 };
 
-function prioridadDe(promedio: number): Prioridad {
-    return promedio < 2 ? 'baja' : promedio <= 3.5 ? 'media' : 'alta';
+function prioridadDe(valores: Record<string, RevisionItem>): Prioridad {
+    const maximo = Object.values(valores).reduce((max, it) => Math.max(max, it.gravedad ?? 1), 1);
+    return maximo <= 2 ? 'baja' : maximo === 3 ? 'media' : 'alta';
 }
 
 function formatDateTime(iso: string): string {
@@ -308,7 +309,7 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
         return suma / items.length;
     }, [valores, items]);
 
-    const prioridad = prioridadDe(promedio);
+    const prioridad = prioridadDe(valores);
 
     function setItem(key: string, patch: Partial<RevisionItem>) {
         setValores((v) => ({ ...v, [key]: { ...v[key], ...patch } }));

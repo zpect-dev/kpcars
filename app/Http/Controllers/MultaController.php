@@ -9,13 +9,15 @@ use App\Models\Multa;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Vehiculo;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\Response as InertiaResponse;
 
 class MultaController extends Controller
 {
@@ -23,7 +25,7 @@ class MultaController extends Controller
      * Dashboard de multas: lista global de multas con su vehículo y el chofer
      * imputado, más el combo de patentes para registrar nuevas.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): InertiaResponse
     {
         $this->authorize('view-multas');
 
@@ -179,6 +181,118 @@ class MultaController extends Controller
         ]);
 
         return redirect()->back()->with('success', $nuevo ? 'Multa marcada como pagada.' : 'Multa marcada como no pagada.');
+    }
+
+    /**
+     * PDF de multas.
+     * Sin ?id → exporta todas agrupadas por ?tipo (vehiculo|chofer).
+     * Con ?id → exporta solo las de ese vehículo/chofer.
+     */
+    public function pdf(Request $request): Response
+    {
+        $this->authorize('view-multas');
+
+        $tipo  = $request->query('tipo', 'vehiculo');
+        $id    = $request->query('id');
+        $q     = $request->query('q');
+        $juris = $request->query('jurisdiccion');
+        $sis   = $request->query('sistema');
+        $chof  = $request->query('chofer');
+        $pr    = $request->query('punto_rojo');
+        $desde = $request->query('desde');
+        $hasta = $request->query('hasta');
+
+        $query = Multa::query()
+            ->with([
+                'vehiculo' => fn ($q2) => $q2->withoutGlobalScope(TenantScope::class)->select('id', 'patente', 'marca', 'modelo'),
+                'conductor:id,name',
+            ])
+            ->orderByDesc('fecha');
+
+        // Filtros compartidos con la vista
+        if ($q) {
+            $query->where(fn ($q2) => $q2
+                ->whereHas('vehiculo', fn ($q3) => $q3->withoutGlobalScope(TenantScope::class)->where('patente', 'like', "%{$q}%"))
+                ->orWhereHas('conductor', fn ($q3) => $q3->where('name', 'like', "%{$q}%"))
+            );
+        }
+        if ($juris) $query->where('jurisdiccion', $juris);
+        if ($sis === 'si') $query->where('pagado', true);
+        if ($sis === 'no') $query->where('pagado', false);
+        if ($chof === 'si') $query->where('cobrado', true);
+        if ($chof === 'no') $query->where('cobrado', false);
+        if ($pr) $query->where('punto_rojo', true);
+        $venc = $request->query('vencimiento');
+        if ($venc === 'no-vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '>=', today());
+        if ($venc === 'vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '<', today());
+        if ($desde) $query->whereDate('fecha', '>=', $desde);
+        if ($hasta) $query->whereDate('fecha', '<=', $hasta);
+
+        $esGlobal = !$id;
+
+        if ($tipo === 'vehiculo' && $id) {
+            $query->where('vehiculo_id', $id);
+            $titulo = Vehiculo::withoutGlobalScope(TenantScope::class)->find($id)?->patente ?? 'Vehículo';
+        } elseif ($tipo === 'chofer' && $id === '0') {
+            $query->whereNull('conductor_id');
+            $titulo = 'Sin chofer';
+        } elseif ($tipo === 'chofer' && $id) {
+            $query->where('conductor_id', $id);
+            $titulo = User::find($id)?->name ?? 'Chofer';
+        } else {
+            $titulo = $tipo === 'chofer' ? 'Todas — Por chofer' : 'Todas — Por vehículo';
+        }
+
+        $multas = $query->get()->map(fn (Multa $m) => [
+            'fecha'            => $m->fecha?->format('d/m/Y'),
+            'fecha_vencimiento'=> $m->fecha_vencimiento?->format('d/m/Y'),
+            'patente'          => $m->vehiculo?->patente ?? 'N/A',
+            'conductor'        => $m->conductor?->name,
+            'descripcion'      => $m->descripcion,
+            'jurisdiccion'     => $m->jurisdiccion,
+            'punto_rojo'       => $m->punto_rojo,
+            'monto'            => (float) $m->monto,
+            'pagado'           => $m->pagado,
+            'cobrado'          => $m->cobrado,
+        ]);
+
+        $totalMonto = $multas->where('punto_rojo', false)->sum('monto');
+        $sinPagar   = $multas->where('pagado', false)->where('punto_rojo', false)->sum('monto');
+        $sinCobrar  = $multas->where('cobrado', false)->where('punto_rojo', false)->sum('monto');
+
+        // Export global: agrupar por vehículo o chofer
+        $grupos = null;
+        if ($esGlobal) {
+            $grupos = ($tipo === 'chofer'
+                ? $multas->groupBy('conductor')
+                : $multas->groupBy('patente')
+            )->map(fn ($ms) => [
+                'label'    => $ms->first()[$tipo === 'chofer' ? 'conductor' : 'patente'] ?? 'Sin chofer',
+                'multas'   => $ms,
+                'total'    => $ms->where('punto_rojo', false)->sum('monto'),
+                'adeudado' => $ms->where('cobrado', false)->where('punto_rojo', false)->sum('monto'),
+            ])->sortByDesc('adeudado')->values();
+        }
+
+        $pdf = Pdf::loadView('pdf.multas', compact('multas', 'titulo', 'tipo', 'totalMonto', 'sinPagar', 'sinCobrar', 'esGlobal', 'grupos'));
+        $pdf->setPaper('a4', 'landscape');
+
+        $filename = 'multas-' . str($titulo)->slug() . '-' . now()->format('Ymd') . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    public function destroy(Request $request, Multa $multa): RedirectResponse
+    {
+        $this->authorize('manage-multas');
+
+        if ($multa->pdf_path) {
+            Storage::disk('public')->delete($multa->pdf_path);
+        }
+
+        $multa->delete();
+
+        return redirect()->back()->with('success', 'Multa eliminada.');
     }
 
     /**
