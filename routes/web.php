@@ -12,10 +12,12 @@ use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
 use App\Http\Controllers\InversionController;
 use App\Http\Controllers\HistorialController;
+use App\Http\Controllers\MultaController;
 use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
+use App\Http\Controllers\RevisionMecanicaController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
@@ -87,6 +89,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('vehiculos/{vehiculo}/asignaciones', [AsignacionController::class, 'index'])->name('vehiculos.asignaciones');
         Route::get('vehiculos/{vehiculo}/asignaciones/pdf', [AsignacionController::class, 'pdf'])->name('vehiculos.asignaciones.pdf');
 
+        // Revisión mecánica (dashboard de prioridad de reparación)
+        Route::get('revision-mecanica', [RevisionMecanicaController::class, 'index'])->name('revision-mecanica.index');
+        Route::post('revision-mecanica/{vehiculo}', [RevisionMecanicaController::class, 'store'])->name('revision-mecanica.store');
+
         // Revisiones
         Route::get('revisiones', [RevisionController::class, 'index'])->name('revisiones.index');
         Route::post('revisiones/cierre', [RevisionController::class, 'cerrar'])->name('revisiones.cerrar');
@@ -102,6 +108,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
         Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
         Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
+
+        // Multas (registro manual + dashboard de deuda por vehículo / por chofer)
+        Route::get('multas', [MultaController::class, 'index'])->name('multas.index');
+        Route::post('multas', [MultaController::class, 'store'])->name('multas.store');
+        Route::patch('multas/{multa}/pago', [MultaController::class, 'togglePago'])->name('multas.pago');
 
         // Transacciones (vista)
         Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');

@@ -238,7 +238,9 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
         setFrom('');
         setTo('');
         setChofer('');
-        router.get('/historial', {}, { preserveState: false, preserveScroll: true });
+        // from/to vacíos explícitos → el server no aplica el default de la semana
+        // actual y muestra todo el historial.
+        router.get('/historial', { from: '', to: '' }, { preserveState: false, preserveScroll: true });
     }
 
     const hasActiveFilters = !!(from || to || chofer);
