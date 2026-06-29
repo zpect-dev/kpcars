@@ -6,7 +6,6 @@ import {
     ChevronRight,
     HandCoins,
     History,
-    Lock,
     Plus,
     Trash2,
     Warehouse,
@@ -473,27 +472,6 @@ export default function GastosIndex({
 
                     {canManage && (
                         <div className="flex items-center gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => router.get('/cierres-gasto')}
-                            >
-                                <History className="mr-1.5 h-4 w-4" />
-                                Historial
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={gastos.length === 0}
-                                onClick={() => {
-                                    if (confirm('¿Cerrar el período actual de gastos? Los gastos listados quedarán archivados en el cierre.')) {
-                                        router.post('/cierres-gasto');
-                                    }
-                                }}
-                            >
-                                <Lock className="mr-1.5 h-4 w-4" />
-                                Cerrar período
-                            </Button>
                             <Button
                                 size="sm"
                                 onClick={() => {

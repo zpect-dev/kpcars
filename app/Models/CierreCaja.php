@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[ScopedBy([TenantScope::class])]
 class CierreCaja extends Model
@@ -29,10 +30,27 @@ class CierreCaja extends Model
     }
 
     /**
-     * Get the detail snapshots for this closing.
+     * Get the detail snapshots for this closing (cobros de inventario).
      */
     public function detalles(): HasMany
     {
         return $this->hasMany(CierreDetalle::class, 'cierre_id');
+    }
+
+    /**
+     * Apertura que este cierre cerró (null para cierres legacy sin apertura).
+     */
+    public function apertura(): HasOne
+    {
+        return $this->hasOne(AperturaCaja::class, 'cierre_id');
+    }
+
+    /**
+     * Cierre de gastos asociado dentro del modelo unificado (null para cierres
+     * legacy que sólo congelaban cobros).
+     */
+    public function cierreGasto(): HasOne
+    {
+        return $this->hasOne(CierreGasto::class, 'cierre_caja_id');
     }
 }

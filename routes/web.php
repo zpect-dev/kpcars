@@ -141,6 +141,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
         Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
         Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
+        Route::post('cobros/abrir', [CobroController::class, 'abrir'])->name('cobros.abrir');
         Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
 
         // Recaudaciones
@@ -157,9 +158,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
         Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
 
-        // Cierres de gastos
-        Route::get('cierres-gasto', [CierreGastoController::class, 'index'])->name('cierres-gasto.index');
-        Route::post('cierres-gasto', [CierreGastoController::class, 'store'])->name('cierres-gasto.store');
+        // Cierres de gastos (solo detalle: el cierre se ejecuta unificado desde Cobros.
+        // El index/store standalone se removió con el refactor de cobros+gastos).
         Route::get('cierres-gasto/{cierreGasto}', [CierreGastoController::class, 'show'])->name('cierres-gasto.show');
         Route::get('pdf/cierres-gasto/{cierreGasto}', [PdfController::class, 'cierreGasto'])->name('pdf.cierre-gasto');
         Route::get('excel/cierres-gasto/{cierreGasto}', [ExcelController::class, 'cierreGasto'])->name('excel.cierre-gasto');

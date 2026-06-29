@@ -467,6 +467,10 @@ it('Inventario es GLOBAL: egreso a un carro de otra empresa enruta el cobro a la
     // Estoy en empresa A pero despacho al carro de empresa B.
     session(['active_company_id' => $this->empresaA->id]);
 
+    // El cobro se enruta a la empresa del carro (B): debe haber un período
+    // abierto en esa empresa para poder registrarlo.
+    \App\Models\AperturaCaja::create(['empresa_id' => $this->empresaB->id, 'user_id' => $admin->id]);
+
     $action = new \App\Actions\ProcessStockMovementAction;
     $action->execute($articulo, 'OUT', 2, $this->vehB->patente, 'Taller');
 

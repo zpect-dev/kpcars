@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\CreateGastoAction;
+use App\Models\AperturaCaja;
 use App\Models\Empresa;
 use App\Models\Gasto;
 use App\Models\Scopes\GastoTenantScope;
@@ -14,6 +15,7 @@ use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,6 +147,18 @@ class GastoController extends Controller
             'tipo' => ['required', Rule::in(['galpon', 'taller', 'oficina', 'kevin', 'stock', 'vehiculo'])],
             'vehiculo_id' => ['nullable', 'integer', 'exists:vehiculos,id', 'required_if:tipo,vehiculo'],
         ]);
+
+        // Exigir un período de caja abierto para registrar el gasto. Un gasto de
+        // vehículo pertenece a la empresa del vehículo; uno global, a la activa.
+        $empresaGasto = $validated['tipo'] === 'vehiculo'
+            ? Vehiculo::withoutGlobalScope(TenantScope::class)->find($validated['vehiculo_id'])?->empresa_id
+            : (session('active_company_id') !== null ? (int) session('active_company_id') : null);
+
+        if (! AperturaCaja::hayPeriodoAbierto($empresaGasto)) {
+            throw ValidationException::withMessages([
+                'tipo' => 'No hay un período de caja abierto para esta empresa. Abrí un período en Cobros antes de registrar el gasto.',
+            ]);
+        }
 
         $action->execute([
             ...$validated,

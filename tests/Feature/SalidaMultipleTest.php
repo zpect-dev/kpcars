@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\UserRole;
+use App\Models\AperturaCaja;
 use App\Models\Articulo;
 use App\Models\Cobro;
 use App\Models\Empresa;
@@ -41,6 +42,10 @@ beforeEach(function () {
     // Los de galpón (repuestos=false) son consumo interno y no generan cobro.
     $this->aceite = Articulo::create(['descripcion' => 'Aceite', 'stock' => 10, 'min_stock' => 1, 'precio' => 100, 'repuestos' => true]);
     $this->filtro = Articulo::create(['descripcion' => 'Filtro', 'stock' => 5, 'min_stock' => 1, 'precio' => 200, 'repuestos' => true]);
+
+    // El cobro se enruta a la empresa del carro (B): el egreso exige un período
+    // de caja abierto en esa empresa.
+    $this->aperturaB = AperturaCaja::create(['empresa_id' => $this->empresaB->id, 'user_id' => $this->admin->id]);
 });
 
 it('procesa una salida múltiple: descuenta stock y genera cobros por línea', function () {
@@ -65,6 +70,26 @@ it('procesa una salida múltiple: descuenta stock y genera cobros por línea', f
     $cobros = Cobro::withoutGlobalScope(TenantScope::class)->get();
     expect($cobros)->toHaveCount(2)
         ->and($cobros->pluck('empresa_id')->unique()->all())->toBe([$this->empresaB->id]);
+});
+
+it('bloquea la salida si no hay un período de caja abierto en la empresa del carro', function () {
+    // Sin período abierto en la empresa del carro (B) no se puede registrar el cobro.
+    $this->aperturaB->delete();
+
+    $this->actingAs($this->admin);
+    session(['active_company_id' => $this->empresaA->id]);
+
+    $this->post('/articulos/salida-multiple', [
+        'patente' => 'BBB222',
+        'lineas' => [
+            ['articulo_id' => $this->aceite->id, 'cantidad' => 3],
+        ],
+    ])->assertSessionHasErrors('lineas');
+
+    // Nada se aplicó: ni stock, ni transacciones, ni cobros.
+    expect($this->aceite->fresh()->stock)->toBe(10)
+        ->and(Transaccion::count())->toBe(0)
+        ->and(Cobro::withoutGlobalScope(TenantScope::class)->count())->toBe(0);
 });
 
 it('es atómica: si una línea no tiene stock, no procesa NADA', function () {
@@ -165,6 +190,10 @@ it('el historial de transacciones es GLOBAL (muestra OUT de todas las empresas)'
     ]);
 
     $this->actingAs($this->admin);
+
+    // Ambas empresas con período abierto (la B ya viene del beforeEach): los
+    // egresos a sus carros generan cobro y exigen un período en cada una.
+    AperturaCaja::create(['empresa_id' => $this->empresaA->id, 'user_id' => $this->admin->id]);
 
     // Egreso a empresa A (estando en A) y a empresa B (estando en A: inventario global).
     session(['active_company_id' => $this->empresaA->id]);

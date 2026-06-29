@@ -19,6 +19,11 @@ class CobroPolicy
         return $user->isAdmin();
     }
 
+    public function abrirCaja(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
     public function cierreCaja(User $user): bool
     {
         return $user->isAdmin();

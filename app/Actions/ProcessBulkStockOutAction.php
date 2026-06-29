@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Models\AperturaCaja;
 use App\Models\Articulo;
 use App\Models\Cobro;
 use App\Models\Scopes\TenantScope;
@@ -63,6 +64,16 @@ class ProcessBulkStockOutAction
                 }
 
                 $articulos[] = ['model' => $articulo, 'cantidad' => $cantidad];
+            }
+
+            // 1b. Si la salida va a generar algún cobro (vehículo no-EXTERNO con
+            // al menos un repuesto), exigir un período de caja abierto en la
+            // empresa del vehículo antes de aplicar nada.
+            $generaCobro = $licensePlate !== 'EXTERNO'
+                && collect($articulos)->contains(fn (array $row) => (bool) $row['model']->repuestos);
+
+            if ($generaCobro && ! AperturaCaja::hayPeriodoAbierto($vehiculo->empresa_id)) {
+                throw new Exception('No hay un período de caja abierto para esta empresa. Abrí un período en Cobros antes de registrar la salida.');
             }
 
             // 2. Aplicar egresos (stock ya validado).

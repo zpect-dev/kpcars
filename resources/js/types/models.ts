@@ -117,8 +117,48 @@ export interface CierreDetalle {
 export interface CierreHistorial {
     id: number;
     user: { id: number; name: string } | null;
+    total_cobros: number;
+    total_gastos: number;
     total: number;
+    /** Id del cierre de gastos hijo (para ver su desglose), si lo hubo. */
+    gasto_cierre_id: number | null;
     detalles: CierreDetalle[];
+    created_at: string;
+}
+
+/** Apertura abierta del período unificado de caja (cobros + gastos). */
+export interface CajaApertura {
+    id: number;
+    user: { id: number; name: string } | null;
+    created_at: string;
+}
+
+/** Línea de gasto no-flota (solo lectura) del período en la pestaña Gastos. */
+export interface CobrosGastoLinea {
+    id: number;
+    fecha: string | null;
+    monto: number;
+    recibio: string | null;
+    metodo_pago: string | null;
+    descripcion: string | null;
+    tipo: string;
+    registrado_por: string | null;
+}
+
+export interface CobrosGastosResumen {
+    cards: { key: string; label: string; total: number }[];
+    total: number;
+    gastos: CobrosGastoLinea[];
+    ultimos: CobrosGastoLinea[];
+    count: number;
+}
+
+/** Cierre de gastos legacy (anterior al refactor unificado). */
+export interface CierreGastoLegacy {
+    id: number;
+    user: { id: number; name: string } | null;
+    total: number;
+    periodo_fin: string | null;
     created_at: string;
 }
 

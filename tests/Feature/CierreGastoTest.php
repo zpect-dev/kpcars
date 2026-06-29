@@ -49,7 +49,19 @@ function vehiculoTest(string $patente): Vehiculo
     ]);
 }
 
-it('crea un cierre con el snapshot por tipo y por patente', function () {
+/**
+ * El cierre de gastos ya no es autónomo: forma parte del cierre unificado de
+ * caja. Se abre un período y se cierra; el CierreGasto queda como hijo del
+ * CierreCaja (cierre_caja_id).
+ */
+function cerrarCajaTest(): \Illuminate\Testing\TestResponse
+{
+    test()->post('/cobros/abrir');
+
+    return test()->post('/cobros/cierre');
+}
+
+it('crea un cierre de gastos hijo con el snapshot por tipo y por patente', function () {
     gastoTest(['tipo' => 'galpon', 'monto' => 1000]);
     gastoTest(['tipo' => 'taller', 'monto' => 500]);
     gastoTest(['tipo' => 'oficina', 'monto' => 200]);
@@ -60,11 +72,13 @@ it('crea un cierre con el snapshot por tipo y por patente', function () {
     gastoTest(['tipo' => 'vehiculo', 'monto' => 700, 'vehiculo_id' => $veh1->id]);
     gastoTest(['tipo' => 'vehiculo', 'monto' => 400, 'vehiculo_id' => $veh2->id]);
 
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
 
     $cierre = CierreGasto::first();
     expect($cierre)->not->toBeNull()
-        ->and((float) $cierre->total_general)->toBe(3100.0);
+        ->and((float) $cierre->total_general)->toBe(3100.0)
+        // Vinculado al cierre de caja padre.
+        ->and($cierre->cierre_caja_id)->not->toBeNull();
 
     // Los gastos quedaron archivados (vinculados al cierre).
     expect(Gasto::where('cierre_gasto_id', $cierre->id)->count())->toBe(6);
@@ -84,10 +98,10 @@ it('crea un cierre con el snapshot por tipo y por patente', function () {
         ->and($patente['BBB222']->total)->toBe(400.0);
 });
 
-it('al borrar un cierre, sus gastos vuelven a pendientes', function () {
+it('al borrar el cierre de gastos, sus gastos vuelven a pendientes', function () {
     gastoTest(['tipo' => 'galpon', 'monto' => 500]);
 
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
     $cierre = CierreGasto::first();
     expect(Gasto::where('cierre_gasto_id', $cierre->id)->count())->toBe(1);
 
@@ -103,6 +117,9 @@ it('congela el reparto entre inversores en la columna distribucion al crear el g
     $inversorB = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '60000002', 'inactivo' => false]);
     $this->inversion->inversores()->attach([$inversorA->id => ['tiene_deuda' => false], $inversorB->id => ['tiene_deuda' => false]]);
 
+    // Registrar un gasto exige un período de caja abierto.
+    \App\Models\AperturaCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
+
     $this->post('/gastos', [
         'fecha' => now()->toDateString(),
         'monto' => 1000,
@@ -116,17 +133,24 @@ it('congela el reparto entre inversores en la columna distribucion al crear el g
         ->and((float) array_sum($gasto->distribucion))->toBe(1000.0);
 });
 
-it('rechaza cerrar cuando no hay gastos pendientes', function () {
-    $this->post('/cierres-gasto')->assertSessionHas('error');
+it('rechaza registrar un gasto si no hay un período de caja abierto', function () {
+    // Sin apertura: el alta de gasto debe rebotar con error y no crear nada.
+    $this->post('/gastos', [
+        'fecha' => now()->toDateString(),
+        'monto' => 500,
+        'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'galpon',
+    ])->assertSessionHasErrors('tipo');
 
-    expect(CierreGasto::count())->toBe(0);
+    expect(Gasto::count())->toBe(0);
 });
 
 it('archiva los gastos: tras cerrar no aparecen en la lista y un nuevo cierre solo toma los nuevos', function () {
     gastoTest(['tipo' => 'galpon', 'monto' => 1000]);
 
     // Primer cierre: toma el gasto inicial.
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
     expect((float) CierreGasto::latest('id')->first()->total_general)->toBe(1000.0);
 
     // La lista de gastos ya no muestra lo archivado.
@@ -139,16 +163,16 @@ it('archiva los gastos: tras cerrar no aparecen en la lista y un nuevo cierre so
     $this->get('/gastos')->assertInertia(fn (Assert $p) => $p->has('gastos', 1));
 
     // Segundo cierre: solo el gasto nuevo.
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
     expect((float) CierreGasto::latest('id')->first()->total_general)->toBe(250.0);
 });
 
-it('muestra el detalle del cierre con desglose', function () {
+it('muestra el detalle del cierre de gastos con desglose', function () {
     gastoTest(['tipo' => 'galpon', 'monto' => 800]);
     $veh = vehiculoTest('CCC333');
     gastoTest(['tipo' => 'vehiculo', 'monto' => 600, 'vehiculo_id' => $veh->id]);
 
-    $this->post('/cierres-gasto');
+    cerrarCajaTest();
     $cierre = CierreGasto::first();
 
     $this->get("/cierres-gasto/{$cierre->id}")->assertInertia(fn (Assert $p) => $p
@@ -161,19 +185,9 @@ it('muestra el detalle del cierre con desglose', function () {
     );
 });
 
-it('lista los cierres realizados', function () {
+it('descarga el PDF del cierre de gastos', function () {
     gastoTest(['monto' => 100]);
-    $this->post('/cierres-gasto');
-
-    $this->get('/cierres-gasto')->assertInertia(fn (Assert $p) => $p
-        ->component('CierresGasto/Index')
-        ->has('cierres.data', 1)
-    );
-});
-
-it('descarga el PDF del cierre', function () {
-    gastoTest(['monto' => 100]);
-    $this->post('/cierres-gasto');
+    cerrarCajaTest();
     $cierre = CierreGasto::first();
 
     $this->get("/pdf/cierres-gasto/{$cierre->id}")
@@ -181,9 +195,9 @@ it('descarga el PDF del cierre', function () {
         ->assertHeader('content-type', 'application/pdf');
 });
 
-it('protege la exportación a Excel del cierre (solo admin)', function () {
+it('protege la exportación a Excel del cierre de gastos (solo admin)', function () {
     gastoTest(['monto' => 100]);
-    $this->post('/cierres-gasto');
+    cerrarCajaTest();
     $cierre = CierreGasto::first();
 
     // La ruta existe y está protegida: un no-admin no llega al controlador
@@ -206,7 +220,7 @@ it('los gastos globales se cierran una sola vez para todas las empresas', functi
 
     // Cierre en empresa A: incluye el global (1000) + vehículo A (500) = 1500.
     session(['active_company_id' => $this->empresa->id]);
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
     $cierreA = CierreGasto::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)->latest('id')->first();
     expect((float) $cierreA->total_general)->toBe(1500.0);
 
@@ -219,16 +233,20 @@ it('los gastos globales se cierran una sola vez para todas las empresas', functi
     );
 
     // Cierre en empresa B: solo el vehículo B (700), sin volver a contar el global.
-    $this->post('/cierres-gasto')->assertRedirect();
+    cerrarCajaTest()->assertRedirect();
     $cierreB = CierreGasto::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
         ->where('empresa_id', $empresaB->id)->latest('id')->first();
     expect((float) $cierreB->total_general)->toBe(700.0);
 });
 
-it('solo el administrador puede acceder a los cierres de gastos', function () {
+it('solo el administrador puede ver el detalle de un cierre de gastos', function () {
+    gastoTest(['monto' => 100]);
+    cerrarCajaTest();
+    $cierre = CierreGasto::first();
+
     $administrativo = User::factory()->create(['role' => UserRole::ADMINISTRATIVO, 'dni' => '50000002']);
     $mecanico = User::factory()->create(['role' => UserRole::MECANICO, 'dni' => '50000003']);
 
-    $this->actingAs($administrativo)->get('/cierres-gasto')->assertForbidden();
-    $this->actingAs($mecanico)->get('/cierres-gasto')->assertForbidden();
+    $this->actingAs($administrativo)->get("/cierres-gasto/{$cierre->id}")->assertForbidden();
+    $this->actingAs($mecanico)->get("/cierres-gasto/{$cierre->id}")->assertForbidden();
 });

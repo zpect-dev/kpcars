@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Models\AperturaCaja;
 use App\Models\Articulo;
 use App\Models\Cobro;
 use App\Models\Scopes\TenantScope;
@@ -77,6 +78,12 @@ class ProcessStockMovementAction
             // Los artículos de galpón (repuestos=false) nunca generan cobro:
             // son consumo interno, no se facturan a ningún vehículo.
             if ($type === 'OUT' && $vehiculo && $licensePlate !== 'EXTERNO' && $articulo->repuestos) {
+                // No se puede registrar un cobro sin un período de caja abierto
+                // en la empresa del vehículo (al que se enruta el cobro).
+                if (! AperturaCaja::hayPeriodoAbierto($vehiculo->empresa_id)) {
+                    throw new Exception('No hay un período de caja abierto para esta empresa. Abrí un período en Cobros antes de registrar el egreso.');
+                }
+
                 Cobro::create([
                     'inversion_id' => $vehiculo->inversion_id,
                     'transaccion_id' => $transaccion->id,

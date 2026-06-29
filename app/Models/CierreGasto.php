@@ -20,6 +20,7 @@ class CierreGasto extends Model
 
     protected $fillable = [
         'empresa_id',
+        'cierre_caja_id',
         'user_id',
         'periodo_inicio',
         'periodo_fin',
@@ -38,6 +39,15 @@ class CierreGasto extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Cierre de caja padre dentro del modelo unificado (null = cierre legacy
+     * autónomo, anterior al refactor de cobros+gastos).
+     */
+    public function cierreCaja(): BelongsTo
+    {
+        return $this->belongsTo(CierreCaja::class, 'cierre_caja_id');
     }
 
     /**
