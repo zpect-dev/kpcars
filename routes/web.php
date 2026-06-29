@@ -112,7 +112,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Multas (registro manual + dashboard de deuda por vehículo / por chofer)
         Route::get('multas', [MultaController::class, 'index'])->name('multas.index');
         Route::post('multas', [MultaController::class, 'store'])->name('multas.store');
-        Route::patch('multas/{multa}/pago', [MultaController::class, 'togglePago'])->name('multas.pago');
+        Route::patch('multas/{multa}', [MultaController::class, 'update'])->name('multas.update');
+        Route::patch('multas/{multa}/pagado', [MultaController::class, 'togglePagado'])->name('multas.pagado');
+        Route::patch('multas/{multa}/cobrado', [MultaController::class, 'toggleCobrado'])->name('multas.cobrado');
 
         // Transacciones (vista)
         Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');

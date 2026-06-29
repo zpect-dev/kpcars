@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Car, Check, ChevronDown, Plus, Search, Siren, User as UserIcon, X } from 'lucide-react';
+import { Car, Check, ChevronDown, FileText, Pencil, Plus, Search, Siren, User as UserIcon, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
@@ -25,9 +25,19 @@ interface Multa {
     conductor_id: number | null;
     conductor?: string | null;
     fecha: string;
+    fecha_vencimiento: string | null;
     monto: number;
     descripcion: string;
-    pagada: boolean;
+    punto_rojo: boolean;
+    jurisdiccion: 'CABA' | 'GBA' | null;
+    pdf_url: string | null;
+    pagado: boolean;
+    cobrado: boolean;
+}
+
+/** Una multa está pendiente mientras no esté pagada al organismo o no esté cobrada al chofer. */
+function pendiente(m: Multa): boolean {
+    return !m.pagado || !m.cobrado;
 }
 
 interface VehiculoOpt {
@@ -49,26 +59,44 @@ function formatFecha(d: string): string {
     return `${day}/${m}/${y}`;
 }
 
+const HOY = new Date().toISOString().slice(0, 10);
+
+/**
+ * Antes (o el mismo día) del vencimiento la multa tiene un 50% de descuento.
+ * Sin fecha de vencimiento no aplica descuento.
+ */
+function tieneDescuento(m: Multa): boolean {
+    return !!m.fecha_vencimiento && HOY <= m.fecha_vencimiento;
+}
+
+/** Monto vigente hoy: 50% si todavía no venció, total en caso contrario. */
+function montoEfectivo(m: Multa): number {
+    return tieneDescuento(m) ? m.monto * 0.5 : m.monto;
+}
+
 interface Grupo {
     key: string;
     titulo: string;
     sub: string;
     multas: Multa[];
-    deuda: number;
+    pendientes: number;
     total: number;
 }
 
 export default function MultasIndex({ multas, vehiculos }: Props) {
     const [tab, setTab] = useState<Tab>('vehiculo');
     const [search, setSearch] = useState('');
-    const [soloDeuda, setSoloDeuda] = useState(false);
+    const [soloPendientes, setSoloPendientes] = useState(false);
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [showModal, setShowModal] = useState(false);
+    const [editing, setEditing] = useState<Multa | null>(null);
 
     const stats = useMemo(() => ({
-        deuda: multas.filter((m) => !m.pagada).reduce((s, m) => s + m.monto, 0),
-        impagas: multas.filter((m) => !m.pagada).length,
-        pagadas: multas.filter((m) => m.pagada).length,
+        total: multas.length,
+        pagadas: multas.filter((m) => m.pagado).length,
+        noPagadas: multas.filter((m) => !m.pagado).length,
+        cobradas: multas.filter((m) => m.cobrado).length,
+        noCobradas: multas.filter((m) => !m.cobrado).length,
     }), [multas]);
 
     const grupos = useMemo<Grupo[]>(() => {
@@ -90,19 +118,19 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 titulo = m.conductor ?? 'Sin chofer';
                 sub = '';
             }
-            if (!map.has(key)) map.set(key, { key, titulo, sub, multas: [], deuda: 0, total: 0 });
+            if (!map.has(key)) map.set(key, { key, titulo, sub, multas: [], pendientes: 0, total: 0 });
             map.get(key)!.multas.push(m);
         }
 
         return Array.from(map.values())
             .map((g) => ({
                 ...g,
-                deuda: g.multas.filter((m) => !m.pagada).reduce((s, m) => s + m.monto, 0),
-                total: g.multas.reduce((s, m) => s + m.monto, 0),
+                pendientes: g.multas.filter(pendiente).length,
+                total: g.multas.reduce((s, m) => s + montoEfectivo(m), 0),
             }))
-            .filter((g) => !soloDeuda || g.deuda > 0)
-            .sort((a, b) => b.deuda - a.deuda || b.total - a.total || a.titulo.localeCompare(b.titulo, 'es', { numeric: true }));
-    }, [multas, tab, search, soloDeuda]);
+            .filter((g) => !soloPendientes || g.pendientes > 0)
+            .sort((a, b) => b.pendientes - a.pendientes || b.total - a.total || a.titulo.localeCompare(b.titulo, 'es', { numeric: true }));
+    }, [multas, tab, search, soloPendientes]);
 
     function toggleExpand(key: string) {
         setExpanded((prev) => {
@@ -112,8 +140,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
         });
     }
 
-    function togglePago(id: number) {
-        router.patch(`/multas/${id}/pago`, {}, { preserveScroll: true, preserveState: true });
+    function togglePagado(id: number) {
+        router.patch(`/multas/${id}/pagado`, {}, { preserveScroll: true, preserveState: true });
+    }
+
+    function toggleCobrado(id: number) {
+        router.patch(`/multas/${id}/cobrado`, {}, { preserveScroll: true, preserveState: true });
     }
 
     return (
@@ -137,20 +169,26 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2.5">
-                            <Siren className="h-4 w-4 text-red-500" />
-                            <span className="text-sm text-red-700 dark:text-red-400">Deuda total</span>
+                            <Siren className="h-4 w-4 text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">Total de multas</span>
                         </div>
-                        <span className="text-lg font-bold tabular-nums text-foreground">{formatARS(stats.deuda)}</span>
+                        <span className="text-lg font-bold tabular-nums text-foreground">{stats.total}</span>
                     </div>
                     <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <span className="text-sm text-muted-foreground">Multas impagas</span>
-                        <span className="text-lg font-bold tabular-nums text-foreground">{stats.impagas}</span>
+                        <span className="text-sm text-muted-foreground">Pagadas al organismo</span>
+                        <span className="text-sm font-semibold tabular-nums">
+                            <span className="text-green-600 dark:text-green-400">{stats.pagadas}</span>
+                            <span className="text-muted-foreground"> / {stats.noPagadas} sin pagar</span>
+                        </span>
                     </div>
                     <div className="flex items-center justify-between overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                        <span className="text-sm text-muted-foreground">Multas pagadas</span>
-                        <span className="text-lg font-bold tabular-nums text-foreground">{stats.pagadas}</span>
+                        <span className="text-sm text-muted-foreground">Cobradas al chofer</span>
+                        <span className="text-sm font-semibold tabular-nums">
+                            <span className="text-green-600 dark:text-green-400">{stats.cobradas}</span>
+                            <span className="text-muted-foreground"> / {stats.noCobradas} sin cobrar</span>
+                        </span>
                     </div>
                 </div>
 
@@ -196,15 +234,15 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                         </div>
                         <button
                             type="button"
-                            onClick={() => setSoloDeuda((v) => !v)}
+                            onClick={() => setSoloPendientes((v) => !v)}
                             className={cn(
                                 'flex h-9 items-center justify-center rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all active:scale-[0.97]',
-                                soloDeuda
-                                    ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+                                soloPendientes
+                                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
                                     : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                             )}
                         >
-                            Solo con deuda
+                            Solo pendientes
                         </button>
                     </div>
                 </div>
@@ -237,19 +275,42 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                                             {g.multas.length} multa{g.multas.length !== 1 ? 's' : ''}
                                         </span>
-                                        <span className={cn(
-                                            'min-w-[90px] shrink-0 text-right text-sm font-bold tabular-nums',
-                                            g.deuda > 0 ? 'text-foreground' : 'text-muted-foreground',
-                                        )}>
-                                            {g.deuda > 0 ? formatARS(g.deuda) : 'Saldada'}
+                                        {g.pendientes > 0 ? (
+                                            <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                {g.pendientes} pendiente{g.pendientes !== 1 ? 's' : ''}
+                                            </span>
+                                        ) : (
+                                            <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                Al día
+                                            </span>
+                                        )}
+                                        <span className="min-w-[90px] shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
+                                            {formatARS(g.total)}
                                         </span>
                                     </button>
 
                                     {isOpen && (
                                         <div className="divide-y divide-border border-t border-border">
-                                            {g.multas.map((m) => (
+                                            {g.multas.map((m) => {
+                                                const conDesc = tieneDescuento(m);
+                                                return (
                                                 <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 sm:flex-nowrap">
-                                                    <span className="w-20 shrink-0 text-xs text-muted-foreground tabular-nums">{formatFecha(m.fecha)}</span>
+                                                    <span className="flex w-20 shrink-0 flex-col text-xs tabular-nums">
+                                                        <span className="text-muted-foreground">{formatFecha(m.fecha)}</span>
+                                                        {m.fecha_vencimiento && (
+                                                            <span className="text-[10px] text-muted-foreground/70" title="Vencimiento">
+                                                                vto {formatFecha(m.fecha_vencimiento)}
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                    {m.punto_rojo && (
+                                                        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" title="Punto rojo" />
+                                                    )}
+                                                    {m.jurisdiccion && (
+                                                        <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                            {m.jurisdiccion}
+                                                        </span>
+                                                    )}
                                                     {tab === 'vehiculo' ? (
                                                         <span className="shrink-0 text-xs text-muted-foreground">
                                                             {m.conductor ?? <span className="italic text-muted-foreground/60">Sin chofer</span>}
@@ -260,24 +321,34 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                         </span>
                                                     )}
                                                     <span className="min-w-0 flex-1 truncate text-sm text-foreground" title={m.descripcion}>{m.descripcion}</span>
-                                                    <span className={cn('shrink-0 text-sm font-semibold tabular-nums', m.pagada ? 'text-muted-foreground line-through' : 'text-foreground')}>
-                                                        {formatARS(m.monto)}
+                                                    <span className="flex shrink-0 flex-col items-end leading-tight">
+                                                        {m.punto_rojo ? (
+                                                            <span className="text-sm font-medium text-muted-foreground" title="Punto rojo — sin importe">—</span>
+                                                        ) : (
+                                                            <span className={cn('text-sm font-semibold tabular-nums', m.pagado ? 'text-muted-foreground line-through' : 'text-foreground')}>
+                                                                {formatARS(montoEfectivo(m))}
+                                                            </span>
+                                                        )}
+                                                        {conDesc && (
+                                                            <span className="text-[10px] font-medium text-green-600 dark:text-green-400" title={`Monto total ${formatARS(m.monto)} — 50% por pago antes del vencimiento`}>
+                                                                -50% (${formatARS(m.monto)})
+                                                            </span>
+                                                        )}
                                                     </span>
                                                     <button
                                                         type="button"
-                                                        onClick={() => togglePago(m.id)}
-                                                        className={cn(
-                                                            'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
-                                                            m.pagada
-                                                                ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400'
-                                                                : 'bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400',
-                                                        )}
-                                                        title={m.pagada ? 'Marcar como impaga' : 'Marcar como pagada'}
+                                                        onClick={(e) => { e.stopPropagation(); setEditing(m); }}
+                                                        title="Editar multa"
+                                                        className="inline-flex shrink-0 items-center rounded-md border border-border px-1.5 py-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                     >
-                                                        {m.pagada ? <><Check className="h-3 w-3" /> Pagada</> : 'Impaga'}
+                                                        <Pencil className="h-3 w-3" />
                                                     </button>
+                                                    <MultaPdf pdfUrl={m.pdf_url} />
+                                                    <EstadoToggle activo={m.pagado} onToggle={() => togglePagado(m.id)} labelOn="Pagada" labelOff="No pagada" />
+                                                    <EstadoToggle activo={m.cobrado} onToggle={() => toggleCobrado(m.id)} labelOn="Cobrada" labelOff="No cobrada" />
                                                 </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
@@ -292,7 +363,49 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 onClose={() => setShowModal(false)}
                 vehiculos={vehiculos}
             />
+
+            <EditarMultaModal
+                multa={editing}
+                onClose={() => setEditing(null)}
+            />
         </>
+    );
+}
+
+/** Link para ver el PDF de la multa (el cambio se hace desde el modal de editar). */
+function MultaPdf({ pdfUrl }: { pdfUrl: string | null }) {
+    if (!pdfUrl) return null;
+
+    return (
+        <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title="Ver PDF de la multa"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+            <FileText className="h-3 w-3" /> PDF
+        </a>
+    );
+}
+
+/** Toggle de un estado booleano (pagada / cobrada) con su opuesto. */
+function EstadoToggle({ activo, onToggle, labelOn, labelOff }: { activo: boolean; onToggle: () => void; labelOn: string; labelOff: string }) {
+    return (
+        <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+            className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors',
+                activo
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
+            )}
+            title={activo ? `Marcar como ${labelOff.toLowerCase()}` : `Marcar como ${labelOn.toLowerCase()}`}
+        >
+            {activo ? <><Check className="h-3 w-3" /> {labelOn}</> : labelOff}
+        </button>
     );
 }
 
@@ -301,8 +414,12 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
     const form = useForm({
         vehiculo_id: '' as string,
         fecha: today,
+        fecha_vencimiento: '' as string,
         monto: '' as string,
         descripcion: '' as string,
+        punto_rojo: false,
+        jurisdiccion: '' as '' | 'CABA' | 'GBA',
+        pdf: null as File | null,
     });
 
     const opciones: ComboboxOption[] = useMemo(
@@ -318,7 +435,20 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
         });
     }
 
-    const canSubmit = form.data.vehiculo_id !== '' && form.data.fecha !== '' && form.data.monto !== '' && form.data.descripcion.trim() !== '';
+    const puntoRojo = form.data.punto_rojo;
+    const canSubmit = form.data.vehiculo_id !== '' && form.data.fecha !== ''
+        && form.data.descripcion.trim() !== '' && form.data.jurisdiccion !== ''
+        && (puntoRojo || (form.data.fecha_vencimiento !== '' && form.data.monto !== ''));
+
+    function setPuntoRojo(checked: boolean) {
+        form.setData((prev) => ({
+            ...prev,
+            punto_rojo: checked,
+            // Punto rojo no tiene importe ni vencimiento/descuento.
+            monto: checked ? '' : prev.monto,
+            fecha_vencimiento: checked ? '' : prev.fecha_vencimiento,
+        }));
+    }
 
     return (
         <Dialog open={open} onOpenChange={(o) => { if (!o) { form.clearErrors(); onClose(); } }}>
@@ -363,17 +493,62 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                 {form.errors.fecha && <p className="text-xs text-red-600">{form.errors.fecha}</p>}
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-monto">Monto</Label>
+                                <Label htmlFor="multa-vto">Fecha de vencimiento</Label>
+                                <Input
+                                    id="multa-vto"
+                                    type="date"
+                                    value={form.data.fecha_vencimiento}
+                                    min={form.data.fecha}
+                                    disabled={puntoRojo}
+                                    onChange={(e) => form.setData('fecha_vencimiento', e.target.value)}
+                                    className={cn(puntoRojo && 'cursor-not-allowed opacity-50')}
+                                />
+                                {form.errors.fecha_vencimiento && <p className="text-xs text-red-600">{form.errors.fecha_vencimiento}</p>}
+                            </div>
+                        </div>
+
+                        <p className="-mt-2 text-[11px] text-muted-foreground">
+                            {puntoRojo
+                                ? 'Las multas de punto rojo no tienen importe ni vencimiento.'
+                                : 'Pagando antes del vencimiento, la multa tiene un 50% de descuento.'}
+                        </p>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="multa-monto">Monto total</Label>
                                 <Input
                                     id="multa-monto"
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    placeholder="0.00"
+                                    placeholder={puntoRojo ? 'Sin monto' : '0.00'}
                                     value={form.data.monto}
+                                    disabled={puntoRojo}
                                     onChange={(e) => form.setData('monto', e.target.value)}
+                                    className={cn(puntoRojo && 'cursor-not-allowed opacity-50')}
                                 />
                                 {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label>Jurisdicción</Label>
+                                <div className="flex gap-1.5">
+                                    {(['CABA', 'GBA'] as const).map((j) => (
+                                        <button
+                                            key={j}
+                                            type="button"
+                                            onClick={() => form.setData('jurisdiccion', j)}
+                                            className={cn(
+                                                'h-9 flex-1 rounded-lg border text-sm font-medium transition-all active:scale-[0.98]',
+                                                form.data.jurisdiccion === j
+                                                    ? 'border-primary/30 bg-primary/10 text-primary'
+                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                            )}
+                                        >
+                                            {j}
+                                        </button>
+                                    ))}
+                                </div>
+                                {form.errors.jurisdiccion && <p className="text-xs text-red-600">{form.errors.jurisdiccion}</p>}
                             </div>
                         </div>
 
@@ -390,6 +565,36 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                             />
                             {form.errors.descripcion && <p className="text-xs text-red-600">{form.errors.descripcion}</p>}
                         </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label>PDF de la multa <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
+                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className={cn('min-w-0 flex-1 truncate', form.data.pdf ? 'text-foreground' : 'text-muted-foreground')}>
+                                    {form.data.pdf ? form.data.pdf.name : 'Seleccionar archivo PDF...'}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept="application/pdf"
+                                    className="hidden"
+                                    onChange={(e) => form.setData('pdf', e.target.files?.[0] ?? null)}
+                                />
+                            </label>
+                            {form.errors.pdf && <p className="text-xs text-red-600">{form.errors.pdf}</p>}
+                        </div>
+
+                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
+                            <input
+                                type="checkbox"
+                                checked={form.data.punto_rojo}
+                                onChange={(e) => setPuntoRojo(e.target.checked)}
+                                className="h-4 w-4 rounded border-input accent-red-500"
+                            />
+                            <span className="flex items-center gap-1.5 text-sm text-foreground">
+                                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                                Punto rojo
+                            </span>
+                        </label>
                     </div>
 
                     <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
@@ -403,6 +608,124 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Modal para editar el monto y la fecha de vencimiento de una multa. */
+function EditarMultaModal({ multa, onClose }: { multa: Multa | null; onClose: () => void }) {
+    return (
+        <Dialog open={!!multa} onOpenChange={(o) => { if (!o) onClose(); }}>
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                {multa && <EditarMultaForm key={multa.id} multa={multa} onClose={onClose} />}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function EditarMultaForm({ multa, onClose }: { multa: Multa; onClose: () => void }) {
+    const form = useForm({
+        monto: String(multa.monto),
+        fecha_vencimiento: multa.fecha_vencimiento ?? '',
+        pdf: null as File | null,
+    });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        // El PDF se sube por multipart; en rutas PATCH hay que falsear el método.
+        form.transform((data) => ({ ...data, _method: 'patch' }));
+        form.post(`/multas/${multa.id}`, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => onClose(),
+        });
+    }
+
+    const camposOk = multa.punto_rojo
+        ? form.data.pdf !== null
+        : form.data.monto !== '' && form.data.fecha_vencimiento !== '';
+
+    return (
+        <>
+            <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                    <Pencil className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                    <DialogTitle className="text-base font-semibold">Editar multa</DialogTitle>
+                    <DialogDescription className="text-xs">
+                        <span className="font-mono font-semibold uppercase">{multa.patente}</span> · infracción del {formatFecha(multa.fecha)}
+                    </DialogDescription>
+                </div>
+            </div>
+
+            <form onSubmit={submit}>
+                <div className="flex flex-col gap-4 px-5 py-5">
+                    {multa.punto_rojo ? (
+                        <p className="text-xs text-muted-foreground">
+                            Multa de punto rojo: no tiene monto ni vencimiento. Solo podés cambiar el PDF.
+                        </p>
+                    ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-monto">Monto total</Label>
+                                <Input
+                                    id="edit-monto"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={form.data.monto}
+                                    onChange={(e) => form.setData('monto', e.target.value)}
+                                />
+                                {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-vto">Fecha de vencimiento</Label>
+                                <Input
+                                    id="edit-vto"
+                                    type="date"
+                                    value={form.data.fecha_vencimiento}
+                                    min={multa.fecha}
+                                    onChange={(e) => form.setData('fecha_vencimiento', e.target.value)}
+                                />
+                                {form.errors.fecha_vencimiento && <p className="text-xs text-red-600">{form.errors.fecha_vencimiento}</p>}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col gap-1.5">
+                        <Label>PDF de la multa</Label>
+                        <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
+                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className={cn('min-w-0 flex-1 truncate', form.data.pdf ? 'text-foreground' : 'text-muted-foreground')}>
+                                {form.data.pdf ? form.data.pdf.name : (multa.pdf_url ? 'Reemplazar PDF (opcional)...' : 'Subir PDF (opcional)...')}
+                            </span>
+                            <input
+                                type="file"
+                                accept="application/pdf"
+                                className="hidden"
+                                onChange={(e) => form.setData('pdf', e.target.files?.[0] ?? null)}
+                            />
+                        </label>
+                        {multa.pdf_url && !form.data.pdf && (
+                            <a href={multa.pdf_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                                Ver PDF actual
+                            </a>
+                        )}
+                        {form.errors.pdf && <p className="text-xs text-red-600">{form.errors.pdf}</p>}
+                    </div>
+                </div>
+
+                <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        <X className="h-4 w-4" /> Cancelar
+                    </Button>
+                    <Button type="submit" disabled={!camposOk || form.processing}>
+                        {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar</>}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </>
     );
 }
 
