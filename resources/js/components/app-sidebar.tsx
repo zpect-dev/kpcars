@@ -38,80 +38,78 @@ setOpenMobile(false);
 
     const perms = auth.permissions ?? {};
 
-    // ── Grupo Taller ─────────────────────────────────────────────────────
-    const tallerItems: NavItem[] = [];
+    // ── Grupo Flota ──────────────────────────────────────────────────────
+    const flotaItems: NavItem[] = [];
 
     if (perms.can_view_vehiculos) {
-        tallerItems.push({ title: 'Vehículos', href: dashboard.url(), icon: CarFront });
+        flotaItems.push({ title: 'Vehículos', href: dashboard.url(), icon: CarFront });
     }
+    if (perms.can_view_multas) {
+        flotaItems.push({ title: 'Multas', href: '/multas', icon: Siren });
+    }
+    if (perms.can_view_revisiones) {
+        flotaItems.push({ title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck });
+    }
+    if (perms.can_view_revision_mecanica) {
+        flotaItems.push({ title: 'Revisión Mecánica', href: '/revision-mecanica', icon: Wrench });
+    }
+    if (perms.can_view_service) {
+        flotaItems.push({ title: 'Service', href: '/services', icon: Gauge });
+    }
+
+    // ── Grupo Taller ─────────────────────────────────────────────────────
+    const tallerItems: NavItem[] = [];
 
     if (perms.can_view_turnos) {
         tallerItems.push({ title: 'Turnos', href: '/appointments', icon: CalendarClock });
     }
-
-    if (perms.can_view_revisiones) {
-        tallerItems.push({ title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck });
+    if (perms.can_view_inventario) {
+        tallerItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });
     }
 
-    if (perms.can_view_revision_mecanica) {
-        tallerItems.push({ title: 'Revisión Mecánica', href: '/revision-mecanica', icon: Wrench });
-    }
-
-    if (perms.can_view_service) {
-        tallerItems.push({ title: 'Service', href: '/services', icon: Gauge });
-    }
-
-    // ── Grupo Gestión ────────────────────────────────────────────────────
-    const gestionItems: NavItem[] = [];
+    // ── Grupo Caja ───────────────────────────────────────────────────────
+    const cajaItems: NavItem[] = [];
 
     if (perms.can_view_cobros) {
-        gestionItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
+        cajaItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
     }
-
     if (perms.can_view_recaudaciones) {
-        gestionItems.push({ title: 'Recaudaciones', href: '/recaudaciones', icon: Coins });
+        cajaItems.push({ title: 'Recaudaciones', href: '/recaudaciones', icon: Coins });
     }
-
     if (perms.can_view_gastos) {
-        gestionItems.push({ title: 'Gastos', href: gastosIndex.url(), icon: HandCoins });
+        cajaItems.push({ title: 'Gastos', href: gastosIndex.url(), icon: HandCoins });
+    }
+    if (perms.can_view_inversiones) {
+        cajaItems.push({ title: 'Inversiones', href: '/inversiones', icon: Wallet });
     }
 
-    if (perms.can_view_multas) {
-        gestionItems.push({ title: 'Multas', href: '/multas', icon: Siren });
-    }
-
-    if (perms.can_view_inventario) {
-        gestionItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });
-    }
+    // ── Grupo Personal ───────────────────────────────────────────────────
+    const personalItems: NavItem[] = [];
 
     if (perms.can_view_personal) {
         const currentRole = url.includes('/users')
             ? new URLSearchParams(url.split('?')[1] ?? '').get('role')
             : null;
 
-        gestionItems.push({
+        personalItems.push({
             title: 'Personal',
             href: '/users',
             icon: Users,
             items: [
-                { title: 'Administración', href: '/users?role=administrador', isActive: currentRole === 'administrador' },
-                { title: 'Administrativos', href: '/users?role=administrativo', isActive: currentRole === 'administrativo' },
-                { title: 'Mecánicos', href: '/users?role=mecanico', isActive: currentRole === 'mecanico' },
-                { title: 'Choferes', href: '/users?role=chofer&status=activos', isActive: currentRole === 'chofer' },
-                { title: 'Inversores', href: '/users?role=inversor', isActive: currentRole === 'inversor' },
+                { title: 'Administración',  href: '/users?role=administrador',         isActive: currentRole === 'administrador' },
+                { title: 'Administrativos', href: '/users?role=administrativo',        isActive: currentRole === 'administrativo' },
+                { title: 'Mecánicos',       href: '/users?role=mecanico',              isActive: currentRole === 'mecanico' },
+                { title: 'Choferes',        href: '/users?role=chofer&status=activos', isActive: currentRole === 'chofer' },
+                { title: 'Inversores',      href: '/users?role=inversor',              isActive: currentRole === 'inversor' },
             ],
         });
     }
 
+    // ── Ítems sueltos al fondo ────────────────────────────────────────────
+    const bottomItems: NavItem[] = [];
+
     if (perms.can_view_historial) {
-        gestionItems.push({ title: 'Historial', href: '/historial', icon: History });
-    }
-
-    // ── Grupo Inversiones (admin only) ──────────────────────────────────
-    const inversionesItems: NavItem[] = [];
-
-    if (perms.can_view_inversiones) {
-        inversionesItems.push({ title: 'Inversiones', href: '/inversiones', icon: Wallet });
+        bottomItems.push({ title: 'Historial', href: '/historial', icon: History });
     }
 
     // ── Grupo Mi Cuenta (inversor) ──────────────────────────────────────
@@ -124,21 +122,12 @@ setOpenMobile(false);
     // ── Ensamblado ──────────────────────────────────────────────────────
     const groups: NavGroup[] = [];
 
-    if (miCuentaItems.length) {
-groups.push({ items: miCuentaItems });
-}
-
-    if (tallerItems.length) {
-groups.push({ label: 'Taller', items: tallerItems });
-}
-
-    if (gestionItems.length) {
-groups.push({ label: 'Gestión', items: gestionItems });
-}
-
-    if (inversionesItems.length) {
-groups.push({ label: 'Inversiones', items: inversionesItems });
-}
+    if (miCuentaItems.length)  groups.push({ items: miCuentaItems });
+    if (flotaItems.length)     groups.push({ label: 'Flota',    items: flotaItems });
+    if (tallerItems.length)    groups.push({ label: 'Taller',   items: tallerItems });
+    if (cajaItems.length)      groups.push({ label: 'Caja',     items: cajaItems });
+    if (personalItems.length)  groups.push({ label: 'Personal', items: personalItems });
+    if (bottomItems.length)    groups.push({ items: bottomItems });
 
     // ── Destino del logo ────────────────────────────────────────────────
     const role = auth.user?.role;
