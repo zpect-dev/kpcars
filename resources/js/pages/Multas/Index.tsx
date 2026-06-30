@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Building2, CalendarDays, Car, Check, ChevronDown, Download, FileText, Medal, Pencil, Plus, Search, Siren, Trash2, User as UserIcon, X } from 'lucide-react';
+import { AlertTriangle, Building2, CalendarDays, Car, Check, ChevronDown, Download, FileText, Medal, Pencil, Plus, Search, Siren, Trash2, User as UserIcon, UserX, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ interface Multa {
     modelo?: string | null;
     conductor_id: number | null;
     conductor?: string | null;
+    conductor_inactivo: boolean;
     fecha: string;
     fecha_vencimiento: string | null;
     monto: number;
@@ -52,7 +53,7 @@ interface Props {
     vehiculos: VehiculoOpt[];
 }
 
-type Tab = 'vehiculo' | 'chofer' | 'ranking';
+type Tab = 'vehiculo' | 'chofer' | 'ex-chofer' | 'ranking';
 
 function formatFecha(d: string): string {
     const [y, m, day] = d.slice(0, 10).split('-');
@@ -155,15 +156,18 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
         setFDesde(''); setFHasta('');
     }
 
+    // El backend solo entiende tipo 'vehiculo' | 'chofer'. Ex-chofer es "por chofer" + inactivo.
+    const tipoPdf = tab === 'vehiculo' || tab === 'ranking' ? 'vehiculo' : 'chofer';
+
     function buildPdfUrl() {
-        const tipo = tab === 'ranking' ? 'vehiculo' : tab;
-        const p = new URLSearchParams({ tipo });
+        const p = new URLSearchParams({ tipo: tipoPdf });
         if (search) p.set('q', search);
         if (fJurisdiccion) p.set('jurisdiccion', fJurisdiccion);
         if (fSistema) p.set('sistema', fSistema);
         if (fChofer) p.set('chofer', fChofer);
         if (fPuntoRojo) p.set('punto_rojo', '1');
         if (fVencimiento) p.set('vencimiento', fVencimiento);
+        if (tab === 'ex-chofer') p.set('inactivo', '1');
         if (fDesde) p.set('desde', fDesde);
         if (fHasta) p.set('hasta', fHasta);
         return `/multas/pdf?${p.toString()}`;
@@ -215,6 +219,7 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
             if (fPuntoRojo && !m.punto_rojo) return false;
             if (fVencimiento === 'no-vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento >= HOY)) return false;
             if (fVencimiento === 'vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento < HOY)) return false;
+            if (tab === 'ex-chofer' && !m.conductor_inactivo) return false;
             if (fDesde && m.fecha < fDesde) return false;
             if (fHasta && m.fecha > fHasta) return false;
             return true;
@@ -353,9 +358,10 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 {/* Tabs */}
                 <div className="flex gap-1.5">
                     {([
-                        { val: 'vehiculo', label: 'Por vehículo', icon: Car },
-                        { val: 'chofer',   label: 'Por chofer',   icon: UserIcon },
-                        { val: 'ranking',  label: 'Ranking',      icon: Medal },
+                        { val: 'vehiculo',  label: 'Por vehículo',  icon: Car },
+                        { val: 'chofer',    label: 'Por chofer',    icon: UserIcon },
+                        { val: 'ex-chofer', label: 'Por ex-chofer', icon: UserX },
+                        { val: 'ranking',   label: 'Ranking',       icon: Medal },
                     ] as const).map(({ val, label, icon: Icon }) => (
                         <button
                             key={val}
@@ -544,7 +550,10 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                     {g.titulo}
                                                 </span>
                                             ) : (
-                                                <span className="truncate text-sm font-semibold text-foreground">{g.titulo}</span>
+                                                <span className="flex min-w-0 shrink items-center gap-1.5">
+                                                    <span className="truncate text-sm font-semibold text-foreground">{g.titulo}</span>
+                                                    {g.multas[0]?.conductor_inactivo && <InactivoBadge />}
+                                                </span>
                                             )}
                                             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{g.sub}</span>
                                             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -565,7 +574,7 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                         </button>
                                         {g.id !== null && (
                                             <a
-                                                href={`/multas/pdf?tipo=${tab}&id=${g.id}`}
+                                                href={`/multas/pdf?tipo=${tipoPdf}&id=${g.id}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 title="Descargar PDF"
@@ -680,7 +689,7 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                             vto {formatFecha(m.fecha_vencimiento)}{vencUrgente && dias !== null && ` (${dias === 0 ? 'hoy' : `${dias}d`})`}
                                                                         </span>
                                                                     )}
-                                                                    {tab === 'chofer' && (
+                                                                    {tab !== 'vehiculo' && (
                                                                         <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-foreground">
                                                                             {m.patente}
                                                                         </span>
@@ -688,8 +697,9 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                 </div>
                                                                 <p className="text-sm font-medium text-foreground">{m.descripcion}</p>
                                                                 {tab === 'vehiculo' && (
-                                                                    <span className="text-xs text-muted-foreground">
+                                                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                                                         {m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}
+                                                                        {m.conductor_inactivo && <InactivoBadge />}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -726,8 +736,9 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                         </div>
                                                         <div className="w-32 shrink-0">
                                                             {tab === 'vehiculo' ? (
-                                                                <span className="block truncate text-xs text-muted-foreground">
-                                                                    {m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}
+                                                                <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                                                                    <span className="truncate">{m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}</span>
+                                                                    {m.conductor_inactivo && <InactivoBadge />}
                                                                 </span>
                                                             ) : (
                                                                 <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-foreground">
@@ -1126,6 +1137,18 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                 </DialogFooter>
             </form>
         </>
+    );
+}
+
+/** Etiqueta para choferes dados de baja. */
+function InactivoBadge() {
+    return (
+        <span
+            title="Chofer inactivo"
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+        >
+            Inactivo
+        </span>
     );
 }
 

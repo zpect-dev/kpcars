@@ -32,7 +32,7 @@ class MultaController extends Controller
         $multas = Multa::query()
             ->with([
                 'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)->select('id', 'patente', 'marca', 'modelo'),
-                'conductor:id,name',
+                'conductor:id,name,inactivo',
             ])
             ->orderByDesc('fecha')
             ->orderByDesc('id')
@@ -45,6 +45,7 @@ class MultaController extends Controller
                 'modelo' => $m->vehiculo?->modelo,
                 'conductor_id' => $m->conductor_id,
                 'conductor' => $m->conductor?->name,
+                'conductor_inactivo' => (bool) ($m->conductor?->inactivo ?? false),
                 'fecha' => $m->fecha?->toDateString(),
                 'fecha_vencimiento' => $m->fecha_vencimiento?->toDateString(),
                 'monto' => (float) $m->monto,
@@ -199,6 +200,7 @@ class MultaController extends Controller
         $sis   = $request->query('sistema');
         $chof  = $request->query('chofer');
         $pr    = $request->query('punto_rojo');
+        $inact = $request->query('inactivo');
         $desde = $request->query('desde');
         $hasta = $request->query('hasta');
 
@@ -222,6 +224,7 @@ class MultaController extends Controller
         if ($chof === 'si') $query->where('cobrado', true);
         if ($chof === 'no') $query->where('cobrado', false);
         if ($pr) $query->where('punto_rojo', true);
+        if ($inact) $query->whereHas('conductor', fn ($q2) => $q2->where('inactivo', true));
         $venc = $request->query('vencimiento');
         if ($venc === 'no-vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '>=', today());
         if ($venc === 'vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '<', today());
