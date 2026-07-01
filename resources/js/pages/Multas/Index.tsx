@@ -63,6 +63,7 @@ interface Pago {
     fecha: string;
     monto: number;
     comprobante_url: string | null;
+    con_deposito: boolean;
 }
 
 /** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
@@ -290,7 +291,9 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 });
             const e = map.get(key)!;
             e.cnt++;
-            e.total += m.monto;
+            // Total efectivo (con descuento de hoy; si ya está cobrada, lo pagado).
+            // Así total = pagado + adeudado y el % pagado cierra correcto.
+            e.total += m.cobrado ? m.monto_cobrado : montoEfectivo(m);
             e.pagado += m.monto_cobrado;
             e.adeudado += faltante(m);
         }
@@ -1428,6 +1431,7 @@ function CobrarMultaForm({
         monto: fully ? '' : String(falta.toFixed(2)),
         fecha_cobro: today,
         comprobante: null as File | null,
+        con_deposito: false,
     });
 
     function submit(e: React.FormEvent) {
@@ -1503,7 +1507,14 @@ function CobrarMultaForm({
                             {multa.pagos.map((p) => (
                                 <div key={p.id} className="flex items-center gap-2 px-3 py-2">
                                     <span className="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">{formatFecha(p.fecha)}</span>
-                                    <span className="flex-1 text-sm font-semibold tabular-nums text-foreground">{formatARS(p.monto)}</span>
+                                    <span className="text-sm font-semibold tabular-nums text-foreground">{formatARS(p.monto)}</span>
+                                    <span className="flex-1">
+                                        {p.con_deposito && (
+                                            <span className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400" title="Pagado con depósito">
+                                                Depósito
+                                            </span>
+                                        )}
+                                    </span>
                                     {p.comprobante_url ? (
                                         <a
                                             href={p.comprobante_url}
@@ -1580,6 +1591,16 @@ function CobrarMultaForm({
                             </label>
                             {form.errors.comprobante && <p className="text-xs text-red-600">{form.errors.comprobante}</p>}
                         </div>
+
+                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
+                            <input
+                                type="checkbox"
+                                checked={form.data.con_deposito}
+                                onChange={(e) => form.setData('con_deposito', e.target.checked)}
+                                className="h-4 w-4 rounded border-input accent-primary"
+                            />
+                            <span className="text-sm text-foreground">Paga con depósito</span>
+                        </label>
 
                         <p className="-mt-1 text-[11px] text-muted-foreground">
                             Si el pago no cubre el total, la multa queda como cobro parcial (pendiente).

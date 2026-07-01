@@ -64,6 +64,7 @@ class MultaController extends Controller
                     'fecha' => $p->fecha?->toDateString(),
                     'monto' => (float) $p->monto,
                     'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
+                    'con_deposito' => $p->con_deposito,
                 ])->values(),
             ]);
 
@@ -354,6 +355,7 @@ class MultaController extends Controller
             'monto' => ['required', 'numeric', 'min:0.01'],
             'fecha_cobro' => ['required', 'date'],
             'comprobante' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
+            'con_deposito' => ['boolean'],
         ]);
 
         $multa->pagos()->create([
@@ -362,6 +364,7 @@ class MultaController extends Controller
             'comprobante_path' => $request->hasFile('comprobante')
                 ? $request->file('comprobante')->store('comprobantes-multas', 'public')
                 : null,
+            'con_deposito' => $validated['con_deposito'] ?? false,
             'registrado_por' => $request->user()->id,
         ]);
 
