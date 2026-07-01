@@ -28,9 +28,13 @@ class DashboardController extends Controller
         $vehiculos = Vehiculo::with(['user', 'inversion', 'empresa'])
             ->where('patente', '!=', 'EXTERNO')
             ->when(! empty($filters['inversion_id']), fn ($q) => $q->where('inversion_id', $filters['inversion_id']))
-            ->orderBy('patente')
             ->get()
-            ->append('documentos');
+            ->append('documentos')
+            // Orden: por inversión (orden natural del nombre; los sin inversión al
+            // final) y, dentro de cada inversión, por patente (alfabético natural).
+            ->sort(fn ($a, $b) => strnatcasecmp($a->inversion?->nombre ?? '~', $b->inversion?->nombre ?? '~')
+                ?: strnatcasecmp($a->patente, $b->patente))
+            ->values();
 
         $inversiones = Inversion::orderBy('nombre')
             ->get(['id', 'nombre'])
