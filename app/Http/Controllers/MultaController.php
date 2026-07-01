@@ -56,6 +56,7 @@ class MultaController extends Controller
                 'pagado' => $m->pagado,
                 'cobrado' => $m->cobrado,
                 'cobrada_en' => $m->cobrada_en?->toDateString(),
+                'monto_cobrado' => (float) $m->monto_cobrado,
             ]);
 
         // Combo de patentes: todos los vehículos (global), menos el ficticio EXTERNO.
@@ -300,26 +301,64 @@ class MultaController extends Controller
     }
 
     /**
-     * Marca/desmarca si la empresa ya le cobró la multa al chofer. Al marcarla
-     * como cobrada se registra la fecha en la que pagó el chofer.
+     * Registra un pago del chofer (se acumula en monto_cobrado) con su fecha.
+     * Admite pagos parciales: la multa queda cobrada solo cuando lo pagado
+     * alcanza el total a cobrar. Con ?reset se reinicia el cobro a cero.
      */
-    public function toggleCobrado(Request $request, Multa $multa): RedirectResponse
+    public function registrarCobro(Request $request, Multa $multa): RedirectResponse
     {
         $this->authorize('manage-multas');
 
-        $validated = $request->validate([
-            'cobrado' => ['required', 'boolean'],
-            'fecha_cobro' => [Rule::requiredIf($request->boolean('cobrado')), 'nullable', 'date'],
-        ]);
+        // Reiniciar el cobro (deshacer): vuelve a "sin cobrar".
+        if ($request->boolean('reset')) {
+            $multa->update(['cobrado' => false, 'cobrada_en' => null, 'monto_cobrado' => 0]);
 
-        if ($validated['cobrado']) {
+            return redirect()->back()->with('success', 'Cobro reiniciado.');
+        }
+
+        // Punto rojo: sin importe, es un simple sí/no con su fecha.
+        if ($multa->punto_rojo) {
+            $validated = $request->validate(['fecha_cobro' => ['required', 'date']]);
             $multa->update(['cobrado' => true, 'cobrada_en' => $validated['fecha_cobro']]);
 
             return redirect()->back()->with('success', 'Multa marcada como cobrada.');
         }
 
-        $multa->update(['cobrado' => false, 'cobrada_en' => null]);
+        $validated = $request->validate([
+            'monto' => ['required', 'numeric', 'min:0.01'],
+            'fecha_cobro' => ['required', 'date'],
+        ]);
 
-        return redirect()->back()->with('success', 'Multa marcada como no cobrada.');
+        $total = $this->montoACobrar($multa);
+        $acumulado = min(round((float) $multa->monto_cobrado + (float) $validated['monto'], 2), $total);
+        $completo = $acumulado + 0.001 >= $total;
+
+        $multa->update([
+            'monto_cobrado' => $acumulado,
+            'cobrada_en' => $validated['fecha_cobro'],
+            'cobrado' => $completo,
+        ]);
+
+        if ($completo) {
+            return redirect()->back()->with('success', 'Multa cobrada por completo.');
+        }
+
+        $falta = max(round($total - $acumulado, 2), 0);
+
+        return redirect()->back()->with('success', 'Pago parcial registrado. Falta $'.number_format($falta, 2, ',', '.').'.');
+    }
+
+    /**
+     * Total a cobrar hoy: 50% si es de CABA y todavía no venció, si no el total.
+     */
+    private function montoACobrar(Multa $multa): float
+    {
+        $monto = (float) $multa->monto;
+
+        $conDescuento = $multa->jurisdiccion === 'CABA'
+            && $multa->fecha_vencimiento !== null
+            && today()->lte($multa->fecha_vencimiento);
+
+        return $conDescuento ? $monto * 0.5 : $monto;
     }
 }

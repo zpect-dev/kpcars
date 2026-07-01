@@ -54,6 +54,7 @@ interface Multa {
     pagado: boolean;
     cobrado: boolean;
     cobrada_en: string | null;
+    monto_cobrado: number;
 }
 
 /** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
@@ -106,6 +107,19 @@ function tieneDescuento(m: Multa): boolean {
 /** Monto vigente hoy: 50% si todavía no venció, total en caso contrario. */
 function montoEfectivo(m: Multa): number {
     return tieneDescuento(m) ? m.monto * 0.5 : m.monto;
+}
+
+/** Lo que falta cobrarle al chofer hoy (0 si ya está cobrada del todo o es punto rojo). */
+function faltante(m: Multa): number {
+    if (m.cobrado || m.punto_rojo) return 0;
+    return Math.max(montoEfectivo(m) - m.monto_cobrado, 0);
+}
+
+/** Estado del cobro al chofer: sin cobrar / parcial / cobrada. */
+function estadoCobro(m: Multa): 'sin' | 'parcial' | 'cobrada' {
+    if (m.cobrado) return 'cobrada';
+    if (m.monto_cobrado > 0) return 'parcial';
+    return 'sin';
 }
 
 interface Grupo {
@@ -232,16 +246,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 .filter((m) => !m.pagado)
                 .reduce((s, m) => s + montoEfectivo(m), 0),
             cntSinPagar: conMonto.filter((m) => !m.pagado).length,
-            porCobrar: conMonto
-                .filter((m) => !m.cobrado)
-                .reduce((s, m) => s + montoEfectivo(m), 0),
+            porCobrar: conMonto.reduce((s, m) => s + faltante(m), 0),
             cntSinCobrar: conMonto.filter((m) => !m.cobrado).length,
             pagado: conMonto
                 .filter((m) => m.pagado)
                 .reduce((s, m) => s + montoEfectivo(m), 0),
-            cobrado: conMonto
-                .filter((m) => m.cobrado)
-                .reduce((s, m) => s + montoEfectivo(m), 0),
+            cobrado: conMonto.reduce((s, m) => s + m.monto_cobrado, 0),
             proximasVencer,
         };
     }, [multas]);
@@ -273,8 +283,8 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
             const e = map.get(key)!;
             e.cnt++;
             e.total += m.monto;
-            if (m.cobrado) e.pagado += m.monto;
-            else e.adeudado += montoEfectivo(m);
+            e.pagado += m.monto_cobrado;
+            e.adeudado += faltante(m);
         }
         return Array.from(map.values()).sort(
             (a, b) => b.adeudado - a.adeudado || b.total - a.total,
@@ -383,17 +393,17 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
     }
 
     function toggleCobrado(m: Multa) {
-        if (m.cobrado) {
-            // Desmarcar: no pide fecha.
+        if (m.punto_rojo) {
+            // Sin importe: cobro sí/no directo (sin monto).
             router.patch(
                 `/multas/${m.id}/cobrado`,
-                { cobrado: false },
+                m.cobrado ? { reset: true } : { fecha_cobro: HOY },
                 { preserveScroll: true, preserveState: true },
             );
-        } else {
-            // Marcar como cobrada: pide la fecha en que pagó el chofer.
-            setCobrando(m);
+            return;
         }
+        // Con importe: el modal registra el pago (total o parcial) o reinicia.
+        setCobrando(m);
     }
 
     function deleteMulta(id: number) {
@@ -1057,36 +1067,37 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                         )
                                                                     }
                                                                     title={
-                                                                        m.cobrado
-                                                                            ? m.cobrada_en
-                                                                                ? `Cobrada el ${formatFecha(m.cobrada_en)} — clic para desmarcar`
-                                                                                : 'Marcar como no cobrada al chofer'
-                                                                            : 'Marcar como cobrada al chofer'
+                                                                        estadoCobro(m) === 'cobrada'
+                                                                            ? (m.cobrada_en ? `Cobrada — pagó ${formatARS(m.monto_cobrado)} el ${formatFecha(m.cobrada_en)}` : 'Cobrada')
+                                                                            : estadoCobro(m) === 'parcial'
+                                                                                ? `Pago parcial: pagó ${formatARS(m.monto_cobrado)}, falta ${formatARS(faltante(m))}`
+                                                                                : 'Registrar cobro al chofer'
                                                                     }
                                                                     className={cn(
                                                                         'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
-                                                                        m.cobrado
+                                                                        estadoCobro(m) === 'cobrada'
                                                                             ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                                            : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                                                                            : estadoCobro(m) === 'parcial'
+                                                                                ? 'border-orange-300 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                                                                : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
                                                                     )}
                                                                 >
                                                                     <UserIcon className="h-3 w-3 shrink-0" />
-                                                                    {m.cobrado
+                                                                    {estadoCobro(m) === 'cobrada'
                                                                         ? 'Cobrada'
-                                                                        : 'Sin cobrar'}
+                                                                        : estadoCobro(m) === 'parcial'
+                                                                            ? 'Parcial'
+                                                                            : 'Sin cobrar'}
                                                                 </button>
                                                             </div>
-                                                            {m.cobrado &&
-                                                                m.cobrada_en && (
-                                                                    <span className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
-                                                                        <UserIcon className="h-2.5 w-2.5" />
-                                                                        Cobrada
-                                                                        el{' '}
-                                                                        {formatFecha(
-                                                                            m.cobrada_en,
-                                                                        )}
-                                                                    </span>
-                                                                )}
+                                                            {!m.punto_rojo && estadoCobro(m) !== 'sin' && (
+                                                                <span className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
+                                                                    <UserIcon className="h-2.5 w-2.5 shrink-0" />
+                                                                    {estadoCobro(m) === 'cobrada'
+                                                                        ? `Pagó ${formatARS(m.monto_cobrado)}${m.cobrada_en ? ' el ' + formatFecha(m.cobrada_en) : ''}`
+                                                                        : `Pagó ${formatARS(m.monto_cobrado)} · Falta ${formatARS(faltante(m))}`}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     );
 
@@ -1379,7 +1390,7 @@ function CobrarMultaModal({
                 if (!o) onClose();
             }}
         >
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
                 {multa && (
                     <CobrarMultaForm
                         key={multa.id}
@@ -1400,7 +1411,15 @@ function CobrarMultaForm({
     onClose: () => void;
 }) {
     const today = new Date().toISOString().slice(0, 10);
-    const form = useForm({ cobrado: true, fecha_cobro: today });
+    const total = montoEfectivo(multa);
+    const pagado = multa.monto_cobrado;
+    const falta = Math.max(total - pagado, 0);
+    const fully = multa.cobrado;
+
+    const form = useForm({
+        monto: fully ? '' : String(falta.toFixed(2)),
+        fecha_cobro: today,
+    });
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -1410,15 +1429,26 @@ function CobrarMultaForm({
         });
     }
 
+    function reiniciar() {
+        router.patch(
+            `/multas/${multa.id}/cobrado`,
+            { reset: true },
+            { preserveScroll: true, onSuccess: () => onClose() },
+        );
+    }
+
+    const montoNum = Number(form.data.monto);
+    const puedeRegistrar = montoNum > 0 && form.data.fecha_cobro !== '' && !form.processing;
+
     return (
-        <>
+        <form onSubmit={submit}>
             <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
                     <UserIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div className="flex-1">
                     <DialogTitle className="text-base font-semibold">
-                        Marcar como cobrada
+                        Cobro al chofer
                     </DialogTitle>
                     <DialogDescription className="text-xs">
                         <span className="font-mono font-semibold uppercase">
@@ -1429,48 +1459,78 @@ function CobrarMultaForm({
                 </div>
             </div>
 
-            <form onSubmit={submit}>
-                <div className="flex flex-col gap-1.5 px-5 py-5">
-                    <Label htmlFor="cobro-fecha">
-                        Fecha en que pagó el chofer
-                    </Label>
-                    <Input
-                        id="cobro-fecha"
-                        type="date"
-                        value={form.data.fecha_cobro}
-                        max={today}
-                        onChange={(e) =>
-                            form.setData('fecha_cobro', e.target.value)
-                        }
-                    />
-                    {form.errors.fecha_cobro && (
-                        <p className="text-xs text-red-600">
-                            {form.errors.fecha_cobro}
-                        </p>
-                    )}
+            <div className="flex flex-col gap-4 px-5 py-5">
+                {/* Resumen del cobro */}
+                <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p>
+                        <p className="text-sm font-bold tabular-nums text-foreground">{formatARS(total)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pagado</p>
+                        <p className="text-sm font-bold tabular-nums text-green-600 dark:text-green-400">{formatARS(pagado)}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Falta</p>
+                        <p className={cn('text-sm font-bold tabular-nums', falta > 0 ? 'text-foreground' : 'text-muted-foreground')}>{formatARS(falta)}</p>
+                    </div>
                 </div>
 
-                <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                    <Button type="button" variant="outline" onClick={onClose}>
-                        <X className="h-4 w-4" /> Cancelar
+                {fully ? (
+                    <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
+                        Cobrada por completo{multa.cobrada_en ? ` el ${formatFecha(multa.cobrada_en)}` : ''}.
+                    </p>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cobro-monto">Monto que pagó</Label>
+                                <Input
+                                    id="cobro-monto"
+                                    type="number"
+                                    min="0"
+                                    max={falta}
+                                    step="0.01"
+                                    value={form.data.monto}
+                                    onChange={(e) => form.setData('monto', e.target.value)}
+                                />
+                                {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cobro-fecha">Fecha del pago</Label>
+                                <Input
+                                    id="cobro-fecha"
+                                    type="date"
+                                    value={form.data.fecha_cobro}
+                                    max={today}
+                                    onChange={(e) => form.setData('fecha_cobro', e.target.value)}
+                                />
+                                {form.errors.fecha_cobro && <p className="text-xs text-red-600">{form.errors.fecha_cobro}</p>}
+                            </div>
+                        </div>
+                        <p className="-mt-1 text-[11px] text-muted-foreground">
+                            Si el pago no cubre el total, la multa queda como cobro parcial (pendiente).
+                        </p>
+                    </>
+                )}
+            </div>
+
+            <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4">
+                {pagado > 0 && (
+                    <Button type="button" variant="ghost" onClick={reiniciar} className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400">
+                        Reiniciar cobro
                     </Button>
-                    <Button
-                        type="submit"
-                        disabled={
-                            form.data.fecha_cobro === '' || form.processing
-                        }
-                    >
-                        {form.processing ? (
-                            'Guardando...'
-                        ) : (
-                            <>
-                                <Check className="h-4 w-4" /> Confirmar cobro
-                            </>
-                        )}
+                )}
+                <Button type="button" variant="outline" onClick={onClose}>
+                    <X className="h-4 w-4" /> Cerrar
+                </Button>
+                {!fully && (
+                    <Button type="submit" disabled={!puedeRegistrar}>
+                        {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Registrar pago</>}
                     </Button>
-                </DialogFooter>
-            </form>
-        </>
+                )}
+            </DialogFooter>
+        </form>
     );
 }
 
