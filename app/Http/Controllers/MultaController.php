@@ -256,22 +256,34 @@ class MultaController extends Controller
             $titulo = $tipo === 'chofer' ? 'Todas — Por chofer' : 'Todas — Por vehículo';
         }
 
-        $multas = $query->get()->map(fn (Multa $m) => [
-            'fecha'            => $m->fecha?->format('d/m/Y'),
-            'fecha_vencimiento'=> $m->fecha_vencimiento?->format('d/m/Y'),
-            'patente'          => $m->vehiculo?->patente ?? 'N/A',
-            'conductor'        => $m->conductor?->name,
-            'descripcion'      => $m->descripcion,
-            'jurisdiccion'     => $m->jurisdiccion,
-            'punto_rojo'       => $m->punto_rojo,
-            'monto'            => (float) $m->monto,
-            'pagado'           => $m->pagado,
-            'cobrado'          => $m->cobrado,
-        ]);
+        $multas = $query->get()->map(function (Multa $m) {
+            // Importe vigente hoy (con el descuento CABA si corresponde) y lo
+            // efectivamente cobrado / adeudado, contemplando pagos parciales.
+            $efectivo = $m->punto_rojo ? 0.0 : $this->montoACobrar($m);
+            $cobrado = (float) $m->monto_cobrado;
 
-        $totalMonto = $multas->where('punto_rojo', false)->sum('monto');
-        $sinPagar   = $multas->where('pagado', false)->where('punto_rojo', false)->sum('monto');
-        $sinCobrar  = $multas->where('cobrado', false)->where('punto_rojo', false)->sum('monto');
+            return [
+                'fecha'            => $m->fecha?->format('d/m/Y'),
+                'fecha_vencimiento'=> $m->fecha_vencimiento?->format('d/m/Y'),
+                'patente'          => $m->vehiculo?->patente ?? 'N/A',
+                'conductor'        => $m->conductor?->name,
+                'descripcion'      => $m->descripcion,
+                'jurisdiccion'     => $m->jurisdiccion,
+                'punto_rojo'       => $m->punto_rojo,
+                'monto'            => (float) $m->monto,
+                'monto_efectivo'   => $efectivo,
+                'monto_cobrado'    => $cobrado,
+                'adeudado'         => $m->cobrado ? 0.0 : max($efectivo - $cobrado, 0),
+                'pagado'           => $m->pagado,
+                'cobrado'          => $m->cobrado,
+            ];
+        });
+
+        $noPr = $multas->where('punto_rojo', false);
+        $totalMonto     = $noPr->sum('monto_efectivo');
+        $pagadoChoferes = $noPr->sum('monto_cobrado');
+        $sinCobrar      = $noPr->sum('adeudado');
+        $sinPagar       = $multas->where('pagado', false)->where('punto_rojo', false)->sum('monto_efectivo');
 
         // Export global: agrupar por vehículo o chofer
         $grupos = null;
@@ -282,12 +294,12 @@ class MultaController extends Controller
             )->map(fn ($ms) => [
                 'label'    => $ms->first()[$tipo === 'chofer' ? 'conductor' : 'patente'] ?? 'Sin chofer',
                 'multas'   => $ms,
-                'total'    => $ms->where('punto_rojo', false)->sum('monto'),
-                'adeudado' => $ms->where('cobrado', false)->where('punto_rojo', false)->sum('monto'),
+                'total'    => $ms->where('punto_rojo', false)->sum('monto_efectivo'),
+                'adeudado' => $ms->where('punto_rojo', false)->sum('adeudado'),
             ])->sortByDesc('adeudado')->values();
         }
 
-        $pdf = Pdf::loadView('pdf.multas', compact('multas', 'titulo', 'tipo', 'totalMonto', 'sinPagar', 'sinCobrar', 'esGlobal', 'grupos'));
+        $pdf = Pdf::loadView('pdf.multas', compact('multas', 'titulo', 'tipo', 'totalMonto', 'pagadoChoferes', 'sinPagar', 'sinCobrar', 'esGlobal', 'grupos'));
         $pdf->setPaper('a4', 'landscape');
 
         $filename = 'multas-' . str($titulo)->slug() . '-' . now()->format('Ymd') . '.pdf';
