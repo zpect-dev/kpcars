@@ -55,6 +55,14 @@ interface Multa {
     cobrado: boolean;
     cobrada_en: string | null;
     monto_cobrado: number;
+    pagos: Pago[];
+}
+
+interface Pago {
+    id: number;
+    fecha: string;
+    monto: number;
+    comprobante_url: string | null;
 }
 
 /** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
@@ -1419,12 +1427,16 @@ function CobrarMultaForm({
     const form = useForm({
         monto: fully ? '' : String(falta.toFixed(2)),
         fecha_cobro: today,
+        comprobante: null as File | null,
     });
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        form.patch(`/multas/${multa.id}/cobrado`, {
+        // Comprobante por multipart; la ruta es PATCH, hay que falsear el método.
+        form.transform((data) => ({ ...data, _method: 'patch' }));
+        form.post(`/multas/${multa.id}/cobrado`, {
             preserveScroll: true,
+            forceFormData: true,
             onSuccess: () => onClose(),
         });
     }
@@ -1435,6 +1447,13 @@ function CobrarMultaForm({
             { reset: true },
             { preserveScroll: true, onSuccess: () => onClose() },
         );
+    }
+
+    function eliminarPago(pagoId: number) {
+        router.delete(`/multas/${multa.id}/pagos/${pagoId}`, {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+        });
     }
 
     const montoNum = Number(form.data.monto);
@@ -1476,6 +1495,42 @@ function CobrarMultaForm({
                     </div>
                 </div>
 
+                {/* Pagos registrados */}
+                {multa.pagos.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pagos registrados</p>
+                        <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border">
+                            {multa.pagos.map((p) => (
+                                <div key={p.id} className="flex items-center gap-2 px-3 py-2">
+                                    <span className="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">{formatFecha(p.fecha)}</span>
+                                    <span className="flex-1 text-sm font-semibold tabular-nums text-foreground">{formatARS(p.monto)}</span>
+                                    {p.comprobante_url ? (
+                                        <a
+                                            href={p.comprobante_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            title="Ver comprobante"
+                                            className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <FileText className="h-3 w-3" /> Comp.
+                                        </a>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground/60">sin comprobante</span>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => eliminarPago(p.id)}
+                                        title="Eliminar pago"
+                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {fully ? (
                     <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
                         Cobrada por completo{multa.cobrada_en ? ` el ${formatFecha(multa.cobrada_en)}` : ''}.
@@ -1508,6 +1563,24 @@ function CobrarMultaForm({
                                 {form.errors.fecha_cobro && <p className="text-xs text-red-600">{form.errors.fecha_cobro}</p>}
                             </div>
                         </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label>Comprobante <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
+                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                <span className={cn('min-w-0 flex-1 truncate', form.data.comprobante ? 'text-foreground' : 'text-muted-foreground')}>
+                                    {form.data.comprobante ? form.data.comprobante.name : 'Adjuntar comprobante (PDF o imagen)...'}
+                                </span>
+                                <input
+                                    type="file"
+                                    accept="application/pdf,image/*"
+                                    className="hidden"
+                                    onChange={(e) => form.setData('comprobante', e.target.files?.[0] ?? null)}
+                                />
+                            </label>
+                            {form.errors.comprobante && <p className="text-xs text-red-600">{form.errors.comprobante}</p>}
+                        </div>
+
                         <p className="-mt-1 text-[11px] text-muted-foreground">
                             Si el pago no cubre el total, la multa queda como cobro parcial (pendiente).
                         </p>

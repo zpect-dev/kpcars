@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Asignacion;
 use App\Models\Multa;
+use App\Models\MultaPago;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Vehiculo;
@@ -33,6 +34,7 @@ class MultaController extends Controller
             ->with([
                 'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)->select('id', 'patente', 'marca', 'modelo'),
                 'conductor:id,name,inactivo',
+                'pagos',
             ])
             ->orderByDesc('fecha')
             ->orderByDesc('id')
@@ -57,6 +59,12 @@ class MultaController extends Controller
                 'cobrado' => $m->cobrado,
                 'cobrada_en' => $m->cobrada_en?->toDateString(),
                 'monto_cobrado' => (float) $m->monto_cobrado,
+                'pagos' => $m->pagos->map(fn (MultaPago $p) => [
+                    'id' => $p->id,
+                    'fecha' => $p->fecha?->toDateString(),
+                    'monto' => (float) $p->monto,
+                    'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
+                ])->values(),
             ]);
 
         // Combo de patentes: todos los vehículos (global), menos el ficticio EXTERNO.
@@ -301,22 +309,28 @@ class MultaController extends Controller
     }
 
     /**
-     * Registra un pago del chofer (se acumula en monto_cobrado) con su fecha.
-     * Admite pagos parciales: la multa queda cobrada solo cuando lo pagado
-     * alcanza el total a cobrar. Con ?reset se reinicia el cobro a cero.
+     * Registra un pago del chofer (con su fecha y comprobante opcional). Admite
+     * pagos parciales: la multa queda cobrada cuando la suma de los pagos alcanza
+     * el total a cobrar. Con ?reset se borran todos los pagos.
      */
     public function registrarCobro(Request $request, Multa $multa): RedirectResponse
     {
         $this->authorize('manage-multas');
 
-        // Reiniciar el cobro (deshacer): vuelve a "sin cobrar".
+        // Reiniciar el cobro (deshacer): borra todos los pagos y sus comprobantes.
         if ($request->boolean('reset')) {
+            foreach ($multa->pagos as $pago) {
+                if ($pago->comprobante_path) {
+                    Storage::disk('public')->delete($pago->comprobante_path);
+                }
+            }
+            $multa->pagos()->delete();
             $multa->update(['cobrado' => false, 'cobrada_en' => null, 'monto_cobrado' => 0]);
 
             return redirect()->back()->with('success', 'Cobro reiniciado.');
         }
 
-        // Punto rojo: sin importe, es un simple sí/no con su fecha.
+        // Punto rojo: sin importe, es un simple sí/no con su fecha (sin pagos).
         if ($multa->punto_rojo) {
             $validated = $request->validate(['fecha_cobro' => ['required', 'date']]);
             $multa->update(['cobrado' => true, 'cobrada_en' => $validated['fecha_cobro']]);
@@ -327,25 +341,65 @@ class MultaController extends Controller
         $validated = $request->validate([
             'monto' => ['required', 'numeric', 'min:0.01'],
             'fecha_cobro' => ['required', 'date'],
+            'comprobante' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
         ]);
 
-        $total = $this->montoACobrar($multa);
-        $acumulado = min(round((float) $multa->monto_cobrado + (float) $validated['monto'], 2), $total);
-        $completo = $acumulado + 0.001 >= $total;
-
-        $multa->update([
-            'monto_cobrado' => $acumulado,
-            'cobrada_en' => $validated['fecha_cobro'],
-            'cobrado' => $completo,
+        $multa->pagos()->create([
+            'monto' => $validated['monto'],
+            'fecha' => $validated['fecha_cobro'],
+            'comprobante_path' => $request->hasFile('comprobante')
+                ? $request->file('comprobante')->store('comprobantes-multas', 'public')
+                : null,
+            'registrado_por' => $request->user()->id,
         ]);
+
+        $completo = $this->recomputarCobro($multa);
 
         if ($completo) {
             return redirect()->back()->with('success', 'Multa cobrada por completo.');
         }
 
-        $falta = max(round($total - $acumulado, 2), 0);
+        $falta = max(round($this->montoACobrar($multa) - (float) $multa->monto_cobrado, 2), 0);
 
         return redirect()->back()->with('success', 'Pago parcial registrado. Falta $'.number_format($falta, 2, ',', '.').'.');
+    }
+
+    /**
+     * Elimina un pago puntual del chofer y recalcula el estado del cobro.
+     */
+    public function eliminarPago(Request $request, Multa $multa, MultaPago $pago): RedirectResponse
+    {
+        $this->authorize('manage-multas');
+
+        abort_unless($pago->multa_id === $multa->id, 404);
+
+        if ($pago->comprobante_path) {
+            Storage::disk('public')->delete($pago->comprobante_path);
+        }
+        $pago->delete();
+
+        $this->recomputarCobro($multa);
+
+        return redirect()->back()->with('success', 'Pago eliminado.');
+    }
+
+    /**
+     * Recalcula monto_cobrado / cobrado / cobrada_en a partir de los pagos.
+     * Devuelve si la multa quedó cobrada por completo.
+     */
+    private function recomputarCobro(Multa $multa): bool
+    {
+        $suma = round((float) $multa->pagos()->sum('monto'), 2);
+        $total = $this->montoACobrar($multa);
+        $completo = $suma > 0 && $suma + 0.001 >= $total;
+
+        $multa->update([
+            'monto_cobrado' => $suma,
+            'cobrado' => $completo,
+            'cobrada_en' => $suma > 0 ? $multa->pagos()->max('fecha') : null,
+        ]);
+
+        return $completo;
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Multa de un vehículo. El conductor se imputa según la asignación activa en la
@@ -41,5 +42,13 @@ class Multa extends Model
     public function registradoPor(): BelongsTo
     {
         return $this->belongsTo(User::class, 'registrado_por');
+    }
+
+    /**
+     * Pagos del chofer (parciales o total), del más reciente al más antiguo.
+     */
+    public function pagos(): HasMany
+    {
+        return $this->hasMany(MultaPago::class)->orderByDesc('fecha')->orderByDesc('id');
     }
 }
