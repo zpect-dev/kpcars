@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Personal
         Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::patch('users/cotizacion-dolar', [UserController::class, 'updateCotizacion'])->name('users.cotizacion');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');

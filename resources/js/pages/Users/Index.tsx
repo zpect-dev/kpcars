@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, ChevronDown, Filter, Plus, Search, Camera, UserPlus, UserCog } from 'lucide-react';
+import { Check, ChevronDown, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +20,11 @@ import { index as usersIndex, updateRole, store } from '@/routes/users';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DocumentSection, DocPreviewDialog, type DocUrls, type DocMode } from '@/components/documentos';
 
+interface Deposito {
+    monto: number;
+    moneda: string;
+}
+
 interface User {
     id: number;
     name: string;
@@ -37,8 +42,7 @@ interface User {
     empresa_default_id?: number | null;
     empresa_restringida_id?: number | null;
     empresas?: { id: number; nombre: string }[];
-    deposito?: string | null;
-    deposito_moneda?: string | null;
+    depositos?: Deposito[];
     documentos?: {
         licencia: DocUrls;
         dni: DocUrls;
@@ -71,6 +75,7 @@ interface Props {
     empresas: Empresa[];
     monedas: MonedaOption[];
     choferCounts?: { activos: number; inactivos: number } | null;
+    cotizacionDolar?: number;
 }
 
 function AvatarDropzone({
@@ -169,7 +174,7 @@ const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: s
         label: 'Garantía',
         items: [
             { val: 'falta_deposito', label: 'Sin depósito',  desc: 'Sin garantía registrada' },
-            { val: 'deposito_bajo',  label: 'Depósito bajo', desc: 'ARS inferior a 1.5× el valor semanal del vehículo' },
+            { val: 'deposito_bajo',  label: 'Depósito bajo', desc: 'Total (ARS + USD convertido) menor a 1.5× el valor del auto' },
         ],
     },
 ];
@@ -220,7 +225,96 @@ function FilterPopoverItem({
     );
 }
 
-export default function UsersIndex({ users, roles, empresas, monedas, choferCounts }: Props) {
+/** Repetidor de depósitos (monto + moneda) para el alta/edición del chofer. */
+function DepositosField({
+    depositos,
+    monedas,
+    onChange,
+    error,
+}: {
+    depositos: Deposito[];
+    monedas: MonedaOption[];
+    onChange: (d: Deposito[]) => void;
+    error?: string;
+}) {
+    function agregar() {
+        const usadas = new Set(depositos.map((d) => d.moneda));
+        const libre = monedas.find((m) => !usadas.has(m.value))?.value ?? monedas[0]?.value ?? 'ARS';
+        onChange([...depositos, { monto: 0, moneda: libre }]);
+    }
+    function actualizar(i: number, patch: Partial<Deposito>) {
+        onChange(depositos.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+    }
+    function quitar(i: number) {
+        onChange(depositos.filter((_, idx) => idx !== i));
+    }
+
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+                <Label>Depósitos (garantía)</Label>
+                <button
+                    type="button"
+                    onClick={agregar}
+                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <Plus className="h-3.5 w-3.5" /> Agregar
+                </button>
+            </div>
+
+            {depositos.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin depósitos cargados.</p>
+            ) : (
+                depositos.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                        <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={d.monto || ''}
+                            onChange={(e) => actualizar(i, { monto: Number(e.target.value) })}
+                            placeholder="0.00"
+                            className="flex-1"
+                        />
+                        <select
+                            value={d.moneda}
+                            onChange={(e) => actualizar(i, { moneda: e.target.value })}
+                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                        >
+                            {monedas.map((m) => (
+                                <option key={m.value} value={m.value} className="bg-background text-foreground">{m.value}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => quitar(i)}
+                            title="Quitar"
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </button>
+                    </div>
+                ))
+            )}
+            {error && <InputError message={error} />}
+        </div>
+    );
+}
+
+/** Total del depósito del chofer expresado en ARS (USD × cotización). */
+function depositoTotalARS(u: User, cotizacion: number): number {
+    return (u.depositos ?? []).reduce(
+        (s, d) => s + (d.moneda === 'USD' ? d.monto * cotizacion : d.monto),
+        0,
+    );
+}
+
+/** El chofer no tiene ningún depósito cargado. */
+function sinDeposito(u: User): boolean {
+    return (u.depositos?.length ?? 0) === 0;
+}
+
+export default function UsersIndex({ users, roles, empresas, monedas, choferCounts, cotizacionDolar = 0 }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
@@ -260,18 +354,16 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'falta_doc_licencia') return !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf;
                 if (filterAlert === 'falta_telefono') return !u.telefono;
                 if (filterAlert === 'falta_correo') return !u.correo;
-                if (filterAlert === 'falta_deposito') return !u.deposito;
+                if (filterAlert === 'falta_deposito') return sinDeposito(u);
                 if (filterAlert === 'deposito_bajo') {
                     if (!u.vehiculo?.precio) return false;
-                    if (!u.deposito) return true;
-                    if (u.deposito_moneda === 'USD') return false;
-                    return Number(u.deposito) < 1.5 * u.vehiculo.precio;
+                    return depositoTotalARS(u, cotizacionDolar) < 1.5 * u.vehiculo.precio;
                 }
                 return true;
             });
         }
         return result;
-    }, [users, searchTerm, filterAlert, filterRole]);
+    }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
 
     const alertCounts = useMemo(() => {
         if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0, deposito_bajo: 0 };
@@ -288,15 +380,13 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             falta_doc_licencia: users.filter((u) => !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf).length,
             falta_telefono: users.filter((u) => !u.telefono).length,
             falta_correo: users.filter((u) => !u.correo).length,
-            falta_deposito: users.filter((u) => !u.deposito).length,
+            falta_deposito: users.filter((u) => sinDeposito(u)).length,
             deposito_bajo: users.filter((u) => {
                 if (!u.vehiculo?.precio) return false;
-                if (!u.deposito) return true;
-                if (u.deposito_moneda === 'USD') return false;
-                return Number(u.deposito) < 1.5 * u.vehiculo.precio;
+                return depositoTotalARS(u, cotizacionDolar) < 1.5 * u.vehiculo.precio;
             }).length,
         };
-    }, [users, filterRole]);
+    }, [users, filterRole, cotizacionDolar]);
 
     function confirmToggleStatus(user: User) {
         if (user.id === auth.user.id) return;
@@ -327,8 +417,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         profile_photo: null as File | null,
         empresas: [] as number[],
         empresa_restringida_id: '' as string,
-        deposito: '' as string,
-        deposito_moneda: 'USD' as string,
+        depositos: [] as Deposito[],
         licencia_pdf: null as File | null,
         licencia_frente: null as File | null,
         licencia_dorso: null as File | null,
@@ -352,8 +441,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         profile_photo: null as File | null,
         empresas: [] as number[],
         empresa_restringida_id: '' as string,
-        deposito: '' as string,
-        deposito_moneda: 'USD' as string,
+        depositos: [] as Deposito[],
         licencia_pdf: null as File | null,
         licencia_frente: null as File | null,
         licencia_dorso: null as File | null,
@@ -363,6 +451,13 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     });
     const [editLicMode, setEditLicMode] = useState<DocMode>('imagenes');
     const [editDniMode, setEditDniMode] = useState<DocMode>('imagenes');
+
+    // Cotización global del dólar (ARS por 1 USD) para el filtro de depósito bajo.
+    const cotizacionForm = useForm({ cotizacion_dolar: String(cotizacionDolar) });
+    function guardarCotizacion(e: React.FormEvent) {
+        e.preventDefault();
+        cotizacionForm.patch('/users/cotizacion-dolar', { preserveScroll: true });
+    }
 
     function openEditModal(user: User) {
         setUserToEdit(user);
@@ -389,8 +484,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             profile_photo: null,
             empresas: (user.empresas ?? []).map((e) => e.id),
             empresa_restringida_id: user.empresa_restringida_id ? String(user.empresa_restringida_id) : '',
-            deposito: user.deposito ?? '',
-            deposito_moneda: user.deposito_moneda || 'USD',
+            depositos: user.depositos ?? [],
             licencia_pdf: null,
             licencia_frente: null,
             licencia_dorso: null,
@@ -489,11 +583,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }
 
 
-    function formatDeposito(user: User) {
-        if (!user.deposito) return null;
-        const currency = user.deposito_moneda ?? 'ARS';
-        const amount = Number(user.deposito).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-        return `${currency} ${amount}`;
+    function formatDeposito(user: User): string | null {
+        const ds = user.depositos ?? [];
+        if (ds.length === 0) return null;
+        return ds
+            .map((d) => `${d.moneda} ${Number(d.monto).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
+            .join(' · ');
     }
 
     // Fecha a mostrar en la columna Alta/Baja, tomada de la auditoría
@@ -709,6 +804,23 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         </div>
                                                     );
                                                 })}
+                                                <form onSubmit={guardarCotizacion} className="flex items-end gap-2 border-t border-border p-3">
+                                                    <div className="flex flex-1 flex-col gap-1">
+                                                        <Label htmlFor="cotizacion" className="text-[11px] text-muted-foreground">Cotización dólar (ARS x USD)</Label>
+                                                        <Input
+                                                            id="cotizacion"
+                                                            type="number"
+                                                            step="0.01"
+                                                            min="0"
+                                                            value={cotizacionForm.data.cotizacion_dolar}
+                                                            onChange={(e) => cotizacionForm.setData('cotizacion_dolar', e.target.value)}
+                                                            className="h-8"
+                                                        />
+                                                    </div>
+                                                    <Button type="submit" size="sm" disabled={cotizacionForm.processing} className="h-8">
+                                                        Guardar
+                                                    </Button>
+                                                </form>
                                             </PopoverContent>
                                         </Popover>
                                     </div>
@@ -942,7 +1054,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             )}
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
-                                                    {user.deposito ? (
+                                                    {formatDeposito(user) ? (
                                                         <span className="font-medium text-foreground">
                                                             {formatDeposito(user)}
                                                         </span>
@@ -1146,7 +1258,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <span className="tracking-wider text-muted-foreground uppercase">
                                                     Depósito
                                                 </span>
-                                                {user.deposito ? (
+                                                {formatDeposito(user) ? (
                                                     <span className="font-medium text-foreground">
                                                         {formatDeposito(user)}
                                                     </span>
@@ -1339,20 +1451,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Garantía</span>
                             <div className="flex-1 border-t border-border/60" />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="deposito">Depósito</Label>
-                                <Input id="deposito" type="number" step="0.01" min="0" value={createForm.data.deposito} onChange={(e) => createForm.setData('deposito', e.target.value)} placeholder="0.00" />
-                                <InputError message={createForm.errors.deposito} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="deposito_moneda">Moneda</Label>
-                                <select id="deposito_moneda" value={createForm.data.deposito_moneda} onChange={(e) => createForm.setData('deposito_moneda', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
-                                    {monedas.map((m) => <option key={m.value} value={m.value} className="bg-background text-foreground">{m.label}</option>)}
-                                </select>
-                                <InputError message={createForm.errors.deposito_moneda} />
-                            </div>
-                        </div>
+                        <DepositosField
+                            depositos={createForm.data.depositos}
+                            monedas={monedas}
+                            onChange={(d) => createForm.setData('depositos', d)}
+                            error={createForm.errors.depositos as string | undefined}
+                        />
 
                         <div className="flex items-center gap-2">
                             <div className="flex-1 border-t border-border/60" />
@@ -1523,20 +1627,12 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <div className="flex-1 border-t border-border/60" />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-deposito">Depósito</Label>
-                                <Input id="edit-deposito" type="number" step="0.01" min="0" value={editForm.data.deposito} onChange={(e) => editForm.setData('deposito', e.target.value)} placeholder="0.00" />
-                                <InputError message={editForm.errors.deposito} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-deposito_moneda">Moneda</Label>
-                                <select id="edit-deposito_moneda" value={editForm.data.deposito_moneda} onChange={(e) => editForm.setData('deposito_moneda', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
-                                    {monedas.map((m) => <option key={m.value} value={m.value} className="bg-background text-foreground">{m.label}</option>)}
-                                </select>
-                                <InputError message={editForm.errors.deposito_moneda} />
-                            </div>
-                        </div>
+                        <DepositosField
+                            depositos={editForm.data.depositos}
+                            monedas={monedas}
+                            onChange={(d) => editForm.setData('depositos', d)}
+                            error={editForm.errors.depositos as string | undefined}
+                        />
 
                         <div className="flex items-center gap-2">
                             <div className="flex-1 border-t border-border/60" />

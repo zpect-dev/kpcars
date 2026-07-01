@@ -11,7 +11,9 @@ use App\Enums\UserRole;
 use App\Models\Asignacion;
 use App\Models\ChoferEvento;
 use App\Models\Empresa;
+use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserDeposito;
 use App\Models\Vehiculo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +47,41 @@ class UserController extends Controller
         return $rules;
     }
 
+    /**
+     * Reemplaza los depósitos del usuario por los enviados (uno o varios,
+     * cada uno con su moneda).
+     *
+     * @param  array<int, array{monto: mixed, moneda: string}>  $depositos
+     */
+    private function syncDepositos(User $user, array $depositos): void
+    {
+        $user->depositos()->delete();
+
+        foreach ($depositos as $d) {
+            $user->depositos()->create([
+                'monto' => $d['monto'],
+                'moneda' => $d['moneda'],
+            ]);
+        }
+    }
+
+    /**
+     * Actualiza la cotización global del dólar (ARS por 1 USD), usada por el
+     * filtro de depósito bajo.
+     */
+    public function updateCotizacion(Request $request)
+    {
+        $this->authorize('create', User::class);
+
+        $validated = $request->validate([
+            'cotizacion_dolar' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        Setting::set('cotizacion_dolar', (string) $validated['cotizacion_dolar']);
+
+        return redirect()->back()->with('success', 'Cotización del dólar actualizada.');
+    }
+
     public function store(Request $request, SaveUserDocumentsAction $documentos)
     {
         $this->authorize('create', User::class);
@@ -60,8 +97,9 @@ class UserController extends Controller
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
-            'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
+            'depositos' => ['nullable', 'array'],
+            'depositos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
+            'depositos.*.moneda' => ['required', Rule::enum(DepositoMoneda::class)],
             ...$this->documentRules(),
         ]);
 
@@ -87,9 +125,9 @@ class UserController extends Controller
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
             'empresa_restringida_id' => $esGestor ? ($validated['empresa_restringida_id'] ?? null) : null,
-            'deposito' => $validated['deposito'] ?? null,
-            'deposito_moneda' => isset($validated['deposito']) ? ($validated['deposito_moneda'] ?? null) : null,
         ]);
+
+        $this->syncDepositos($user, $validated['depositos'] ?? []);
 
         // Pivot empresa_user: sólo aplica al rol inversor.
         if ($validated['role'] === UserRole::INVERSOR->value) {
@@ -160,6 +198,7 @@ class UserController extends Controller
             $query->with([
                 'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
                 'choferEventos' => fn ($q) => $q->orderByDesc('created_at')->orderByDesc('id'),
+                'depositos',
             ]);
         }
 
@@ -168,7 +207,7 @@ class UserController extends Controller
         }
 
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'estado_actualizado_en', 'created_at', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'deposito', 'deposito_moneda', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'estado_actualizado_en', 'created_at', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])
             ->append(['profile_photo_url', 'documentos']);
 
         if ($isChoferFilter) {
@@ -184,6 +223,10 @@ class UserController extends Controller
                     'modelo'  => $vehiculo->modelo,
                     'precio'  => $vehiculo->precio,
                 ] : null;
+                $arr['depositos'] = $user->depositos->map(fn (UserDeposito $d) => [
+                    'monto' => (float) $d->monto,
+                    'moneda' => $d->moneda->value,
+                ])->values();
                 $arr['licencia_por_vencer'] = $vencimientoLicencia !== null
                     && $vencimientoLicencia->gte($today)
                     && $vencimientoLicencia->lte($today->copy()->addDays(30));
@@ -225,6 +268,7 @@ class UserController extends Controller
             'empresas' => $empresas,
             'monedas' => $monedas,
             'choferCounts' => $choferCounts,
+            'cotizacionDolar' => (float) (Setting::get('cotizacion_dolar') ?? 0),
         ]);
     }
 
@@ -305,8 +349,9 @@ class UserController extends Controller
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
-            'deposito' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'deposito_moneda' => ['nullable', 'required_with:deposito', Rule::enum(DepositoMoneda::class)],
+            'depositos' => ['nullable', 'array'],
+            'depositos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
+            'depositos.*.moneda' => ['required', Rule::enum(DepositoMoneda::class)],
             'alta_fecha' => ['nullable', 'date'],
             'baja_fecha' => ['nullable', 'date'],
             ...$this->documentRules(),
@@ -318,11 +363,9 @@ class UserController extends Controller
         $bajaFecha = $validated['baja_fecha'] ?? null;
         unset($validated['alta_fecha'], $validated['baja_fecha']);
 
-        // Limpiar moneda si no hay depósito
-        if (empty($validated['deposito'])) {
-            $validated['deposito'] = null;
-            $validated['deposito_moneda'] = null;
-        }
+        // Los depósitos no son columnas del usuario: se sincronizan aparte.
+        $depositos = $validated['depositos'] ?? [];
+        unset($validated['depositos']);
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo_path) {
@@ -347,6 +390,8 @@ class UserController extends Controller
         }
 
         $user->update($validated);
+
+        $this->syncDepositos($user, $depositos);
 
         // Sincroniza pivot empresa_user para inversor (no aplica a otros roles).
         if ($user->isInversor() && $empresaIds !== null) {
