@@ -44,16 +44,19 @@ it('crea un usuario con licencia en PDF y DNI en imágenes (frente y dorso)', fu
     Storage::disk('public')->assertExists($user->dni_dorso_path);
 });
 
-it('rechaza una imagen de documento sin su otra cara', function () {
+it('permite subir una sola cara del documento (se completa más adelante)', function () {
     $this->from('/users')->post('/users', [
         'name' => 'Chofer Incompleto',
         'dni' => '80009002',
         'role' => 'chofer',
         'dni_frente' => UploadedFile::fake()->image('dni-frente.jpg'),
-        // falta dni_dorso
-    ])->assertSessionHasErrors('dni_dorso');
+        // sin dni_dorso: se puede subir otro día
+    ])->assertSessionHasNoErrors();
 
-    expect(User::where('dni', '80009002')->exists())->toBeFalse();
+    $user = User::where('dni', '80009002')->first();
+    expect($user)->not->toBeNull()
+        ->and($user->dni_frente_path)->not->toBeNull()
+        ->and($user->dni_dorso_path)->toBeNull();
 });
 
 it('rechaza mezclar PDF e imágenes en el mismo documento', function () {

@@ -19,10 +19,10 @@ class SaveUserDocumentsAction
     /**
      * Procesa la carga de documentos (licencia y DNI) de un usuario.
      *
-     * Cada documento es opcional y mutuamente excluyente: o un PDF (con ambas
-     * caras adentro) o dos imágenes (frente y dorso). La validación previa en
-     * el controlador garantiza que no lleguen ambas modalidades a la vez y que,
-     * si llega una imagen, lleguen las dos.
+     * Cada documento es opcional: o un PDF (con ambas caras adentro) o imágenes
+     * (frente y/o dorso). El frente y el dorso son independientes: se puede subir
+     * uno ahora y el otro más adelante, sin perder el que ya estaba. La validación
+     * previa solo evita mezclar PDF con imágenes a la vez.
      */
     public function execute(User $user, Request $request): void
     {

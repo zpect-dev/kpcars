@@ -62,13 +62,14 @@ it('guarda cédula en imágenes, título en PDF y seguro con vencimiento', funct
     Storage::disk('public')->assertExists($this->vehiculo->seguro_path);
 });
 
-it('rechaza una sola cara de cédula', function () {
+it('permite subir una sola cara de cédula (se completa más adelante)', function () {
     $this->from('/dashboard')->post("/vehiculos/{$this->vehiculo->id}/documentos", [
         'cedula_frente' => UploadedFile::fake()->image('ced-frente.jpg'),
-    ])->assertSessionHasErrors('cedula_dorso');
+    ])->assertSessionHasNoErrors();
 
     $this->vehiculo->refresh();
-    expect($this->vehiculo->cedula_frente_path)->toBeNull();
+    expect($this->vehiculo->cedula_frente_path)->not->toBeNull()
+        ->and($this->vehiculo->cedula_dorso_path)->toBeNull();
 });
 
 it('rechaza mezclar PDF e imágenes en el título', function () {

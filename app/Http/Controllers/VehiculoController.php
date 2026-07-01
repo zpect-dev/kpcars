@@ -168,12 +168,13 @@ class VehiculoController extends Controller
             'seguro_vencimiento' => ['nullable', 'date'],
         ];
 
-        // Cédula y título: PDF (ambas caras) o dos imágenes (frente + dorso),
-        // mutuamente excluyentes; si llega una imagen, deben llegar las dos.
+        // Cédula y título: PDF (ambas caras) o imágenes (frente / dorso).
+        // Frente y dorso son independientes: se puede subir uno hoy y el otro
+        // más adelante. 'prohibits' evita mezclar PDF con imágenes.
         foreach (['cedula', 'titulo'] as $t) {
             $rules["{$t}_pdf"]    = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
-            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_dorso"];
-            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_frente"];
+            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
+            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
         }
 
         $request->validate($rules);

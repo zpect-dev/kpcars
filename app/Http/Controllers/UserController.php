@@ -39,9 +39,11 @@ class UserController extends Controller
         $rules = [];
 
         foreach (['licencia', 'dni'] as $t) {
+            // Frente y dorso son independientes: se puede subir uno hoy y el
+            // otro más adelante. 'prohibits' evita mezclar PDF con imágenes.
             $rules["{$t}_pdf"]    = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
-            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_dorso"];
-            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', "required_with:{$t}_frente"];
+            $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
+            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
         }
 
         return $rules;

@@ -240,7 +240,7 @@ export function DocumentSection({
             )}
 
             {mode === 'imagenes' && (
-                <p className="text-[11px] text-muted-foreground">Si subís imágenes, cargá ambas caras (frente y dorso).</p>
+                <p className="text-[11px] text-muted-foreground">Podés subir el frente y el dorso por separado (una cara ahora y la otra más adelante).</p>
             )}
 
             <InputError message={error} />
