@@ -63,6 +63,18 @@ class GastoController extends Controller
             ])
             ->values();
 
+        // Empresas (id => nombre) para los cards y el reparto por empresa.
+        $empresas = Empresa::orderBy('id')->get(['id', 'nombre']);
+        $empresaNombres = $empresas->pluck('nombre', 'id');
+
+        $mapDistribucionEmpresas = fn (?array $dist) => collect($dist ?? [])
+            ->map(fn ($monto, $empresaId) => [
+                'empresa_id' => (int) $empresaId,
+                'empresa_nombre' => $empresaNombres[(int) $empresaId] ?? null,
+                'monto' => (float) $monto,
+            ])
+            ->values();
+
         $mapGasto = fn (Gasto $g) => [
             'id' => $g->id,
             'fecha' => $g->fecha?->format('Y-m-d'),
@@ -83,21 +95,30 @@ class GastoController extends Controller
                 : null,
             'registrado_por' => $g->user?->name,
             'distribuciones' => $mapDistribucion($g->distribucion),
+            'distribuciones_empresas' => $mapDistribucionEmpresas($g->distribucion_empresas),
             'mi_monto' => null,
         ];
 
         $gastos = $gastosColl->map($mapGasto)->values();
 
-        // Sección 1: 5 cards de totales del período pendiente.
-        $empresas = Empresa::orderBy('id')->get(['id', 'nombre']);
-
-        $cards = $empresas->map(fn (Empresa $emp) => [
-            'key' => 'empresa_'.$emp->id,
-            'label' => $emp->nombre,
-            'total' => (float) $gastosColl
+        // Sección 1: cards de totales del período pendiente. Cada empresa suma
+        // sus gastos de flota (tipo vehículo) más la parte que le toca de los
+        // gastos globales (galpón/taller/oficina), según el reparto por empresa.
+        $cards = $empresas->map(function (Empresa $emp) use ($gastosColl) {
+            $flota = (float) $gastosColl
                 ->filter(fn (Gasto $g) => $g->tipo === 'vehiculo' && $g->vehiculo?->empresa_id === $emp->id)
-                ->sum(fn (Gasto $g) => (float) $g->monto),
-        ])->values()->all();
+                ->sum(fn (Gasto $g) => (float) $g->monto);
+
+            $globales = (float) $gastosColl
+                ->filter(fn (Gasto $g) => in_array($g->tipo, Gasto::TIPOS_GLOBALES, true))
+                ->sum(fn (Gasto $g) => (float) (($g->distribucion_empresas ?? [])[$emp->id] ?? 0));
+
+            return [
+                'key' => 'empresa_'.$emp->id,
+                'label' => $emp->nombre,
+                'total' => $flota + $globales,
+            ];
+        })->values()->all();
 
         $cards[] = [
             'key' => 'kevin',

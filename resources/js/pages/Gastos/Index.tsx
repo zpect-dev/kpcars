@@ -58,6 +58,12 @@ interface Distribucion {
     monto: number;
 }
 
+interface DistribucionEmpresa {
+    empresa_id: number;
+    empresa_nombre: string | null;
+    monto: number;
+}
+
 interface Gasto {
     id: number;
     fecha: string;
@@ -76,6 +82,7 @@ interface Gasto {
     } | null;
     registrado_por: string | null;
     distribuciones: Distribucion[] | null;
+    distribuciones_empresas: DistribucionEmpresa[] | null;
     mi_monto: number | null;
 }
 
@@ -116,6 +123,26 @@ function cardIcon(key: string): React.ReactNode {
     if (key === 'kevin') return <UserCircle2 className={cls} />;
     if (key === 'galpon') return <Warehouse className={cls} />;
     return <HandCoins className={cls} />;
+}
+
+/** Tipos cuyo monto se reparte por empresa según autos alquilados. */
+const TIPOS_POR_EMPRESA = ['galpon', 'taller', 'oficina'];
+
+/** Agrega el reparto por empresa (congelado por gasto) sumando una lista de gastos. */
+function empresasBreakdown(list: Gasto[]): { empresa_id: number; nombre: string; total: number }[] {
+    const map = new Map<number, { empresa_id: number; nombre: string; total: number }>();
+    for (const g of list) {
+        for (const e of g.distribuciones_empresas ?? []) {
+            const cur = map.get(e.empresa_id) ?? {
+                empresa_id: e.empresa_id,
+                nombre: e.empresa_nombre ?? 'Empresa',
+                total: 0,
+            };
+            cur.total += e.monto;
+            map.set(e.empresa_id, cur);
+        }
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
 function formatARS(value: number): string {
@@ -617,6 +644,36 @@ export default function GastosIndex({
 
                                     {catOpen && (
                                         <div className="border-t border-border bg-muted/10 p-2">
+                                            {!isInversor &&
+                                                TIPOS_POR_EMPRESA.includes(cat.key) &&
+                                                catGastos.length > 0 &&
+                                                (() => {
+                                                    const bd = empresasBreakdown(catGastos);
+                                                    if (bd.length === 0) return null;
+                                                    return (
+                                                        <div className="mb-2 rounded-lg border border-border bg-card p-3">
+                                                            <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                                                Reparto por empresa (según autos alquilados)
+                                                            </p>
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {bd.map((e) => (
+                                                                    <div
+                                                                        key={e.empresa_id}
+                                                                        className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1"
+                                                                    >
+                                                                        <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                        <span className="text-xs font-medium text-foreground">
+                                                                            {e.nombre}
+                                                                        </span>
+                                                                        <span className="text-xs font-bold tabular-nums text-foreground">
+                                                                            {formatARS(e.total)}
+                                                                        </span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             {catGastos.length === 0 ? (
                                                 <p className="px-2 py-4 text-center text-xs text-muted-foreground">
                                                     Sin gastos en esta

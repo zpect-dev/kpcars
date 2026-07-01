@@ -42,6 +42,10 @@ import type {
     ResumenIntegradoInversion,
 } from '@/types';
 
+// Historial de cierres y cierres de gastos anteriores: ocultos en la vista por
+// pedido (los datos siguen existiendo). Poner en true para volver a mostrarlos.
+const MOSTRAR_HISTORIAL_CIERRES = false;
+
 function formatARS(value: number): string {
     return new Intl.NumberFormat('es-AR', {
         style: 'currency',
@@ -332,7 +336,7 @@ export default function CobrosIndex({
                 )}
 
                 {/* Historial de Cierres (unificado) */}
-                {historialCierres.length > 0 && (
+                {MOSTRAR_HISTORIAL_CIERRES && historialCierres.length > 0 && (
                     <div className="mt-2">
                         <h3 className="mb-3 text-sm font-semibold text-foreground">
                             Historial de Cierres
@@ -1010,7 +1014,7 @@ function GastosPanel({
             )}
 
             {/* Cierres de gastos legacy */}
-            {historialGastosLegacy.length > 0 && (
+            {MOSTRAR_HISTORIAL_CIERRES && historialGastosLegacy.length > 0 && (
                 <div>
                     <h3 className="mb-2 text-sm font-semibold text-foreground">Cierres de gastos anteriores</h3>
                     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">

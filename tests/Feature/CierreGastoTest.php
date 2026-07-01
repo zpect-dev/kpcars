@@ -133,6 +133,93 @@ it('congela el reparto entre inversores en la columna distribucion al crear el g
         ->and((float) array_sum($gasto->distribucion))->toBe(1000.0);
 });
 
+it('reparte galpón por empresa según autos alquilados y entre los inversores de cada empresa', function () {
+    // Empresa A (la del beforeEach): 3 autos alquilados, 2 inversores.
+    $invA1 = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000001', 'inactivo' => false]);
+    $invA2 = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000002', 'inactivo' => false]);
+    $this->inversion->inversores()->attach([
+        $invA1->id => ['tiene_deuda' => false],
+        $invA2->id => ['tiene_deuda' => false],
+    ]);
+
+    // Empresa B: 1 auto alquilado, 1 inversor.
+    $empresaB = Empresa::create(['nombre' => 'Empresa B']);
+    $inversionB = Inversion::create(['nombre' => 'Inv B', 'empresa_id' => $empresaB->id]);
+    $invB = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000003', 'inactivo' => false]);
+    $inversionB->inversores()->attach([$invB->id => ['tiene_deuda' => false]]);
+
+    // Chofer que "alquila" los autos (user_id no nulo = alquilado).
+    $chofer = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '62000001']);
+
+    foreach (['AAA001', 'AAA002', 'AAA003'] as $patente) {
+        Vehiculo::factory()->create([
+            'patente' => $patente,
+            'empresa_id' => $this->empresa->id,
+            'inversion_id' => $this->inversion->id,
+            'user_id' => $chofer->id,
+        ]);
+    }
+    Vehiculo::factory()->create([
+        'patente' => 'BBB001',
+        'empresa_id' => $empresaB->id,
+        'inversion_id' => $inversionB->id,
+        'user_id' => $chofer->id,
+    ]);
+
+    \App\Models\AperturaCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
+
+    $this->post('/gastos', [
+        'fecha' => now()->toDateString(),
+        'monto' => 1000,
+        'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'galpon',
+    ])->assertRedirect();
+
+    $dist = Gasto::latest('id')->first()->distribucion;
+
+    // Empresa A: 3/4 = 750, dividido entre sus 2 inversores = 375 c/u.
+    // Empresa B: 1/4 = 250, para su único inversor.
+    expect((float) $dist[$invA1->id])->toBe(375.0)
+        ->and((float) $dist[$invA2->id])->toBe(375.0)
+        ->and((float) $dist[$invB->id])->toBe(250.0)
+        ->and((float) array_sum($dist))->toBe(1000.0);
+});
+
+it('una empresa con autos alquilados pero sin inversores figura en el reparto por empresa, sin imputar a inversores', function () {
+    // Empresa A: 1 auto alquilado, 1 inversor.
+    $invA = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '63000001', 'inactivo' => false]);
+    $this->inversion->inversores()->attach([$invA->id => ['tiene_deuda' => false]]);
+
+    // Empresa B: 1 auto alquilado, SIN inversores.
+    $empresaB = Empresa::create(['nombre' => 'Empresa B']);
+    $inversionB = Inversion::create(['nombre' => 'Inv B', 'empresa_id' => $empresaB->id]);
+
+    $chofer = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '64000001']);
+    Vehiculo::factory()->create(['patente' => 'AAA010', 'empresa_id' => $this->empresa->id, 'inversion_id' => $this->inversion->id, 'user_id' => $chofer->id]);
+    Vehiculo::factory()->create(['patente' => 'BBB010', 'empresa_id' => $empresaB->id, 'inversion_id' => $inversionB->id, 'user_id' => $chofer->id]);
+
+    \App\Models\AperturaCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
+
+    $this->post('/gastos', [
+        'fecha' => now()->toDateString(),
+        'monto' => 1000,
+        'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo',
+        'tipo' => 'galpon',
+    ])->assertRedirect();
+
+    $gasto = Gasto::latest('id')->first();
+
+    // Reparto por empresa: ambas figuran 500/500 (refleja los autos alquilados).
+    expect((float) $gasto->distribucion_empresas[$this->empresa->id])->toBe(500.0)
+        ->and((float) $gasto->distribucion_empresas[$empresaB->id])->toBe(500.0);
+
+    // Imputación a inversores: solo la parte de la empresa A (B queda sin imputar).
+    expect((float) $gasto->distribucion[$invA->id])->toBe(500.0)
+        ->and((float) array_sum($gasto->distribucion))->toBe(500.0);
+});
+
 it('rechaza registrar un gasto si no hay un período de caja abierto', function () {
     // Sin apertura: el alta de gasto debe rebotar con error y no crear nada.
     $this->post('/gastos', [

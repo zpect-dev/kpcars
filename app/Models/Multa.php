@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * fecha de la infracción (snapshot al registrar). Es global (sin TenantScope):
  * abarca vehículos de todas las empresas.
  */
-#[Fillable(['vehiculo_id', 'conductor_id', 'fecha', 'fecha_vencimiento', 'monto', 'descripcion', 'punto_rojo', 'jurisdiccion', 'pdf_path', 'pagado', 'cobrado', 'pagada_en', 'registrado_por'])]
+#[Fillable(['vehiculo_id', 'conductor_id', 'fecha', 'fecha_vencimiento', 'monto', 'descripcion', 'punto_rojo', 'jurisdiccion', 'pdf_path', 'pagado', 'cobrado', 'pagada_en', 'cobrada_en', 'registrado_por'])]
 class Multa extends Model
 {
     protected $casts = [
@@ -24,6 +24,7 @@ class Multa extends Model
         'pagado' => 'boolean',
         'cobrado' => 'boolean',
         'pagada_en' => 'datetime',
+        'cobrada_en' => 'date',
     ];
 
     public function vehiculo(): BelongsTo

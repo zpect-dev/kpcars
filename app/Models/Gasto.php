@@ -23,6 +23,7 @@ class Gasto extends Model
         'fecha',
         'monto',
         'distribucion',
+        'distribucion_empresas',
         'user_id',
         'recibio',
         'metodo_pago',
@@ -39,6 +40,8 @@ class Gasto extends Model
             'monto' => 'decimal:2',
             // Reparto entre inversores (user_id => monto), congelado al crear.
             'distribucion' => 'array',
+            // Reparto por empresa (empresa_id => monto) para galpón/taller/oficina.
+            'distribucion_empresas' => 'array',
         ];
     }
 

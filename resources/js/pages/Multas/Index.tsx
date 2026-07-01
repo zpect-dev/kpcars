@@ -1,5 +1,24 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Building2, CalendarDays, Car, Check, ChevronDown, Download, FileText, Medal, Pencil, Plus, Search, Siren, Trash2, User as UserIcon, UserX, X } from 'lucide-react';
+import {
+    AlertTriangle,
+    Building2,
+    CalendarDays,
+    Car,
+    Check,
+    ChevronDown,
+    Download,
+    FileText,
+    FileX,
+    Medal,
+    Pencil,
+    Plus,
+    Search,
+    Siren,
+    Trash2,
+    User as UserIcon,
+    UserX,
+    X,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
@@ -34,6 +53,7 @@ interface Multa {
     pdf_url: string | null;
     pagado: boolean;
     cobrado: boolean;
+    cobrada_en: string | null;
 }
 
 /** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
@@ -61,21 +81,26 @@ function formatFecha(d: string): string {
 }
 
 const HOY = new Date().toISOString().slice(0, 10);
-const _d3 = new Date(); _d3.setDate(_d3.getDate() + 3);
+const _d3 = new Date();
+_d3.setDate(_d3.getDate() + 3);
 const HOY_PLUS_3 = _d3.toISOString().slice(0, 10);
-const _d7 = new Date(); _d7.setDate(_d7.getDate() + 7);
+const _d7 = new Date();
+_d7.setDate(_d7.getDate() + 7);
 const HOY_PLUS_7 = _d7.toISOString().slice(0, 10);
 
 function diasHastaVenc(v: string): number {
-    return Math.round((new Date(v).getTime() - new Date(HOY).getTime()) / 86_400_000);
+    return Math.round(
+        (new Date(v).getTime() - new Date(HOY).getTime()) / 86_400_000,
+    );
 }
 
 /**
- * Antes (o el mismo día) del vencimiento la multa tiene un 50% de descuento.
- * Sin fecha de vencimiento no aplica descuento.
+ * Solo las multas de CABA tienen 50% de descuento si se pagan antes (o el mismo
+ * día) del vencimiento. Las de GBA (provincia) nunca tienen descuento, y sin
+ * fecha de vencimiento tampoco aplica.
  */
 function tieneDescuento(m: Multa): boolean {
-    return !!m.fecha_vencimiento && HOY <= m.fecha_vencimiento;
+    return m.jurisdiccion === 'CABA' && !!m.fecha_vencimiento && HOY <= m.fecha_vencimiento;
 }
 
 /** Monto vigente hoy: 50% si todavía no venció, total en caso contrario. */
@@ -100,19 +125,23 @@ type FiltroPeriodo = '' | 'mes' | 'mes-ant' | '3m' | 'año';
 function periodoRango(p: FiltroPeriodo): { desde: string; hasta: string } {
     const now = new Date();
     const iso = (d: Date) => d.toISOString().slice(0, 10);
-    if (p === 'mes') return {
-        desde: iso(new Date(now.getFullYear(), now.getMonth(), 1)),
-        hasta: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-    };
-    if (p === 'mes-ant') return {
-        desde: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-        hasta: iso(new Date(now.getFullYear(), now.getMonth(), 0)),
-    };
+    if (p === 'mes')
+        return {
+            desde: iso(new Date(now.getFullYear(), now.getMonth(), 1)),
+            hasta: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+        };
+    if (p === 'mes-ant')
+        return {
+            desde: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+            hasta: iso(new Date(now.getFullYear(), now.getMonth(), 0)),
+        };
     if (p === '3m') {
-        const d = new Date(now); d.setMonth(d.getMonth() - 3);
+        const d = new Date(now);
+        d.setMonth(d.getMonth() - 3);
         return { desde: iso(d), hasta: iso(now) };
     }
-    if (p === 'año') return { desde: `${now.getFullYear()}-01-01`, hasta: iso(now) };
+    if (p === 'año')
+        return { desde: `${now.getFullYear()}-01-01`, hasta: iso(now) };
     return { desde: '', hasta: '' };
 }
 
@@ -122,13 +151,16 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Multa | null>(null);
+    const [cobrando, setCobrando] = useState<Multa | null>(null);
 
     // Filtros
     const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>('');
     const [fSistema, setFSistema] = useState<FiltroEstado>('');
     const [fChofer, setFChofer] = useState<FiltroEstado>('');
     const [fPuntoRojo, setFPuntoRojo] = useState(false);
-    const [fVencimiento, setFVencimiento] = useState<'' | 'vencida' | 'no-vencida'>('');
+    const [fVencimiento, setFVencimiento] = useState<
+        '' | 'vencida' | 'no-vencida'
+    >('');
     const [fDesde, setFDesde] = useState('');
     const [fHasta, setFHasta] = useState('');
 
@@ -147,17 +179,26 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
         setFHasta(r.hasta);
     }
 
-    const filtrosActivos = [fJurisdiccion, fSistema, fChofer, fVencimiento].filter(Boolean).length
-        + (fPuntoRojo ? 1 : 0) + (fDesde ? 1 : 0) + (fHasta ? 1 : 0);
+    const filtrosActivos =
+        [fJurisdiccion, fSistema, fChofer, fVencimiento].filter(Boolean)
+            .length +
+        (fPuntoRojo ? 1 : 0) +
+        (fDesde ? 1 : 0) +
+        (fHasta ? 1 : 0);
 
     function limpiarFiltros() {
-        setFJurisdiccion(''); setFSistema(''); setFChofer('');
-        setFPuntoRojo(false); setFVencimiento('');
-        setFDesde(''); setFHasta('');
+        setFJurisdiccion('');
+        setFSistema('');
+        setFChofer('');
+        setFPuntoRojo(false);
+        setFVencimiento('');
+        setFDesde('');
+        setFHasta('');
     }
 
     // El backend solo entiende tipo 'vehiculo' | 'chofer'. Ex-chofer es "por chofer" + inactivo.
-    const tipoPdf = tab === 'vehiculo' || tab === 'ranking' ? 'vehiculo' : 'chofer';
+    const tipoPdf =
+        tab === 'vehiculo' || tab === 'ranking' ? 'vehiculo' : 'chofer';
 
     function buildPdfUrl() {
         const p = new URLSearchParams({ tipo: tipoPdf });
@@ -175,50 +216,97 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
 
     const stats = useMemo(() => {
         const conMonto = multas.filter((m) => !m.punto_rojo);
+        // Solo CABA: son las únicas que pierden descuento al vencer (GBA no tiene).
         const proximasVencer = multas.filter(
-            (m) => m.fecha_vencimiento && !m.cobrado && !m.punto_rojo
-                && m.fecha_vencimiento >= HOY && m.fecha_vencimiento <= HOY_PLUS_7,
+            (m) =>
+                m.jurisdiccion === 'CABA' &&
+                m.fecha_vencimiento &&
+                !m.cobrado &&
+                !m.punto_rojo &&
+                m.fecha_vencimiento >= HOY &&
+                m.fecha_vencimiento <= HOY_PLUS_7,
         );
         return {
             total: multas.length,
-            deudaSistema: conMonto.filter((m) => !m.pagado).reduce((s, m) => s + montoEfectivo(m), 0),
+            deudaSistema: conMonto
+                .filter((m) => !m.pagado)
+                .reduce((s, m) => s + montoEfectivo(m), 0),
             cntSinPagar: conMonto.filter((m) => !m.pagado).length,
-            porCobrar: conMonto.filter((m) => !m.cobrado).reduce((s, m) => s + montoEfectivo(m), 0),
+            porCobrar: conMonto
+                .filter((m) => !m.cobrado)
+                .reduce((s, m) => s + montoEfectivo(m), 0),
             cntSinCobrar: conMonto.filter((m) => !m.cobrado).length,
-            pagado: conMonto.filter((m) => m.pagado).reduce((s, m) => s + m.monto, 0),
-            cobrado: conMonto.filter((m) => m.cobrado).reduce((s, m) => s + m.monto, 0),
+            pagado: conMonto
+                .filter((m) => m.pagado)
+                .reduce((s, m) => s + montoEfectivo(m), 0),
+            cobrado: conMonto
+                .filter((m) => m.cobrado)
+                .reduce((s, m) => s + montoEfectivo(m), 0),
             proximasVencer,
         };
     }, [multas]);
 
     const ranking = useMemo(() => {
-        const map = new Map<string, { id: number; nombre: string; cnt: number; total: number; pagado: number; adeudado: number }>();
+        const map = new Map<
+            string,
+            {
+                id: number;
+                nombre: string;
+                cnt: number;
+                total: number;
+                pagado: number;
+                adeudado: number;
+            }
+        >();
         for (const m of multas) {
             if (m.punto_rojo) continue;
             const key = m.conductor_id ? `c${m.conductor_id}` : 'sin';
-            if (!map.has(key)) map.set(key, { id: m.conductor_id ?? 0, nombre: m.conductor ?? 'Sin chofer', cnt: 0, total: 0, pagado: 0, adeudado: 0 });
+            if (!map.has(key))
+                map.set(key, {
+                    id: m.conductor_id ?? 0,
+                    nombre: m.conductor ?? 'Sin chofer',
+                    cnt: 0,
+                    total: 0,
+                    pagado: 0,
+                    adeudado: 0,
+                });
             const e = map.get(key)!;
             e.cnt++;
             e.total += m.monto;
             if (m.cobrado) e.pagado += m.monto;
             else e.adeudado += montoEfectivo(m);
         }
-        return Array.from(map.values()).sort((a, b) => b.adeudado - a.adeudado || b.total - a.total);
+        return Array.from(map.values()).sort(
+            (a, b) => b.adeudado - a.adeudado || b.total - a.total,
+        );
     }, [multas]);
 
     const grupos = useMemo<Grupo[]>(() => {
         const q = search.toLowerCase().trim();
 
         const visibles = multas.filter((m) => {
-            if (q && !m.patente.toLowerCase().includes(q) && !(m.conductor ?? '').toLowerCase().includes(q)) return false;
+            if (
+                q &&
+                !m.patente.toLowerCase().includes(q) &&
+                !(m.conductor ?? '').toLowerCase().includes(q)
+            )
+                return false;
             if (fJurisdiccion && m.jurisdiccion !== fJurisdiccion) return false;
             if (fSistema === 'si' && !m.pagado) return false;
             if (fSistema === 'no' && m.pagado) return false;
             if (fChofer === 'si' && !m.cobrado) return false;
             if (fChofer === 'no' && m.cobrado) return false;
             if (fPuntoRojo && !m.punto_rojo) return false;
-            if (fVencimiento === 'no-vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento >= HOY)) return false;
-            if (fVencimiento === 'vencida' && !(m.fecha_vencimiento && m.fecha_vencimiento < HOY)) return false;
+            if (
+                fVencimiento === 'no-vencida' &&
+                !(m.fecha_vencimiento && m.fecha_vencimiento >= HOY)
+            )
+                return false;
+            if (
+                fVencimiento === 'vencida' &&
+                !(m.fecha_vencimiento && m.fecha_vencimiento < HOY)
+            )
+                return false;
             if (tab === 'ex-chofer' && !m.conductor_inactivo) return false;
             if (fDesde && m.fecha < fDesde) return false;
             if (fHasta && m.fecha > fHasta) return false;
@@ -239,7 +327,16 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 titulo = m.conductor ?? 'Sin chofer';
                 sub = '';
             }
-            if (!map.has(key)) map.set(key, { key, id: id ?? 0, titulo, sub, multas: [], pendientes: 0, total: 0 });
+            if (!map.has(key))
+                map.set(key, {
+                    key,
+                    id: id ?? 0,
+                    titulo,
+                    sub,
+                    multas: [],
+                    pendientes: 0,
+                    total: 0,
+                });
             map.get(key)!.multas.push(m);
         }
 
@@ -249,23 +346,54 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 pendientes: g.multas.filter(pendiente).length,
                 total: g.multas.reduce((s, m) => s + montoEfectivo(m), 0),
             }))
-            .sort((a, b) => b.pendientes - a.pendientes || b.total - a.total || a.titulo.localeCompare(b.titulo, 'es', { numeric: true }));
-    }, [multas, tab, search, fJurisdiccion, fSistema, fChofer, fPuntoRojo, fVencimiento, fDesde, fHasta]);
+            .sort(
+                (a, b) =>
+                    b.pendientes - a.pendientes ||
+                    b.total - a.total ||
+                    a.titulo.localeCompare(b.titulo, 'es', { numeric: true }),
+            );
+    }, [
+        multas,
+        tab,
+        search,
+        fJurisdiccion,
+        fSistema,
+        fChofer,
+        fPuntoRojo,
+        fVencimiento,
+        fDesde,
+        fHasta,
+    ]);
 
     function toggleExpand(key: string) {
         setExpanded((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) next.delete(key); else next.add(key);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
             return next;
         });
     }
 
     function togglePagado(id: number) {
-        router.patch(`/multas/${id}/pagado`, {}, { preserveScroll: true, preserveState: true });
+        router.patch(
+            `/multas/${id}/pagado`,
+            {},
+            { preserveScroll: true, preserveState: true },
+        );
     }
 
-    function toggleCobrado(id: number) {
-        router.patch(`/multas/${id}/cobrado`, {}, { preserveScroll: true, preserveState: true });
+    function toggleCobrado(m: Multa) {
+        if (m.cobrado) {
+            // Desmarcar: no pide fecha.
+            router.patch(
+                `/multas/${m.id}/cobrado`,
+                { cobrado: false },
+                { preserveScroll: true, preserveState: true },
+            );
+        } else {
+            // Marcar como cobrada: pide la fecha en que pagó el chofer.
+            setCobrando(m);
+        }
     }
 
     function deleteMulta(id: number) {
@@ -280,9 +408,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">Multas</h1>
+                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                            Multas
+                        </h1>
                         <p className="mt-0.5 text-xs text-muted-foreground">
-                            La multa se imputa al chofer que tenía el vehículo en la fecha de la infracción.
+                            La multa se imputa al chofer que tenía el vehículo
+                            en la fecha de la infracción.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -293,11 +424,19 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                             className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
+                            <span className="hidden sm:inline">
+                                Exportar PDF
+                            </span>
                         </a>
-                        <Button size="sm" onClick={() => setShowModal(true)} className="shrink-0">
+                        <Button
+                            size="sm"
+                            onClick={() => setShowModal(true)}
+                            className="shrink-0"
+                        >
                             <Plus className="h-4 w-4" />
-                            <span className="hidden sm:inline">Registrar multa</span>
+                            <span className="hidden sm:inline">
+                                Registrar multa
+                            </span>
                         </Button>
                     </div>
                 </div>
@@ -306,31 +445,53 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <div className="flex flex-col gap-1 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
-                            <Building2 className="h-3.5 w-3.5" /> Deuda al sistema
+                            <Building2 className="h-3.5 w-3.5" /> Deuda al
+                            sistema
                         </span>
-                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.deudaSistema)}</span>
-                        <span className="text-xs text-muted-foreground">{stats.cntSinPagar} multa{stats.cntSinPagar !== 1 ? 's' : ''} sin pagar</span>
+                        <span className="text-xl font-bold text-foreground tabular-nums">
+                            {formatARS(stats.deudaSistema)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {stats.cntSinPagar} multa
+                            {stats.cntSinPagar !== 1 ? 's' : ''} sin pagar
+                        </span>
                     </div>
                     <div className="flex flex-col gap-1 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 shadow-sm">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                            <UserIcon className="h-3.5 w-3.5" /> Por cobrar a choferes
+                            <UserIcon className="h-3.5 w-3.5" /> Por cobrar a
+                            choferes
                         </span>
-                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.porCobrar)}</span>
-                        <span className="text-xs text-muted-foreground">{stats.cntSinCobrar} multa{stats.cntSinCobrar !== 1 ? 's' : ''} sin cobrar</span>
+                        <span className="text-xl font-bold text-foreground tabular-nums">
+                            {formatARS(stats.porCobrar)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            {stats.cntSinCobrar} multa
+                            {stats.cntSinCobrar !== 1 ? 's' : ''} sin cobrar
+                        </span>
                     </div>
                     <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                            <Building2 className="h-3.5 w-3.5" /> Pagado al sistema
+                            <Building2 className="h-3.5 w-3.5" /> Pagado al
+                            sistema
                         </span>
-                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.pagado)}</span>
-                        <span className="text-xs text-muted-foreground">acumulado histórico</span>
+                        <span className="text-xl font-bold text-foreground tabular-nums">
+                            {formatARS(stats.pagado)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            acumulado histórico
+                        </span>
                     </div>
                     <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                            <UserIcon className="h-3.5 w-3.5" /> Cobrado a choferes
+                            <UserIcon className="h-3.5 w-3.5" /> Cobrado a
+                            choferes
                         </span>
-                        <span className="text-xl font-bold tabular-nums text-foreground">{formatARS(stats.cobrado)}</span>
-                        <span className="text-xs text-muted-foreground">acumulado histórico</span>
+                        <span className="text-xl font-bold text-foreground tabular-nums">
+                            {formatARS(stats.cobrado)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                            acumulado histórico
+                        </span>
                     </div>
                 </div>
 
@@ -340,13 +501,23 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                                {stats.proximasVencer.length} multa{stats.proximasVencer.length !== 1 ? 's' : ''} pierden el descuento en los próximos 7 días
+                                {stats.proximasVencer.length} multa
+                                {stats.proximasVencer.length !== 1
+                                    ? 's'
+                                    : ''}{' '}
+                                pierden el descuento en los próximos 7 días
                             </p>
                             <p className="mt-0.5 text-xs text-muted-foreground">
                                 {stats.proximasVencer
-                                    .sort((a, b) => a.fecha_vencimiento!.localeCompare(b.fecha_vencimiento!))
+                                    .sort((a, b) =>
+                                        a.fecha_vencimiento!.localeCompare(
+                                            b.fecha_vencimiento!,
+                                        ),
+                                    )
                                     .map((m) => {
-                                        const dias = diasHastaVenc(m.fecha_vencimiento!);
+                                        const dias = diasHastaVenc(
+                                            m.fecha_vencimiento!,
+                                        );
                                         return `${m.patente} (${dias === 0 ? 'hoy' : `${dias}d`})`;
                                     })
                                     .join(' · ')}
@@ -357,12 +528,26 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
 
                 {/* Tabs */}
                 <div className="flex gap-1.5">
-                    {([
-                        { val: 'vehiculo',  label: 'Por vehículo',  icon: Car },
-                        { val: 'chofer',    label: 'Por chofer',    icon: UserIcon },
-                        { val: 'ex-chofer', label: 'Por ex-chofer', icon: UserX },
-                        { val: 'ranking',   label: 'Ranking',       icon: Medal },
-                    ] as const).map(({ val, label, icon: Icon }) => (
+                    {(
+                        [
+                            {
+                                val: 'vehiculo',
+                                label: 'Por vehículo',
+                                icon: Car,
+                            },
+                            {
+                                val: 'chofer',
+                                label: 'Por chofer',
+                                icon: UserIcon,
+                            },
+                            {
+                                val: 'ex-chofer',
+                                label: 'Por ex-chofer',
+                                icon: UserX,
+                            },
+                            { val: 'ranking', label: 'Ranking', icon: Medal },
+                        ] as const
+                    ).map(({ val, label, icon: Icon }) => (
                         <button
                             key={val}
                             type="button"
@@ -382,47 +567,109 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
 
                 {/* Ranking */}
                 {tab === 'ranking' && (
-                    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                         <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
                             <Medal className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium text-foreground">Ranking de choferes por deuda pendiente</span>
+                            <span className="text-sm font-medium text-foreground">
+                                Ranking de choferes por deuda pendiente
+                            </span>
                         </div>
                         {ranking.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">Sin datos.</p>
+                            <p className="py-10 text-center text-sm text-muted-foreground">
+                                Sin datos.
+                            </p>
                         ) : (
                             <div>
                                 {/* Header desktop */}
                                 <div className="hidden items-center gap-4 border-b border-border px-4 py-2 sm:flex">
-                                    <span className="w-6 shrink-0 text-[11px] font-medium text-muted-foreground">#</span>
-                                    <span className="flex-1 text-[11px] font-medium text-muted-foreground">Conductor</span>
-                                    <span className="w-16 shrink-0 text-center text-[11px] font-medium text-muted-foreground">Multas</span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Total</span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Pagado</span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Adeuda</span>
-                                    <span className="w-24 shrink-0 text-[11px] font-medium text-muted-foreground">% pagado</span>
+                                    <span className="w-6 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                        #
+                                    </span>
+                                    <span className="flex-1 text-[11px] font-medium text-muted-foreground">
+                                        Conductor
+                                    </span>
+                                    <span className="w-16 shrink-0 text-center text-[11px] font-medium text-muted-foreground">
+                                        Multas
+                                    </span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                        Total
+                                    </span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                        Pagado
+                                    </span>
+                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                        Adeuda
+                                    </span>
+                                    <span className="w-24 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                        % pagado
+                                    </span>
                                 </div>
                                 {ranking.map((r, i) => {
-                                    const pct = r.total > 0 ? Math.round((r.pagado / r.total) * 100) : 0;
+                                    const pct =
+                                        r.total > 0
+                                            ? Math.round(
+                                                  (r.pagado / r.total) * 100,
+                                              )
+                                            : 0;
                                     return (
-                                        <div key={r.id} className={cn('flex items-center gap-4 px-4 py-3 text-sm', i % 2 === 1 && 'bg-muted/20', i < ranking.length - 1 && 'border-b border-border')}>
-                                            <span className={cn('w-6 shrink-0 text-xs font-bold tabular-nums',
-                                                i === 0 ? 'text-yellow-500' : i === 1 ? 'text-zinc-400' : i === 2 ? 'text-amber-700' : 'text-muted-foreground/50',
-                                            )}>
+                                        <div
+                                            key={r.id}
+                                            className={cn(
+                                                'flex items-center gap-4 px-4 py-3 text-sm',
+                                                i % 2 === 1 && 'bg-muted/20',
+                                                i < ranking.length - 1 &&
+                                                    'border-b border-border',
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'w-6 shrink-0 text-xs font-bold tabular-nums',
+                                                    i === 0
+                                                        ? 'text-yellow-500'
+                                                        : i === 1
+                                                          ? 'text-zinc-400'
+                                                          : i === 2
+                                                            ? 'text-amber-700'
+                                                            : 'text-muted-foreground/50',
+                                                )}
+                                            >
                                                 {i + 1}
                                             </span>
-                                            <span className="flex-1 truncate font-medium">{r.nombre}</span>
-                                            <span className="w-16 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{r.cnt}</span>
-                                            <span className="w-28 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatARS(r.total)}</span>
-                                            <span className="w-28 shrink-0 text-right text-xs font-semibold tabular-nums text-green-600 dark:text-green-400">{formatARS(r.pagado)}</span>
-                                            <span className={cn('w-28 shrink-0 text-right text-xs font-semibold tabular-nums', r.adeudado > 0 ? 'text-red-500' : 'text-muted-foreground')}>
+                                            <span className="flex-1 truncate font-medium">
+                                                {r.nombre}
+                                            </span>
+                                            <span className="w-16 shrink-0 text-center text-xs text-muted-foreground tabular-nums">
+                                                {r.cnt}
+                                            </span>
+                                            <span className="w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                                                {formatARS(r.total)}
+                                            </span>
+                                            <span className="w-28 shrink-0 text-right text-xs font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                                {formatARS(r.pagado)}
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    'w-28 shrink-0 text-right text-xs font-semibold tabular-nums',
+                                                    r.adeudado > 0
+                                                        ? 'text-red-500'
+                                                        : 'text-muted-foreground',
+                                                )}
+                                            >
                                                 {formatARS(r.adeudado)}
                                             </span>
                                             <div className="w-24 shrink-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                                                        <div className="h-full rounded-full bg-green-500 transition-all" style={{ width: `${pct}%` }} />
+                                                        <div
+                                                            className="h-full rounded-full bg-green-500 transition-all"
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                            }}
+                                                        />
                                                     </div>
-                                                    <span className="w-7 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{pct}%</span>
+                                                    <span className="w-7 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+                                                        {pct}%
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -434,337 +681,643 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 )}
 
                 {/* Filtros */}
-                {tab !== 'ranking' && <div className="rounded-xl border border-border bg-card shadow-sm">
-                    {/* Buscador */}
-                    <div className="flex items-center gap-2 px-3 py-3">
-                        <div className="relative flex-1">
-                            <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Buscar patente o chofer..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-9"
-                            />
+                {tab !== 'ranking' && (
+                    <div className="rounded-xl border border-border bg-card shadow-sm">
+                        {/* Buscador */}
+                        <div className="flex items-center gap-2 px-3 py-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Buscar patente o chofer..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-9"
+                                />
+                            </div>
+                            {(filtrosActivos > 0 || search) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        limpiarFiltros();
+                                        setSearch('');
+                                    }}
+                                    className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    Limpiar
+                                </button>
+                            )}
                         </div>
-                        {(filtrosActivos > 0 || search) && (
-                            <button
-                                type="button"
-                                onClick={() => { limpiarFiltros(); setSearch(''); }}
-                                className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                Limpiar
-                            </button>
-                        )}
-                    </div>
 
-                    {/* Fila 2: estado */}
-                    <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5">
-                        <Chip activo={fJurisdiccion === 'CABA'} onClick={() => setFJurisdiccion((v) => v === 'CABA' ? '' : 'CABA')}>CABA</Chip>
-                        <Chip activo={fJurisdiccion === 'GBA'} onClick={() => setFJurisdiccion((v) => v === 'GBA' ? '' : 'GBA')}>GBA</Chip>
-                        <div className="h-4 w-px bg-border" />
-                        <Chip activo={fSistema === 'no'} onClick={() => setFSistema((v) => v === 'no' ? '' : 'no')}>
-                            <Building2 className="h-3 w-3" /> Sin pagar al sistema
-                        </Chip>
-                        <Chip activo={fSistema === 'si'} onClick={() => setFSistema((v) => v === 'si' ? '' : 'si')}>
-                            <Building2 className="h-3 w-3" /> Pagada al sistema
-                        </Chip>
-                        <div className="h-4 w-px bg-border" />
-                        <Chip activo={fChofer === 'no'} onClick={() => setFChofer((v) => v === 'no' ? '' : 'no')}>
-                            <UserIcon className="h-3 w-3" /> Sin cobrar
-                        </Chip>
-                        <Chip activo={fChofer === 'si'} onClick={() => setFChofer((v) => v === 'si' ? '' : 'si')}>
-                            <UserIcon className="h-3 w-3" /> Cobrada
-                        </Chip>
-                        <div className="h-4 w-px bg-border" />
-                        <Chip activo={fPuntoRojo} onClick={() => setFPuntoRojo((v) => !v)}>
-                            <span className="h-2 w-2 rounded-full bg-red-500" /> Punto rojo
-                        </Chip>
-                        <Chip activo={fVencimiento === 'no-vencida'} onClick={() => setFVencimiento((v) => v === 'no-vencida' ? '' : 'no-vencida')}>
-                            No vencida
-                        </Chip>
-                        <Chip activo={fVencimiento === 'vencida'} onClick={() => setFVencimiento((v) => v === 'vencida' ? '' : 'vencida')}>
-                            Vencida
-                        </Chip>
-                    </div>
-
-                    {/* Fila 3: período */}
-                    <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-3 py-2.5">
-                        <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
-                            <CalendarDays className="h-3.5 w-3.5" /> Período
-                        </span>
-                        <div className="h-4 w-px bg-border" />
-                        {([
-                            { val: 'mes',     label: 'Este mes' },
-                            { val: 'mes-ant', label: 'Mes anterior' },
-                            { val: '3m',      label: 'Últimos 3 meses' },
-                            { val: 'año',     label: 'Este año' },
-                        ] as { val: FiltroPeriodo; label: string }[]).map(({ val, label }) => (
+                        {/* Fila 2: estado */}
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2.5">
                             <Chip
-                                key={val}
-                                activo={fPeriodoActivo === val}
-                                onClick={() => fPeriodoActivo === val ? (setFDesde(''), setFHasta('')) : setPeriodo(val)}
+                                activo={fJurisdiccion === 'CABA'}
+                                onClick={() =>
+                                    setFJurisdiccion((v) =>
+                                        v === 'CABA' ? '' : 'CABA',
+                                    )
+                                }
                             >
-                                {label}
+                                CABA
                             </Chip>
-                        ))}
-                        <div className="ml-auto flex items-center gap-1.5">
-                            <Input
-                                type="date"
-                                value={fDesde}
-                                onChange={(e) => setFDesde(e.target.value)}
-                                className="h-8 w-[130px] text-xs"
-                            />
-                            <span className="text-xs text-muted-foreground">–</span>
-                            <Input
-                                type="date"
-                                value={fHasta}
-                                min={fDesde}
-                                onChange={(e) => setFHasta(e.target.value)}
-                                className="h-8 w-[130px] text-xs"
-                            />
+                            <Chip
+                                activo={fJurisdiccion === 'GBA'}
+                                onClick={() =>
+                                    setFJurisdiccion((v) =>
+                                        v === 'GBA' ? '' : 'GBA',
+                                    )
+                                }
+                            >
+                                GBA
+                            </Chip>
+                            <div className="h-4 w-px bg-border" />
+                            <Chip
+                                activo={fSistema === 'no'}
+                                onClick={() =>
+                                    setFSistema((v) => (v === 'no' ? '' : 'no'))
+                                }
+                            >
+                                <Building2 className="h-3 w-3" /> Sin pagar al
+                                sistema
+                            </Chip>
+                            <Chip
+                                activo={fSistema === 'si'}
+                                onClick={() =>
+                                    setFSistema((v) => (v === 'si' ? '' : 'si'))
+                                }
+                            >
+                                <Building2 className="h-3 w-3" /> Pagada al
+                                sistema
+                            </Chip>
+                            <div className="h-4 w-px bg-border" />
+                            <Chip
+                                activo={fChofer === 'no'}
+                                onClick={() =>
+                                    setFChofer((v) => (v === 'no' ? '' : 'no'))
+                                }
+                            >
+                                <UserIcon className="h-3 w-3" /> Sin cobrar
+                            </Chip>
+                            <Chip
+                                activo={fChofer === 'si'}
+                                onClick={() =>
+                                    setFChofer((v) => (v === 'si' ? '' : 'si'))
+                                }
+                            >
+                                <UserIcon className="h-3 w-3" /> Cobrada
+                            </Chip>
+                            <div className="h-4 w-px bg-border" />
+                            <Chip
+                                activo={fPuntoRojo}
+                                onClick={() => setFPuntoRojo((v) => !v)}
+                            >
+                                <span className="h-2 w-2 rounded-full bg-red-500" />{' '}
+                                Punto rojo
+                            </Chip>
+                            <Chip
+                                activo={fVencimiento === 'no-vencida'}
+                                onClick={() =>
+                                    setFVencimiento((v) =>
+                                        v === 'no-vencida' ? '' : 'no-vencida',
+                                    )
+                                }
+                            >
+                                No vencida
+                            </Chip>
+                            <Chip
+                                activo={fVencimiento === 'vencida'}
+                                onClick={() =>
+                                    setFVencimiento((v) =>
+                                        v === 'vencida' ? '' : 'vencida',
+                                    )
+                                }
+                            >
+                                Vencida
+                            </Chip>
+                        </div>
+
+                        {/* Fila 3: período */}
+                        <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-3 py-2.5">
+                            <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                                <CalendarDays className="h-3.5 w-3.5" /> Período
+                            </span>
+                            <div className="h-4 w-px bg-border" />
+                            {(
+                                [
+                                    { val: 'mes', label: 'Este mes' },
+                                    { val: 'mes-ant', label: 'Mes anterior' },
+                                    { val: '3m', label: 'Últimos 3 meses' },
+                                    { val: 'año', label: 'Este año' },
+                                ] as { val: FiltroPeriodo; label: string }[]
+                            ).map(({ val, label }) => (
+                                <Chip
+                                    key={val}
+                                    activo={fPeriodoActivo === val}
+                                    onClick={() =>
+                                        fPeriodoActivo === val
+                                            ? (setFDesde(''), setFHasta(''))
+                                            : setPeriodo(val)
+                                    }
+                                >
+                                    {label}
+                                </Chip>
+                            ))}
+                            <div className="ml-auto flex items-center gap-1.5">
+                                <Input
+                                    type="date"
+                                    value={fDesde}
+                                    onChange={(e) => setFDesde(e.target.value)}
+                                    className="h-8 w-[130px] text-xs"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                    –
+                                </span>
+                                <Input
+                                    type="date"
+                                    value={fHasta}
+                                    min={fDesde}
+                                    onChange={(e) => setFHasta(e.target.value)}
+                                    className="h-8 w-[130px] text-xs"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>}
+                )}
 
                 {/* Lista agrupada */}
-                {tab !== 'ranking' && (grupos.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                        {multas.length === 0 ? 'Todavía no hay multas registradas.' : 'No hay multas que coincidan con los filtros.'}
-                    </div>
-                ) : (
-                    <div className="flex flex-col gap-2 pb-4">
-                        {grupos.map((g) => {
-                            const isOpen = expanded.has(g.key);
-                            return (
-                                <div key={g.key} className="group/card overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                                    <div className="flex items-center transition-colors hover:bg-muted/40">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleExpand(g.key)}
-                                            className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
-                                        >
-                                            <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200', isOpen && 'rotate-180')} />
-                                            {tab === 'vehiculo' ? (
-                                                <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold uppercase tracking-wide text-foreground">
-                                                    {g.titulo}
-                                                </span>
-                                            ) : (
-                                                <span className="flex min-w-0 shrink items-center gap-1.5">
-                                                    <span className="truncate text-sm font-semibold text-foreground">{g.titulo}</span>
-                                                    {g.multas[0]?.conductor_inactivo && <InactivoBadge />}
-                                                </span>
-                                            )}
-                                            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{g.sub}</span>
-                                            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                                                {g.multas.length} multa{g.multas.length !== 1 ? 's' : ''}
-                                            </span>
-                                            {g.pendientes > 0 ? (
-                                                <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                                    {g.pendientes} pendiente{g.pendientes !== 1 ? 's' : ''}
-                                                </span>
-                                            ) : (
-                                                <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                                    Al día
-                                                </span>
-                                            )}
-                                            <span className="min-w-[90px] shrink-0 text-right text-sm font-bold tabular-nums text-foreground">
-                                                {formatARS(g.total)}
-                                            </span>
-                                        </button>
-                                        {g.id !== null && (
-                                            <a
-                                                href={`/multas/pdf?tipo=${tipoPdf}&id=${g.id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                title="Descargar PDF"
-                                                className="mr-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 opacity-0 transition-all group-hover/card:opacity-100 hover:!text-foreground hover:bg-muted"
+                {tab !== 'ranking' &&
+                    (grupos.length === 0 ? (
+                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
+                            {multas.length === 0
+                                ? 'Todavía no hay multas registradas.'
+                                : 'No hay multas que coincidan con los filtros.'}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2 pb-4">
+                            {grupos.map((g) => {
+                                const isOpen = expanded.has(g.key);
+                                return (
+                                    <div
+                                        key={g.key}
+                                        className="group/card overflow-hidden rounded-xl border border-border bg-card shadow-sm"
+                                    >
+                                        <div className="flex items-center transition-colors hover:bg-muted/40">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    toggleExpand(g.key)
+                                                }
+                                                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left"
                                             >
-                                                <Download className="h-3.5 w-3.5" />
-                                            </a>
-                                        )}
-                                    </div>
-
-                                    {isOpen && (
-                                        <div className="border-t border-border">
-                                            {/* Header — solo desktop */}
-                                            <div className="hidden items-center gap-4 border-b border-border bg-muted/30 px-4 py-2 sm:flex">
-                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">Fecha inf.</span>
-                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">Vencimiento</span>
-                                                <span className="w-[72px] shrink-0 text-[11px] font-medium text-muted-foreground">Jurisd.</span>
-                                                <span className="w-32 shrink-0 text-[11px] font-medium text-muted-foreground">{tab === 'vehiculo' ? 'Conductor' : 'Patente'}</span>
-                                                <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">Descripción</span>
-                                                <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">Monto</span>
-                                                <span className="w-[196px] shrink-0 text-[11px] font-medium text-muted-foreground">Estado</span>
-                                                <span className="w-[60px] shrink-0" />
-                                            </div>
-
-                                            {g.multas.map((m) => {
-                                                const conDesc = tieneDescuento(m);
-                                                const vencida = !!m.fecha_vencimiento && HOY > m.fecha_vencimiento;
-                                                const dias = m.fecha_vencimiento && !m.cobrado ? diasHastaVenc(m.fecha_vencimiento) : null;
-                                                const vencUrgente = dias !== null && dias >= 0 && dias <= 3;
-                                                const vencProximo = dias !== null && dias > 3 && dias <= 7;
-
-                                                const montoNode = m.punto_rojo ? (
-                                                    <span className="text-sm text-muted-foreground">—</span>
+                                                <ChevronDown
+                                                    className={cn(
+                                                        'h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200',
+                                                        isOpen && 'rotate-180',
+                                                    )}
+                                                />
+                                                {tab === 'vehiculo' ? (
+                                                    <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold tracking-wide text-foreground uppercase">
+                                                        {g.titulo}
+                                                    </span>
                                                 ) : (
-                                                    <div className="flex flex-col items-end gap-0.5">
-                                                        <span className={cn('text-sm font-semibold tabular-nums', (m.cobrado || conDesc) ? 'text-muted-foreground line-through' : 'text-foreground')}>
-                                                            {formatARS(m.monto)}
+                                                    <span className="flex min-w-0 shrink items-center gap-1.5">
+                                                        <span className="truncate text-sm font-semibold text-foreground">
+                                                            {g.titulo}
                                                         </span>
-                                                        {conDesc && !m.cobrado && (
-                                                            <span className="text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">
-                                                                {formatARS(montoEfectivo(m))}
-                                                            </span>
+                                                        {g.multas[0]
+                                                            ?.conductor_inactivo && (
+                                                            <InactivoBadge />
                                                         )}
-                                                    </div>
-                                                );
+                                                    </span>
+                                                )}
+                                                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                                                    {g.sub}
+                                                </span>
+                                                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                                                    {g.multas.length} multa
+                                                    {g.multas.length !== 1
+                                                        ? 's'
+                                                        : ''}
+                                                </span>
+                                                {g.pendientes > 0 ? (
+                                                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                        {g.pendientes} pendiente
+                                                        {g.pendientes !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                ) : (
+                                                    <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                        Al día
+                                                    </span>
+                                                )}
+                                                <span className="min-w-[90px] shrink-0 text-right text-sm font-bold text-foreground tabular-nums">
+                                                    {formatARS(g.total)}
+                                                </span>
+                                            </button>
+                                            {g.id !== null && (
+                                                <a
+                                                    href={`/multas/pdf?tipo=${tipoPdf}&id=${g.id}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title="Descargar PDF"
+                                                    className="mr-3 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground/30 opacity-0 transition-all group-hover/card:opacity-100 hover:bg-muted hover:!text-foreground"
+                                                >
+                                                    <Download className="h-3.5 w-3.5" />
+                                                </a>
+                                            )}
+                                        </div>
 
-                                                const estadosNode = (extraClass = '') => (
-                                                    <div className={cn('flex gap-1.5', extraClass)}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => togglePagado(m.id)}
-                                                            title={m.pagado ? 'Marcar como no pagada en el sistema de infracciones' : 'Marcar como pagada en el sistema de infracciones'}
+                                        {isOpen && (
+                                            <div className="border-t border-border">
+                                                {/* Header — solo desktop */}
+                                                <div className="hidden items-center gap-4 border-b border-border bg-muted/30 px-4 py-2 sm:flex">
+                                                    <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                        Fecha inf.
+                                                    </span>
+                                                    <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                        Vencimiento
+                                                    </span>
+                                                    <span className="w-[72px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                        Jurisd.
+                                                    </span>
+                                                    <span className="w-32 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                        {tab === 'vehiculo'
+                                                            ? 'Conductor'
+                                                            : 'Patente'}
+                                                    </span>
+                                                    <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">
+                                                        Descripción
+                                                    </span>
+                                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                                        Monto
+                                                    </span>
+                                                    <span className="w-[196px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                        Estado
+                                                    </span>
+                                                    <span className="w-[60px] shrink-0" />
+                                                </div>
+
+                                                {g.multas.map((m) => {
+                                                    const conDesc =
+                                                        tieneDescuento(m);
+                                                    const vencida =
+                                                        !!m.fecha_vencimiento &&
+                                                        HOY >
+                                                            m.fecha_vencimiento;
+                                                    const dias =
+                                                        m.fecha_vencimiento &&
+                                                        !m.cobrado
+                                                            ? diasHastaVenc(
+                                                                  m.fecha_vencimiento,
+                                                              )
+                                                            : null;
+                                                    const vencUrgente =
+                                                        dias !== null &&
+                                                        dias >= 0 &&
+                                                        dias <= 3;
+                                                    const vencProximo =
+                                                        dias !== null &&
+                                                        dias > 3 &&
+                                                        dias <= 7;
+
+                                                    const montoNode =
+                                                        m.punto_rojo ? (
+                                                            <span className="text-sm text-muted-foreground">
+                                                                —
+                                                            </span>
+                                                        ) : (
+                                                            <div className="flex flex-col items-end gap-0.5">
+                                                                <span
+                                                                    className={cn(
+                                                                        'text-sm font-semibold tabular-nums',
+                                                                        m.cobrado ||
+                                                                            conDesc
+                                                                            ? 'text-muted-foreground line-through'
+                                                                            : 'text-foreground',
+                                                                    )}
+                                                                >
+                                                                    {formatARS(
+                                                                        m.monto,
+                                                                    )}
+                                                                </span>
+                                                                {conDesc &&
+                                                                    !m.cobrado && (
+                                                                        <span className="text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                                                            {formatARS(
+                                                                                montoEfectivo(
+                                                                                    m,
+                                                                                ),
+                                                                            )}
+                                                                        </span>
+                                                                    )}
+                                                            </div>
+                                                        );
+
+                                                    const estadosNode = (
+                                                        extraClass = '',
+                                                    ) => (
+                                                        <div
                                                             className={cn(
-                                                                'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
-                                                                m.pagado
-                                                                    ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                                                'flex flex-col gap-1',
+                                                                extraClass,
                                                             )}
                                                         >
-                                                            <Building2 className="h-3 w-3 shrink-0" />
-                                                            {m.pagado ? 'Pagada' : 'Sin pagar'}
-                                                        </button>
+                                                            <div className="flex gap-1.5">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        togglePagado(
+                                                                            m.id,
+                                                                        )
+                                                                    }
+                                                                    title={
+                                                                        m.pagado
+                                                                            ? 'Marcar como no pagada en el sistema de infracciones'
+                                                                            : 'Marcar como pagada en el sistema de infracciones'
+                                                                    }
+                                                                    className={cn(
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        m.pagado
+                                                                            ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                            : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                                                    )}
+                                                                >
+                                                                    <Building2 className="h-3 w-3 shrink-0" />
+                                                                    {m.pagado
+                                                                        ? 'Pagada'
+                                                                        : 'Sin pagar'}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        toggleCobrado(
+                                                                            m,
+                                                                        )
+                                                                    }
+                                                                    title={
+                                                                        m.cobrado
+                                                                            ? m.cobrada_en
+                                                                                ? `Cobrada el ${formatFecha(m.cobrada_en)} — clic para desmarcar`
+                                                                                : 'Marcar como no cobrada al chofer'
+                                                                            : 'Marcar como cobrada al chofer'
+                                                                    }
+                                                                    className={cn(
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        m.cobrado
+                                                                            ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                            : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                                                                    )}
+                                                                >
+                                                                    <UserIcon className="h-3 w-3 shrink-0" />
+                                                                    {m.cobrado
+                                                                        ? 'Cobrada'
+                                                                        : 'Sin cobrar'}
+                                                                </button>
+                                                            </div>
+                                                            {m.cobrado &&
+                                                                m.cobrada_en && (
+                                                                    <span className="flex items-center justify-center gap-1 text-[10px] text-muted-foreground">
+                                                                        <UserIcon className="h-2.5 w-2.5" />
+                                                                        Cobrada
+                                                                        el{' '}
+                                                                        {formatFecha(
+                                                                            m.cobrada_en,
+                                                                        )}
+                                                                    </span>
+                                                                )}
+                                                        </div>
+                                                    );
+
+                                                    const editBtn = (
                                                         <button
                                                             type="button"
-                                                            onClick={() => toggleCobrado(m.id)}
-                                                            title={m.cobrado ? 'Marcar como no cobrada al chofer' : 'Marcar como cobrada al chofer'}
-                                                            className={cn(
-                                                                'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
-                                                                m.cobrado
-                                                                    ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                                    : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-                                                            )}
+                                                            onClick={() =>
+                                                                setEditing(m)
+                                                            }
+                                                            title="Editar"
+                                                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                                         >
-                                                            <UserIcon className="h-3 w-3 shrink-0" />
-                                                            {m.cobrado ? 'Cobrada' : 'Sin cobrar'}
+                                                            <Pencil className="h-3.5 w-3.5" />
                                                         </button>
-                                                    </div>
-                                                );
+                                                    );
 
-                                                const editBtn = (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditing(m)}
-                                                        title="Editar"
-                                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                                    >
-                                                        <Pencil className="h-3.5 w-3.5" />
-                                                    </button>
-                                                );
+                                                    return (
+                                                        <div
+                                                            key={m.id}
+                                                            className="divide-y divide-border border-b border-border last:border-b-0"
+                                                        >
+                                                            {/* ── MOBILE ── */}
+                                                            <div className="flex flex-col gap-3 px-4 py-3 sm:hidden">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="flex min-w-0 flex-col gap-1">
+                                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                                            {m.punto_rojo && (
+                                                                                <span
+                                                                                    className="h-2 w-2 rounded-full bg-red-500"
+                                                                                    title="Punto rojo"
+                                                                                />
+                                                                            )}
+                                                                            {m.jurisdiccion && (
+                                                                                <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                    {
+                                                                                        m.jurisdiccion
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                            {!m.pdf_url && (
+                                                                                <span
+                                                                                    className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                                                                                    title="Sin PDF"
+                                                                                >
+                                                                                    <FileX className="h-2.5 w-2.5" />{' '}
+                                                                                    Sin
+                                                                                    PDF
+                                                                                </span>
+                                                                            )}
+                                                                            <span className="text-xs text-muted-foreground tabular-nums">
+                                                                                {formatFecha(
+                                                                                    m.fecha,
+                                                                                )}
+                                                                            </span>
+                                                                            {m.fecha_vencimiento && (
+                                                                                <span
+                                                                                    className={cn(
+                                                                                        'text-xs tabular-nums',
+                                                                                        vencida
+                                                                                            ? 'text-muted-foreground/40 line-through'
+                                                                                            : vencUrgente
+                                                                                              ? 'font-semibold text-red-500'
+                                                                                              : vencProximo
+                                                                                                ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                                                                : 'text-muted-foreground/70',
+                                                                                    )}
+                                                                                >
+                                                                                    vto{' '}
+                                                                                    {formatFecha(
+                                                                                        m.fecha_vencimiento,
+                                                                                    )}
+                                                                                    {vencUrgente &&
+                                                                                        dias !==
+                                                                                            null &&
+                                                                                        ` (${dias === 0 ? 'hoy' : `${dias}d`})`}
+                                                                                </span>
+                                                                            )}
+                                                                            {tab !==
+                                                                                'vehiculo' && (
+                                                                                <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground uppercase">
+                                                                                    {
+                                                                                        m.patente
+                                                                                    }
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                        <p className="text-sm font-medium text-foreground">
+                                                                            {
+                                                                                m.descripcion
+                                                                            }
+                                                                        </p>
+                                                                        {tab ===
+                                                                            'vehiculo' && (
+                                                                            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                                                {m.conductor ?? (
+                                                                                    <span className="italic opacity-50">
+                                                                                        Sin
+                                                                                        chofer
+                                                                                    </span>
+                                                                                )}
+                                                                                {m.conductor_inactivo && (
+                                                                                    <InactivoBadge />
+                                                                                )}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                                        {
+                                                                            montoNode
+                                                                        }
+                                                                        {
+                                                                            editBtn
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                                {estadosNode(
+                                                                    'w-full',
+                                                                )}
+                                                            </div>
 
-                                                return (
-                                                <div key={m.id} className="divide-y divide-border border-b border-border last:border-b-0">
-                                                    {/* ── MOBILE ── */}
-                                                    <div className="flex flex-col gap-3 px-4 py-3 sm:hidden">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="flex min-w-0 flex-col gap-1">
-                                                                <div className="flex flex-wrap items-center gap-1.5">
-                                                                    {m.punto_rojo && <span className="h-2 w-2 rounded-full bg-red-500" title="Punto rojo" />}
+                                                            {/* ── DESKTOP ── */}
+                                                            <div className="hidden items-center gap-4 px-4 py-2.5 sm:flex">
+                                                                <span className="w-[80px] shrink-0 text-xs text-muted-foreground tabular-nums">
+                                                                    {formatFecha(
+                                                                        m.fecha,
+                                                                    )}
+                                                                </span>
+                                                                <span
+                                                                    className={cn(
+                                                                        'w-[80px] shrink-0 text-xs tabular-nums',
+                                                                        !m.fecha_vencimiento
+                                                                            ? 'text-muted-foreground/30'
+                                                                            : vencida
+                                                                              ? 'text-muted-foreground/40 line-through'
+                                                                              : vencUrgente
+                                                                                ? 'font-semibold text-red-500'
+                                                                                : vencProximo
+                                                                                  ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                                                  : 'text-muted-foreground',
+                                                                    )}
+                                                                >
+                                                                    {m.fecha_vencimiento
+                                                                        ? formatFecha(
+                                                                              m.fecha_vencimiento,
+                                                                          )
+                                                                        : '—'}
+                                                                    {vencUrgente &&
+                                                                        dias !==
+                                                                            null && (
+                                                                            <span className="ml-1 text-[10px] opacity-80">
+                                                                                {dias ===
+                                                                                0
+                                                                                    ? 'hoy'
+                                                                                    : `${dias}d`}
+                                                                            </span>
+                                                                        )}
+                                                                </span>
+                                                                <div className="flex w-[72px] shrink-0 items-center gap-1.5">
+                                                                    {m.punto_rojo && (
+                                                                        <span
+                                                                            className="h-2 w-2 shrink-0 rounded-full bg-red-500"
+                                                                            title="Punto rojo"
+                                                                        />
+                                                                    )}
                                                                     {m.jurisdiccion && (
-                                                                        <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                                            {m.jurisdiccion}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className="text-xs tabular-nums text-muted-foreground">{formatFecha(m.fecha)}</span>
-                                                                    {m.fecha_vencimiento && (
-                                                                        <span className={cn('text-xs tabular-nums',
-                                                                            vencida ? 'text-muted-foreground/40 line-through'
-                                                                            : vencUrgente ? 'font-semibold text-red-500'
-                                                                            : vencProximo ? 'font-semibold text-amber-500 dark:text-amber-400'
-                                                                            : 'text-muted-foreground/70',
-                                                                        )}>
-                                                                            vto {formatFecha(m.fecha_vencimiento)}{vencUrgente && dias !== null && ` (${dias === 0 ? 'hoy' : `${dias}d`})`}
-                                                                        </span>
-                                                                    )}
-                                                                    {tab !== 'vehiculo' && (
-                                                                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase text-foreground">
-                                                                            {m.patente}
+                                                                        <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                            {
+                                                                                m.jurisdiccion
+                                                                            }
                                                                         </span>
                                                                     )}
                                                                 </div>
-                                                                <p className="text-sm font-medium text-foreground">{m.descripcion}</p>
-                                                                {tab === 'vehiculo' && (
-                                                                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                                        {m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}
-                                                                        {m.conductor_inactivo && <InactivoBadge />}
-                                                                    </span>
+                                                                <div className="w-32 shrink-0">
+                                                                    {tab ===
+                                                                    'vehiculo' ? (
+                                                                        <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                                                                            <span className="truncate">
+                                                                                {m.conductor ?? (
+                                                                                    <span className="italic opacity-50">
+                                                                                        Sin
+                                                                                        chofer
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                            {m.conductor_inactivo && (
+                                                                                <InactivoBadge />
+                                                                            )}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
+                                                                            {
+                                                                                m.patente
+                                                                            }
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p
+                                                                    className="min-w-0 flex-1 truncate text-sm text-foreground"
+                                                                    title={
+                                                                        m.descripcion
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        m.descripcion
+                                                                    }
+                                                                </p>
+                                                                <div className="w-28 shrink-0 text-right">
+                                                                    {montoNode}
+                                                                </div>
+                                                                {estadosNode(
+                                                                    'w-[196px] shrink-0',
                                                                 )}
+                                                                <div className="flex w-[60px] shrink-0 items-center justify-end gap-1">
+                                                                    {editBtn}
+                                                                    <MultaPdf
+                                                                        pdfUrl={
+                                                                            m.pdf_url
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             </div>
-                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                                {montoNode}
-                                                                {editBtn}
-                                                            </div>
                                                         </div>
-                                                        {estadosNode('w-full')}
-                                                    </div>
-
-                                                    {/* ── DESKTOP ── */}
-                                                    <div className="hidden items-center gap-4 px-4 py-2.5 sm:flex">
-                                                        <span className="w-[80px] shrink-0 text-xs tabular-nums text-muted-foreground">{formatFecha(m.fecha)}</span>
-                                                        <span className={cn('w-[80px] shrink-0 text-xs tabular-nums',
-                                                            !m.fecha_vencimiento ? 'text-muted-foreground/30'
-                                                            : vencida ? 'text-muted-foreground/40 line-through'
-                                                            : vencUrgente ? 'font-semibold text-red-500'
-                                                            : vencProximo ? 'font-semibold text-amber-500 dark:text-amber-400'
-                                                            : 'text-muted-foreground',
-                                                        )}>
-                                                            {m.fecha_vencimiento ? formatFecha(m.fecha_vencimiento) : '—'}
-                                                            {vencUrgente && dias !== null && (
-                                                                <span className="ml-1 text-[10px] opacity-80">{dias === 0 ? 'hoy' : `${dias}d`}</span>
-                                                            )}
-                                                        </span>
-                                                        <div className="flex w-[72px] shrink-0 items-center gap-1.5">
-                                                            {m.punto_rojo && <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" title="Punto rojo" />}
-                                                            {m.jurisdiccion && (
-                                                                <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                                                    {m.jurisdiccion}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="w-32 shrink-0">
-                                                            {tab === 'vehiculo' ? (
-                                                                <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                                                                    <span className="truncate">{m.conductor ?? <span className="italic opacity-50">Sin chofer</span>}</span>
-                                                                    {m.conductor_inactivo && <InactivoBadge />}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-foreground">
-                                                                    {m.patente}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <p className="min-w-0 flex-1 truncate text-sm text-foreground" title={m.descripcion}>{m.descripcion}</p>
-                                                        <div className="w-28 shrink-0 text-right">{montoNode}</div>
-                                                        {estadosNode('w-[196px] shrink-0')}
-                                                        <div className="flex w-[60px] shrink-0 items-center justify-end gap-1">
-                                                            {editBtn}
-                                                            <MultaPdf pdfUrl={m.pdf_url} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                );
-                                            })}
-
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                ))}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
             </div>
 
             <RegistrarMultaModal
@@ -778,12 +1331,26 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 onClose={() => setEditing(null)}
                 onDelete={deleteMulta}
             />
+
+            <CobrarMultaModal
+                multa={cobrando}
+                onClose={() => setCobrando(null)}
+            />
         </>
     );
 }
 
 function MultaPdf({ pdfUrl }: { pdfUrl: string | null }) {
-    if (!pdfUrl) return null;
+    if (!pdfUrl) {
+        return (
+            <span
+                title="Sin PDF"
+                className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+            >
+                <FileX className="h-3.5 w-3.5" />
+            </span>
+        );
+    }
     return (
         <a
             href={pdfUrl}
@@ -797,8 +1364,125 @@ function MultaPdf({ pdfUrl }: { pdfUrl: string | null }) {
     );
 }
 
+/** Al marcar una multa como cobrada, pide la fecha en que pagó el chofer. */
+function CobrarMultaModal({
+    multa,
+    onClose,
+}: {
+    multa: Multa | null;
+    onClose: () => void;
+}) {
+    return (
+        <Dialog
+            open={!!multa}
+            onOpenChange={(o) => {
+                if (!o) onClose();
+            }}
+        >
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
+                {multa && (
+                    <CobrarMultaForm
+                        key={multa.id}
+                        multa={multa}
+                        onClose={onClose}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
 
-function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onClose: () => void; vehiculos: VehiculoOpt[] }) {
+function CobrarMultaForm({
+    multa,
+    onClose,
+}: {
+    multa: Multa;
+    onClose: () => void;
+}) {
+    const today = new Date().toISOString().slice(0, 10);
+    const form = useForm({ cobrado: true, fecha_cobro: today });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.patch(`/multas/${multa.id}/cobrado`, {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+        });
+    }
+
+    return (
+        <>
+            <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
+                    <UserIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="flex-1">
+                    <DialogTitle className="text-base font-semibold">
+                        Marcar como cobrada
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                        <span className="font-mono font-semibold uppercase">
+                            {multa.patente}
+                        </span>
+                        {multa.conductor ? ` · ${multa.conductor}` : ''}
+                    </DialogDescription>
+                </div>
+            </div>
+
+            <form onSubmit={submit}>
+                <div className="flex flex-col gap-1.5 px-5 py-5">
+                    <Label htmlFor="cobro-fecha">
+                        Fecha en que pagó el chofer
+                    </Label>
+                    <Input
+                        id="cobro-fecha"
+                        type="date"
+                        value={form.data.fecha_cobro}
+                        max={today}
+                        onChange={(e) =>
+                            form.setData('fecha_cobro', e.target.value)
+                        }
+                    />
+                    {form.errors.fecha_cobro && (
+                        <p className="text-xs text-red-600">
+                            {form.errors.fecha_cobro}
+                        </p>
+                    )}
+                </div>
+
+                <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        <X className="h-4 w-4" /> Cancelar
+                    </Button>
+                    <Button
+                        type="submit"
+                        disabled={
+                            form.data.fecha_cobro === '' || form.processing
+                        }
+                    >
+                        {form.processing ? (
+                            'Guardando...'
+                        ) : (
+                            <>
+                                <Check className="h-4 w-4" /> Confirmar cobro
+                            </>
+                        )}
+                    </Button>
+                </DialogFooter>
+            </form>
+        </>
+    );
+}
+
+function RegistrarMultaModal({
+    open,
+    onClose,
+    vehiculos,
+}: {
+    open: boolean;
+    onClose: () => void;
+    vehiculos: VehiculoOpt[];
+}) {
     const today = new Date().toISOString().slice(0, 10);
     const form = useForm({
         vehiculo_id: '' as string,
@@ -812,7 +1496,12 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
     });
 
     const opciones: ComboboxOption[] = useMemo(
-        () => vehiculos.map((v) => ({ value: String(v.id), label: v.patente, sub: `${v.marca} ${v.modelo}` })),
+        () =>
+            vehiculos.map((v) => ({
+                value: String(v.id),
+                label: v.patente,
+                sub: `${v.marca} ${v.modelo}`,
+            })),
         [vehiculos],
     );
 
@@ -820,14 +1509,22 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
         e.preventDefault();
         form.post('/multas', {
             preserveScroll: true,
-            onSuccess: () => { form.reset(); form.setData('fecha', today); onClose(); },
+            onSuccess: () => {
+                form.reset();
+                form.setData('fecha', today);
+                onClose();
+            },
         });
     }
 
     const puntoRojo = form.data.punto_rojo;
-    const canSubmit = form.data.vehiculo_id !== '' && form.data.fecha !== ''
-        && form.data.descripcion.trim() !== '' && form.data.jurisdiccion !== ''
-        && (puntoRojo || (form.data.fecha_vencimiento !== '' && form.data.monto !== ''));
+    const canSubmit =
+        form.data.vehiculo_id !== '' &&
+        form.data.fecha !== '' &&
+        form.data.descripcion.trim() !== '' &&
+        form.data.jurisdiccion !== '' &&
+        (puntoRojo ||
+            (form.data.fecha_vencimiento !== '' && form.data.monto !== ''));
 
     function setPuntoRojo(checked: boolean) {
         form.setData((prev) => ({
@@ -840,16 +1537,27 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
     }
 
     return (
-        <Dialog open={open} onOpenChange={(o) => { if (!o) { form.clearErrors(); onClose(); } }}>
+        <Dialog
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) {
+                    form.clearErrors();
+                    onClose();
+                }
+            }}
+        >
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
                 <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
                         <Siren className="h-5 w-5 text-red-500" />
                     </div>
                     <div className="flex-1">
-                        <DialogTitle className="text-base font-semibold">Registrar multa</DialogTitle>
+                        <DialogTitle className="text-base font-semibold">
+                            Registrar multa
+                        </DialogTitle>
                         <DialogDescription className="text-xs">
-                            El chofer se determina automáticamente según la fecha.
+                            El chofer se determina automáticamente según la
+                            fecha.
                         </DialogDescription>
                     </div>
                 </div>
@@ -863,43 +1571,73 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                 placeholder="Buscar patente..."
                                 options={opciones}
                                 value={form.data.vehiculo_id}
-                                onSelect={(o) => form.setData('vehiculo_id', o.value)}
+                                onSelect={(o) =>
+                                    form.setData('vehiculo_id', o.value)
+                                }
                                 uppercase
                             />
-                            {form.errors.vehiculo_id && <p className="text-xs text-red-600">{form.errors.vehiculo_id}</p>}
+                            {form.errors.vehiculo_id && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.vehiculo_id}
+                                </p>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-fecha">Fecha de infracción</Label>
+                                <Label htmlFor="multa-fecha">
+                                    Fecha de infracción
+                                </Label>
                                 <Input
                                     id="multa-fecha"
                                     type="date"
                                     value={form.data.fecha}
                                     max={today}
-                                    onChange={(e) => form.setData('fecha', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('fecha', e.target.value)
+                                    }
                                 />
-                                {form.errors.fecha && <p className="text-xs text-red-600">{form.errors.fecha}</p>}
+                                {form.errors.fecha && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.fecha}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-vto">Fecha de vencimiento</Label>
+                                <Label htmlFor="multa-vto">
+                                    Fecha de vencimiento
+                                </Label>
                                 <Input
                                     id="multa-vto"
                                     type="date"
                                     value={form.data.fecha_vencimiento}
                                     min={form.data.fecha}
                                     disabled={puntoRojo}
-                                    onChange={(e) => form.setData('fecha_vencimiento', e.target.value)}
-                                    className={cn(puntoRojo && 'cursor-not-allowed opacity-50')}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'fecha_vencimiento',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className={cn(
+                                        puntoRojo &&
+                                            'cursor-not-allowed opacity-50',
+                                    )}
                                 />
-                                {form.errors.fecha_vencimiento && <p className="text-xs text-red-600">{form.errors.fecha_vencimiento}</p>}
+                                {form.errors.fecha_vencimiento && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.fecha_vencimiento}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
                         <p className="-mt-2 text-[11px] text-muted-foreground">
                             {puntoRojo
                                 ? 'Las multas de punto rojo no tienen importe ni vencimiento.'
-                                : 'Pagando antes del vencimiento, la multa tiene un 50% de descuento.'}
+                                : form.data.jurisdiccion === 'GBA'
+                                    ? 'Las multas de GBA (provincia) no tienen descuento.'
+                                    : 'CABA: pagando antes del vencimiento, la multa tiene un 50% de descuento (GBA no tiene descuento).'}
                         </p>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -910,13 +1648,24 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                     type="number"
                                     min="0"
                                     step="0.01"
-                                    placeholder={puntoRojo ? 'Sin monto' : '0.00'}
+                                    placeholder={
+                                        puntoRojo ? 'Sin monto' : '0.00'
+                                    }
                                     value={form.data.monto}
                                     disabled={puntoRojo}
-                                    onChange={(e) => form.setData('monto', e.target.value)}
-                                    className={cn(puntoRojo && 'cursor-not-allowed opacity-50')}
+                                    onChange={(e) =>
+                                        form.setData('monto', e.target.value)
+                                    }
+                                    className={cn(
+                                        puntoRojo &&
+                                            'cursor-not-allowed opacity-50',
+                                    )}
                                 />
-                                {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                                {form.errors.monto && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.monto}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label>Jurisdicción</Label>
@@ -925,7 +1674,9 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                         <button
                                             key={j}
                                             type="button"
-                                            onClick={() => form.setData('jurisdiccion', j)}
+                                            onClick={() =>
+                                                form.setData('jurisdiccion', j)
+                                            }
                                             className={cn(
                                                 'h-9 flex-1 rounded-lg border text-sm font-medium transition-all active:scale-[0.98]',
                                                 form.data.jurisdiccion === j
@@ -937,7 +1688,11 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                         </button>
                                     ))}
                                 </div>
-                                {form.errors.jurisdiccion && <p className="text-xs text-red-600">{form.errors.jurisdiccion}</p>}
+                                {form.errors.jurisdiccion && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.jurisdiccion}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
@@ -948,28 +1703,57 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                                 rows={3}
                                 placeholder="Motivo de la multa..."
                                 value={form.data.descripcion}
-                                onChange={(e) => form.setData('descripcion', e.target.value)}
+                                onChange={(e) =>
+                                    form.setData('descripcion', e.target.value)
+                                }
                                 maxLength={1000}
-                                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                             />
-                            {form.errors.descripcion && <p className="text-xs text-red-600">{form.errors.descripcion}</p>}
+                            {form.errors.descripcion && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.descripcion}
+                                </p>
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                            <Label>PDF de la multa <span className="font-normal text-muted-foreground">(opcional)</span></Label>
+                            <Label>
+                                PDF de la multa{' '}
+                                <span className="font-normal text-muted-foreground">
+                                    (opcional)
+                                </span>
+                            </Label>
                             <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
                                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span className={cn('min-w-0 flex-1 truncate', form.data.pdf ? 'text-foreground' : 'text-muted-foreground')}>
-                                    {form.data.pdf ? form.data.pdf.name : 'Seleccionar archivo PDF...'}
+                                <span
+                                    className={cn(
+                                        'min-w-0 flex-1 truncate',
+                                        form.data.pdf
+                                            ? 'text-foreground'
+                                            : 'text-muted-foreground',
+                                    )}
+                                >
+                                    {form.data.pdf
+                                        ? form.data.pdf.name
+                                        : 'Seleccionar archivo PDF...'}
                                 </span>
                                 <input
                                     type="file"
                                     accept="application/pdf"
                                     className="hidden"
-                                    onChange={(e) => form.setData('pdf', e.target.files?.[0] ?? null)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'pdf',
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
                                 />
                             </label>
-                            {form.errors.pdf && <p className="text-xs text-red-600">{form.errors.pdf}</p>}
+                            {form.errors.pdf && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.pdf}
+                                </p>
+                            )}
                         </div>
 
                         <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
@@ -987,11 +1771,24 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
                     </div>
 
                     <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             <X className="h-4 w-4" /> Cancelar
                         </Button>
-                        <Button type="submit" disabled={!canSubmit || form.processing}>
-                            {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Registrar</>}
+                        <Button
+                            type="submit"
+                            disabled={!canSubmit || form.processing}
+                        >
+                            {form.processing ? (
+                                'Guardando...'
+                            ) : (
+                                <>
+                                    <Check className="h-4 w-4" /> Registrar
+                                </>
+                            )}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -1001,17 +1798,45 @@ function RegistrarMultaModal({ open, onClose, vehiculos }: { open: boolean; onCl
 }
 
 /** Modal para editar el monto y la fecha de vencimiento de una multa. */
-function EditarMultaModal({ multa, onClose, onDelete }: { multa: Multa | null; onClose: () => void; onDelete: (id: number) => void }) {
+function EditarMultaModal({
+    multa,
+    onClose,
+    onDelete,
+}: {
+    multa: Multa | null;
+    onClose: () => void;
+    onDelete: (id: number) => void;
+}) {
     return (
-        <Dialog open={!!multa} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <Dialog
+            open={!!multa}
+            onOpenChange={(o) => {
+                if (!o) onClose();
+            }}
+        >
             <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                {multa && <EditarMultaForm key={multa.id} multa={multa} onClose={onClose} onDelete={onDelete} />}
+                {multa && (
+                    <EditarMultaForm
+                        key={multa.id}
+                        multa={multa}
+                        onClose={onClose}
+                        onDelete={onDelete}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );
 }
 
-function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: () => void; onDelete: (id: number) => void }) {
+function EditarMultaForm({
+    multa,
+    onClose,
+    onDelete,
+}: {
+    multa: Multa;
+    onClose: () => void;
+    onDelete: (id: number) => void;
+}) {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const form = useForm({
         monto: String(multa.monto),
@@ -1041,9 +1866,14 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                     <Pencil className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex-1">
-                    <DialogTitle className="text-base font-semibold">Editar multa</DialogTitle>
+                    <DialogTitle className="text-base font-semibold">
+                        Editar multa
+                    </DialogTitle>
                     <DialogDescription className="text-xs">
-                        <span className="font-mono font-semibold uppercase">{multa.patente}</span> · infracción del {formatFecha(multa.fecha)}
+                        <span className="font-mono font-semibold uppercase">
+                            {multa.patente}
+                        </span>{' '}
+                        · infracción del {formatFecha(multa.fecha)}
                     </DialogDescription>
                 </div>
             </div>
@@ -1052,7 +1882,8 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                 <div className="flex flex-col gap-4 px-5 py-5">
                     {multa.punto_rojo ? (
                         <p className="text-xs text-muted-foreground">
-                            Multa de punto rojo: no tiene monto ni vencimiento. Solo podés cambiar el PDF.
+                            Multa de punto rojo: no tiene monto ni vencimiento.
+                            Solo podés cambiar el PDF.
                         </p>
                     ) : (
                         <div className="grid grid-cols-2 gap-3">
@@ -1065,20 +1896,37 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                                     step="0.01"
                                     placeholder="0.00"
                                     value={form.data.monto}
-                                    onChange={(e) => form.setData('monto', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData('monto', e.target.value)
+                                    }
                                 />
-                                {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                                {form.errors.monto && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.monto}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-vto">Fecha de vencimiento</Label>
+                                <Label htmlFor="edit-vto">
+                                    Fecha de vencimiento
+                                </Label>
                                 <Input
                                     id="edit-vto"
                                     type="date"
                                     value={form.data.fecha_vencimiento}
                                     min={multa.fecha}
-                                    onChange={(e) => form.setData('fecha_vencimiento', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'fecha_vencimiento',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
-                                {form.errors.fecha_vencimiento && <p className="text-xs text-red-600">{form.errors.fecha_vencimiento}</p>}
+                                {form.errors.fecha_vencimiento && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.fecha_vencimiento}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1087,33 +1935,70 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                         <Label>PDF de la multa</Label>
                         <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
                             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span className={cn('min-w-0 flex-1 truncate', form.data.pdf ? 'text-foreground' : 'text-muted-foreground')}>
-                                {form.data.pdf ? form.data.pdf.name : (multa.pdf_url ? 'Reemplazar PDF (opcional)...' : 'Subir PDF (opcional)...')}
+                            <span
+                                className={cn(
+                                    'min-w-0 flex-1 truncate',
+                                    form.data.pdf
+                                        ? 'text-foreground'
+                                        : 'text-muted-foreground',
+                                )}
+                            >
+                                {form.data.pdf
+                                    ? form.data.pdf.name
+                                    : multa.pdf_url
+                                      ? 'Reemplazar PDF (opcional)...'
+                                      : 'Subir PDF (opcional)...'}
                             </span>
                             <input
                                 type="file"
                                 accept="application/pdf"
                                 className="hidden"
-                                onChange={(e) => form.setData('pdf', e.target.files?.[0] ?? null)}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'pdf',
+                                        e.target.files?.[0] ?? null,
+                                    )
+                                }
                             />
                         </label>
                         {multa.pdf_url && !form.data.pdf && (
-                            <a href={multa.pdf_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                            <a
+                                href={multa.pdf_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-primary hover:underline"
+                            >
                                 Ver PDF actual
                             </a>
                         )}
-                        {form.errors.pdf && <p className="text-xs text-red-600">{form.errors.pdf}</p>}
+                        {form.errors.pdf && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.pdf}
+                            </p>
+                        )}
                     </div>
                 </div>
 
                 <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
                     {confirmDelete ? (
                         <>
-                            <span className="mr-auto text-xs text-muted-foreground">¿Seguro que querés eliminarla?</span>
-                            <Button type="button" variant="outline" size="sm" onClick={() => setConfirmDelete(false)}>
+                            <span className="mr-auto text-xs text-muted-foreground">
+                                ¿Seguro que querés eliminarla?
+                            </span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setConfirmDelete(false)}
+                            >
                                 No
                             </Button>
-                            <Button type="button" size="sm" className="bg-red-500 hover:bg-red-600" onClick={() => onDelete(multa.id)}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="bg-red-500 hover:bg-red-600"
+                                onClick={() => onDelete(multa.id)}
+                            >
                                 <Trash2 className="h-3.5 w-3.5" /> Sí, eliminar
                             </Button>
                         </>
@@ -1126,11 +2011,24 @@ function EditarMultaForm({ multa, onClose, onDelete }: { multa: Multa; onClose: 
                             >
                                 Eliminar multa
                             </button>
-                            <Button type="button" variant="outline" onClick={onClose}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onClose}
+                            >
                                 <X className="h-4 w-4" /> Cancelar
                             </Button>
-                            <Button type="submit" disabled={!camposOk || form.processing}>
-                                {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar</>}
+                            <Button
+                                type="submit"
+                                disabled={!camposOk || form.processing}
+                            >
+                                {form.processing ? (
+                                    'Guardando...'
+                                ) : (
+                                    <>
+                                        <Check className="h-4 w-4" /> Guardar
+                                    </>
+                                )}
                             </Button>
                         </>
                     )}
@@ -1145,14 +2043,22 @@ function InactivoBadge() {
     return (
         <span
             title="Chofer inactivo"
-            className="inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+            className="inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
         >
             Inactivo
         </span>
     );
 }
 
-function Chip({ activo, onClick, children }: { activo: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({
+    activo,
+    onClick,
+    children,
+}: {
+    activo: boolean;
+    onClick: () => void;
+    children: React.ReactNode;
+}) {
     return (
         <button
             type="button"

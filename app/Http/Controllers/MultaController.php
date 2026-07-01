@@ -55,6 +55,7 @@ class MultaController extends Controller
                 'pdf_url' => $m->pdf_path ? Storage::disk('public')->url($m->pdf_path) : null,
                 'pagado' => $m->pagado,
                 'cobrado' => $m->cobrado,
+                'cobrada_en' => $m->cobrada_en?->toDateString(),
             ]);
 
         // Combo de patentes: todos los vehículos (global), menos el ficticio EXTERNO.
@@ -299,16 +300,26 @@ class MultaController extends Controller
     }
 
     /**
-     * Alterna si la empresa ya le cobró la multa al chofer.
+     * Marca/desmarca si la empresa ya le cobró la multa al chofer. Al marcarla
+     * como cobrada se registra la fecha en la que pagó el chofer.
      */
     public function toggleCobrado(Request $request, Multa $multa): RedirectResponse
     {
         $this->authorize('manage-multas');
 
-        $nuevo = ! $multa->cobrado;
+        $validated = $request->validate([
+            'cobrado' => ['required', 'boolean'],
+            'fecha_cobro' => [Rule::requiredIf($request->boolean('cobrado')), 'nullable', 'date'],
+        ]);
 
-        $multa->update(['cobrado' => $nuevo]);
+        if ($validated['cobrado']) {
+            $multa->update(['cobrado' => true, 'cobrada_en' => $validated['fecha_cobro']]);
 
-        return redirect()->back()->with('success', $nuevo ? 'Multa marcada como cobrada.' : 'Multa marcada como no cobrada.');
+            return redirect()->back()->with('success', 'Multa marcada como cobrada.');
+        }
+
+        $multa->update(['cobrado' => false, 'cobrada_en' => null]);
+
+        return redirect()->back()->with('success', 'Multa marcada como no cobrada.');
     }
 }

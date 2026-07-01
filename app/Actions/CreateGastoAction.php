@@ -32,10 +32,23 @@ class CreateGastoAction
         return DB::transaction(function () use ($data) {
             $gasto = Gasto::create($data);
 
-            // El reparto entre inversores se congela en la propia fila del gasto
-            // (columna JSON). Así el histórico no cambia si luego varía el estado
-            // de deuda de los inversores.
-            $gasto->distribucion = $this->calcularDistribuciones($gasto);
+            // El reparto se congela en la propia fila del gasto (columnas JSON).
+            // Así el histórico no cambia si luego varía el estado de los inversores
+            // o la flota.
+            $monto = (float) $gasto->monto;
+
+            if (in_array($gasto->tipo, Gasto::TIPOS_GLOBALES, true)) {
+                // Galpón / taller / oficina: reparto por empresa (según autos
+                // alquilados) y, dentro de cada empresa, entre sus inversores.
+                [$gasto->distribucion, $gasto->distribucion_empresas] = $this->distribuirGlobal($monto);
+            } elseif (in_array($gasto->tipo, Gasto::TIPOS_INVERSOR_6, true)) {
+                $gasto->distribucion = [Gasto::INVERSOR_6_ID => $monto];
+            } elseif ($gasto->tipo === 'vehiculo' && $gasto->vehiculo_id) {
+                $gasto->distribucion = $this->distribuirPorVehiculo($gasto->vehiculo_id, $monto);
+            } else {
+                $gasto->distribucion = [];
+            }
+
             $gasto->save();
 
             return $gasto->load('vehiculo:id,patente,marca,modelo');
@@ -43,43 +56,103 @@ class CreateGastoAction
     }
 
     /**
-     * @return array<int, float> user_id => monto
-     */
-    protected function calcularDistribuciones(Gasto $gasto): array
-    {
-        $monto = (float) $gasto->monto;
-
-        if (in_array($gasto->tipo, Gasto::TIPOS_GLOBALES, true)) {
-            return $this->distribuirGlobal($monto);
-        }
-
-        if (in_array($gasto->tipo, Gasto::TIPOS_INVERSOR_6, true)) {
-            return [Gasto::INVERSOR_6_ID => $monto];
-        }
-
-        if ($gasto->tipo === 'vehiculo' && $gasto->vehiculo_id) {
-            return $this->distribuirPorVehiculo($gasto->vehiculo_id, $monto);
-        }
-
-        return [];
-    }
-
-    /**
-     * Reparte entre todos los inversores que participan en al menos una inversión.
+     * Gastos de galpón / taller / oficina: se reparten entre las empresas en
+     * proporción a sus autos alquilados (vehículos con chofer asignado), y la
+     * parte de cada empresa se divide en partes iguales entre los inversores de
+     * esa empresa.
      *
-     * @return array<int, float>
+     * El reparto por empresa refleja siempre los autos alquilados (todas las
+     * empresas con autos participan). La parte de cada empresa se imputa a sus
+     * inversores; si una empresa no tiene inversores, su parte aparece igual en
+     * el reparto por empresa pero queda SIN IMPUTAR a nivel inversor (por eso la
+     * suma de la distribución por inversor puede ser menor al total).
+     *
+     * Si no hay ningún auto alquilado en ninguna empresa, cae al reparto
+     * equitativo entre todos los inversores activos.
+     *
+     * @return array{0: array<int, float>, 1: array<int, float>}
+     *         [ user_id => monto , empresa_id => monto ]
      */
     protected function distribuirGlobal(float $monto): array
     {
-        $userIds = DB::table('inversion_user')
+        // Autos alquilados por empresa: con chofer asignado, sin el ficticio EXTERNO.
+        $autosPorEmpresa = DB::table('vehiculos')
+            ->whereNotNull('user_id')
+            ->whereNotNull('empresa_id')
+            ->where('patente', '!=', 'EXTERNO')
+            ->selectRaw('empresa_id, COUNT(*) as total')
+            ->groupBy('empresa_id')
+            ->pluck('total', 'empresa_id');
+
+        // Inversores activos de cada empresa (vía las inversiones de la empresa).
+        $inversoresPorEmpresa = DB::table('inversion_user')
             ->join('users', 'users.id', '=', 'inversion_user.user_id')
+            ->join('inversiones', 'inversiones.id', '=', 'inversion_user.inversion_id')
             ->where('users.inactivo', false)
             ->where('users.role', 'inversor')
+            ->select('inversiones.empresa_id', 'inversion_user.user_id')
             ->distinct()
-            ->pluck('inversion_user.user_id')
-            ->all();
+            ->get()
+            ->groupBy('empresa_id')
+            ->map(fn ($filas) => $filas->pluck('user_id')->map(fn ($id) => (int) $id)->unique()->values()->all());
 
-        return $this->splitEquitativo($userIds, $monto);
+        // Todas las empresas con autos alquilados participan en el reparto por
+        // empresa (tengan o no inversores).
+        $elegibles = [];
+        $totalAutos = 0;
+        foreach ($autosPorEmpresa as $empresaId => $cantidad) {
+            if ($cantidad > 0) {
+                $elegibles[] = [
+                    'empresa_id' => (int) $empresaId,
+                    'autos' => (int) $cantidad,
+                    'inversores' => $inversoresPorEmpresa[$empresaId] ?? [],
+                ];
+                $totalAutos += (int) $cantidad;
+            }
+        }
+
+        // Sin autos alquilados: reparto equitativo entre todos los inversores activos.
+        if ($totalAutos === 0) {
+            $userIds = DB::table('inversion_user')
+                ->join('users', 'users.id', '=', 'inversion_user.user_id')
+                ->where('users.inactivo', false)
+                ->where('users.role', 'inversor')
+                ->distinct()
+                ->pluck('inversion_user.user_id')
+                ->all();
+
+            return [$this->splitEquitativo($userIds, $monto), []];
+        }
+
+        // Redondeo en dos niveles para que todo cuadre exacto:
+        //  1) cada empresa recibe monto * autos / totalAutos (la última, el remanente);
+        //  2) la parte de cada empresa se divide en partes iguales entre sus inversores.
+        $porEmpresa = [];
+        $porInversor = [];
+        $acumulado = 0.0;
+        $n = count($elegibles);
+
+        foreach ($elegibles as $idx => $empresa) {
+            if ($idx === $n - 1) {
+                $parteEmpresa = round($monto - $acumulado, 2);
+            } else {
+                $parteEmpresa = round($monto * $empresa['autos'] / $totalAutos, 2);
+                $acumulado += $parteEmpresa;
+            }
+
+            $porEmpresa[$empresa['empresa_id']] = $parteEmpresa;
+
+            // Imputación a inversores solo si la empresa tiene; si no, su parte
+            // queda sin imputar (figura en el reparto por empresa, no en el de
+            // inversores).
+            if ($empresa['inversores'] !== []) {
+                foreach ($this->splitEquitativo($empresa['inversores'], $parteEmpresa) as $userId => $parte) {
+                    $porInversor[$userId] = ($porInversor[$userId] ?? 0.0) + $parte;
+                }
+            }
+        }
+
+        return [$porInversor, $porEmpresa];
     }
 
     /**
