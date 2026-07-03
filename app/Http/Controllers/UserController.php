@@ -458,7 +458,9 @@ class UserController extends Controller
         $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
-            ->with(['vehiculo', 'asignadoPor:id,name'])
+            // Vehículo global: la patente se muestra sin importar la empresa activa
+            // (un chofer puede haber tenido autos de distintas empresas).
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get()
             ->map(fn ($a) => [
@@ -491,7 +493,9 @@ class UserController extends Controller
         $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
-            ->with(['vehiculo', 'asignadoPor:id,name'])
+            // Vehículo global (sin TenantScope): la patente se ve aunque el auto
+            // sea de otra empresa.
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get();
 
