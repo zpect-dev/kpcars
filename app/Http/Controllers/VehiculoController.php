@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\SaveVehiculoDocumentsAction;
 use App\Models\Asignacion;
+use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,14 +54,19 @@ class VehiculoController extends Controller
         DB::transaction(function () use ($validated, $request) {
             $vehiculo = Vehiculo::create($validated);
 
-            // Si se asigna conductor al crear, asegurar que no tenga otro vehículo
+            // Si se asigna conductor al crear, asegurar que no tenga otro vehículo.
+            // Se ignora el TenantScope para detectar también vehículos del mismo
+            // chofer en OTRAS empresas (un conductor = un solo vehículo, global).
             if (! empty($validated['user_id'])) {
-                $prevVehiculoIds = Vehiculo::where('user_id', $validated['user_id'])
+                $prevVehiculoIds = Vehiculo::withoutGlobalScope(TenantScope::class)
+                    ->where('user_id', $validated['user_id'])
                     ->where('id', '!=', $vehiculo->id)
                     ->pluck('id');
 
                 if ($prevVehiculoIds->isNotEmpty()) {
-                    Vehiculo::whereIn('id', $prevVehiculoIds)->update(['user_id' => null]);
+                    Vehiculo::withoutGlobalScope(TenantScope::class)
+                        ->whereIn('id', $prevVehiculoIds)
+                        ->update(['user_id' => null]);
                     Asignacion::whereIn('vehiculo_id', $prevVehiculoIds)
                         ->whereNull('fecha_fin')
                         ->update(['fecha_fin' => now()]);
@@ -131,12 +137,17 @@ class VehiculoController extends Controller
 
                 // Abrir nueva asignación si hay conductor nuevo
                 if ($conductorNuevo) {
-                    $prevVehiculoIds = Vehiculo::where('user_id', $conductorNuevo)
+                    // Global (sin TenantScope): un conductor no puede tener otro
+                    // vehículo, ni siquiera en otra empresa.
+                    $prevVehiculoIds = Vehiculo::withoutGlobalScope(TenantScope::class)
+                        ->where('user_id', $conductorNuevo)
                         ->where('id', '!=', $vehiculo->id)
                         ->pluck('id');
 
                     if ($prevVehiculoIds->isNotEmpty()) {
-                        Vehiculo::whereIn('id', $prevVehiculoIds)->update(['user_id' => null]);
+                        Vehiculo::withoutGlobalScope(TenantScope::class)
+                            ->whereIn('id', $prevVehiculoIds)
+                            ->update(['user_id' => null]);
                         Asignacion::whereIn('vehiculo_id', $prevVehiculoIds)
                             ->whereNull('fecha_fin')
                             ->update(['fecha_fin' => now()]);
