@@ -91,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Revisión mecánica (dashboard de prioridad de reparación)
         Route::get('revision-mecanica', [RevisionMecanicaController::class, 'index'])->name('revision-mecanica.index');
+        Route::get('revision-mecanica/pdf', [RevisionMecanicaController::class, 'pdf'])->name('revision-mecanica.pdf');
         Route::post('revision-mecanica/{vehiculo}', [RevisionMecanicaController::class, 'store'])->name('revision-mecanica.store');
 
         // Revisiones

@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Check, MessageSquareText, Search, Wrench, X } from 'lucide-react';
+import { Check, Download, MessageSquareText, Search, Wrench, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -143,17 +143,36 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
         });
     }, [filas, search, filtro]);
 
+    function buildPdfUrl() {
+        const p = new URLSearchParams();
+        if (search.trim()) p.set('q', search.trim());
+        if (filtro !== 'all') p.set('prioridad', filtro);
+        const qs = p.toString();
+        return `/revision-mecanica/pdf${qs ? `?${qs}` : ''}`;
+    }
+
     return (
         <>
             <Head title="Revisión Mecánica" />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">Revisión Mecánica</h1>
-                    <p className="text-xs text-muted-foreground">
-                        Vehículos con chofer asignado. Tocá uno para revisar su estado mecánico y definir la prioridad de reparación.
-                    </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">Revisión Mecánica</h1>
+                        <p className="text-xs text-muted-foreground">
+                            Vehículos con chofer asignado. Tocá uno para revisar su estado mecánico y definir la prioridad de reparación.
+                        </p>
+                    </div>
+                    <a
+                        href={buildPdfUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
+                    </a>
                 </div>
 
                 {/* Filtros */}
