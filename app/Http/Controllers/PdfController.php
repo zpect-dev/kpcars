@@ -77,6 +77,69 @@ class PdfController extends Controller
     }
 
     /**
+     * PDF de los gastos (sin flota) del panel de Cobros. Respeta la empresa
+     * activa. Si se pasa un cierre, exporta los gastos de ese período histórico
+     * (rango de fecha); si no, los del período actual (pendientes).
+     */
+    public function cobrosGastos(Request $request, ?CierreCaja $cierre = null): Response
+    {
+        $historico = $cierre !== null;
+
+        if ($historico) {
+            // El cierre debe pertenecer a la empresa activa.
+            $empresaActiva = session('active_company_id');
+            if ($empresaActiva !== null) {
+                abort_unless(
+                    $cierre->detalles()->where('empresa_id', (int) $empresaActiva)->exists(),
+                    403,
+                );
+            }
+        }
+
+        $hasta = $historico ? $cierre->created_at->toDateTimeString() : null;
+        $desde = $historico
+            ? CierreCaja::where('created_at', '<', $cierre->created_at)->latest()->value('created_at')?->toDateTimeString()
+            : null;
+
+        // Scopeado por empresa activa vía GastoTenantScope (igual que el panel).
+        $gastos = Gasto::query()
+            ->when(! $historico, fn ($q) => $q->pendientes())
+            ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
+            ->where('gastos.tipo', '!=', 'vehiculo')
+            ->latest('fecha')
+            ->latest('id')
+            ->get();
+
+        $tipoLabels = [
+            'galpon' => 'Galpón',
+            'taller' => 'Taller',
+            'oficina' => 'Oficina',
+            'kevin' => 'Kevin',
+            'stock' => 'Stock',
+        ];
+
+        $filas = $gastos->map(fn (Gasto $g) => [
+            'fecha' => $g->fecha?->format('d/m/Y'),
+            'descripcion' => trim((string) $g->descripcion) !== '' ? $g->descripcion : 'Sin descripción',
+            'categoria' => $tipoLabels[$g->tipo] ?? ucfirst((string) $g->tipo),
+            'patente' => '—',
+            'monto' => (float) $g->monto,
+        ]);
+
+        $total = (float) $gastos->sum(fn (Gasto $g) => (float) $g->monto);
+
+        $nombre = $historico
+            ? 'gastos-cierre-'.$cierre->id
+            : 'gastos-'.now()->format('Y-m-d');
+
+        $pdf = Pdf::loadView('pdf.gastos', compact('filas', 'total'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download($nombre.'.pdf');
+    }
+
+    /**
      * PDF de un cierre de gastos con desglose por tipo y por patente.
      */
     public function cierreGasto(Request $request, CierreGasto $cierreGasto): Response

@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Box,
     Building2,
@@ -30,7 +30,7 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { index, abrir, cierre, cierreDesglose } from '@/routes/cobros';
+import { index, abrir, cierre, cierreDesglose, historial } from '@/routes/cobros';
 import type {
     CajaApertura,
     CierreGastoLegacy,
@@ -98,6 +98,12 @@ interface Props {
     historialGastosLegacy: CierreGastoLegacy[];
     resumenIntegrado: ResumenIntegradoInversion[];
     totalIntegrado: number;
+    // Presente solo en la réplica de solo lectura de un cierre puntual.
+    historico?: {
+        id: number;
+        fecha: string | null;
+        user: { id: number; name: string } | null;
+    } | null;
 }
 
 type Tab = 'inventario' | 'gastos';
@@ -114,6 +120,7 @@ export default function CobrosIndex({
     historialGastosLegacy,
     resumenIntegrado,
     totalIntegrado,
+    historico = null,
 }: Props) {
     const { auth } = usePage<any>().props;
     const isAdmin = auth.user.role === 'administrador';
@@ -248,46 +255,91 @@ export default function CobrosIndex({
 
     return (
         <>
-            <Head title="Cobros" />
+            <Head title={historico ? `Cierre de Caja #${historico.id}` : 'Cobros'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header + estado del período */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
-                        <h2 className="text-lg font-semibold text-foreground">
-                            Cobros
-                        </h2>
-                        {abierta && apertura ? (
-                            <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                                <LockOpen className="h-3.5 w-3.5" />
-                                Período abierto desde {formatDate(apertura.created_at)}
-                                {apertura.user?.name ? ` por ${apertura.user.name}` : ''}
-                            </p>
+                        {historico ? (
+                            <>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Link
+                                        href={historial.url()}
+                                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium hover:text-foreground"
+                                    >
+                                        <History className="h-3.5 w-3.5" />
+                                        Historial
+                                    </Link>
+                                    <ChevronRight className="h-3 w-3" />
+                                </div>
+                                <h2 className="mt-0.5 text-lg font-semibold text-foreground">
+                                    Cierre de Caja #{historico.id}
+                                </h2>
+                                <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <Lock className="h-3.5 w-3.5" />
+                                    {historico.fecha ? formatDate(historico.fecha) : '—'}
+                                    {historico.user?.name ? ` · cerró ${historico.user.name}` : ''}
+                                    <span className="ml-1 rounded-full border border-border bg-muted/60 px-2 py-0.5">
+                                        Solo lectura
+                                    </span>
+                                </p>
+                            </>
                         ) : (
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                {ultimoCierre
-                                    ? `Sin período abierto · último cierre ${formatDate(ultimoCierre.created_at)}`
-                                    : 'Sin período abierto'}
-                            </p>
+                            <>
+                                <h2 className="text-lg font-semibold text-foreground">
+                                    Cobros
+                                </h2>
+                                {abierta && apertura ? (
+                                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                                        <LockOpen className="h-3.5 w-3.5" />
+                                        Período abierto desde {formatDate(apertura.created_at)}
+                                        {apertura.user?.name ? ` por ${apertura.user.name}` : ''}
+                                    </p>
+                                ) : (
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        {ultimoCierre
+                                            ? `Sin período abierto · último cierre ${formatDate(ultimoCierre.created_at)}`
+                                            : 'Sin período abierto'}
+                                    </p>
+                                )}
+                            </>
                         )}
                     </div>
 
-                    {isAdmin && (
+                    {historico ? (
                         <div className="flex items-center gap-2">
-                            {!abierta ? (
-                                <Button size="sm" onClick={handleAbrir} disabled={processingAbrir}>
-                                    <LockOpen className="mr-1.5 h-4 w-4" />
-                                    {processingAbrir ? 'Abriendo...' : 'Abrir período'}
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setShowCierreModal(true)}
-                                    disabled={totalACerrar === 0}
-                                >
-                                    <Lock className="mr-1.5 h-4 w-4" />
-                                    Cierre de Caja
-                                </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={historial.url()}>
+                                    <History className="mr-1.5 h-4 w-4" />
+                                    Volver al historial
+                                </Link>
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={historial.url()}>
+                                    <History className="mr-1.5 h-4 w-4" />
+                                    Historial
+                                </Link>
+                            </Button>
+                            {isAdmin && (
+                                !abierta ? (
+                                    <Button size="sm" onClick={handleAbrir} disabled={processingAbrir}>
+                                        <LockOpen className="mr-1.5 h-4 w-4" />
+                                        {processingAbrir ? 'Abriendo...' : 'Abrir período'}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setShowCierreModal(true)}
+                                        disabled={totalACerrar === 0}
+                                    >
+                                        <Lock className="mr-1.5 h-4 w-4" />
+                                        Cierre de Caja
+                                    </Button>
+                                )
                             )}
                         </div>
                     )}
@@ -327,11 +379,13 @@ export default function CobrosIndex({
                         totalIntegrado={totalIntegrado}
                         totalGeneral={totalGeneral}
                         totalGanancia={totalGanancia}
+                        historico={historico}
                     />
                 ) : (
                     <GastosPanel
                         gastosResumen={gastosResumen}
                         historialGastosLegacy={historialGastosLegacy}
+                        historico={historico}
                     />
                 )}
 
@@ -636,11 +690,13 @@ function InventarioPanel({
     totalIntegrado,
     totalGeneral,
     totalGanancia,
+    historico = null,
 }: {
     resumenIntegrado: ResumenIntegradoInversion[];
     totalIntegrado: number;
     totalGeneral: number;
     totalGanancia: number;
+    historico?: { id: number } | null;
 }) {
     const [expandedIntegrado, setExpandedIntegrado] = useState<Set<number>>(new Set());
     const [expandedVeh, setExpandedVeh] = useState<Set<number>>(new Set());
@@ -704,22 +760,31 @@ function InventarioPanel({
 
             {/* Exportar */}
             <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/pdf/cobros', '_blank')}>
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">PDF cobros</span>
-                </Button>
-                <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/excel/cobros', '_blank')}>
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span className="hidden sm:inline">Excel cobros</span>
-                </Button>
-                <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/pdf/cobros-integrado', '_blank')}>
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">PDF integrado</span>
-                </Button>
-                <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/excel/cobros-integrado', '_blank')}>
-                    <FileSpreadsheet className="h-4 w-4" />
-                    <span className="hidden sm:inline">Excel integrado</span>
-                </Button>
+                {historico ? (
+                    <Button variant="outline" size="sm" onClick={() => window.open(`/pdf/cierres-caja/${historico.id}`, '_blank')}>
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline">PDF del cierre</span>
+                    </Button>
+                ) : (
+                    <>
+                        <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/pdf/cobros', '_blank')}>
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF cobros</span>
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/excel/cobros', '_blank')}>
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span className="hidden sm:inline">Excel cobros</span>
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/pdf/cobros-integrado', '_blank')}>
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">PDF integrado</span>
+                        </Button>
+                        <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/excel/cobros-integrado', '_blank')}>
+                            <FileSpreadsheet className="h-4 w-4" />
+                            <span className="hidden sm:inline">Excel integrado</span>
+                        </Button>
+                    </>
+                )}
             </div>
 
             {/* Integrado por inversión → vehículo (cobros + gastos de flota) */}
@@ -845,6 +910,7 @@ const CATEGORIAS: { key: string; label: string; tipos: string[]; icon: React.Rea
 
 function cardIcon(key: string): React.ReactNode {
     const cls = 'h-5 w-5 text-muted-foreground';
+    if (key.startsWith('empresa_')) return <Building2 className={cls} />;
     if (key === 'kevin') return <UserCircle2 className={cls} />;
     if (key === 'galpon') return <Warehouse className={cls} />;
     return <HandCoins className={cls} />;
@@ -853,11 +919,14 @@ function cardIcon(key: string): React.ReactNode {
 function GastosPanel({
     gastosResumen,
     historialGastosLegacy,
+    historico = null,
 }: {
     gastosResumen: CobrosGastosResumen;
     historialGastosLegacy: CierreGastoLegacy[];
+    historico?: { id: number } | null;
 }) {
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
+    const [mostrarTodos, setMostrarTodos] = useState(false);
 
     function toggleCat(key: string) {
         setExpandedCats((prev) => {
@@ -882,6 +951,10 @@ function GastosPanel({
         ...gastosResumen.cards,
         { key: 'general', label: 'Total', total: gastosResumen.total },
     ];
+
+    // "Últimos gastos": por defecto los últimos 10, con opción de ver todos.
+    const listaUltimos = mostrarTodos ? gastosResumen.gastos : gastosResumen.ultimos;
+    const hayMasGastos = gastosResumen.gastos.length > gastosResumen.ultimos.length;
 
     function renderLista(list: CobrosGastoLinea[]) {
         if (list.length === 0) {
@@ -917,16 +990,32 @@ function GastosPanel({
 
     return (
         <div className="flex flex-col gap-4">
-            <p className="text-xs text-muted-foreground">
-                Gastos del período sin la flota (la flota se ve en Inventario, anclada a cada vehículo). Solo lectura — el alta se hace en{' '}
-                <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => router.get('/gastos')}>
-                    Gastos
-                </button>
-                .
-            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                    Gastos del período sin la flota (la flota se ve en Inventario, anclada a cada vehículo). Solo lectura — el alta se hace en{' '}
+                    <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => router.get('/gastos')}>
+                        Gastos
+                    </button>
+                    .
+                </p>
 
-            {/* Cards de totales */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={gastosResumen.gastos.length === 0}
+                    onClick={() => window.open(historico ? `/pdf/cobros-gastos/${historico.id}` : '/pdf/cobros-gastos', '_blank')}
+                >
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">PDF gastos</span>
+                </Button>
+            </div>
+
+            {/* Cards de totales (una sola fila en pantallas medianas+) */}
+            <div
+                className="grid grid-cols-2 gap-3 sm:[grid-template-columns:repeat(var(--cards),minmax(0,1fr))]"
+                style={{ '--cards': allCards.length } as React.CSSProperties}
+            >
                 {allCards.map((card) => {
                     const isGeneral = card.key === 'general';
                     return (
@@ -950,30 +1039,46 @@ function GastosPanel({
                 {gastosResumen.ultimos.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-muted-foreground">No hay gastos en el período.</p>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
-                                <tr>
-                                    <th className="px-3 py-2 font-medium">Fecha</th>
-                                    <th className="px-3 py-2 font-medium">Descripción</th>
-                                    <th className="px-3 py-2 font-medium">Categoría</th>
-                                    <th className="px-3 py-2 font-medium">Recibió</th>
-                                    <th className="px-3 py-2 text-right font-medium">Monto</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {gastosResumen.ultimos.map((g) => (
-                                    <tr key={g.id} className="hover:bg-muted/20">
-                                        <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{formatDateDia(g.fecha)}</td>
-                                        <td className="px-3 py-2 font-medium text-foreground">{g.descripcion?.trim() || 'Sin descripción'}</td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-foreground">{TIPO_LABEL[g.tipo] ?? g.tipo}</td>
-                                        <td className="px-3 py-2 whitespace-nowrap text-foreground">{g.recibio ?? '—'}</td>
-                                        <td className="px-3 py-2 text-right font-bold whitespace-nowrap text-foreground">{formatARS(Number(g.monto))}</td>
+                    <>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="px-3 py-2 font-medium">Fecha</th>
+                                        <th className="px-3 py-2 font-medium">Descripción</th>
+                                        <th className="px-3 py-2 font-medium">Categoría</th>
+                                        <th className="px-3 py-2 font-medium">Recibió</th>
+                                        <th className="px-3 py-2 text-right font-medium">Monto</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {listaUltimos.map((g) => (
+                                        <tr key={g.id} className="hover:bg-muted/20">
+                                            <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">{formatDateDia(g.fecha)}</td>
+                                            <td className="px-3 py-2 font-medium text-foreground">{g.descripcion?.trim() || 'Sin descripción'}</td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">{TIPO_LABEL[g.tipo] ?? g.tipo}</td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">{g.recibio ?? '—'}</td>
+                                            <td className="px-3 py-2 text-right font-bold whitespace-nowrap text-foreground">{formatARS(Number(g.monto))}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {hayMasGastos && (
+                            <div className="border-t border-border px-4 py-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setMostrarTodos((v) => !v)}
+                                    className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                    {mostrarTodos
+                                        ? 'Mostrar menos'
+                                        : `Mostrar más (${gastosResumen.gastos.length - gastosResumen.ultimos.length})`}
+                                    <ChevronDown className={`h-3.5 w-3.5 transition-transform ${mostrarTodos ? 'rotate-180' : ''}`} />
+                                </button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

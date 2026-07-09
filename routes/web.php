@@ -144,6 +144,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Cobros
         Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
         Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
+        // Historial de cierres de caja: lista + réplica de solo lectura por cierre.
+        // Deben ir antes de cobros/{inversion} para no colisionar con ese catch-all.
+        Route::get('cobros/historial', [CobroController::class, 'historial'])->name('cobros.historial');
+        Route::get('cobros/historial/{cierre}', [CobroController::class, 'historialShow'])->name('cobros.historial.show');
         Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
         Route::post('cobros/abrir', [CobroController::class, 'abrir'])->name('cobros.abrir');
         Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
@@ -201,6 +205,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
         Route::get('pdf/cobros-integrado', [PdfController::class, 'cobrosIntegrado'])->name('pdf.cobros-integrado');
         Route::get('excel/cobros-integrado', [ExcelController::class, 'cobrosIntegrado'])->name('excel.cobros-integrado');
+        // Gastos del panel de Cobros (período actual o de un cierre puntual).
+        Route::get('pdf/cobros-gastos', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos');
+        Route::get('pdf/cobros-gastos/{cierre}', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos.cierre');
         Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
         Route::get('pdf/cierres-sueldo/{cierreSueldo}', [PdfController::class, 'cierreSueldo'])->name('pdf.cierre-sueldo');
         Route::get('excel/cierres-sueldo/{cierreSueldo}', [ExcelController::class, 'cierreSueldo'])->name('excel.cierre-sueldo');
