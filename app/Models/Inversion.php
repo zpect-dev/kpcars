@@ -46,19 +46,12 @@ class Inversion extends Model
 
     /**
      * Inversores asignados (máximo MAX_INVERSORES por inversión).
+     * El pivot lleva la deuda como monto simple: deudor = deuda > 0.
      */
     public function inversores(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'inversion_user')
-            ->withPivot(['tiene_deuda', 'es_financiador'])
+            ->withPivot(['es_financiador', 'deuda'])
             ->withTimestamps();
-    }
-
-    /**
-     * Movimientos de deuda de todos los inversores en esta inversión.
-     */
-    public function deudaMovimientos(): HasMany
-    {
-        return $this->hasMany(DeudaMovimiento::class);
     }
 }

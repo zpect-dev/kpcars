@@ -11,6 +11,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -669,11 +670,11 @@ function RecaudacionCard({
                 <div className="grid grid-cols-2 gap-2 mb-3">
                     <div className="flex flex-col gap-1">
                         <Label className="text-xs">Efectivo</Label>
-                        <Input
-                            type="number" min="0" step="0.01" placeholder="0"
+                        <MoneyInput
+                            placeholder="0"
                             className={cn('h-8 text-sm', excede && 'border-red-500')}
-                            value={form.data.efectivo}
-                            onChange={(e) => form.setData('efectivo', e.target.value)}
+                            value={form.data.efectivo === '' ? null : Number(form.data.efectivo)}
+                            onValueChange={(n) => form.setData('efectivo', n == null ? '' : String(n))}
                             onKeyDown={onKeyDown}
                             onBlur={editable ? save : undefined}
                             disabled={!editable}
@@ -681,11 +682,11 @@ function RecaudacionCard({
                     </div>
                     <div className="flex flex-col gap-1">
                         <Label className="text-xs">Transferencia</Label>
-                        <Input
-                            type="number" min="0" step="0.01" placeholder="0"
+                        <MoneyInput
+                            placeholder="0"
                             className={cn('h-8 text-sm', excede && 'border-red-500')}
-                            value={form.data.transferencia}
-                            onChange={(e) => form.setData('transferencia', e.target.value)}
+                            value={form.data.transferencia === '' ? null : Number(form.data.transferencia)}
+                            onValueChange={(n) => form.setData('transferencia', n == null ? '' : String(n))}
                             onKeyDown={onKeyDown}
                             onBlur={editable ? save : undefined}
                             disabled={!editable}
@@ -693,11 +694,11 @@ function RecaudacionCard({
                     </div>
                     <div className="flex flex-col gap-1">
                         <Label className="text-xs">Descuento</Label>
-                        <Input
-                            type="number" min="0" step="0.01" placeholder="0"
+                        <MoneyInput
+                            placeholder="0"
                             className="h-8 text-sm"
-                            value={form.data.descuento}
-                            onChange={(e) => form.setData('descuento', e.target.value)}
+                            value={form.data.descuento === '' ? null : Number(form.data.descuento)}
+                            onValueChange={(n) => form.setData('descuento', n == null ? '' : String(n))}
                             onKeyDown={onKeyDown}
                             onBlur={editable ? save : undefined}
                             disabled={!editable}
@@ -808,11 +809,11 @@ function RecaudacionRow({
 
             {/* Efectivo */}
             <td className="px-3 py-2">
-                <Input
-                    type="number" min="0" step="0.01" placeholder="0"
+                <MoneyInput
+                    placeholder="0"
                     className={cn('h-8 w-full text-sm', excede && 'border-red-500')}
-                    value={form.data.efectivo}
-                    onChange={(e) => form.setData('efectivo', e.target.value)}
+                    value={form.data.efectivo === '' ? null : Number(form.data.efectivo)}
+                    onValueChange={(n) => form.setData('efectivo', n == null ? '' : String(n))}
                     onKeyDown={onKeyDown}
                     onBlur={editable ? save : undefined}
                     disabled={!editable}
@@ -821,11 +822,11 @@ function RecaudacionRow({
 
             {/* Transferencia */}
             <td className="px-3 py-2">
-                <Input
-                    type="number" min="0" step="0.01" placeholder="0"
+                <MoneyInput
+                    placeholder="0"
                     className={cn('h-8 w-full text-sm', excede && 'border-red-500')}
-                    value={form.data.transferencia}
-                    onChange={(e) => form.setData('transferencia', e.target.value)}
+                    value={form.data.transferencia === '' ? null : Number(form.data.transferencia)}
+                    onValueChange={(n) => form.setData('transferencia', n == null ? '' : String(n))}
                     onKeyDown={onKeyDown}
                     onBlur={editable ? save : undefined}
                     disabled={!editable}
@@ -834,11 +835,11 @@ function RecaudacionRow({
 
             {/* Descuento */}
             <td className="px-3 py-2">
-                <Input
-                    type="number" min="0" step="0.01" placeholder="0"
+                <MoneyInput
+                    placeholder="0"
                     className="h-8 w-full text-sm"
-                    value={form.data.descuento}
-                    onChange={(e) => form.setData('descuento', e.target.value)}
+                    value={form.data.descuento === '' ? null : Number(form.data.descuento)}
+                    onValueChange={(n) => form.setData('descuento', n == null ? '' : String(n))}
                     onKeyDown={onKeyDown}
                     onBlur={editable ? save : undefined}
                     disabled={!editable}

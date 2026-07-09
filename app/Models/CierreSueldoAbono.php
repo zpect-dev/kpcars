@@ -7,12 +7,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class CierreInversionRecaudacion extends Model
+/**
+ * Abono de deuda registrado en el modal del cierre de sueldos.
+ * Es la foto de lo descontado; el saldo vivo está en inversion_user.deuda.
+ */
+class CierreSueldoAbono extends Model
 {
-    protected $table = 'cierres_inversion_recaudaciones';
+    protected $table = 'cierre_sueldo_abonos';
 
     protected $fillable = [
-        'cierre_id',
+        'cierre_sueldo_id',
+        'user_id',
         'inversion_id',
         'monto',
     ];
@@ -26,7 +31,12 @@ class CierreInversionRecaudacion extends Model
 
     public function cierre(): BelongsTo
     {
-        return $this->belongsTo(CierreInversion::class, 'cierre_id');
+        return $this->belongsTo(CierreSueldo::class, 'cierre_sueldo_id');
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     public function inversion(): BelongsTo

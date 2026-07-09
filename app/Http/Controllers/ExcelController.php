@@ -7,10 +7,9 @@ namespace App\Http\Controllers;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Models\AperturaRecaudacion;
 use App\Models\CierreGasto;
-use App\Models\CierreInversion;
-use App\Models\CierreInversionPago;
+use App\Models\CierreSueldo;
+use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
-use App\Models\DeudaMovimiento;
 use App\Models\Recaudacion;
 use Illuminate\Http\Request;
 use Spatie\SimpleExcel\SimpleExcelWriter;
@@ -105,61 +104,54 @@ class ExcelController extends Controller
     }
 
     /**
-     * Excel export for a cierre de inversión.
+     * Excel export del cierre de sueldos, con desglose por empresa.
      */
-    public function cierreInversion(Request $request, CierreInversion $cierreInversion): StreamedResponse
+    public function cierreSueldo(Request $request, CierreSueldo $cierreSueldo): StreamedResponse
     {
         // Acceso: middleware role:administrador.
 
-        $cierreInversion->load([
+        $cierreSueldo->load([
             'pagos.user:id,name,dni',
-            'pagos.inversion:id,nombre',
+            'pagos.empresa:id,nombre',
         ]);
 
         $flotaConceptos = ['parte_completa', 'media_parte_deudor', 'cero_deudor'];
-        $tasa = $cierreInversion->tasa ? (float) $cierreInversion->tasa : null;
+        $tasa = (float) $cierreSueldo->tasa;
 
-        $filename = 'cierre-inversion-'.$cierreInversion->id.'-'.$cierreInversion->periodo_fin->format('Y-m-d').'.xlsx';
+        $filename = 'cierre-sueldo-'.$cierreSueldo->id.'-'.$cierreSueldo->created_at->format('Y-m-d').'.xlsx';
 
         $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Empresa', 'Inversor', 'DNI', 'Flota ARS', 'Flota USD', 'Financiación ARS', 'Financiación USD', 'Total ARS', 'Total USD']);
 
-        $headers = ['Inversor', 'DNI', 'Flota ARS', 'Financiación ARS', 'Total ARS'];
-        if ($tasa) {
-            $headers = ['Inversor', 'DNI', 'Flota ARS', 'Flota USD', 'Financiación ARS', 'Financiación USD', 'Total ARS', 'Total USD'];
-        }
-        $writer->addHeader($headers);
-
-        $porInversor = $cierreInversion->pagos
-            ->groupBy('user_id')
-            ->map(fn ($pagos) => ['user' => $pagos->first()->user, 'pagos' => $pagos])
-            ->sortBy(fn ($row) => mb_strtolower((string) $row['user']->name))
+        $porEmpresaInversor = $cierreSueldo->pagos
+            ->groupBy(fn (CierreSueldoPago $p) => $p->empresa_id.':'.$p->user_id)
+            ->map(fn ($pagos) => [
+                'empresa' => $pagos->first()->empresa,
+                'user' => $pagos->first()->user,
+                'pagos' => $pagos,
+            ])
+            ->sortBy([
+                fn ($a, $b) => ($a['empresa']?->id ?? 0) <=> ($b['empresa']?->id ?? 0),
+                fn ($a, $b) => strcasecmp((string) $a['user']->name, (string) $b['user']->name),
+            ])
             ->values();
 
-        foreach ($porInversor as $row) {
+        foreach ($porEmpresaInversor as $row) {
             $flota = $row['pagos']->filter(fn ($p) => in_array($p->concepto, $flotaConceptos))->sum('monto');
             $financ = $row['pagos']->filter(fn ($p) => $p->concepto === 'redistribucion_financiador')->sum('monto');
             $total = $flota + $financ;
 
-            if ($tasa) {
-                $writer->addRow([
-                    $row['user']->name,
-                    $row['user']->dni,
-                    round((float) $flota, 2),
-                    round((float) $flota / $tasa, 2),
-                    $financ > 0 ? round((float) $financ, 2) : '',
-                    $financ > 0 ? round((float) $financ / $tasa, 2) : '',
-                    round((float) $total, 2),
-                    round((float) $total / $tasa, 2),
-                ]);
-            } else {
-                $writer->addRow([
-                    $row['user']->name,
-                    $row['user']->dni,
-                    round((float) $flota, 2),
-                    $financ > 0 ? round((float) $financ, 2) : '',
-                    round((float) $total, 2),
-                ]);
-            }
+            $writer->addRow([
+                $row['empresa']?->nombre ?? '—',
+                $row['user']->name,
+                $row['user']->dni,
+                round((float) $flota, 2),
+                $tasa > 0 ? round((float) $flota / $tasa, 2) : '',
+                $financ > 0 ? round((float) $financ, 2) : '',
+                $financ > 0 && $tasa > 0 ? round((float) $financ / $tasa, 2) : '',
+                round((float) $total, 2),
+                $tasa > 0 ? round((float) $total / $tasa, 2) : '',
+            ]);
         }
 
         return $writer->toBrowser();
@@ -177,15 +169,12 @@ class ExcelController extends Controller
 
         $flotaConceptos = ['parte_completa', 'media_parte_deudor', 'cero_deudor'];
 
-        // Cross-empresa: el inversor puede tener cierres en varias empresas.
-        $pagosPorCierre = CierreInversionPago::with([
-            'cierre' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
-                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa'),
-        ])
+        // Los cierres de sueldo son globales (cubren ambas empresas).
+        $pagosPorCierre = CierreSueldoPago::with('cierre:id,tasa,created_at')
             ->where('user_id', $user->id)
-            ->orderByDesc('cierre_id')
+            ->orderByDesc('cierre_sueldo_id')
             ->get()
-            ->groupBy('cierre_id');
+            ->groupBy('cierre_sueldo_id');
 
         $writer = SimpleExcelWriter::streamDownload('mi-cuenta-'.now()->format('Y-m-d').'.xlsx');
         $writer->addHeader(['Cierre #', 'Fecha', 'Flota ARS', 'Financiación ARS', 'Total ARS']);
@@ -198,7 +187,7 @@ class ExcelController extends Controller
 
             $writer->addRow([
                 $cierre?->id,
-                $cierre?->periodo_fin?->format('d/m/Y'),
+                $cierre?->created_at?->format('d/m/Y'),
                 round((float) $flota, 2),
                 $financ > 0 ? round((float) $financ, 2) : '',
                 round((float) $total, 2),

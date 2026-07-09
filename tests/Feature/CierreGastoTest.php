@@ -115,7 +115,7 @@ it('al borrar el cierre de gastos, sus gastos vuelven a pendientes', function ()
 it('congela el reparto entre inversores en la columna distribucion al crear el gasto', function () {
     $inversorA = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '60000001', 'inactivo' => false]);
     $inversorB = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '60000002', 'inactivo' => false]);
-    $this->inversion->inversores()->attach([$inversorA->id => ['tiene_deuda' => false], $inversorB->id => ['tiene_deuda' => false]]);
+    $this->inversion->inversores()->attach([$inversorA->id => ['deuda' => 0], $inversorB->id => ['deuda' => 0]]);
 
     // Registrar un gasto exige un período de caja abierto.
     \App\Models\AperturaCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
@@ -138,15 +138,15 @@ it('reparte galpón por empresa según autos alquilados y entre los inversores d
     $invA1 = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000001', 'inactivo' => false]);
     $invA2 = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000002', 'inactivo' => false]);
     $this->inversion->inversores()->attach([
-        $invA1->id => ['tiene_deuda' => false],
-        $invA2->id => ['tiene_deuda' => false],
+        $invA1->id => ['deuda' => 0],
+        $invA2->id => ['deuda' => 0],
     ]);
 
     // Empresa B: 1 auto alquilado, 1 inversor.
     $empresaB = Empresa::create(['nombre' => 'Empresa B']);
     $inversionB = Inversion::create(['nombre' => 'Inv B', 'empresa_id' => $empresaB->id]);
     $invB = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '61000003', 'inactivo' => false]);
-    $inversionB->inversores()->attach([$invB->id => ['tiene_deuda' => false]]);
+    $inversionB->inversores()->attach([$invB->id => ['deuda' => 0]]);
 
     // Chofer que "alquila" los autos (user_id no nulo = alquilado).
     $chofer = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '62000001']);
@@ -189,7 +189,7 @@ it('reparte galpón por empresa según autos alquilados y entre los inversores d
 it('una empresa con autos alquilados pero sin inversores figura en el reparto por empresa, sin imputar a inversores', function () {
     // Empresa A: 1 auto alquilado, 1 inversor.
     $invA = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '63000001', 'inactivo' => false]);
-    $this->inversion->inversores()->attach([$invA->id => ['tiene_deuda' => false]]);
+    $this->inversion->inversores()->attach([$invA->id => ['deuda' => 0]]);
 
     // Empresa B: 1 auto alquilado, SIN inversores.
     $empresaB = Empresa::create(['nombre' => 'Empresa B']);

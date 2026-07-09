@@ -74,8 +74,7 @@ it('matriz de gates respeta el contrato del sistema', function () {
         'view-personal'        => ['admin', 'administrativo'],
         'view-cobros'          => ['admin'],
         'view-gastos'          => ['admin'],
-        'view-inversiones'     => ['admin'],
-        'view-cierres-inversion' => ['admin'],
+        'view-cierres-sueldo'  => ['admin'],
         'manage-precios'       => ['admin'],
         'annul-transactions'   => ['admin'],
         'import-asignaciones'  => ['admin'],
@@ -109,7 +108,7 @@ it('view-mi-cuenta requiere ser inversor con inversiones asignadas', function ()
     $inv = Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
         ->create(['nombre' => 'Inv Test', 'empresa_id' => $this->empresa->id]);
     $inv->inversores()->attach($this->inversor->id, [
-        'tiene_deuda' => false,
+        'deuda' => 0,
         'es_financiador' => false,
     ]);
 

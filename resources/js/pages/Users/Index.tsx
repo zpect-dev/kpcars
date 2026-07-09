@@ -1,6 +1,6 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, ChevronDown, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Download, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,19 @@ import { DocumentSection, DocPreviewDialog, type DocUrls, type DocMode } from '@
 interface Deposito {
     monto: number;
     moneda: string;
+}
+
+interface InversionAsignada {
+    id: number;
+    nombre: string;
+    empresa: { id: number; nombre: string } | null;
+    pivot: { es_financiador: boolean | number; deuda: string | number };
+}
+
+interface InversionDisponible {
+    id: number;
+    nombre: string;
+    empresa: { id: number; nombre: string } | null;
 }
 
 interface User {
@@ -42,6 +56,7 @@ interface User {
     empresa_default_id?: number | null;
     empresa_restringida_id?: number | null;
     empresas?: { id: number; nombre: string }[];
+    inversiones?: InversionAsignada[];
     depositos?: Deposito[];
     documentos?: {
         licencia: DocUrls;
@@ -76,6 +91,7 @@ interface Props {
     monedas: MonedaOption[];
     choferCounts?: { activos: number; inactivos: number } | null;
     cotizacionDolar?: number;
+    inversionesDisponibles?: InversionDisponible[] | null;
 }
 
 function AvatarDropzone({
@@ -267,13 +283,10 @@ function DepositosField({
             ) : (
                 depositos.map((d, i) => (
                     <div key={i} className="flex items-center gap-2">
-                        <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={d.monto || ''}
-                            onChange={(e) => actualizar(i, { monto: Number(e.target.value) })}
-                            placeholder="0.00"
+                        <MoneyInput
+                            value={d.monto || null}
+                            onValueChange={(n) => actualizar(i, { monto: n ?? 0 })}
+                            placeholder="0,00"
                             className="flex-1"
                         />
                         <select
@@ -314,8 +327,9 @@ function sinDeposito(u: User): boolean {
     return (u.depositos?.length ?? 0) === 0;
 }
 
-export default function UsersIndex({ users, roles, empresas, monedas, choferCounts, cotizacionDolar = 0 }: Props) {
+export default function UsersIndex({ users, roles, empresas, monedas, choferCounts, cotizacionDolar = 0, inversionesDisponibles = null }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
+    const [inversorConfig, setInversorConfig] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
     const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({});
@@ -328,6 +342,15 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     const urlParams = new URLSearchParams(window.location.search);
     const filterRole = urlParams.get('role');
     const filterStatus = urlParams.get('status');
+
+    function buildChoferesPdfUrl() {
+        const p = new URLSearchParams();
+        if (filterStatus) p.set('status', filterStatus);
+        if (searchTerm.trim()) p.set('q', searchTerm.trim());
+        if (filterAlert !== 'all') p.set('alert', filterAlert);
+        const qs = p.toString();
+        return `/users/choferes/pdf${qs ? `?${qs}` : ''}`;
+    }
 
     const filteredUsers = useMemo(() => {
         let result = users;
@@ -739,6 +762,15 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
                                 {/* Filtrar */}
                                 <div className="flex w-full items-end gap-2 lg:w-auto">
+                                    <a
+                                        href={buildChoferesPdfUrl()}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-[9px] text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                                    >
+                                        <Download className="h-4 w-4 shrink-0" />
+                                        <span className="hidden sm:inline">Exportar PDF</span>
+                                    </a>
                                     <div className="flex flex-col gap-2">
                                         <Label className="invisible hidden lg:block">Más</Label>
                                         <Popover>
@@ -807,13 +839,10 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <form onSubmit={guardarCotizacion} className="flex items-end gap-2 border-t border-border p-3">
                                                     <div className="flex flex-1 flex-col gap-1">
                                                         <Label htmlFor="cotizacion" className="text-[11px] text-muted-foreground">Cotización dólar (ARS x USD)</Label>
-                                                        <Input
+                                                        <MoneyInput
                                                             id="cotizacion"
-                                                            type="number"
-                                                            step="0.01"
-                                                            min="0"
-                                                            value={cotizacionForm.data.cotizacion_dolar}
-                                                            onChange={(e) => cotizacionForm.setData('cotizacion_dolar', e.target.value)}
+                                                            value={cotizacionForm.data.cotizacion_dolar === '' ? null : Number(cotizacionForm.data.cotizacion_dolar)}
+                                                            onValueChange={(n) => cotizacionForm.setData('cotizacion_dolar', n == null ? '' : String(n))}
                                                             className="h-8"
                                                         />
                                                     </div>
@@ -1096,6 +1125,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                                 ))}
                                                             </select>
                                                         )}
+                                                        {user.role === 'inversor' && inversionesDisponibles && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="w-fit"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setInversorConfig(user);
+                                                                }}
+                                                            >
+                                                                Inversiones ({user.inversiones?.length ?? 0})
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </td>
@@ -1221,6 +1263,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             </span>
                                         )}
                                     </div>
+
+                                    {user.role === 'inversor' && inversionesDisponibles && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="w-fit"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setInversorConfig(user);
+                                            }}
+                                        >
+                                            Inversiones ({user.inversiones?.length ?? 0})
+                                        </Button>
+                                    )}
 
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="flex flex-col gap-0.5">
@@ -1730,7 +1786,232 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             </Dialog>
 
             <DocPreviewDialog preview={previewImage} onClose={() => setPreviewImage(null)} />
+
+            {inversorConfig && inversionesDisponibles && (
+                <InversorInversionesDialog
+                    user={inversorConfig}
+                    inversionesDisponibles={inversionesDisponibles}
+                    onClose={() => setInversorConfig(null)}
+                />
+            )}
         </>
+    );
+}
+
+// ─── Configuración de inversiones + deuda del inversor (sólo admin) ────────
+
+function InversorInversionesDialog({
+    user,
+    inversionesDisponibles,
+    onClose,
+}: {
+    user: User;
+    inversionesDisponibles: InversionDisponible[];
+    onClose: () => void;
+}) {
+    interface Row {
+        inversion_id: number;
+        nombre: string;
+        empresa: string;
+        asignado: boolean;
+        es_financiador: boolean;
+        deuda: string;
+    }
+
+    const [rows, setRows] = useState<Row[]>(() => {
+        const actuales = new Map(
+            (user.inversiones ?? []).map((i) => [i.id, i.pivot]),
+        );
+        return inversionesDisponibles.map((inv) => {
+            const pivot = actuales.get(inv.id);
+            return {
+                inversion_id: inv.id,
+                nombre: inv.nombre,
+                empresa: inv.empresa?.nombre ?? '—',
+                asignado: !!pivot,
+                es_financiador: Boolean(Number(pivot?.es_financiador ?? 0)),
+                deuda: String(Number(pivot?.deuda ?? 0)),
+            };
+        });
+    });
+
+    const [processing, setProcessing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    function updateRow(id: number, patch: Partial<Row>) {
+        setError(null);
+        setRows((prev) =>
+            prev.map((r) => {
+                if (r.inversion_id !== id) return r;
+                const next = { ...r, ...patch };
+                if (!next.asignado) {
+                    next.es_financiador = false;
+                    next.deuda = '0';
+                }
+                // Exclusividad financiador / deudor (deuda > 0)
+                if (patch.es_financiador) next.deuda = '0';
+                if (patch.deuda !== undefined && Number(patch.deuda) > 0) {
+                    next.es_financiador = false;
+                }
+                return next;
+            }),
+        );
+    }
+
+    function handleSave() {
+        const seleccionadas = rows.filter((r) => r.asignado);
+        const invalida = seleccionadas.find(
+            (r) => !Number.isFinite(Number(r.deuda)) || Number(r.deuda) < 0,
+        );
+        if (invalida) {
+            setError(`La deuda en ${invalida.nombre} no es válida.`);
+            return;
+        }
+
+        setProcessing(true);
+        setError(null);
+        router.put(
+            `/users/${user.id}/inversiones`,
+            {
+                inversiones: seleccionadas.map((r) => ({
+                    inversion_id: r.inversion_id,
+                    es_financiador: r.es_financiador,
+                    deuda: Number(r.deuda) || 0,
+                })),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+                onError: (errs) => {
+                    setError(Object.values(errs).join(' ') || 'Error al guardar.');
+                },
+                onFinish: () => setProcessing(false),
+            },
+        );
+    }
+
+    // Agrupar por empresa para lectura más clara
+    const porEmpresa = useMemo(() => {
+        const map = new Map<string, Row[]>();
+        for (const r of rows) {
+            if (!map.has(r.empresa)) map.set(r.empresa, []);
+            map.get(r.empresa)!.push(r);
+        }
+        return Array.from(map.entries());
+    }, [rows]);
+
+    return (
+        <Dialog open onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="max-h-[85vh] gap-0 overflow-y-auto p-0 sm:max-w-[560px]">
+                <div className="border-b border-border px-5 pt-5 pb-4">
+                    <DialogTitle className="text-base font-semibold">
+                        Inversiones de {user.name}
+                    </DialogTitle>
+                    <DialogDescription className="text-xs">
+                        Marcá a qué inversiones pertenece, si financia y cuánta
+                        deuda tiene en cada una. Los abonos del cierre descuentan
+                        esta deuda automáticamente.
+                    </DialogDescription>
+                </div>
+
+                <div className="flex flex-col gap-4 px-5 py-4">
+                    {porEmpresa.map(([empresa, items]) => (
+                        <div key={empresa}>
+                            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                                {empresa}
+                            </p>
+                            <ul className="mt-1.5 divide-y divide-border rounded-xl border border-border">
+                                {items.map((r) => {
+                                    const esDeudor = Number(r.deuda) > 0;
+                                    return (
+                                        <li
+                                            key={r.inversion_id}
+                                            className={cn(
+                                                'flex items-center justify-between gap-3 px-3 py-2.5',
+                                                r.asignado ? 'bg-primary/5' : '',
+                                            )}
+                                        >
+                                            <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={r.asignado}
+                                                    onChange={(e) =>
+                                                        updateRow(r.inversion_id, {
+                                                            asignado: e.target.checked,
+                                                        })
+                                                    }
+                                                    className="h-4 w-4 rounded border-input"
+                                                />
+                                                <span className="truncate text-sm font-medium text-foreground">
+                                                    {r.nombre}
+                                                </span>
+                                            </label>
+
+                                            <label
+                                                className={cn(
+                                                    'flex shrink-0 items-center gap-1.5 text-xs',
+                                                    !r.asignado && 'opacity-40',
+                                                )}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={r.es_financiador}
+                                                    disabled={!r.asignado || esDeudor}
+                                                    onChange={(e) =>
+                                                        updateRow(r.inversion_id, {
+                                                            es_financiador: e.target.checked,
+                                                        })
+                                                    }
+                                                    className="h-4 w-4 rounded border-input"
+                                                />
+                                                Financia
+                                            </label>
+
+                                            <div
+                                                className={cn(
+                                                    'flex shrink-0 items-center gap-1.5',
+                                                    !r.asignado && 'opacity-40',
+                                                )}
+                                            >
+                                                <span className="text-xs text-muted-foreground">Deuda</span>
+                                                <MoneyInput
+                                                    value={r.deuda === '' ? null : Number(r.deuda)}
+                                                    disabled={!r.asignado || r.es_financiador}
+                                                    onValueChange={(n) =>
+                                                        updateRow(r.inversion_id, {
+                                                            deuda: n == null ? '' : String(n),
+                                                        })
+                                                    }
+                                                    className={cn(
+                                                        'h-8 w-28 px-2 py-1 text-right text-sm tabular-nums',
+                                                        esDeudor && 'border-red-500/40 text-red-700 dark:text-red-400',
+                                                    )}
+                                                />
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    ))}
+
+                    {error && (
+                        <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                <DialogFooter className="gap-2 border-t border-border px-5 py-4 sm:gap-2">
+                    <Button variant="outline" onClick={onClose} disabled={processing}>
+                        Cancelar
+                    </Button>
+                    <Button onClick={handleSave} disabled={processing}>
+                        {processing ? 'Guardando...' : 'Guardar cambios'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 

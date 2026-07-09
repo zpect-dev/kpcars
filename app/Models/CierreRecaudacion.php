@@ -18,6 +18,7 @@ class CierreRecaudacion extends Model
     protected $fillable = [
         'empresa_id',
         'user_id',
+        'cierre_sueldo_id',
     ];
 
     /**
@@ -42,5 +43,13 @@ class CierreRecaudacion extends Model
     public function recaudaciones(): HasMany
     {
         return $this->hasMany(Recaudacion::class, 'cierre_id');
+    }
+
+    /**
+     * Cierre de sueldos global que disparó este cierre de recaudación.
+     */
+    public function cierreSueldo(): BelongsTo
+    {
+        return $this->belongsTo(CierreSueldo::class, 'cierre_sueldo_id');
     }
 }

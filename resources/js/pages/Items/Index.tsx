@@ -30,6 +30,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { index, salidaMultiple, store, updateCosto } from '@/routes/articulos';
@@ -624,17 +625,15 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     {editingCostId ===
                                                     item.id ? (
                                                         <div className="flex items-center gap-1">
-                                                            <Input
-                                                                type="number"
-                                                                min="0"
-                                                                step="0.01"
+                                                            <MoneyInput
                                                                 value={
-                                                                    editingCostValue
+                                                                    editingCostValue === ''
+                                                                        ? null
+                                                                        : Number(editingCostValue)
                                                                 }
-                                                                onChange={(e) =>
+                                                                onValueChange={(n) =>
                                                                     setEditingCostValue(
-                                                                        e.target
-                                                                            .value,
+                                                                        n == null ? '' : String(n),
                                                                     )
                                                                 }
                                                                 onKeyDown={(
@@ -656,7 +655,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                         cancelEditCost();
                                                                     }
                                                                 }}
-                                                                className="h-7 w-24 text-xs"
+                                                                className="h-7 w-28 text-xs"
                                                                 autoFocus
                                                             />
                                                             <button
@@ -1592,19 +1591,20 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 </div>
                                 <div className="flex flex-col gap-1.5">
                                     <Label htmlFor="costo">Costo (ARS)</Label>
-                                    <Input
+                                    <MoneyInput
                                         id="costo"
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={createForm.data.costo}
-                                        onChange={(e) =>
+                                        value={
+                                            createForm.data.costo === ''
+                                                ? null
+                                                : Number(createForm.data.costo)
+                                        }
+                                        onValueChange={(n) =>
                                             createForm.setData(
                                                 'costo',
-                                                e.target.value,
+                                                n == null ? '' : String(n),
                                             )
                                         }
-                                        placeholder="0.00"
+                                        placeholder="0,00"
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         {createForm.data.costo &&

@@ -4,6 +4,7 @@ import {
     Car,
     ChevronDown,
     ChevronRight,
+    Download,
     HandCoins,
     History,
     Plus,
@@ -25,6 +26,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -497,8 +499,17 @@ export default function GastosIndex({
                         </p>
                     </div>
 
-                    {canManage && (
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                        <a
+                            href="/pdf/gastos"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </a>
+                        {canManage && (
                             <Button
                                 size="sm"
                                 onClick={() => {
@@ -509,8 +520,8 @@ export default function GastosIndex({
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Nuevo gasto
                             </Button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 {/* ─── Sección 1: cards de totales ───────────────────────── */}
@@ -823,14 +834,11 @@ export default function GastosIndex({
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="g-monto">Monto</Label>
-                                <Input
+                                <MoneyInput
                                     id="g-monto"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={monto}
-                                    onChange={(e) => setMonto(e.target.value)}
-                                    placeholder="0.00"
+                                    value={monto === '' ? null : Number(monto)}
+                                    onValueChange={(n) => setMonto(n == null ? '' : String(n))}
+                                    placeholder="0,00"
                                 />
                                 {errors.monto && (
                                     <p className="text-xs text-destructive">

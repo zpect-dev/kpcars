@@ -20,6 +20,7 @@ import {
     RecaudacionesTabla,
     ResumenRecaudacionModal,
 } from '@/components/recaudaciones-tabla';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -42,6 +43,27 @@ import {
 } from '@/components/ui/popover';
 import type { RecaudacionFila } from '@/types';
 
+interface DeudorInversion {
+    inversion_id: number;
+    inversion: string;
+    empresa: string;
+    deuda: number;
+}
+
+interface Deudor {
+    user_id: number;
+    name: string;
+    deuda_total: number;
+    inversiones: DeudorInversion[];
+}
+
+interface EmpresaCierre {
+    id: number;
+    nombre: string;
+    apertura_abierta: boolean;
+    total_recaudado: number;
+}
+
 interface Props {
     abierta: boolean;
     apertura: {
@@ -57,6 +79,11 @@ interface Props {
         user: { id: number; name: string } | null;
         created_at: string;
     } | null;
+    cierreUnificado: {
+        empresas: EmpresaCierre[];
+        deudores: Deudor[];
+        vehiculosCruzados: string[];
+    };
 }
 
 export default function RecaudacionesIndex({
@@ -66,6 +93,7 @@ export default function RecaudacionesIndex({
     totalGeneral,
     gananciaPotencial,
     ultimoCierre,
+    cierreUnificado,
 }: Props) {
     const { auth } = usePage<any>().props;
     const isAdmin = auth?.user?.role === 'administrador';
@@ -113,12 +141,23 @@ export default function RecaudacionesIndex({
             ? Math.round((totalGeneral / gananciaPotencial) * 100)
             : 0;
 
+    // ── Cierre unificado: solo la tasa. La decisión "abona / no abona" de cada
+    //    socio deudor se ajusta después, en el detalle del cierre (editable).
+    const todasAbiertas = cierreUnificado.empresas.every((e) => e.apertura_abierta);
+    const totalACerrar = cierreUnificado.empresas.reduce((s, e) => s + e.total_recaudado, 0);
+
+    const [tasa, setTasa] = useState('');
+
+    function abrirModalCierre() {
+        setTasa('');
+        setShowCierreModal(true);
+    }
 
     function handleCierre() {
         setProcessingCierre(true);
         router.post(
             '/recaudaciones/cierre',
-            {},
+            { tasa },
             {
                 preserveScroll: true,
                 onFinish: () => {
@@ -288,7 +327,7 @@ export default function RecaudacionesIndex({
                                 {isAdmin && (
                                     <Button
                                         size="sm"
-                                        onClick={() => setShowCierreModal(true)}
+                                        onClick={abrirModalCierre}
                                         disabled={filas.length === 0}
                                     >
                                         <Lock className="mr-1.5 h-4 w-4" />
@@ -467,34 +506,95 @@ export default function RecaudacionesIndex({
                 </DialogContent>
             </Dialog>
 
-            {/* Modal confirmar cierre */}
+            {/* Modal cierre unificado: ambas empresas + tasa + abonos */}
             <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] gap-0 overflow-y-auto sm:max-w-[560px]">
                     <DialogHeader>
-                        <DialogTitle>
-                            Confirmar cierre de recaudaciones
-                        </DialogTitle>
+                        <DialogTitle>Cierre unificado de recaudaciones</DialogTitle>
                         <DialogDescription>
-                            Se registrará el cierre del período actual y los
-                            valores quedarán congelados. El período quedará
-                            cerrado hasta que abras una nueva recaudación.
+                            Se cierran las recaudaciones de las dos empresas a la
+                            vez y se calcula el sueldo de cada socio. Los abonos de
+                            los deudores se ajustan después, en el detalle del cierre.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="rounded-xl border border-border bg-muted/30 px-4 py-3">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">
-                            Total a cerrar
-                        </p>
-                        <p className="mt-1 text-xl font-bold text-foreground">
-                            {formatARS(totalGeneral)}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            {filas.length} vehículo
-                            {filas.length !== 1 ? 's' : ''}
-                        </p>
+                    {/* Estado por empresa */}
+                    <div className="mt-3 flex flex-col gap-2">
+                        {cierreUnificado.empresas.map((e) => (
+                            <div
+                                key={e.id}
+                                className="flex items-center justify-between rounded-xl border border-border bg-muted/30 px-4 py-2.5"
+                            >
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">{e.nombre}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {e.apertura_abierta
+                                            ? `Recaudado: ${formatARS(e.total_recaudado)}`
+                                            : 'Sin recaudación abierta'}
+                                    </p>
+                                </div>
+                                {e.apertura_abierta ? (
+                                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                        Abierta
+                                    </span>
+                                ) : (
+                                    <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                        Cerrada
+                                    </span>
+                                )}
+                            </div>
+                        ))}
                     </div>
 
-                    <DialogFooter>
+                    {cierreUnificado.vehiculosCruzados.length > 0 && (
+                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                            Hay vehículos asignados a una inversión de otra
+                            empresa: <strong>{cierreUnificado.vehiculosCruzados.join(', ')}</strong>.
+                            Corregí la inversión de esos vehículos antes de cerrar.
+                        </div>
+                    )}
+
+                    {!todasAbiertas ? (
+                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                            Para ejecutar el cierre unificado, todas las empresas
+                            deben tener su recaudación abierta.
+                        </div>
+                    ) : (
+                        <>
+                            {/* Tasa */}
+                            <div className="mt-4">
+                                <label className="text-xs font-medium text-muted-foreground uppercase">
+                                    Tasa de cambio (ARS por 1 USD)
+                                </label>
+                                <MoneyInput
+                                    value={tasa === '' ? null : Number(tasa)}
+                                    onValueChange={(n) => setTasa(n == null ? '' : String(n))}
+                                    placeholder="Ej: 1.450,00"
+                                    className="mt-1 w-full"
+                                />
+                            </div>
+
+                            {/* Aviso: los abonos se ajustan después, en el detalle */}
+                            <div className="mt-3 rounded-xl border border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+                                Los sueldos se calculan como si todos los socios abonaran.
+                                Después, en el detalle del cierre, marcás por socio si
+                                <strong className="text-foreground"> abona o no</strong> y el
+                                importe del abono — el cierre se recalcula en vivo.
+                            </div>
+
+                            {/* Total */}
+                            <div className="mt-4 rounded-xl border border-border bg-muted/30 px-4 py-3">
+                                <p className="text-xs font-medium text-muted-foreground uppercase">
+                                    Total a cerrar (ambas empresas)
+                                </p>
+                                <p className="mt-1 text-xl font-bold text-foreground">
+                                    {formatARS(totalACerrar)}
+                                </p>
+                            </div>
+                        </>
+                    )}
+
+                    <DialogFooter className="mt-4">
                         <Button
                             type="button"
                             variant="outline"
@@ -505,11 +605,17 @@ export default function RecaudacionesIndex({
                         <Button
                             type="button"
                             onClick={handleCierre}
-                            disabled={processingCierre}
+                            disabled={
+                                processingCierre ||
+                                !todasAbiertas ||
+                                cierreUnificado.vehiculosCruzados.length > 0 ||
+                                !tasa ||
+                                Number(tasa) <= 0
+                            }
                         >
                             {processingCierre
                                 ? 'Procesando...'
-                                : 'Confirmar cierre'}
+                                : 'Cerrar y calcular sueldos'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

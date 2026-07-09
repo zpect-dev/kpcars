@@ -1,16 +1,15 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, ChevronRight, Plus } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Calendar, ChevronRight, Lock } from 'lucide-react';
 import { MoneyDual } from '@/components/money-dual';
 import { cn } from '@/lib/utils';
 
 interface Cierre {
     id: number;
-    periodo_inicio: string | null;
-    periodo_fin: string;
-    total_recaudado: string | number;
-    tasa: string | number | null;
+    fecha: string | null;
+    tasa: number;
     ejecutado_por: { id: number; name: string } | null;
+    total_pagado: number;
+    total_abonado: number;
 }
 
 interface Paginator {
@@ -34,41 +33,35 @@ function formatFecha(d: string | null): string {
     });
 }
 
-export default function CierresIndex({ cierres }: Props) {
+export default function CierresSueldoIndex({ cierres }: Props) {
     return (
         <>
-            <Head title="Cierres de Inversión" />
+            <Head title="Cierres de Sueldo" />
 
             <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
 
                 {/* Header */}
-                <div className="flex items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                            Cierres de Inversión
-                        </h1>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            Historial de liquidaciones semanales.
-                        </p>
-                    </div>
-                    <Button onClick={() => router.get('/cierres-inversion/nuevo')}>
-                        <Plus className="mr-1 h-4 w-4" />
-                        Nuevo cierre
-                    </Button>
+                <div>
+                    <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+                        Cierres de Sueldo
+                    </h1>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        Cada cierre se genera automáticamente al cerrar la
+                        recaudación de las dos empresas.
+                    </p>
                 </div>
 
                 {/* List */}
                 {cierres.data.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 text-center">
                         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                            <Calendar className="h-6 w-6" />
+                            <Lock className="h-6 w-6" />
                         </div>
                         <span className="text-base font-semibold text-foreground">Sin cierres</span>
-                        <span className="text-sm text-muted-foreground">No hay cierres realizados todavía.</span>
-                        <Button size="sm" onClick={() => router.get('/cierres-inversion/nuevo')}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            Crear primer cierre
-                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                            Los cierres aparecen acá cuando ejecutás el cierre
+                            unificado desde Recaudaciones.
+                        </span>
                     </div>
                 ) : (
                     <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -78,7 +71,7 @@ export default function CierresIndex({ cierres }: Props) {
                                 <button
                                     key={c.id}
                                     type="button"
-                                    onClick={() => router.get(`/cierres-inversion/${c.id}`)}
+                                    onClick={() => router.get(`/cierres-sueldo/${c.id}`)}
                                     className={cn(
                                         'flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/40',
                                         !isLast && 'border-b border-border',
@@ -93,14 +86,15 @@ export default function CierresIndex({ cierres }: Props) {
                                             Cierre #{c.id}
                                         </span>
                                         <span className="text-xs text-muted-foreground">
-                                            {formatFecha(c.periodo_fin)}
+                                            {formatFecha(c.fecha)}
                                             {c.ejecutado_por && ` · ${c.ejecutado_por.name}`}
+                                            {c.total_abonado > 0 && ' · con abonos de deuda'}
                                         </span>
                                     </div>
 
                                     <div className="flex shrink-0 items-center gap-3">
                                         <MoneyDual
-                                            ars={Number(c.total_recaudado)}
+                                            ars={Number(c.total_pagado)}
                                             tasa={c.tasa ? Number(c.tasa) : null}
                                             orientation="stacked"
                                             size="sm"
@@ -151,6 +145,6 @@ export default function CierresIndex({ cierres }: Props) {
     );
 }
 
-CierresIndex.layout = {
-    breadcrumbs: [{ title: 'Cierres', href: '/cierres-inversion' }],
+CierresSueldoIndex.layout = {
+    breadcrumbs: [{ title: 'Cierres de Sueldo', href: '/cierres-sueldo' }],
 };

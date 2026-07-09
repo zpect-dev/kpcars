@@ -187,19 +187,12 @@ class User extends Authenticatable
 
     /**
      * Inversiones en las que el usuario participa como inversor.
+     * El pivot lleva la deuda como monto simple: deudor = deuda > 0.
      */
     public function inversiones(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(Inversion::class, 'inversion_user')
-            ->withPivot(['tiene_deuda', 'es_financiador'])
+            ->withPivot(['es_financiador', 'deuda'])
             ->withTimestamps();
-    }
-
-    /**
-     * Movimientos de deuda del usuario.
-     */
-    public function deudaMovimientos(): HasMany
-    {
-        return $this->hasMany(DeudaMovimiento::class);
     }
 }
