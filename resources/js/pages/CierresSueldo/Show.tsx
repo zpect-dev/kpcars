@@ -13,7 +13,7 @@ import {
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { formatARS, formatUSD } from '@/components/money-dual';
-import { CONCEPTO_COLOR, CONCEPTO_LABEL, FLOTA_CONCEPTOS } from '@/lib/concepto';
+import { CONCEPTO_LABEL, CONCEPTO_PILL, FLOTA_CONCEPTOS } from '@/lib/concepto';
 import { cn } from '@/lib/utils';
 
 interface Detalle {
@@ -90,8 +90,156 @@ function toUSD(ars: number, tasa: number): number | null {
     return tasa > 0 ? ars / tasa : null;
 }
 
+/**
+ * Agrupa los detalles por inversión: cada inversión rinde una sola fila con su
+ * concepto base (parte / media parte / cero) y, aparte, la redistribución del
+ * financiador si la hubiera (misma inversión, columna propia).
+ */
+function groupDetalles(detalles: Detalle[]) {
+    const map = new Map<string, { inversion: string | null; base: Detalle | null; redistribucion: Detalle | null }>();
+    const orden: string[] = [];
+
+    for (const d of detalles) {
+        const key = d.inversion ?? '—';
+        if (!map.has(key)) {
+            map.set(key, { inversion: d.inversion, base: null, redistribucion: null });
+            orden.push(key);
+        }
+        const entry = map.get(key)!;
+        if (d.concepto === 'redistribucion_financiador') {
+            entry.redistribucion = d;
+        } else {
+            entry.base = d;
+        }
+    }
+
+    return orden.map((k) => map.get(k)!);
+}
+
+/**
+ * Tabla de detalle de un socio: una fila por inversión (Monto base +
+ * Redistribución en columnas propias, agrupadas a la derecha) con su Total,
+ * más una fila de totales al pie y el abono de deuda como nota aparte.
+ */
+function DetalleInversiones({ detalles, abonoTotal }: { detalles: Detalle[]; abonoTotal: number }) {
+    const grupos = groupDetalles(detalles);
+    const totMonto = grupos.reduce((s, g) => s + (g.base?.monto ?? 0), 0);
+    const totRedis = grupos.reduce((s, g) => s + (g.redistribucion?.monto ?? 0), 0);
+    const totGeneral = totMonto + totRedis;
+
+    // Banda de fondo continua para destacar la columna Total.
+    const totalCol = 'bg-foreground/[0.04]';
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-border/60">
+            <table className="w-full text-xs">
+                <thead>
+                    <tr className="bg-muted/40 text-[10px] uppercase tracking-wider text-muted-foreground">
+                        <th className="whitespace-nowrap px-3 py-2 pl-4 text-left font-semibold">Inversión</th>
+                        <th className="w-full px-3 py-2 text-left font-semibold">Concepto</th>
+                        <th className="whitespace-nowrap px-3 py-2 pl-6 text-right font-semibold">Monto</th>
+                        <th className="whitespace-nowrap px-3 py-2 pl-6 text-right font-semibold">Redistribución</th>
+                        <th className={cn('whitespace-nowrap px-3 py-2 pl-6 pr-4 text-right font-semibold text-foreground', totalCol)}>Total</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                    {grupos.map((g, j) => {
+                        const rowTotal = (g.base?.monto ?? 0) + (g.redistribucion?.monto ?? 0);
+                        const esFinanciador = !!g.redistribucion;
+                        return (
+                            <tr
+                                key={j}
+                                className={cn(
+                                    'transition-colors hover:bg-accent/30',
+                                    esFinanciador
+                                        ? 'bg-violet-500/[0.06]'
+                                        : j % 2 === 1 && 'bg-foreground/[0.015]',
+                                )}
+                            >
+                                <td className="whitespace-nowrap px-3 py-2 pl-4 font-semibold text-foreground">
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <span
+                                            className={cn(
+                                                'h-1.5 w-1.5 rounded-full',
+                                                esFinanciador ? 'bg-violet-500' : 'bg-border',
+                                            )}
+                                        />
+                                        {g.inversion ?? '—'}
+                                    </span>
+                                </td>
+                                <td className="px-3 py-2">
+                                    {g.base ? (
+                                        <span className={cn(
+                                            'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                            CONCEPTO_PILL[g.base.concepto] ?? 'border-border bg-muted text-muted-foreground',
+                                        )}>
+                                            {CONCEPTO_LABEL[g.base.concepto] ?? g.base.concepto}
+                                        </span>
+                                    ) : (
+                                        <span className="text-muted-foreground/50">—</span>
+                                    )}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 pl-6 text-right tabular-nums text-foreground">
+                                    {g.base ? formatARS(g.base.monto) : <span className="text-muted-foreground/40">—</span>}
+                                </td>
+                                <td className="whitespace-nowrap px-3 py-2 pl-6 text-right tabular-nums">
+                                    {g.redistribucion ? (
+                                        <span className="font-medium text-violet-500 dark:text-violet-400">
+                                            + {formatARS(g.redistribucion.monto)}
+                                        </span>
+                                    ) : (
+                                        <span className="text-muted-foreground/40">—</span>
+                                    )}
+                                </td>
+                                <td className={cn('whitespace-nowrap px-3 py-2 pl-6 pr-4 text-right font-bold tabular-nums text-foreground', totalCol)}>
+                                    {formatARS(rowTotal)}
+                                </td>
+                            </tr>
+                        );
+                    })}
+                </tbody>
+                <tfoot>
+                    <tr className="border-t-2 border-border bg-muted/60">
+                        <td className="px-3 py-2.5 pl-4 text-[11px] font-bold uppercase tracking-wider text-foreground" colSpan={2}>
+                            Total
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 pl-6 text-right font-semibold tabular-nums text-foreground">
+                            {formatARS(totMonto)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 pl-6 text-right font-semibold tabular-nums">
+                            {totRedis > 0 ? (
+                                <span className="text-violet-500 dark:text-violet-400">+ {formatARS(totRedis)}</span>
+                            ) : (
+                                <span className="text-muted-foreground/40">—</span>
+                            )}
+                        </td>
+                        <td className={cn('whitespace-nowrap px-3 py-2.5 pl-6 pr-4 text-right text-sm font-extrabold tabular-nums text-emerald-600 dark:text-emerald-400', totalCol)}>
+                            {formatARS(totGeneral)}
+                        </td>
+                    </tr>
+                    {abonoTotal > 0 && (
+                        <tr className="border-t border-border/60 bg-emerald-500/[0.06]">
+                            <td className="px-3 py-2 pl-4 text-emerald-600 dark:text-emerald-400" colSpan={2}>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <HandCoins className="h-3.5 w-3.5" />
+                                    Abono aplicado a su deuda
+                                </span>
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 pl-6 pr-4 text-right font-semibold tabular-nums text-emerald-600 dark:text-emerald-400" colSpan={3}>
+                                − {formatARS(abonoTotal)}
+                            </td>
+                        </tr>
+                    )}
+                </tfoot>
+            </table>
+        </div>
+    );
+}
+
 export default function CierreSueldoShow({ cierre, empresas, porSocio, abonos, socios, puedeEditar, totales }: Props) {
     const sociosCount = porSocio.length;
+    const totalCards = empresas.length + 1;
+    const [mostrarDeudores, setMostrarDeudores] = useState(false);
 
     return (
         <>
@@ -120,6 +268,20 @@ export default function CierreSueldoShow({ cierre, empresas, porSocio, abonos, s
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {socios.length > 0 && (
+                            <Button
+                                variant={mostrarDeudores ? 'default' : 'outline'}
+                                size="sm"
+                                onClick={() => setMostrarDeudores((v) => !v)}
+                                aria-expanded={mostrarDeudores}
+                            >
+                                <HandCoins className="mr-1.5 h-4 w-4" />
+                                Deudores
+                                <ChevronDown
+                                    className={cn('ml-1.5 h-4 w-4 transition-transform', mostrarDeudores && 'rotate-180')}
+                                />
+                            </Button>
+                        )}
                         <Button
                             variant="outline"
                             size="sm"
@@ -140,7 +302,10 @@ export default function CierreSueldoShow({ cierre, empresas, porSocio, abonos, s
                 </div>
 
                 {/* ── Hero: números grandes del cierre ───────────────────── */}
-                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div
+                    className="grid grid-cols-2 gap-3 lg:[grid-template-columns:repeat(var(--hero-cols),minmax(0,1fr))]"
+                    style={{ '--hero-cols': totalCards } as React.CSSProperties}
+                >
                     {empresas.map((e) => (
                         <HeroStat
                             key={e.id}
@@ -160,25 +325,22 @@ export default function CierreSueldoShow({ cierre, empresas, porSocio, abonos, s
                         tone="ok"
                         sub={`entre ${sociosCount} socio${sociosCount !== 1 ? 's' : ''}`}
                     />
-                    <HeroStat
-                        label="Abonos de deuda"
-                        ars={totales.abonado}
-                        tasa={cierre.tasa}
-                        icon={HandCoins}
-                        tone="info"
-                        sub={totales.abonado > 0 ? 'descontados de las deudas' : 'nadie abonó en este cierre'}
-                    />
                 </div>
 
-                {/* ── Decisiones de deudores (editable) ──────────────────── */}
-                {socios.length > 0 && (
+                {/* ── Decisiones de deudores (editable, toggle desde el header) ─ */}
+                {socios.length > 0 && mostrarDeudores && (
                     <div className="overflow-hidden rounded-2xl border border-border bg-card">
                         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
                                 <HandCoins className="h-5 w-5" />
                             </div>
-                            <div>
-                                <p className="text-base font-semibold text-foreground">Deudores — abona / no abona</p>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-base font-semibold text-foreground">
+                                    Deudores — abona / no abona
+                                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                                        {socios.length} deudor{socios.length !== 1 ? 'es' : ''}
+                                    </span>
+                                </p>
                                 <p className="text-xs text-muted-foreground">
                                     Marcá si cada deudor abona (cobra media parte y baja su deuda) o no
                                     (cobra 0 en sus inversiones con deuda). El cierre se recalcula al instante.
@@ -548,34 +710,7 @@ function EmpresaSection({
 
                                     {abierto && (
                                         <div className="border-t border-border/60 bg-muted/20 px-5 py-3 pl-[4.25rem]">
-                                            <table className="w-full text-xs">
-                                                <tbody className="divide-y divide-border/40">
-                                                    {row.detalles.map((d, j) => (
-                                                        <tr key={j}>
-                                                            <td className="py-1.5 font-medium text-foreground">
-                                                                {d.inversion ?? '—'}
-                                                            </td>
-                                                            <td className={cn('py-1.5', CONCEPTO_COLOR[d.concepto] ?? 'text-muted-foreground')}>
-                                                                {CONCEPTO_LABEL[d.concepto] ?? d.concepto}
-                                                            </td>
-                                                            <td className="py-1.5 text-right tabular-nums text-foreground">
-                                                                {formatARS(d.monto)}
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    {abono && abono.total > 0 && (
-                                                        <tr>
-                                                            <td className="py-1.5" />
-                                                            <td className="py-1.5 text-emerald-600 dark:text-emerald-400">
-                                                                Abono aplicado a su deuda
-                                                            </td>
-                                                            <td className="py-1.5 text-right tabular-nums font-medium text-emerald-600 dark:text-emerald-400">
-                                                                − {formatARS(abono.total)}
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
+                                            <DetalleInversiones detalles={row.detalles} abonoTotal={abono?.total ?? 0} />
                                         </div>
                                     )}
                                 </div>
