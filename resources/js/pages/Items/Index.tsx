@@ -1,5 +1,6 @@
 import { Head, useForm, router, usePage } from '@inertiajs/react';
 import {
+    AlertCircle,
     ArrowDownCircle,
     ArrowUpCircle,
     Check,
@@ -50,6 +51,8 @@ interface OrderLine {
 }
 
 type InventarioTab = 'repuestos' | 'galpon';
+type StockFilter = 'all' | 'sin-stock' | 'bajo' | 'normal';
+
 
 // Descripción automática para los egresos de artículos del galpón.
 const GALPON_DESC = 'Artículos para galpón';
@@ -85,6 +88,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
     // ─── Pestaña activa: Repuestos (repuestos=1) vs Galpón (repuestos=0) ──────
     const [activeTab, setActiveTab] = useState<InventarioTab>('repuestos');
+    const [stockFilter, setStockFilter] = useState<StockFilter>('all');
 
     const tabItems = useMemo(
         () =>
@@ -94,6 +98,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         [items, activeTab],
     );
 
+    function switchTab(tab: InventarioTab) {
+        setActiveTab(tab);
+        setStockFilter('all');
+    }
+
     const counts = useMemo(
         () => ({
             repuestos: items.filter((i) => i.repuestos).length,
@@ -101,6 +110,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         }),
         [items],
     );
+
+    const stats = useMemo(() => ({
+        total:    tabItems.length,
+        sinStock: tabItems.filter((i) => i.stock === 0).length,
+        bajo:     tabItems.filter((i) => i.stock > 0 && i.stock <= i.min_stock).length,
+        normal:   tabItems.filter((i) => i.stock > i.min_stock).length,
+    }), [tabItems]);
 
     // ─── Edición inline de costo (el precio se calcula con +45%) ──────────────
     const [editingCostId, setEditingCostId] = useState<number | null>(null);
@@ -141,16 +157,22 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
     const [itemSearch, setItemSearch] = useState('');
 
     const filteredItems = useMemo(() => {
-        if (!itemSearch) {
-            return tabItems;
+        let result = tabItems;
+
+        const q = itemSearch.toLowerCase().trim();
+        if (q) result = result.filter((i) => i.descripcion.toLowerCase().includes(q));
+
+        if (stockFilter === 'sin-stock') result = result.filter((i) => i.stock === 0);
+        else if (stockFilter === 'bajo')  result = result.filter((i) => i.stock > 0 && i.stock <= i.min_stock);
+        else if (stockFilter === 'normal') result = result.filter((i) => i.stock > i.min_stock);
+
+        // Al filtrar por crítico o bajo, mostrar los más urgentes primero
+        if (stockFilter === 'sin-stock' || stockFilter === 'bajo') {
+            result = [...result].sort((a, b) => a.stock - b.stock);
         }
 
-        const q = itemSearch.toLowerCase();
-
-        return tabItems.filter((item) =>
-            item.descripcion.toLowerCase().includes(q),
-        );
-    }, [tabItems, itemSearch]);
+        return result;
+    }, [tabItems, itemSearch, stockFilter]);
 
     // ─── Modal Egreso (OUT múltiple) ─────────────────────────────────────────
     const [showSalidaModal, setShowSalidaModal] = useState(false);
@@ -498,7 +520,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 <div className="flex w-full gap-1 rounded-xl border border-border bg-muted/40 p-1 sm:w-auto sm:self-start">
                     <button
                         type="button"
-                        onClick={() => setActiveTab('repuestos')}
+                        onClick={() => switchTab('repuestos')}
                         className={cn(
                             'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all sm:flex-none',
                             activeTab === 'repuestos'
@@ -514,7 +536,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     </button>
                     <button
                         type="button"
-                        onClick={() => setActiveTab('galpon')}
+                        onClick={() => switchTab('galpon')}
                         className={cn(
                             'flex flex-1 items-center justify-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-all sm:flex-none',
                             activeTab === 'galpon'
@@ -530,10 +552,38 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     </button>
                 </div>
 
-                {/* Tabla + cards */}
-                <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    {/* Desktop */}
-                    <div className="hidden overflow-x-auto md:block">
+                {/* Filtros de stock */}
+                <div className="flex flex-wrap gap-1.5">
+                    {([
+                        { key: 'all',       label: 'Todos',      value: stats.total,    dot: null },
+                        { key: 'sin-stock', label: 'Sin stock',  value: stats.sinStock, dot: 'bg-red-500' },
+                        { key: 'bajo',      label: 'Stock bajo', value: stats.bajo,     dot: 'bg-amber-500' },
+                        { key: 'normal',    label: 'Normal',     value: stats.normal,   dot: 'bg-green-500' },
+                    ] as const).map((s) => {
+                        const active = stockFilter === s.key;
+                        return (
+                            <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => setStockFilter((p) => p === s.key ? 'all' : s.key)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                    active
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                {s.dot && <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-primary-foreground/60' : s.dot)} />}
+                                {s.label}
+                                <span className={cn('tabular-nums', active ? 'opacity-70' : 'text-foreground')}>{s.value}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Tabla desktop */}
+                <div className="hidden w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
+                    <div className="overflow-x-auto">
                         <table className="w-full table-fixed text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
@@ -607,18 +657,26 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         {item.descripcion}
                                                     </span>
                                                 </td>
-                                                <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
-                                                    <span
-                                                        className={
-                                                            lowStock
-                                                                ? 'font-semibold text-red-700 dark:text-red-400'
-                                                                : ''
-                                                        }
-                                                    >
-                                                        {item.stock}
-                                                    </span>
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {item.stock === 0 && (
+                                                            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                                                        )}
+                                                        <div className="min-w-0">
+                                                            <span className={cn(
+                                                                'font-semibold tabular-nums',
+                                                                item.stock === 0
+                                                                    ? 'text-red-700 dark:text-red-400'
+                                                                    : lowStock
+                                                                        ? 'text-amber-700 dark:text-amber-400'
+                                                                        : 'text-foreground',
+                                                            )}>
+                                                                {item.stock}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </td>
-                                                <td className="truncate px-4 py-3 sm:px-6 sm:py-4">
+                                                <td className="truncate px-4 py-3 text-muted-foreground sm:px-6 sm:py-4">
                                                     {item.min_stock}
                                                 </td>
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
@@ -730,80 +788,73 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         </table>
                     </div>
 
-                    {/* Mobile cards */}
-                    <ul className="divide-y divide-border md:hidden">
-                        {filteredItems.length === 0 ? (
-                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No hay artículos registrados o no coinciden con
-                                la búsqueda.
-                            </li>
-                        ) : (
-                            filteredItems.map((item) => {
-                                const lowStock = item.stock <= item.min_stock;
+                </div>
 
-                                return (
-                                    <li
-                                        key={item.id}
-                                        className={cn(
-                                            'flex flex-col gap-1 p-4',
-                                            lowStock &&
-                                                'bg-red-50 dark:bg-red-950/30',
-                                        )}
-                                    >
-                                        <p
-                                            className={cn(
-                                                'line-clamp-2 text-sm font-semibold',
-                                                lowStock
-                                                    ? 'text-red-800 dark:text-red-300'
-                                                    : 'text-foreground',
-                                            )}
-                                        >
-                                            {item.descripcion}
-                                        </p>
-                                        <div className="flex items-baseline gap-4 text-xs">
-                                            <span>
-                                                Stock:{' '}
-                                                <span
-                                                    className={cn(
-                                                        'text-base font-semibold',
-                                                        lowStock
-                                                            ? 'text-red-700 dark:text-red-400'
-                                                            : 'text-foreground',
-                                                    )}
-                                                >
+                {/* Mobile cards — independientes, mismo estilo que el resto de la app */}
+                <div className="flex flex-col gap-2 pb-4 md:hidden">
+                    {filteredItems.length === 0 ? (
+                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
+                            No hay artículos registrados o no coinciden con la búsqueda.
+                        </div>
+                    ) : (
+                        filteredItems.map((item) => {
+                            const sinStock = item.stock === 0;
+                            const lowStock = item.stock > 0 && item.stock <= item.min_stock;
+
+                            return (
+                                <div
+                                    key={item.id}
+                                    className={cn(
+                                        'flex items-center gap-3 rounded-xl border border-l-4 bg-card p-3 shadow-sm',
+                                        sinStock
+                                            ? 'border-l-red-500'
+                                            : lowStock
+                                                ? 'border-l-amber-500'
+                                                : 'border-l-border',
+                                    )}
+                                >
+                                    {/* Número de stock */}
+                                    <div className="flex w-10 shrink-0 flex-col items-center justify-center">
+                                        {sinStock ? (
+                                            <AlertCircle className="h-5 w-5 text-red-500" />
+                                        ) : (
+                                            <>
+                                                <span className={cn(
+                                                    'text-xl font-bold tabular-nums leading-none',
+                                                    lowStock ? 'text-amber-500' : 'text-foreground',
+                                                )}>
                                                     {item.stock}
                                                 </span>
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                Mín:{' '}
-                                                <span className="font-medium">
-                                                    {item.min_stock}
-                                                </span>
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                Costo:{' '}
-                                                <span className="font-medium">
-                                                    {item.costo != null
-                                                        ? formatARS(
-                                                              Number(item.costo),
-                                                          )
-                                                        : '—'}
-                                                </span>
-                                            </span>
-                                            <span className="text-muted-foreground">
-                                                Precio:{' '}
-                                                <span className="font-medium">
-                                                    {formatARS(
-                                                        Number(item.precio),
-                                                    )}
-                                                </span>
-                                            </span>
+                                                <span className="text-[9px] text-muted-foreground">uds</span>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* Separador vertical */}
+                                    <div className="h-8 w-px shrink-0 bg-border" />
+
+                                    {/* Contenido */}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium text-foreground">
+                                            {item.descripcion}
+                                        </p>
+                                        <div className="mt-1.5 flex gap-3 text-[11px] text-muted-foreground">
+                                            <span>Mín: <span className="font-medium text-foreground">{item.min_stock}</span></span>
+                                            <span>Precio: <span className="font-medium text-foreground">{formatARS(Number(item.precio))}</span></span>
                                         </div>
-                                    </li>
-                                );
-                            })
-                        )}
-                    </ul>
+                                    </div>
+
+                                    {/* Indicador de estado — solo cuando hay problema */}
+                                    {(sinStock || lowStock) && (
+                                        <div className={cn(
+                                            'h-2 w-2 shrink-0 rounded-full',
+                                            sinStock ? 'bg-red-500' : 'bg-amber-500',
+                                        )} />
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             </div>
 

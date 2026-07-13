@@ -191,27 +191,32 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                 </div>
 
                 {/* Stats — clickeables para filtrar */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="flex flex-wrap gap-1.5">
                     {([
-                        { key: 'alta',      label: 'Prioridad alta',  value: stats.alta,      cls: 'border-red-500/20 bg-red-500/5',     active: 'ring-2 ring-red-500/40',   text: 'text-red-700 dark:text-red-400' },
-                        { key: 'media',     label: 'Prioridad media', value: stats.media,     cls: 'border-amber-500/20 bg-amber-500/5', active: 'ring-2 ring-amber-500/40', text: 'text-amber-700 dark:text-amber-400' },
-                        { key: 'baja',      label: 'Prioridad baja',  value: stats.baja,      cls: 'border-green-500/20 bg-green-500/5', active: 'ring-2 ring-green-500/40', text: 'text-green-700 dark:text-green-400' },
-                        { key: 'pendiente', label: 'Sin revisar',     value: stats.pendiente, cls: 'border-border bg-card',              active: 'ring-2 ring-border',        text: 'text-muted-foreground' },
-                    ] as const).map((s) => (
-                        <button
-                            key={s.key}
-                            type="button"
-                            onClick={() => toggleFiltro(s.key)}
-                            className={cn(
-                                'flex flex-col gap-0.5 overflow-hidden rounded-xl border px-4 py-3 shadow-sm text-left transition-all active:scale-[0.98]',
-                                s.cls,
-                                filtro === s.key && s.active,
-                            )}
-                        >
-                            <span className={cn('text-xs', s.text)}>{s.label}</span>
-                            <span className="text-lg font-bold tabular-nums text-foreground">{s.value}</span>
-                        </button>
-                    ))}
+                        { key: 'alta',      label: 'Alta',       value: stats.alta,      dot: 'bg-red-500' },
+                        { key: 'media',     label: 'Media',      value: stats.media,     dot: 'bg-amber-500' },
+                        { key: 'baja',      label: 'Baja',       value: stats.baja,      dot: 'bg-green-500' },
+                        { key: 'pendiente', label: 'Sin revisar', value: stats.pendiente, dot: null },
+                    ] as const).map((s) => {
+                        const active = filtro === s.key;
+                        return (
+                            <button
+                                key={s.key}
+                                type="button"
+                                onClick={() => toggleFiltro(s.key)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                    active
+                                        ? 'border-primary bg-primary text-primary-foreground'
+                                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                {s.dot && <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-primary-foreground/60' : s.dot)} />}
+                                {s.label}
+                                <span className={cn('tabular-nums', active ? 'opacity-70' : 'text-foreground')}>{s.value}</span>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Buscador */}
