@@ -1,6 +1,7 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, ChevronDown, Download, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, Crop, Download, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
+import type { MouseEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { index as usersIndex, updateRole, store } from '@/routes/users';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DocumentSection, DocPreviewDialog, type DocUrls, type DocMode } from '@/components/documentos';
+import { useImageCropper, type CropInput } from '@/components/image-cropper';
 
 interface Deposito {
     monto: number;
@@ -103,13 +105,26 @@ function AvatarDropzone({
     currentUrl?: string | null;
     onDrop: (files: File[]) => void;
 }) {
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
+    const { cropImage, cropperElement } = useImageCropper();
+
+    async function handleDrop(files: File[]) {
+        const f = files[0];
+        if (!f) return;
+        try {
+            onDrop([await cropImage(f)]);
+        } catch {
+            // recorte cancelado: no cambia nada
+        }
+    }
+
+    const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+        onDrop: handleDrop,
         accept: {
             'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
         },
         maxFiles: 1,
         multiple: false,
+        noClick: true,
     });
 
     const previewUrl = useMemo(
@@ -117,32 +132,61 @@ function AvatarDropzone({
         [file, currentUrl],
     );
 
+    async function recropCurrent(e: MouseEvent) {
+        e.stopPropagation();
+        const input: CropInput | null = file
+            ? file
+            : currentUrl
+              ? { url: currentUrl, name: 'avatar' }
+              : null;
+        if (!input) return;
+        try {
+            onDrop([await cropImage(input)]);
+        } catch {
+            // recorte cancelado: no cambia nada
+        }
+    }
+
     return (
-        <div
-            {...getRootProps()}
-            className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-solid border-primary bg-primary/10' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
-        >
-            <input {...getInputProps()} />
-            {previewUrl ? (
-                <>
-                    <img
-                        src={previewUrl}
-                        alt="Avatar"
-                        className="h-full w-full bg-muted object-cover"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Camera className="h-6 w-6 text-white" />
+        <>
+            {cropperElement}
+            <div
+                {...getRootProps()}
+                onClick={open}
+                className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-solid border-primary bg-primary/10' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
+            >
+                <input {...getInputProps()} />
+                {previewUrl ? (
+                    <>
+                        <img
+                            src={previewUrl}
+                            alt="Avatar"
+                            className="h-full w-full bg-muted object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                            <span title="Reemplazar" className="text-white">
+                                <Camera className="h-5 w-5" />
+                            </span>
+                            <button
+                                type="button"
+                                onClick={recropCurrent}
+                                title="Recortar"
+                                className="text-white transition-transform hover:scale-110"
+                            >
+                                <Crop className="h-5 w-5" />
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center text-muted-foreground outline-none">
+                        <Camera className="mb-1 h-6 w-6 opacity-50 transition-opacity group-hover:opacity-100" />
+                        <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">
+                            Subir
+                        </span>
                     </div>
-                </>
-            ) : (
-                <div className="flex flex-col items-center text-muted-foreground outline-none">
-                    <Camera className="mb-1 h-6 w-6 opacity-50 transition-opacity group-hover:opacity-100" />
-                    <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">
-                        Subir
-                    </span>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </>
     );
 }
 

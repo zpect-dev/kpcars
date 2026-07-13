@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { useImageCropper } from '@/components/image-cropper';
 
 interface Multa {
     id: number;
@@ -1435,6 +1436,21 @@ function CobrarMultaForm({
         con_deposito: false,
     });
 
+    const { cropImage, cropperElement } = useImageCropper();
+
+    async function handleComprobante(f: File | null) {
+        // Solo las imágenes pasan por el editor de recorte; los PDF van directo.
+        if (f && f.type.startsWith('image/')) {
+            try {
+                form.setData('comprobante', await cropImage(f));
+            } catch {
+                // recorte cancelado
+            }
+            return;
+        }
+        form.setData('comprobante', f);
+    }
+
     function submit(e: React.FormEvent) {
         e.preventDefault();
         // Comprobante por multipart; la ruta es PATCH, hay que falsear el método.
@@ -1466,6 +1482,7 @@ function CobrarMultaForm({
 
     return (
         <form onSubmit={submit}>
+            {cropperElement}
             <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
                     <UserIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -1583,7 +1600,10 @@ function CobrarMultaForm({
                                     type="file"
                                     accept="application/pdf,image/*"
                                     className="hidden"
-                                    onChange={(e) => form.setData('comprobante', e.target.files?.[0] ?? null)}
+                                    onChange={(e) => {
+                                        handleComprobante(e.target.files?.[0] ?? null);
+                                        e.target.value = '';
+                                    }}
                                 />
                             </label>
                             {form.errors.comprobante && <p className="text-xs text-red-600">{form.errors.comprobante}</p>}

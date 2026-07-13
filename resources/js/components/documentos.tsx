@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Camera, Check, Copy, Download, FileText, Share2 } from 'lucide-react';
+import { Camera, Copy, Crop, Download, FileText, Share2 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import InputError from '@/components/input-error';
+import { useImageCropper, type CropInput } from '@/components/image-cropper';
 import {
     Dialog,
     DialogContent,
@@ -99,8 +100,34 @@ export function DocImageDropzone({
     onDrop: (files: File[]) => void;
     onPreview: OnDocPreview;
 }) {
+    const { cropImage, cropperElement } = useImageCropper();
+
+    async function handleCropDrop(files: File[]) {
+        const f = files[0];
+        if (!f) return;
+        try {
+            onDrop([await cropImage(f)]);
+        } catch {
+            // recorte cancelado: no cambia nada
+        }
+    }
+
+    async function recropCurrent() {
+        const input: CropInput | null = file
+            ? file
+            : existingUrl
+              ? { url: existingUrl, name: label }
+              : null;
+        if (!input) return;
+        try {
+            onDrop([await cropImage(input)]);
+        } catch {
+            // recorte cancelado: no cambia nada
+        }
+    }
+
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-        onDrop,
+        onDrop: handleCropDrop,
         accept: IMG_ACCEPT,
         maxFiles: 1,
         multiple: false,
@@ -116,6 +143,7 @@ export function DocImageDropzone({
 
     return (
         <div className="flex flex-col gap-1">
+            {cropperElement}
             <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
             <div
                 {...getRootProps()}
@@ -133,13 +161,22 @@ export function DocImageDropzone({
                             onClick={() => onPreview(previewUrl, label, 'image')}
                             className="h-full w-full cursor-zoom-in object-cover"
                         />
-                        <button
-                            type="button"
-                            onClick={open}
-                            className="absolute right-1 bottom-1 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white opacity-0 transition-opacity group-hover:opacity-100"
-                        >
-                            <Camera className="h-3 w-3" /> Reemplazar
-                        </button>
+                        <div className="absolute right-1 bottom-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                                type="button"
+                                onClick={recropCurrent}
+                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                            >
+                                <Crop className="h-3 w-3" /> Recortar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={open}
+                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                            >
+                                <Camera className="h-3 w-3" /> Reemplazar
+                            </button>
+                        </div>
                     </>
                 ) : (
                     <button
@@ -344,8 +381,39 @@ export function DocSingleDropzone({
     onDrop: (files: File[]) => void;
     onPreview: OnDocPreview;
 }) {
+    const { cropImage, cropperElement } = useImageCropper();
+
+    async function handleDrop(files: File[]) {
+        const f = files[0];
+        if (!f) return;
+        // Solo las imágenes pasan por el editor de recorte; los PDF van directo.
+        if (f.type.startsWith('image/')) {
+            try {
+                onDrop([await cropImage(f)]);
+            } catch {
+                // recorte cancelado
+            }
+            return;
+        }
+        onDrop(files);
+    }
+
+    async function recropCurrent() {
+        const input: CropInput | null = file
+            ? file
+            : existingUrl
+              ? { url: existingUrl, name: title }
+              : null;
+        if (!input) return;
+        try {
+            onDrop([await cropImage(input)]);
+        } catch {
+            // recorte cancelado
+        }
+    }
+
     const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-        onDrop,
+        onDrop: handleDrop,
         accept: { ...PDF_ACCEPT, ...IMG_ACCEPT },
         maxFiles: 1,
         multiple: false,
@@ -367,6 +435,7 @@ export function DocSingleDropzone({
                 isDragActive ? 'border-solid border-primary bg-primary/10' : 'border-dashed border-border bg-muted',
             )}
         >
+            {cropperElement}
             <input {...getInputProps()} />
             {previewUrl ? (
                 <>
@@ -400,13 +469,24 @@ export function DocSingleDropzone({
                             </a>
                             {isExisting && <ShareButton url={existingUrl!} name={title} />}
                         </div>
-                        <button
-                            type="button"
-                            onClick={open}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                        >
-                            <FileText className="h-3.5 w-3.5" /> Reemplazar
-                        </button>
+                        <div className="flex items-center gap-3">
+                            {!isPdf && (
+                                <button
+                                    type="button"
+                                    onClick={recropCurrent}
+                                    className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                                >
+                                    <Crop className="h-3.5 w-3.5" /> Recortar
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={open}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                            >
+                                <FileText className="h-3.5 w-3.5" /> Reemplazar
+                            </button>
+                        </div>
                     </div>
                 </>
             ) : (
