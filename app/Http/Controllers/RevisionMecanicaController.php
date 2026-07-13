@@ -8,8 +8,10 @@ use App\Enums\PrioridadReparacion;
 use App\Models\RevisionMecanica;
 use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,6 +25,21 @@ class RevisionMecanicaController extends Controller
     {
         $this->authorize('view-revision-mecanica');
 
+        return Inertia::render('RevisionMecanica/Index', [
+            'filas' => $this->filas(),
+            'items' => collect(RevisionMecanica::ITEMS)
+                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
+                ->values(),
+        ]);
+    }
+
+    /**
+     * Filas del dashboard: cada vehículo con chofer + su última revisión mecánica.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function filas(): Collection
+    {
         $vehiculos = Vehiculo::withoutGlobalScope(TenantScope::class)
             ->with(['user:id,name', 'inversion:id,nombre'])
             ->where('patente', '!=', 'EXTERNO')
@@ -38,7 +55,7 @@ class RevisionMecanicaController extends Controller
             ->get()
             ->groupBy('vehiculo_id');
 
-        $filas = $vehiculos->map(function (Vehiculo $v) use ($ultimas) {
+        return $vehiculos->map(function (Vehiculo $v) use ($ultimas) {
             $r = $ultimas->get($v->id)?->first();
 
             return [
@@ -58,13 +75,65 @@ class RevisionMecanicaController extends Controller
                 ] : null,
             ];
         })->values();
+    }
 
-        return Inertia::render('RevisionMecanica/Index', [
+    /**
+     * Exporta a PDF el listado de vehículos en revisión mecánica, respetando los
+     * filtros de la vista (búsqueda por patente/chofer y prioridad).
+     */
+    public function pdf(Request $request): \Illuminate\Http\Response
+    {
+        $this->authorize('view-revision-mecanica');
+
+        $q = trim((string) $request->query('q', ''));
+        $prioridad = $request->query('prioridad'); // alta | media | baja | pendiente | null
+
+        $pesos = ['alta' => 3, 'media' => 2, 'baja' => 1];
+
+        $filas = $this->filas()
+            ->filter(function (array $f) use ($q, $prioridad) {
+                if ($prioridad === 'pendiente' && $f['revision'] !== null) {
+                    return false;
+                }
+                if (in_array($prioridad, ['alta', 'media', 'baja'], true)
+                    && ($f['revision']['prioridad'] ?? null) !== $prioridad) {
+                    return false;
+                }
+                if ($q !== '') {
+                    $needle = mb_strtolower($q);
+                    if (! str_contains(mb_strtolower($f['patente']), $needle)
+                        && ! str_contains(mb_strtolower($f['chofer']), $needle)) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            // Prioridad desc (alta > media > baja > sin revisión), luego patente.
+            ->sort(function (array $a, array $b) use ($pesos) {
+                $pa = $a['revision'] ? $pesos[$a['revision']['prioridad']] : 0;
+                $pb = $b['revision'] ? $pesos[$b['revision']['prioridad']] : 0;
+
+                return $pb <=> $pa ?: strnatcasecmp($a['patente'], $b['patente']);
+            })
+            ->values();
+
+        $titulos = [
+            'alta' => 'Prioridad alta',
+            'media' => 'Prioridad media',
+            'baja' => 'Prioridad baja',
+            'pendiente' => 'Pendientes (sin revisión)',
+        ];
+        $titulo = $titulos[$prioridad] ?? 'Todos';
+
+        $pdf = Pdf::loadView('pdf.revision-mecanica', [
             'filas' => $filas,
-            'items' => collect(RevisionMecanica::ITEMS)
-                ->map(fn (string $label, string $key) => ['key' => $key, 'label' => $label])
-                ->values(),
+            'titulo' => $titulo,
+            'busqueda' => $q,
         ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download('revision-mecanica-'.now()->format('Ymd').'.pdf');
     }
 
     /**

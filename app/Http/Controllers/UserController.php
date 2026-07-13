@@ -205,7 +205,14 @@ class UserController extends Controller
         }
 
         if ($isInversorFilter) {
-            $query->with(['empresas:id,nombre']);
+            // Personal muestra y configura las inversiones del inversor con su
+            // deuda (cross-empresa: bypass del TenantScope en Inversion).
+            $query->with([
+                'empresas:id,nombre',
+                'inversiones' => fn ($q) => $q
+                    ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                    ->with('empresa:id,nombre'),
+            ]);
         }
 
         $users = $query
@@ -263,6 +270,22 @@ class UserController extends Controller
             'symbol' => $m->symbol(),
         ]);
 
+        // Inversiones disponibles para configurar inversores desde Personal
+        // (sólo admin; cross-empresa, agrupadas por empresa en el frontend).
+        $inversionesDisponibles = null;
+        if ($isInversorFilter && Gate::allows('manage-inversiones')) {
+            $inversionesDisponibles = \App\Models\Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->with('empresa:id,nombre')
+                ->get(['id', 'nombre', 'empresa_id'])
+                ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->map(fn ($inv) => [
+                    'id' => $inv->id,
+                    'nombre' => $inv->nombre,
+                    'empresa' => $inv->empresa,
+                ]);
+        }
+
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
@@ -271,7 +294,71 @@ class UserController extends Controller
             'monedas' => $monedas,
             'choferCounts' => $choferCounts,
             'cotizacionDolar' => (float) (Setting::get('cotizacion_dolar') ?? 0),
+            'inversionesDisponibles' => $inversionesDisponibles,
         ]);
+    }
+
+    /**
+     * Sincroniza las inversiones de un inversor desde Personal: a qué
+     * inversiones pertenece, si financia y cuánta deuda tiene en cada una.
+     */
+    public function syncInversiones(Request $request, User $user)
+    {
+        Gate::authorize('manage-inversiones');
+
+        if ($user->role !== UserRole::INVERSOR) {
+            return back()->with('error', 'El usuario seleccionado no tiene rol de inversor.');
+        }
+
+        $validated = $request->validate([
+            'inversiones' => ['present', 'array'],
+            'inversiones.*.inversion_id' => ['required', 'integer', 'distinct', 'exists:inversiones,id'],
+            'inversiones.*.es_financiador' => ['required', 'boolean'],
+            'inversiones.*.deuda' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+        ]);
+
+        $items = collect($validated['inversiones'] ?? []);
+
+        $invalido = $items->first(fn ($i) => $i['es_financiador'] && (float) $i['deuda'] > 0);
+        if ($invalido) {
+            return back()->with('error', 'Un inversor no puede ser financiador y deudor al mismo tiempo.');
+        }
+
+        DB::transaction(function () use ($user, $items) {
+            // Validar el cupo de cada inversión que se agrega (max 6 inversores).
+            $actuales = $user->inversiones()
+                ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->pluck('inversiones.id')
+                ->all();
+
+            $nuevas = $items->pluck('inversion_id')->map(fn ($id) => (int) $id)
+                ->diff($actuales);
+
+            foreach ($nuevas as $inversionId) {
+                $count = DB::table('inversion_user')
+                    ->where('inversion_id', $inversionId)
+                    ->lockForUpdate()
+                    ->count();
+
+                if ($count >= \App\Models\Inversion::MAX_INVERSORES) {
+                    $nombre = DB::table('inversiones')->where('id', $inversionId)->value('nombre');
+                    throw new \RuntimeException(
+                        "La inversión \"{$nombre}\" ya tiene el máximo de ".\App\Models\Inversion::MAX_INVERSORES.' inversores.'
+                    );
+                }
+            }
+
+            $sync = $items->mapWithKeys(fn ($i) => [
+                (int) $i['inversion_id'] => [
+                    'es_financiador' => (bool) $i['es_financiador'],
+                    'deuda' => round((float) $i['deuda'], 2),
+                ],
+            ])->toArray();
+
+            $user->inversiones()->sync($sync);
+        });
+
+        return back()->with('success', 'Inversiones del inversor actualizadas.');
     }
 
     public function updateRole(Request $request, User $user)
@@ -458,7 +545,9 @@ class UserController extends Controller
         $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
-            ->with(['vehiculo', 'asignadoPor:id,name'])
+            // Vehículo global: la patente se muestra sin importar la empresa activa
+            // (un chofer puede haber tenido autos de distintas empresas).
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get()
             ->map(fn ($a) => [
@@ -491,7 +580,9 @@ class UserController extends Controller
         $this->authorize('viewAsignaciones', $user);
 
         $asignaciones = Asignacion::where('conductor_id', $user->id)
-            ->with(['vehiculo', 'asignadoPor:id,name'])
+            // Vehículo global (sin TenantScope): la patente se ve aunque el auto
+            // sea de otra empresa.
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get();
 
@@ -499,5 +590,119 @@ class UserController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download("asignaciones-{$user->dni}-".now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Exporta a PDF el listado de choferes respetando los filtros de la vista:
+     * estado (activos/inactivos), búsqueda (nombre/DNI) y la alerta seleccionada.
+     */
+    public function choferesPdf(Request $request): \Illuminate\Http\Response
+    {
+        $this->authorize('viewAny', User::class);
+
+        $status = $request->query('status'); // activos | inactivos | null
+        $q = trim((string) $request->query('q', ''));
+        $alert = $request->query('alert'); // ver switch de más abajo
+
+        $today = now()->startOfDay();
+        $en30 = $today->copy()->addDays(30);
+        $cotizacion = (float) (Setting::get('cotizacion_dolar') ?? 0);
+
+        $choferes = User::where('role', UserRole::CHOFER->value)
+            ->when($status === 'activos', fn ($qq) => $qq->where('inactivo', false))
+            ->when($status === 'inactivos', fn ($qq) => $qq->where('inactivo', true))
+            ->with([
+                'vehiculoAsignado' => fn ($qq) => $qq->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+                'depositos',
+            ])
+            ->orderBy('name')
+            ->get();
+
+        $filas = $choferes->map(function (User $u) use ($today, $en30, $cotizacion) {
+            $venc = $u->fecha_vencimiento_licencia;
+            $veh = $u->vehiculoAsignado;
+            $depTotalArs = $u->depositos->sum(fn (UserDeposito $d) => $d->moneda === DepositoMoneda::USD
+                ? (float) $d->monto * $cotizacion
+                : (float) $d->monto);
+
+            return [
+                'name' => $u->name,
+                'dni' => $u->dni,
+                'telefono' => $u->telefono,
+                'correo' => $u->correo,
+                'inactivo' => $u->inactivo,
+                'venc_licencia' => $venc?->format('d/m/Y'),
+                'depositos' => $u->depositos->map(fn (UserDeposito $d) => $d->moneda->value.' '
+                    .number_format((float) $d->monto, 0, ',', '.'))->all(),
+                'vehiculo' => $veh?->patente,
+                // Flags para replicar los filtros de alerta de la vista.
+                '_licencia_vencida' => $venc !== null && $venc->lt($today),
+                '_licencia_por_vencer' => $venc !== null && $venc->gte($today) && $venc->lte($en30),
+                '_sin_licencia' => $venc === null,
+                '_falta_foto' => $u->profile_photo_path === null,
+                '_falta_doc_dni' => $u->dni_frente_path === null || $u->dni_dorso_path === null,
+                '_falta_doc_licencia' => $u->licencia_frente_path === null && $u->licencia_pdf_path === null,
+                '_falta_telefono' => empty($u->telefono),
+                '_falta_correo' => empty($u->correo),
+                '_sin_deposito' => $u->depositos->isEmpty(),
+                '_deposito_bajo' => $veh !== null && (float) $veh->precio > 0 && $depTotalArs < 1.5 * (float) $veh->precio,
+            ];
+        });
+
+        // Búsqueda por nombre / DNI.
+        if ($q !== '') {
+            $needle = mb_strtolower($q);
+            $filas = $filas->filter(fn (array $f) => str_contains(mb_strtolower($f['name']), $needle)
+                || str_contains(mb_strtolower($f['dni']), $needle));
+        }
+
+        // Filtro de alerta (mismo criterio que la vista).
+        $flag = match ($alert) {
+            'licencia_vencida' => '_licencia_vencida',
+            'licencia_por_vencer' => '_licencia_por_vencer',
+            'sin_licencia' => '_sin_licencia',
+            'falta_foto' => '_falta_foto',
+            'falta_doc_dni' => '_falta_doc_dni',
+            'falta_doc_licencia' => '_falta_doc_licencia',
+            'falta_telefono' => '_falta_telefono',
+            'falta_correo' => '_falta_correo',
+            'falta_deposito' => '_sin_deposito',
+            'deposito_bajo' => '_deposito_bajo',
+            default => null,
+        };
+        if ($flag !== null) {
+            $filas = $filas->filter(fn (array $f) => $f[$flag] === true);
+        }
+
+        $filas = $filas->values();
+
+        $etiquetasAlerta = [
+            'licencia_vencida' => 'Licencia vencida',
+            'licencia_por_vencer' => 'Licencia por vencer',
+            'sin_licencia' => 'Sin licencia',
+            'falta_foto' => 'Sin foto',
+            'falta_doc_dni' => 'Falta doc. DNI',
+            'falta_doc_licencia' => 'Falta doc. licencia',
+            'falta_telefono' => 'Sin teléfono',
+            'falta_correo' => 'Sin correo',
+            'falta_deposito' => 'Sin depósito',
+            'deposito_bajo' => 'Depósito bajo',
+        ];
+        $etiquetaEstado = match ($status) {
+            'inactivos' => 'Inactivos',
+            'activos' => 'Activos',
+            default => 'Todos',
+        };
+        $subtitulo = $etiquetasAlerta[$alert] ?? null;
+
+        $pdf = Pdf::loadView('pdf.choferes', [
+            'filas' => $filas,
+            'estado' => $etiquetaEstado,
+            'subtitulo' => $subtitulo,
+            'busqueda' => $q,
+        ]);
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->download('choferes-'.now()->format('Ymd').'.pdf');
     }
 }

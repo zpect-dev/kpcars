@@ -4,7 +4,7 @@ use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreGastoController;
-use App\Http\Controllers\CierreInversionController;
+use App\Http\Controllers\CierreSueldoController;
 use App\Http\Controllers\CobroController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
@@ -91,6 +91,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Revisión mecánica (dashboard de prioridad de reparación)
         Route::get('revision-mecanica', [RevisionMecanicaController::class, 'index'])->name('revision-mecanica.index');
+        Route::get('revision-mecanica/pdf', [RevisionMecanicaController::class, 'pdf'])->name('revision-mecanica.pdf');
         Route::post('revision-mecanica/{vehiculo}', [RevisionMecanicaController::class, 'store'])->name('revision-mecanica.store');
 
         // Revisiones
@@ -102,6 +103,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // Personal
         Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::get('users/choferes/pdf', [UserController::class, 'choferesPdf'])->name('users.choferes.pdf');
         Route::patch('users/cotizacion-dolar', [UserController::class, 'updateCotizacion'])->name('users.cotizacion');
         Route::post('users', [UserController::class, 'store'])->name('users.store');
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
@@ -142,6 +144,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Cobros
         Route::get('cobros', [CobroController::class, 'index'])->name('cobros.index');
         Route::get('cobros/cierres/{cierre}/desglose', [CobroController::class, 'cierreDesglose'])->name('cobros.cierre-desglose');
+        // Historial de cierres de caja: lista + réplica de solo lectura por cierre.
+        // Deben ir antes de cobros/{inversion} para no colisionar con ese catch-all.
+        Route::get('cobros/historial', [CobroController::class, 'historial'])->name('cobros.historial');
+        Route::get('cobros/historial/{cierre}', [CobroController::class, 'historialShow'])->name('cobros.historial.show');
         Route::get('cobros/{inversion}', [CobroController::class, 'show'])->name('cobros.show');
         Route::post('cobros/abrir', [CobroController::class, 'abrir'])->name('cobros.abrir');
         Route::post('cobros/cierre', [CobroController::class, 'cierreCaja'])->name('cobros.cierre');
@@ -159,6 +165,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('gastos', [GastoController::class, 'index'])->name('gastos.index');
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
         Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
+        Route::get('pdf/gastos', [PdfController::class, 'gastos'])->name('pdf.gastos');
 
         // Cierres de gastos (solo detalle: el cierre se ejecuta unificado desde Cobros.
         // El index/store standalone se removió con el refactor de cobros+gastos).
@@ -166,23 +173,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('pdf/cierres-gasto/{cierreGasto}', [PdfController::class, 'cierreGasto'])->name('pdf.cierre-gasto');
         Route::get('excel/cierres-gasto/{cierreGasto}', [ExcelController::class, 'cierreGasto'])->name('excel.cierre-gasto');
 
-        // Inversiones
-        Route::get('inversiones', [InversionController::class, 'index'])->name('inversiones.index');
+        // Inversiones: sólo creación (usada por el dashboard de vehículos).
+        // El panel navegable se eliminó; la asignación inversor/deuda se hace
+        // desde Personal (users/{user}/inversiones).
         Route::post('inversiones', [InversionController::class, 'store'])->name('inversiones.store');
-        Route::post('inversiones/{inversion}/inversores', [InversionController::class, 'attachInversor'])->name('inversiones.inversores.attach');
-        Route::put('inversiones/{inversion}/inversores/sync', [InversionController::class, 'syncInversores'])->name('inversiones.inversores.sync');
-        Route::patch('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'updateInversor'])->name('inversiones.inversores.update');
-        Route::delete('inversiones/{inversion}/inversores/{user}', [InversionController::class, 'detachInversor'])->name('inversiones.inversores.detach');
-        Route::get('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'showDeuda'])->name('inversiones.deuda.show');
-        Route::post('inversiones/{inversion}/inversores/{user}/deuda', [InversionController::class, 'storeDeudaMovimiento'])->name('inversiones.deuda.store');
-        Route::post('inversores/{user}/pago-cascada', [InversionController::class, 'pagoEnCascada'])->name('inversiones.deuda.cascada');
 
-        // Cierres semanales de inversión
-        Route::get('cierres-inversion', [CierreInversionController::class, 'index'])->name('cierres-inversion.index');
-        Route::get('cierres-inversion/nuevo', [CierreInversionController::class, 'create'])->name('cierres-inversion.create');
-        Route::post('cierres-inversion', [CierreInversionController::class, 'store'])->name('cierres-inversion.store');
-        Route::get('cierres-inversion/{cierreInversion}', [CierreInversionController::class, 'show'])->name('cierres-inversion.show');
-        Route::get('cierres-inversion/{cierreInversion}/inversor/{user}', [CierreInversionController::class, 'showInversor'])->name('cierres-inversion.inversor');
+        // Config de inversiones+deuda por inversor desde Personal (sólo admin)
+        Route::put('users/{user}/inversiones', [UserController::class, 'syncInversiones'])->name('users.inversiones.sync');
+
+        // Cierres de sueldo (generados por el cierre unificado de recaudaciones)
+        Route::get('cierres-sueldo', [CierreSueldoController::class, 'index'])->name('cierres-sueldo.index');
+        Route::get('cierres-sueldo/{cierreSueldo}', [CierreSueldoController::class, 'show'])->name('cierres-sueldo.show');
+        Route::patch('cierres-sueldo/{cierreSueldo}/socios/{user}', [CierreSueldoController::class, 'updateSocio'])->name('cierres-sueldo.socios.update');
 
         // Anulación de transacciones (auditoría sensible)
         Route::post('transactions/{transaccion}/annul', [TransactionController::class, 'annul'])->name('transactions.annul');
@@ -203,9 +205,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
         Route::get('pdf/cobros-integrado', [PdfController::class, 'cobrosIntegrado'])->name('pdf.cobros-integrado');
         Route::get('excel/cobros-integrado', [ExcelController::class, 'cobrosIntegrado'])->name('excel.cobros-integrado');
+        // Gastos del panel de Cobros (período actual o de un cierre puntual).
+        Route::get('pdf/cobros-gastos', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos');
+        Route::get('pdf/cobros-gastos/{cierre}', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos.cierre');
         Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
-        Route::get('pdf/cierres-inversion/{cierreInversion}', [PdfController::class, 'cierreInversion'])->name('pdf.cierre-inversion');
-        Route::get('excel/cierres-inversion/{cierreInversion}', [ExcelController::class, 'cierreInversion'])->name('excel.cierre-inversion');
+        Route::get('pdf/cierres-sueldo/{cierreSueldo}', [PdfController::class, 'cierreSueldo'])->name('pdf.cierre-sueldo');
+        Route::get('excel/cierres-sueldo/{cierreSueldo}', [ExcelController::class, 'cierreSueldo'])->name('excel.cierre-sueldo');
         Route::get('excel/cobros', [ExcelController::class, 'cobros'])->name('excel.cobros');
     });
 

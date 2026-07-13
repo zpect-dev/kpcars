@@ -4,98 +4,84 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Models\CierreInversion;
-use App\Models\CierreInversionPago;
-use App\Models\DeudaMovimiento;
+use App\Models\CierreSueldo;
+use App\Models\CierreSueldoAbono;
+use App\Models\CierreSueldoPago;
 use App\Models\Scopes\TenantScope;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class MiCuentaController extends Controller
 {
     /**
-     * Vista del inversor: sus inversiones, saldo de deuda y movimientos.
+     * Vista del inversor: sus inversiones, deuda vigente y sueldos cobrados.
      */
     public function index(Request $request): Response
     {
         // El middleware `role:inversor` ya filtró el rol. El Gate adicional valida
         // que el inversor tenga al menos una inversión asignada.
-        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
+        Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
 
-        // Mi Cuenta es vista cross-empresa para el inversor: muestra TODAS sus
-        // inversiones, no sólo las de la empresa activa. Bypasseamos TenantScope.
+        // Mi Cuenta es vista cross-empresa: muestra TODAS sus inversiones,
+        // no sólo las de la empresa activa. Bypasseamos TenantScope.
         $inversiones = $user->inversiones()
             ->withoutGlobalScope(TenantScope::class)
             ->with('empresa:id,nombre')
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
-            ->map(function ($inv) use ($user) {
-                $movimientos = DeudaMovimiento::with('registradoPor:id,name')
-                    ->where('inversion_id', $inv->id)
-                    ->where('user_id', $user->id)
-                    ->orderByDesc('created_at')
-                    ->orderByDesc('id')
-                    ->get();
+            ->map(fn ($inv) => [
+                'id' => $inv->id,
+                'nombre' => $inv->nombre,
+                'empresa' => $inv->empresa,
+                'es_financiador' => (bool) $inv->pivot->es_financiador,
+                'deuda' => (float) $inv->pivot->deuda,
+            ]);
 
-                $saldo = (float) $movimientos->reduce(
-                    fn (float $carry, DeudaMovimiento $m) => $m->tipo === 'cargo'
-                        ? $carry + (float) $m->monto
-                        : $carry - (float) $m->monto,
-                    0.0,
-                );
-
-                return [
-                    'id' => $inv->id,
-                    'nombre' => $inv->nombre,
-                    'empresa' => $inv->empresa,
-                    'tiene_deuda' => (bool) $inv->pivot->tiene_deuda,
-                    'es_financiador' => (bool) $inv->pivot->es_financiador,
-                    'saldo' => $saldo,
-                    'movimientos' => $movimientos,
-                ];
-            });
-
-        // Historial de cierres en los que cobró el inversor (cross-empresa).
-        // El eager-loading respeta global scopes por default; forzamos el bypass
-        // para no perder cierres de otras empresas en las que también participa.
-        $pagosPorCierre = CierreInversionPago::with([
-            'cierre' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
-                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa', 'created_at'),
+        // Historial de cierres en los que cobró (los cierres de sueldo son
+        // globales, sin TenantScope; el bypass sólo hace falta en Inversion).
+        $pagosPorCierre = CierreSueldoPago::with([
+            'cierre:id,tasa,created_at',
             'inversion' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
                 ->select('id', 'nombre'),
         ])
             ->where('user_id', $user->id)
-            ->orderByDesc('cierre_id')
+            ->orderByDesc('cierre_sueldo_id')
             ->get()
-            ->groupBy('cierre_id');
+            ->groupBy('cierre_sueldo_id');
 
-        $cierres = $pagosPorCierre->map(function ($pagos) {
+        // Abonos de deuda del inversor registrados en cada cierre.
+        $abonosPorCierre = CierreSueldoAbono::where('user_id', $user->id)
+            ->selectRaw('cierre_sueldo_id, SUM(monto) as total')
+            ->groupBy('cierre_sueldo_id')
+            ->pluck('total', 'cierre_sueldo_id');
+
+        $cierres = $pagosPorCierre->map(function ($pagos) use ($abonosPorCierre) {
             $cierre = $pagos->first()->cierre;
 
             return [
                 'id' => $cierre?->id,
-                'periodo_inicio' => $cierre?->periodo_inicio?->toIso8601String(),
-                'periodo_fin' => $cierre?->periodo_fin?->toIso8601String(),
-                'total' => (float) $pagos->sum(fn ($p) => (float) $p->monto),
+                'fecha' => $cierre?->created_at?->toIso8601String(),
                 'tasa' => $cierre?->tasa ? (float) $cierre->tasa : null,
-                'detalles' => $pagos->map(fn ($p) => [
-                    'inversion' => $p->inversion?->nombre,
-                    'concepto' => $p->concepto,
-                    'monto' => (float) $p->monto,
-                ])->values(),
+                'total' => (float) $pagos->sum(fn (CierreSueldoPago $p) => (float) $p->monto),
+                'abonado' => (float) ($abonosPorCierre[$cierre?->id] ?? 0),
+                'detalles' => $pagos
+                    ->map(fn (CierreSueldoPago $p) => [
+                        'inversion' => $p->inversion?->nombre,
+                        'concepto' => $p->concepto,
+                        'monto' => (float) $p->monto,
+                    ])
+                    ->sortBy(fn ($d) => (string) $d['inversion'], SORT_NATURAL | SORT_FLAG_CASE)
+                    ->values(),
             ];
         })->values();
 
-        // Tasa actual = la del último cierre globalmente (no scoped a empresa,
-        // porque el inversor puede ver cierres de varias empresas y la "tasa"
-        // del último es una referencia comercial).
-        $tasaActual = CierreInversion::withoutGlobalScope(TenantScope::class)
-            ->latest('periodo_fin')
-            ->value('tasa');
+        // Tasa de referencia = la del último cierre de sueldos.
+        $tasaActual = CierreSueldo::latest('created_at')->value('tasa');
 
         return Inertia::render('MiCuenta/Index', [
             'inversiones' => $inversiones,

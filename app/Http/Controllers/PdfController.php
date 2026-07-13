@@ -10,11 +10,12 @@ use App\Models\Appointment;
 use App\Models\Articulo;
 use App\Models\CierreCaja;
 use App\Models\CierreGasto;
-use App\Models\CierreInversion;
-use App\Models\CierreInversionPago;
 use App\Models\CierreRecaudacion;
+use App\Models\CierreSueldo;
+use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
-use App\Models\DeudaMovimiento;
+use App\Models\Empresa;
+use App\Models\Gasto;
 use App\Models\Recaudacion;
 use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
@@ -28,6 +29,116 @@ use Illuminate\Support\Facades\Gate;
 
 class PdfController extends Controller
 {
+    /**
+     * PDF con todos los gastos pendientes (todas las empresas), con el mismo
+     * formato que la tabla "Últimos 10 gastos": fecha, descripción, categoría,
+     * patente y monto.
+     */
+    public function gastos(Request $request): Response
+    {
+        // Acceso: middleware role:administrador. Vista GLOBAL, igual que
+        // GastoController@index: ignora la empresa activa y muestra los gastos
+        // aún sin cierre de todas las empresas.
+        $gastos = Gasto::query()
+            ->withoutGlobalScope(GastoTenantScope::class)
+            ->pendientes()
+            ->with([
+                'vehiculo' => fn ($q) => $q
+                    ->withoutGlobalScope(TenantScope::class)
+                    ->select('id', 'patente'),
+            ])
+            ->latest('fecha')
+            ->latest('id')
+            ->get();
+
+        $tipoLabels = [
+            'galpon' => 'Galpón',
+            'taller' => 'Taller',
+            'oficina' => 'Oficina',
+            'kevin' => 'Kevin',
+            'stock' => 'Stock',
+            'vehiculo' => 'Vehículo',
+        ];
+
+        $filas = $gastos->map(fn (Gasto $g) => [
+            'fecha' => $g->fecha?->format('d/m/Y'),
+            'descripcion' => trim((string) $g->descripcion) !== '' ? $g->descripcion : 'Sin descripción',
+            'categoria' => $tipoLabels[$g->tipo] ?? ucfirst((string) $g->tipo),
+            'patente' => $g->vehiculo?->patente ?? '—',
+            'monto' => (float) $g->monto,
+        ]);
+
+        $total = (float) $gastos->sum(fn (Gasto $g) => (float) $g->monto);
+
+        $pdf = Pdf::loadView('pdf.gastos', compact('filas', 'total'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download('gastos-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * PDF de los gastos (sin flota) del panel de Cobros. Respeta la empresa
+     * activa. Si se pasa un cierre, exporta los gastos de ese período histórico
+     * (rango de fecha); si no, los del período actual (pendientes).
+     */
+    public function cobrosGastos(Request $request, ?CierreCaja $cierre = null): Response
+    {
+        $historico = $cierre !== null;
+
+        if ($historico) {
+            // El cierre debe pertenecer a la empresa activa.
+            $empresaActiva = session('active_company_id');
+            if ($empresaActiva !== null) {
+                abort_unless(
+                    $cierre->detalles()->where('empresa_id', (int) $empresaActiva)->exists(),
+                    403,
+                );
+            }
+        }
+
+        $hasta = $historico ? $cierre->created_at->toDateTimeString() : null;
+        $desde = $historico
+            ? CierreCaja::where('created_at', '<', $cierre->created_at)->latest()->value('created_at')?->toDateTimeString()
+            : null;
+
+        // Scopeado por empresa activa vía GastoTenantScope (igual que el panel).
+        $gastos = Gasto::query()
+            ->when(! $historico, fn ($q) => $q->pendientes())
+            ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
+            ->where('gastos.tipo', '!=', 'vehiculo')
+            ->latest('fecha')
+            ->latest('id')
+            ->get();
+
+        $tipoLabels = [
+            'galpon' => 'Galpón',
+            'taller' => 'Taller',
+            'oficina' => 'Oficina',
+            'kevin' => 'Kevin',
+            'stock' => 'Stock',
+        ];
+
+        $filas = $gastos->map(fn (Gasto $g) => [
+            'fecha' => $g->fecha?->format('d/m/Y'),
+            'descripcion' => trim((string) $g->descripcion) !== '' ? $g->descripcion : 'Sin descripción',
+            'categoria' => $tipoLabels[$g->tipo] ?? ucfirst((string) $g->tipo),
+            'patente' => '—',
+            'monto' => (float) $g->monto,
+        ]);
+
+        $total = (float) $gastos->sum(fn (Gasto $g) => (float) $g->monto);
+
+        $nombre = $historico
+            ? 'gastos-cierre-'.$cierre->id
+            : 'gastos-'.now()->format('Y-m-d');
+
+        $pdf = Pdf::loadView('pdf.gastos', compact('filas', 'total'))
+            ->setPaper('a4', 'portrait');
+
+        return $pdf->download($nombre.'.pdf');
+    }
+
     /**
      * PDF de un cierre de gastos con desglose por tipo y por patente.
      */
@@ -247,38 +358,71 @@ class PdfController extends Controller
     }
 
     /**
-     * Generate PDF for a cierre de inversión.
+     * PDF del cierre de sueldos: desglose por empresa → inversión → socio.
      */
-    public function cierreInversion(Request $request, CierreInversion $cierreInversion): Response
+    public function cierreSueldo(Request $request, CierreSueldo $cierreSueldo): Response
     {
         // Acceso: middleware role:administrador.
 
-        $cierreInversion->load([
+        $cierreSueldo->load([
             'ejecutadoPor:id,name',
-            'recaudaciones.inversion:id,nombre',
+            'cierresRecaudacion:id,empresa_id,cierre_sueldo_id',
             'pagos.user:id,name,dni',
-            'pagos.inversion:id,nombre',
+            'pagos.inversion' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'nombre'),
+            'abonos.user:id,name',
+            'abonos.inversion' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'nombre'),
         ]);
 
-        $recaudaciones = $cierreInversion->recaudaciones
-            ->sortBy(fn ($r) => (string) $r->inversion?->nombre, SORT_NATURAL | SORT_FLAG_CASE)
+        // Recaudado por inversión del período congelado por este cierre.
+        $cierreRecIds = $cierreSueldo->cierresRecaudacion->pluck('id')->all();
+        $recaudadoPorInversion = empty($cierreRecIds) ? collect() : \Illuminate\Support\Facades\DB::table('recaudaciones')
+            ->whereIn('recaudaciones.cierre_id', $cierreRecIds)
+            ->join('vehiculos', 'recaudaciones.vehiculo_id', '=', 'vehiculos.id')
+            ->join('inversiones', 'vehiculos.inversion_id', '=', 'inversiones.id')
+            ->groupBy('vehiculos.inversion_id', 'inversiones.nombre', 'inversiones.empresa_id')
+            ->selectRaw('inversiones.nombre as nombre, inversiones.empresa_id as empresa_id, SUM(recaudaciones.total) as total')
+            ->get();
+
+        $empresas = Empresa::orderBy('id')->get()->map(function (Empresa $empresa) use ($cierreSueldo, $recaudadoPorInversion) {
+            $pagosEmpresa = $cierreSueldo->pagos->where('empresa_id', $empresa->id);
+
+            $porInversor = $pagosEmpresa
+                ->groupBy('user_id')
+                ->map(fn ($pagos) => [
+                    'user' => $pagos->first()->user,
+                    'total' => (float) $pagos->sum(fn (CierreSueldoPago $p) => (float) $p->monto),
+                    'pagos' => $pagos
+                        ->sortBy(fn (CierreSueldoPago $p) => (string) $p->inversion?->nombre, SORT_NATURAL | SORT_FLAG_CASE)
+                        ->values(),
+                ])
+                ->sortBy(fn ($row) => mb_strtolower((string) $row['user']->name))
+                ->values();
+
+            $recaudaciones = $recaudadoPorInversion
+                ->where('empresa_id', $empresa->id)
+                ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values();
+
+            return [
+                'nombre' => $empresa->nombre,
+                'recaudado' => (float) $recaudaciones->sum('total'),
+                'distribuido' => (float) $porInversor->sum('total'),
+                'recaudaciones' => $recaudaciones,
+                'porInversor' => $porInversor,
+            ];
+        })->values();
+
+        $cierre = $cierreSueldo;
+        $abonos = $cierreSueldo->abonos
+            ->sortBy(fn ($a) => mb_strtolower((string) $a->user?->name))
             ->values();
 
-        $porInversor = $cierreInversion->pagos
-            ->groupBy('user_id')
-            ->map(fn ($pagos) => [
-                'user' => $pagos->first()->user,
-                'pagos' => $pagos,
-            ])
-            ->sortBy(fn ($row) => mb_strtolower((string) $row['user']->name))
-            ->values();
-
-        $cierre = $cierreInversion;
-
-        $pdf = Pdf::loadView('pdf.cierre-inversion', compact('cierre', 'recaudaciones', 'porInversor'))
+        $pdf = Pdf::loadView('pdf.cierre-sueldo', compact('cierre', 'empresas', 'abonos'))
             ->setPaper('a4', 'landscape');
 
-        return $pdf->download('cierre-inversion-'.$cierre->id.'-'.$cierre->periodo_fin->format('Y-m-d').'.pdf');
+        return $pdf->download('cierre-sueldo-'.$cierre->id.'-'.$cierre->created_at->format('Y-m-d').'.pdf');
     }
 
     /**
@@ -297,52 +441,38 @@ class PdfController extends Controller
             ->get()
             ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
-            ->map(function ($inv) use ($user) {
-                $movimientos = DeudaMovimiento::where('inversion_id', $inv->id)
-                    ->where('user_id', $user->id)
-                    ->get();
+            ->map(fn ($inv) => [
+                'nombre' => $inv->nombre,
+                'es_financiador' => (bool) $inv->pivot->es_financiador,
+                'deuda' => (float) $inv->pivot->deuda,
+            ]);
 
-                $saldo = (float) $movimientos->reduce(
-                    fn (float $carry, DeudaMovimiento $m) => $m->tipo === 'cargo'
-                        ? $carry + (float) $m->monto
-                        : $carry - (float) $m->monto,
-                    0.0,
-                );
-
-                return [
-                    'nombre' => $inv->nombre,
-                    'tiene_deuda' => (bool) $inv->pivot->tiene_deuda,
-                    'es_financiador' => (bool) $inv->pivot->es_financiador,
-                    'saldo' => $saldo,
-                ];
-            });
-
-        $pagosPorCierre = CierreInversionPago::with([
-            'cierre' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
-                ->select('id', 'periodo_inicio', 'periodo_fin', 'tasa'),
+        $pagosPorCierre = CierreSueldoPago::with([
+            'cierre:id,tasa,created_at',
+            'inversion' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)
+                ->select('id', 'nombre'),
         ])
             ->where('user_id', $user->id)
-            ->orderByDesc('cierre_id')
+            ->orderByDesc('cierre_sueldo_id')
             ->get()
-            ->groupBy('cierre_id');
+            ->groupBy('cierre_sueldo_id');
 
         $cierres = $pagosPorCierre->map(function ($pagos) {
             $cierre = $pagos->first()->cierre;
 
             return [
                 'id' => $cierre?->id,
-                'periodo_fin' => $cierre?->periodo_fin?->toIso8601String(),
+                'fecha' => $cierre?->created_at?->toIso8601String(),
                 'tasa' => $cierre?->tasa ? (float) $cierre->tasa : null,
                 'detalles' => $pagos->map(fn ($p) => [
+                    'inversion' => $p->inversion?->nombre,
                     'concepto' => $p->concepto,
                     'monto' => (float) $p->monto,
                 ])->values(),
             ];
         })->values();
 
-        $tasaActual = CierreInversion::withoutGlobalScope(TenantScope::class)
-            ->latest('periodo_fin')
-            ->value('tasa');
+        $tasaActual = CierreSueldo::latest('created_at')->value('tasa');
         $tasaActual = $tasaActual ? (float) $tasaActual : null;
 
         $pdf = Pdf::loadView('pdf.mi-cuenta', compact('user', 'inversiones', 'cierres', 'tasaActual'))

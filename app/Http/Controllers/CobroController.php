@@ -11,6 +11,7 @@ use App\Models\AperturaCaja;
 use App\Models\CierreCaja;
 use App\Models\CierreGasto;
 use App\Models\Cobro;
+use App\Models\Empresa;
 use App\Models\Gasto;
 use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
@@ -155,17 +156,38 @@ class CobroController extends Controller
      * resumen integrado. Estructurado igual que la página /gastos (cards +
      * últimos + lista por categoría), pero de solo lectura.
      */
-    private function buildGastosResumen(): array
+    private function buildGastosResumen(?string $desde = null, ?string $hasta = null): array
     {
+        $historico = $hasta !== null;
+
         $gastos = Gasto::query()
-            ->pendientes()
+            ->when(! $historico, fn ($q) => $q->pendientes())
+            ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
             ->where('tipo', '!=', 'vehiculo')
             ->with('user:id,name')
             ->latest('fecha')
             ->latest('id')
             ->get();
 
-        $cards = [
+        // Reparto de los gastos globales (galpón/taller/oficina) entre empresas,
+        // según distribucion_empresas. Igual criterio que la página /gastos, pero
+        // acotado a los gastos no-flota del panel de Cobros.
+        $globales = $gastos->whereIn('tipo', Gasto::TIPOS_GLOBALES);
+
+        $empresaCards = Empresa::orderBy('id')
+            ->get(['id', 'nombre'])
+            ->map(fn (Empresa $emp) => [
+                'key' => 'empresa_'.$emp->id,
+                'label' => $emp->nombre,
+                'total' => (float) $globales->sum(
+                    fn (Gasto $g) => (float) (($g->distribucion_empresas ?? [])[$emp->id] ?? 0),
+                ),
+            ])
+            ->values()
+            ->all();
+
+        $cards = array_merge($empresaCards, [
             [
                 'key' => 'kevin',
                 'label' => 'Kevin',
@@ -176,7 +198,7 @@ class CobroController extends Controller
                 'label' => 'Galpón',
                 'total' => (float) $gastos->whereIn('tipo', ['galpon', 'taller', 'oficina'])->sum(fn (Gasto $g) => (float) $g->monto),
             ],
-        ];
+        ]);
 
         $lista = $gastos->map(fn (Gasto $g) => [
             'id' => $g->id,
@@ -321,6 +343,121 @@ class CobroController extends Controller
         return response()->json([
             'desglose' => $desglose,
             'transacciones' => $transacciones,
+        ]);
+    }
+
+    /**
+     * Historial: lista de cierres de caja de la empresa activa, con sus totales.
+     * Cada uno enlaza a la réplica de solo lectura (historialShow).
+     */
+    public function historial(Request $request): Response
+    {
+        $this->authorize('viewAny', Cobro::class);
+
+        $empresaActiva = session('active_company_id');
+
+        $cierres = CierreCaja::with([
+            'user:id,name',
+            'detalles:id,cierre_id,empresa_id,total',
+            'cierreGasto:id,cierre_caja_id,total_general',
+        ])
+            ->when($empresaActiva, function ($q) use ($empresaActiva) {
+                $q->whereHas('detalles', fn ($q2) => $q2->where('empresa_id', $empresaActiva));
+            })
+            ->latest()
+            ->get()
+            ->map(function (CierreCaja $cierre) use ($empresaActiva) {
+                $detalles = $empresaActiva
+                    ? $cierre->detalles->where('empresa_id', (int) $empresaActiva)
+                    : $cierre->detalles;
+
+                $totalCobros = (float) $detalles->sum('total');
+                $totalGastos = (float) ($cierre->cierreGasto?->total_general ?? 0);
+
+                return [
+                    'id' => $cierre->id,
+                    'user' => $cierre->user,
+                    'total_cobros' => $totalCobros,
+                    'total_gastos' => $totalGastos,
+                    'total' => $totalCobros + $totalGastos,
+                    'created_at' => $cierre->created_at?->toIso8601String(),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('Cobros/Historial', [
+            'cierres' => $cierres,
+        ]);
+    }
+
+    /**
+     * Réplica de solo lectura de la vista de Cobros para un cierre puntual.
+     * Reconstruye los mismos datos que index() pero acotados al período del
+     * cierre (rango de fecha: cierre anterior exclusivo → este cierre inclusivo),
+     * y renderiza el mismo componente Cobros/Index con la meta `historico`.
+     */
+    public function historialShow(Request $request, CierreCaja $cierre): Response
+    {
+        $this->authorize('viewAny', Cobro::class);
+
+        // El cierre debe pertenecer a la empresa activa (tener detalles en ella).
+        $empresaActiva = session('active_company_id');
+        if ($empresaActiva !== null) {
+            abort_unless(
+                $cierre->detalles()->where('empresa_id', (int) $empresaActiva)->exists(),
+                403,
+            );
+        }
+
+        $hasta = $cierre->created_at->toDateTimeString();
+        $desde = CierreCaja::where('created_at', '<', $cierre->created_at)
+            ->latest()
+            ->value('created_at')?->toDateTimeString();
+
+        // Resumen de cobros por inversión/empresa del período (misma forma que index).
+        $resumen = Cobro::query()
+            ->when($desde, fn ($q) => $q->where('cobros.created_at', '>', $desde))
+            ->where('cobros.created_at', '<=', $hasta)
+            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
+            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('inversiones', 'cobros.inversion_id', '=', 'inversiones.id')
+            ->join('empresas', 'cobros.empresa_id', '=', 'empresas.id')
+            ->selectRaw('
+                cobros.inversion_id,
+                cobros.empresa_id,
+                inversiones.nombre as inversion_nombre,
+                empresas.nombre as empresa_nombre,
+                SUM(articulos.precio * transacciones.cantidad) as total,
+                SUM((articulos.precio - COALESCE(articulos.costo, articulos.precio / 1.45)) * transacciones.cantidad) as ganancia,
+                COUNT(cobros.id) as transacciones_count
+            ')
+            ->groupBy('cobros.inversion_id', 'cobros.empresa_id', 'inversiones.nombre', 'empresas.nombre')
+            ->get()
+            ->sortBy('inversion_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->sortBy('empresa_nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        $gastosResumen = $this->buildGastosResumen($desde, $hasta);
+        $resumenIntegrado = app(BuildResumenIntegradoAction::class)->execute($desde, $hasta);
+
+        return Inertia::render('Cobros/Index', [
+            'abierta' => false,
+            'apertura' => null,
+            'resumen' => $resumen,
+            'totalGeneral' => (float) $resumen->sum('total'),
+            'totalGanancia' => (float) $resumen->sum('ganancia'),
+            'totalGastos' => (float) $gastosResumen['total'],
+            'gastosResumen' => $gastosResumen,
+            'ultimoCierre' => null,
+            'historialCierres' => [],
+            'historialGastosLegacy' => [],
+            'resumenIntegrado' => $resumenIntegrado,
+            'totalIntegrado' => (float) $resumenIntegrado->sum('total'),
+            'historico' => [
+                'id' => $cierre->id,
+                'fecha' => $cierre->created_at?->toIso8601String(),
+                'user' => $cierre->user()->first(['id', 'name']),
+            ],
         ]);
     }
 

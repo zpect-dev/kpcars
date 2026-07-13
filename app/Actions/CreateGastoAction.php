@@ -189,16 +189,17 @@ class CreateGastoAction
             ->filter(fn ($i) => strnatcasecmp($i->nombre, $inversionActual->nombre) < 0)
             ->last();
 
+        // Deudor = deuda > 0 en el pivot (la deuda ahora es un monto simple).
         $deudaPrevia = [];
         if ($inversionPrevia) {
             foreach ($inversionPrevia->inversores as $inv) {
-                $deudaPrevia[$inv->id] = (bool) $inv->pivot->tiene_deuda;
+                $deudaPrevia[$inv->id] = (float) $inv->pivot->deuda > 0;
             }
         }
 
         $elegibles = [];
         foreach ($inversionActual->inversores as $inv) {
-            $tieneDeudaActual = (bool) $inv->pivot->tiene_deuda;
+            $tieneDeudaActual = (float) $inv->pivot->deuda > 0;
 
             if (! $tieneDeudaActual) {
                 // No-deudor actual: ya pagó esta inversión → incluido.

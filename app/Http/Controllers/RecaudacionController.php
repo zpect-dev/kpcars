@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\ProcessCierreUnificadoAction;
 use App\Models\AperturaRecaudacion;
 use App\Models\CierreRecaudacion;
+use App\Models\Empresa;
 use App\Models\Recaudacion;
+use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class RecaudacionController extends Controller
 {
@@ -89,7 +93,91 @@ class RecaudacionController extends Controller
             'ultimoCierre' => $ultimo
                 ? ['id' => $ultimo->id, 'user' => $ultimo->user, 'created_at' => $ultimo->created_at]
                 : null,
+            'cierreUnificado' => $this->datosCierreUnificado(),
         ]);
+    }
+
+    /**
+     * Datos para el modal del cierre unificado: estado de la apertura de cada
+     * empresa (el cierre exige que TODAS estén abiertas), los socios deudores
+     * con su deuda por inversión para registrar los abonos, y los vehículos
+     * cuya inversión pertenece a otra empresa (bloquean el cierre).
+     *
+     * @return array{empresas: mixed, deudores: mixed, vehiculosCruzados: mixed}
+     */
+    private function datosCierreUnificado(): array
+    {
+        // Aperturas abiertas de TODAS las empresas (bypass del TenantScope).
+        $aperturasAbiertas = AperturaRecaudacion::withoutGlobalScope(TenantScope::class)
+            ->abierta()
+            ->get()
+            ->keyBy('empresa_id');
+
+        // Total recaudado hasta ahora en el período abierto de cada empresa.
+        $totalesAbiertos = DB::table('recaudaciones')
+            ->whereIn('apertura_id', $aperturasAbiertas->pluck('id'))
+            ->whereNull('cierre_id')
+            ->groupBy('empresa_id')
+            ->selectRaw('empresa_id, SUM(total) as total')
+            ->pluck('total', 'empresa_id');
+
+        $empresas = Empresa::orderBy('id')->get()->map(fn (Empresa $e) => [
+            'id' => $e->id,
+            'nombre' => $e->nombre,
+            'apertura_abierta' => $aperturasAbiertas->has($e->id),
+            'total_recaudado' => (float) ($totalesAbiertos[$e->id] ?? 0),
+        ])->values();
+
+        // Socios deudores (pivot deuda > 0) de todas las empresas, con el
+        // detalle por inversión en el mismo orden de la cascada de abonos.
+        $filasDeuda = DB::table('inversion_user')
+            ->join('users', 'inversion_user.user_id', '=', 'users.id')
+            ->join('inversiones', 'inversion_user.inversion_id', '=', 'inversiones.id')
+            ->join('empresas', 'inversiones.empresa_id', '=', 'empresas.id')
+            ->where('inversion_user.deuda', '>', 0)
+            ->orderBy('users.name')
+            ->orderByRaw('LENGTH(inversiones.nombre), inversiones.nombre')
+            ->get([
+                'users.id as user_id',
+                'users.name as user_name',
+                'inversiones.id as inversion_id',
+                'inversiones.nombre as inversion_nombre',
+                'empresas.nombre as empresa_nombre',
+                'inversion_user.deuda as deuda',
+            ]);
+
+        $deudores = $filasDeuda
+            ->groupBy('user_id')
+            ->map(fn ($filas) => [
+                'user_id' => $filas->first()->user_id,
+                'name' => $filas->first()->user_name,
+                'deuda_total' => (float) $filas->sum('deuda'),
+                'inversiones' => $filas->map(fn ($f) => [
+                    'inversion_id' => $f->inversion_id,
+                    'inversion' => $f->inversion_nombre,
+                    'empresa' => $f->empresa_nombre,
+                    'deuda' => (float) $f->deuda,
+                ])->values(),
+            ])
+            ->values();
+
+        // Vehículos del período cuya inversión es de OTRA empresa: la Action
+        // rechaza el cierre; se anticipan acá para avisar en el modal.
+        $vehiculosCruzados = DB::table('recaudaciones')
+            ->whereIn('recaudaciones.apertura_id', $aperturasAbiertas->pluck('id'))
+            ->whereNull('recaudaciones.cierre_id')
+            ->join('vehiculos', 'recaudaciones.vehiculo_id', '=', 'vehiculos.id')
+            ->join('inversiones', 'vehiculos.inversion_id', '=', 'inversiones.id')
+            ->whereColumn('inversiones.empresa_id', '!=', 'recaudaciones.empresa_id')
+            ->pluck('vehiculos.patente')
+            ->unique()
+            ->values();
+
+        return [
+            'empresas' => $empresas,
+            'deudores' => $deudores,
+            'vehiculosCruzados' => $vehiculosCruzados,
+        ];
     }
 
     /**
@@ -287,31 +375,26 @@ class RecaudacionController extends Controller
     }
 
     /**
-     * Close the current recaudaciones period, snapshotting the open rows.
+     * Cierre UNIFICADO: congela las recaudaciones abiertas de ambas empresas
+     * a la vez y dispara el cálculo de sueldos de los socios (con los abonos
+     * de deuda seleccionados en el modal).
      */
-    public function cierre(Request $request): RedirectResponse
+    public function cierre(Request $request, ProcessCierreUnificadoAction $action): RedirectResponse
     {
         $this->authorize('manage-recaudaciones');
 
-        $apertura = AperturaRecaudacion::abierta()->latest()->first();
+        $validated = $request->validate([
+            'tasa' => ['required', 'numeric', 'min:0.0001', 'max:9999999999.9999'],
+        ]);
 
-        if ($apertura === null) {
-            return redirect()->back()->with('warning', 'No hay una recaudación abierta para cerrar.');
+        try {
+            $cierre = $action->execute((float) $validated['tasa'], $request->user());
+        } catch (RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        DB::transaction(function () use ($apertura) {
-            $cierre = CierreRecaudacion::create([
-                'empresa_id' => session('active_company_id'),
-                'user_id' => auth()->id(),
-            ]);
-
-            // Congelar las filas de la apertura asignándoles este cierre y marcar
-            // la apertura como cerrada. El período queda vacío hasta una nueva apertura.
-            $apertura->recaudaciones()->update(['cierre_id' => $cierre->id]);
-            $apertura->update(['cierre_id' => $cierre->id]);
-        });
-
-        return redirect()->back()->with('success', 'Cierre de recaudaciones ejecutado correctamente.');
+        return redirect()->route('cierres-sueldo.show', $cierre->id)
+            ->with('success', 'Cierre unificado ejecutado correctamente.');
     }
 
     /**

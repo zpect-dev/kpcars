@@ -77,6 +77,39 @@ it('no permite reasignar un vehículo a un conductor inactivo al editar', functi
     expect($veh->fresh()->user_id)->toBe($activo->id);
 });
 
+it('un conductor no puede tener vehículos en dos empresas: al asignarlo a uno nuevo se libera el de la otra empresa', function () {
+    $chofer = User::factory()->create(['role' => UserRole::CHOFER, 'dni' => '30000020', 'inactivo' => false]);
+
+    // Vehículo en la Empresa Test (A), asignado al chofer, con su asignación abierta.
+    $vehA = Vehiculo::create(datosVehiculo(['patente' => 'AAA100', 'user_id' => $chofer->id, 'empresa_id' => $this->empresa->id]));
+    \App\Models\Asignacion::create([
+        'vehiculo_id' => $vehA->id,
+        'conductor_id' => $chofer->id,
+        'asignado_por' => $this->admin->id,
+        'fecha_inicio' => now()->subDay(),
+    ]);
+
+    // Empresa B con su inversión; cambio la empresa activa a B.
+    $empresaB = Empresa::create(['nombre' => 'Empresa B']);
+    $inversionB = Inversion::create(['nombre' => 'Inv B', 'empresa_id' => $empresaB->id]);
+    session(['active_company_id' => $empresaB->id]);
+
+    // Creo un vehículo en B asignado al MISMO chofer.
+    $this->post('/vehiculos', datosVehiculo(['patente' => 'BBB100', 'inversion_id' => $inversionB->id, 'user_id' => $chofer->id]))
+        ->assertSessionHasNoErrors();
+
+    // El vehículo de la empresa A queda sin conductor y su asignación se cierra.
+    expect($vehA->fresh()->user_id)->toBeNull();
+
+    // El chofer termina con un solo vehículo (global, sin scope de empresa).
+    $count = Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+        ->where('user_id', $chofer->id)->count();
+    expect($count)->toBe(1);
+
+    $asignacionesAbiertas = \App\Models\Asignacion::where('vehiculo_id', $vehA->id)->whereNull('fecha_fin')->count();
+    expect($asignacionesAbiertas)->toBe(0);
+});
+
 it('guarda el estado de la patente al crear', function () {
     $this->post('/vehiculos', datosVehiculo(['estado_patente' => 'provisional']))
         ->assertSessionHasNoErrors();

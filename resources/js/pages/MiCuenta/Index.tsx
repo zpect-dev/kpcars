@@ -15,23 +15,12 @@ import { formatARS, formatUSD } from '@/components/money-dual';
 import { cn } from '@/lib/utils';
 import { getConceptoDisplay, FLOTA_CONCEPTOS, CONCEPTO_LABEL } from '@/lib/concepto';
 
-interface Movimiento {
-    id: number;
-    tipo: 'cargo' | 'pago';
-    monto: string;
-    descripcion: string | null;
-    created_at: string;
-    registrado_por: { id: number; name: string } | null;
-}
-
 interface InversionRow {
     id: number;
     nombre: string;
     empresa: { id: number; nombre: string } | null;
-    tiene_deuda: boolean;
     es_financiador: boolean;
-    saldo: number;
-    movimientos: Movimiento[];
+    deuda: number;
 }
 
 interface CierreDetalle {
@@ -42,9 +31,9 @@ interface CierreDetalle {
 
 interface CierreRow {
     id: number;
-    periodo_inicio: string | null;
-    periodo_fin: string;
+    fecha: string | null;
     total: number;
+    abonado: number;
     tasa: number | null;
     detalles: CierreDetalle[];
 }
@@ -60,7 +49,8 @@ function toUSD(ars: number, tasa: number | null): number | null {
     return tasa && tasa > 0 ? ars / tasa : null;
 }
 
-function formatFecha(d: string): string {
+function formatFecha(d: string | null): string {
+    if (!d) return '—';
     return new Date(d).toLocaleDateString('es-AR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
     });
@@ -74,18 +64,9 @@ function nextSundayLabel(): string {
 }
 
 function getStatus(inv: InversionRow) {
-    if (inv.tiene_deuda) return 'deuda' as const;
+    if (inv.deuda > 0) return 'deuda' as const;
     if (inv.es_financiador) return 'financia' as const;
     return 'al-dia' as const;
-}
-
-
-function getRecentPago(movimientos: Movimiento[]): Movimiento | null {
-    const pagos = movimientos.filter((m) => m.tipo === 'pago');
-    if (pagos.length === 0) return null;
-    const latest = pagos[0];
-    const days = (Date.now() - new Date(latest.created_at).getTime()) / 86_400_000;
-    return days <= 60 ? latest : null;
 }
 
 export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Props) {
@@ -99,8 +80,8 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
         });
     }
 
-    const deudaTotal = inversiones.reduce((a, i) => a + (i.tiene_deuda ? i.saldo : 0), 0);
-    const inversionesConDeuda = inversiones.filter((i) => i.tiene_deuda).length;
+    const deudaTotal = inversiones.reduce((a, i) => a + i.deuda, 0);
+    const inversionesConDeuda = inversiones.filter((i) => i.deuda > 0).length;
     const ultimoCierre = cierres[0] ?? null;
     const totalHistorico = cierres.reduce((a, c) => a + c.total, 0);
 
@@ -204,7 +185,7 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
                             ? formatUSD(ultimoCierreUSD)
                             : ultimoCierre ? formatARS(ultimoCierre.total) : '—'}
                         sub={ultimoCierre
-                            ? (ultimoCierreUSD != null ? formatARS(ultimoCierre.total) + ' · ' : '') + formatFecha(ultimoCierre.periodo_fin)
+                            ? (ultimoCierreUSD != null ? formatARS(ultimoCierre.total) + ' · ' : '') + formatFecha(ultimoCierre.fecha)
                             : 'Sin cierres aún'}
                         icon={Coins}
                         tone="orange"
@@ -301,8 +282,8 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
                                                     Cierre #{c.id}
                                                 </span>
                                                 <span className="text-xs text-muted-foreground">
-                                                    {formatFecha(c.periodo_fin)}
-                                                    {c.periodo_inicio && ` · desde ${formatFecha(c.periodo_inicio)}`}
+                                                    {formatFecha(c.fecha)}
+                                                    {c.abonado > 0 && ` · abonaste ${formatARS(c.abonado)} de deuda`}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-3 shrink-0">
@@ -388,7 +369,7 @@ function PositionRow({ inv, status, lastEntry, tasaActual, isLast }: {
 
     const lastEntryUSD = lastEntry ? toUSD(lastEntry.monto, tasaActual) : null;
     const conceptoDisplay = lastEntry ? getConceptoDisplay(lastEntry.concepto) : null;
-    const recentPago = getRecentPago(inv.movimientos);
+    const deudaUSD = inv.deuda > 0 ? toUSD(inv.deuda, tasaActual) : null;
 
     return (
         <div className={cn(
@@ -402,14 +383,16 @@ function PositionRow({ inv, status, lastEntry, tasaActual, isLast }: {
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-mono text-sm font-semibold text-foreground">{inv.nombre}</span>
+                    {inv.empresa && (
+                        <span className="text-[10px] text-muted-foreground">{inv.empresa.nombre}</span>
+                    )}
                     <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', badgeCls)}>
                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         {badgeLabel}
                     </span>
-                    {recentPago && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/8 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                            Pago aplicado · {formatFecha(recentPago.created_at)}
+                    {inv.deuda > 0 && (
+                        <span className="font-mono text-[11px] font-medium text-red-500 dark:text-red-400">
+                            − {deudaUSD != null ? formatUSD(deudaUSD) : formatARS(inv.deuda)}
                         </span>
                     )}
                 </div>

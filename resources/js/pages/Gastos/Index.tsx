@@ -4,6 +4,7 @@ import {
     Car,
     ChevronDown,
     ChevronRight,
+    Download,
     HandCoins,
     History,
     Plus,
@@ -25,6 +26,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -185,6 +187,7 @@ export default function GastosIndex({
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+    const [mostrarTodosUltimos, setMostrarTodosUltimos] = useState(false);
     const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set());
     const [expandedInversiones, setExpandedInversiones] = useState<Set<string>>(
         new Set(),
@@ -497,8 +500,17 @@ export default function GastosIndex({
                         </p>
                     </div>
 
-                    {canManage && (
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
+                        <a
+                            href="/pdf/gastos"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span className="hidden sm:inline">Exportar PDF</span>
+                        </a>
+                        {canManage && (
                             <Button
                                 size="sm"
                                 onClick={() => {
@@ -509,8 +521,8 @@ export default function GastosIndex({
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Nuevo gasto
                             </Button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 {/* ─── Sección 1: cards de totales ───────────────────────── */}
@@ -542,12 +554,12 @@ export default function GastosIndex({
                     })}
                 </div>
 
-                {/* ─── Sección 2: últimos 10 gastos globales ─────────────── */}
+                {/* ─── Sección 2: últimos gastos globales (10 + ver todos) ─── */}
                 <div className="rounded-xl border border-border bg-card shadow-sm">
                     <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                         <History className="h-4 w-4 text-muted-foreground" />
                         <h3 className="text-sm font-semibold text-foreground">
-                            Últimos 10 gastos
+                            Últimos gastos
                         </h3>
                     </div>
                     {ultimosGlobales.length === 0 ? (
@@ -555,40 +567,56 @@ export default function GastosIndex({
                             No hay gastos registrados.
                         </p>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
-                                    <tr>
-                                        <th className="px-3 py-2 font-medium">Fecha</th>
-                                        <th className="px-3 py-2 font-medium">Descripción</th>
-                                        <th className="px-3 py-2 font-medium">Categoría</th>
-                                        <th className="px-3 py-2 font-medium">Patente</th>
-                                        <th className="px-3 py-2 text-right font-medium">Monto</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {ultimosGlobales.map((g) => (
-                                        <tr key={g.id} className="hover:bg-muted/20">
-                                            <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">
-                                                {formatDate(g.fecha)}
-                                            </td>
-                                            <td className="px-3 py-2 font-medium text-foreground">
-                                                {g.descripcion?.trim() || 'Sin descripción'}
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">
-                                                {TIPO_LABEL[g.tipo]}
-                                            </td>
-                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">
-                                                {g.vehiculo?.patente ?? '—'}
-                                            </td>
-                                            <td className="px-3 py-2 text-right font-bold whitespace-nowrap text-foreground">
-                                                {formatARS(Number(g.monto))}
-                                            </td>
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                        <tr>
+                                            <th className="px-3 py-2 font-medium">Fecha</th>
+                                            <th className="px-3 py-2 font-medium">Descripción</th>
+                                            <th className="px-3 py-2 font-medium">Categoría</th>
+                                            <th className="px-3 py-2 font-medium">Patente</th>
+                                            <th className="px-3 py-2 text-right font-medium">Monto</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {(mostrarTodosUltimos ? gastos : ultimosGlobales).map((g) => (
+                                            <tr key={g.id} className="hover:bg-muted/20">
+                                                <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                    {formatDate(g.fecha)}
+                                                </td>
+                                                <td className="px-3 py-2 font-medium text-foreground">
+                                                    {g.descripcion?.trim() || 'Sin descripción'}
+                                                </td>
+                                                <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                                                    {TIPO_LABEL[g.tipo]}
+                                                </td>
+                                                <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                                                    {g.vehiculo?.patente ?? '—'}
+                                                </td>
+                                                <td className="px-3 py-2 text-right font-bold whitespace-nowrap text-foreground">
+                                                    {formatARS(Number(g.monto))}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {gastos.length > ultimosGlobales.length && (
+                                <div className="border-t border-border px-4 py-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setMostrarTodosUltimos((v) => !v)}
+                                        className="flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                        {mostrarTodosUltimos
+                                            ? 'Mostrar menos'
+                                            : `Mostrar más (${gastos.length - ultimosGlobales.length})`}
+                                        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${mostrarTodosUltimos ? 'rotate-180' : ''}`} />
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -823,14 +851,11 @@ export default function GastosIndex({
                             </div>
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="g-monto">Monto</Label>
-                                <Input
+                                <MoneyInput
                                     id="g-monto"
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={monto}
-                                    onChange={(e) => setMonto(e.target.value)}
-                                    placeholder="0.00"
+                                    value={monto === '' ? null : Number(monto)}
+                                    onValueChange={(n) => setMonto(n == null ? '' : String(n))}
+                                    placeholder="0,00"
                                 />
                                 {errors.monto && (
                                     <p className="text-xs text-destructive">

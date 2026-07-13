@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { Check, ChevronDown, MessageSquareText, Search, Wrench, X } from 'lucide-react';
+import { Check, ChevronDown, Download, MessageSquareText, Search, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,17 +52,17 @@ interface Props {
 }
 
 const GRAVEDAD: { v: number; label: string; active: string; dot: string }[] = [
-    { v: 1, label: 'Bien',     active: 'border-green-500 bg-green-500 text-white',   dot: 'bg-green-500' },
+    { v: 1, label: 'Bien',     active: 'border-green-500 bg-green-500 text-white',     dot: 'bg-green-500' },
     { v: 2, label: 'Leve',     active: 'border-emerald-500 bg-emerald-500 text-white', dot: 'bg-emerald-400' },
-    { v: 3, label: 'Moderado', active: 'border-amber-500 bg-amber-500 text-white',   dot: 'bg-amber-500' },
-    { v: 4, label: 'Grave',    active: 'border-orange-500 bg-orange-500 text-white', dot: 'bg-orange-500' },
-    { v: 5, label: 'Crítico',  active: 'border-red-500 bg-red-500 text-white',       dot: 'bg-red-500' },
+    { v: 3, label: 'Moderado', active: 'border-amber-500 bg-amber-500 text-white',     dot: 'bg-amber-500' },
+    { v: 4, label: 'Grave',    active: 'border-orange-500 bg-orange-500 text-white',   dot: 'bg-orange-500' },
+    { v: 5, label: 'Crítico',  active: 'border-red-500 bg-red-500 text-white',         dot: 'bg-red-500' },
 ];
 
 const PRIORIDAD: Record<Prioridad, { label: string; badge: string; dot: string; border: string; row: string }> = {
-    alta:  { label: 'Alta',  badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',         dot: 'bg-red-500',    border: 'border-l-red-500',    row: 'bg-red-500/5' },
-    media: { label: 'Media', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500',  border: 'border-l-amber-500',  row: 'bg-amber-500/5' },
-    baja:  { label: 'Baja',  badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500',  border: 'border-l-green-500',  row: 'bg-green-500/5' },
+    alta:  { label: 'Alta',  badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',         dot: 'bg-red-500',   border: 'border-l-red-500',   row: 'bg-red-500/5' },
+    media: { label: 'Media', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500', border: 'border-l-amber-500', row: 'bg-amber-500/5' },
+    baja:  { label: 'Baja',  badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500', border: 'border-l-green-500', row: 'bg-green-500/5' },
 };
 
 const ITEM_ROW_BG: Record<number, string> = {
@@ -158,26 +158,45 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
         setFiltro((prev) => prev === val ? 'all' : val);
     }
 
+    function buildPdfUrl() {
+        const p = new URLSearchParams();
+        if (search.trim()) p.set('q', search.trim());
+        if (filtro !== 'all') p.set('prioridad', filtro);
+        const qs = p.toString();
+        return `/revision-mecanica/pdf${qs ? `?${qs}` : ''}`;
+    }
+
     return (
         <>
             <Head title="Revisión Mecánica" />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">Revisión Mecánica</h1>
-                    <p className="text-xs text-muted-foreground">
-                        Tocá un vehículo para revisar su estado mecánico y definir la prioridad de reparación.
-                    </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">Revisión Mecánica</h1>
+                        <p className="text-xs text-muted-foreground">
+                            Vehículos con chofer asignado. Tocá uno para revisar su estado mecánico y definir la prioridad de reparación.
+                        </p>
+                    </div>
+                    <a
+                        href={buildPdfUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <Download className="h-4 w-4" />
+                        <span className="hidden sm:inline">Exportar PDF</span>
+                    </a>
                 </div>
 
                 {/* Stats — clickeables para filtrar */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     {([
-                        { key: 'alta',      label: 'Prioridad alta',  value: stats.alta,      cls: 'border-red-500/20 bg-red-500/5',     active: 'ring-2 ring-red-500/40',     text: 'text-red-700 dark:text-red-400' },
-                        { key: 'media',     label: 'Prioridad media', value: stats.media,     cls: 'border-amber-500/20 bg-amber-500/5', active: 'ring-2 ring-amber-500/40',   text: 'text-amber-700 dark:text-amber-400' },
-                        { key: 'baja',      label: 'Prioridad baja',  value: stats.baja,      cls: 'border-green-500/20 bg-green-500/5', active: 'ring-2 ring-green-500/40',   text: 'text-green-700 dark:text-green-400' },
-                        { key: 'pendiente', label: 'Sin revisar',     value: stats.pendiente, cls: 'border-border bg-card',              active: 'ring-2 ring-border',          text: 'text-muted-foreground' },
+                        { key: 'alta',      label: 'Prioridad alta',  value: stats.alta,      cls: 'border-red-500/20 bg-red-500/5',     active: 'ring-2 ring-red-500/40',   text: 'text-red-700 dark:text-red-400' },
+                        { key: 'media',     label: 'Prioridad media', value: stats.media,     cls: 'border-amber-500/20 bg-amber-500/5', active: 'ring-2 ring-amber-500/40', text: 'text-amber-700 dark:text-amber-400' },
+                        { key: 'baja',      label: 'Prioridad baja',  value: stats.baja,      cls: 'border-green-500/20 bg-green-500/5', active: 'ring-2 ring-green-500/40', text: 'text-green-700 dark:text-green-400' },
+                        { key: 'pendiente', label: 'Sin revisar',     value: stats.pendiente, cls: 'border-border bg-card',              active: 'ring-2 ring-border',        text: 'text-muted-foreground' },
                     ] as const).map((s) => (
                         <button
                             key={s.key}
@@ -216,7 +235,6 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                     <div className="flex flex-col gap-2 pb-4">
                         {filtradas.map((f) => {
                             const p = f.revision ? PRIORIDAD[f.revision.prioridad] : null;
-                            // ítems con problema (gravedad >= 3), ordenados por gravedad desc
                             const problemas = f.revision
                                 ? items
                                     .map((it) => ({ label: it.label, g: f.revision!.items[it.key]?.gravedad ?? 1 }))
@@ -337,7 +355,6 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
     function setItem(key: string, patch: Partial<RevisionItem>) {
         setValores((v) => {
             const next = { ...v, [key]: { ...v[key], ...patch } };
-            // Abrir desc automáticamente si la gravedad sube a > 1
             if (patch.gravedad !== undefined && patch.gravedad > 1) {
                 setExpandedDesc((s) => new Set([...s, key]));
             }
@@ -390,7 +407,7 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
                         <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
                             {problemasCount} ítem{problemasCount !== 1 ? 's' : ''} con atención requerida
                         </span>
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                             {items
                                 .filter((it) => (valores[it.key]?.gravedad ?? 1) >= 3)
                                 .sort((a, b) => (valores[b.key]?.gravedad ?? 1) - (valores[a.key]?.gravedad ?? 1))
@@ -439,17 +456,14 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
                                         {it.label}
                                     </span>
                                     <div className="flex items-center gap-2">
-                                        <span className={cn(
-                                            'text-[10px] font-semibold uppercase tracking-wider',
-                                            g >= 3 ? GRAVEDAD[g - 1].active.split(' ')[1].replace('bg-', 'text-').replace('-500', '-600') : 'text-muted-foreground',
-                                        )}>
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                             {GRAVEDAD[g - 1]?.label}
                                         </span>
                                         <button
                                             type="button"
                                             onClick={() => toggleDesc(it.key)}
                                             className={cn(
-                                                'text-[10px] text-muted-foreground/60 transition-colors hover:text-muted-foreground',
+                                                'text-muted-foreground/60 transition-colors hover:text-muted-foreground',
                                                 hasDesc && 'text-muted-foreground',
                                             )}
                                             title={showDesc ? 'Ocultar nota' : 'Agregar nota'}

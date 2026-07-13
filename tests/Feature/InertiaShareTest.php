@@ -34,7 +34,7 @@ it('share: admin recibe permisos completos y empresas disponibles', function () 
         ->where('auth.permissions.can_view_vehiculos', true)
         ->where('auth.permissions.can_view_cobros', true)
         ->where('auth.permissions.can_view_gastos', true)
-        ->where('auth.permissions.can_view_inversiones', true)
+        ->where('auth.permissions.can_manage_inversiones', true)
         ->where('auth.permissions.can_manage_precios', true)
         ->where('auth.permissions.can_annul_transactions', true)
         ->where('auth.permissions.can_switch_empresa', true)
@@ -61,7 +61,7 @@ it('share: administrativo recibe permisos limitados y puede switchear empresa', 
         // ── Bloqueado:
         ->where('auth.permissions.can_view_cobros', false)
         ->where('auth.permissions.can_view_gastos', false)
-        ->where('auth.permissions.can_view_inversiones', false)
+        ->where('auth.permissions.can_manage_inversiones', false)
         ->where('auth.permissions.can_manage_precios', false)
         ->where('auth.permissions.can_annul_transactions', false)
         ->where('auth.permissions.can_view_mi_cuenta', false)
@@ -96,7 +96,7 @@ it('share: inversor con inversiones tiene can_view_mi_cuenta=true', function () 
     $inversor->empresas()->sync([$this->empresaA->id]);
     $inv = Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
         ->create(['nombre' => 'Inv X', 'empresa_id' => $this->empresaA->id]);
-    $inv->inversores()->attach($inversor->id, ['tiene_deuda' => false, 'es_financiador' => false]);
+    $inv->inversores()->attach($inversor->id, ['deuda' => 0, 'es_financiador' => false]);
 
     $this->actingAs($inversor)->get('/mi-cuenta')->assertInertia(fn ($p) => $p
         ->where('auth.active_company.id', $this->empresaA->id)
@@ -118,7 +118,7 @@ it('share: inversor con DOS empresas recibe ambas en empresas_disponibles y can_
     // Inversión en A para que can_view_mi_cuenta sea true.
     $inv = Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
         ->create(['nombre' => 'Inv Y', 'empresa_id' => $this->empresaA->id]);
-    $inv->inversores()->attach($inversor->id, ['tiene_deuda' => false, 'es_financiador' => false]);
+    $inv->inversores()->attach($inversor->id, ['deuda' => 0, 'es_financiador' => false]);
 
     $this->actingAs($inversor)->get('/mi-cuenta')->assertInertia(fn ($p) => $p
         ->where('auth.permissions.can_switch_empresa', true)

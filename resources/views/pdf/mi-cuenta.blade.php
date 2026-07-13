@@ -72,7 +72,7 @@
                 <tr>
                     <td>{{ $inv['nombre'] }}</td>
                     <td>
-                        @if($inv['tiene_deuda'])
+                        @if($inv['deuda'] > 0)
                             <span class="badge badge-deuda">En deuda</span>
                         @elseif($inv['es_financiador'])
                             <span class="badge badge-financ">Financia</span>
@@ -80,17 +80,17 @@
                             <span class="badge badge-ok">Al día</span>
                         @endif
                     </td>
-                    <td class="text-right @if($inv['saldo'] > 0) deuda-color @endif">
-                        @if($inv['saldo'] > 0)
-                            $ {{ number_format($inv['saldo'], 2, ',', '.') }}
+                    <td class="text-right @if($inv['deuda'] > 0) deuda-color @endif">
+                        @if($inv['deuda'] > 0)
+                            $ {{ number_format($inv['deuda'], 2, ',', '.') }}
                         @else
                             —
                         @endif
                     </td>
                     @if($tasaActual)
-                        <td class="text-right @if($inv['saldo'] > 0) deuda-color @endif">
-                            @if($inv['saldo'] > 0)
-                                USD {{ number_format($inv['saldo'] / $tasaActual, 2, '.', ',') }}
+                        <td class="text-right @if($inv['deuda'] > 0) deuda-color @endif">
+                            @if($inv['deuda'] > 0)
+                                USD {{ number_format($inv['deuda'] / $tasaActual, 2, '.', ',') }}
                             @else
                                 —
                             @endif
@@ -135,7 +135,7 @@
                     @endphp
                     <tr>
                         <td>{{ $c['id'] }}</td>
-                        <td>{{ \Carbon\Carbon::parse($c['periodo_fin'])->format('d/m/Y') }}</td>
+                        <td>{{ \Carbon\Carbon::parse($c['fecha'])->format('d/m/Y') }}</td>
                         <td class="text-right flota-color">$ {{ number_format($flota, 2, ',', '.') }}</td>
                         @if($tasaActual)
                             <td class="text-right flota-color">

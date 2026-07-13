@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -79,8 +79,8 @@ setOpenMobile(false);
     if (perms.can_view_gastos) {
         cajaItems.push({ title: 'Gastos', href: gastosIndex.url(), icon: HandCoins });
     }
-    if (perms.can_view_inversiones) {
-        cajaItems.push({ title: 'Inversiones', href: '/inversiones', icon: Wallet });
+    if (perms.can_view_cierres_sueldo) {
+        cajaItems.push({ title: 'Cierres de Sueldo', href: '/cierres-sueldo', icon: Lock });
     }
 
     // ── Grupo Personal ───────────────────────────────────────────────────

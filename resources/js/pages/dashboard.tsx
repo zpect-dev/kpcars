@@ -42,6 +42,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -2132,14 +2133,11 @@ function VehiculoForm({
                 </div>
                 <div className="flex flex-col gap-1.5">
                     <Label htmlFor="precio">Precio</Label>
-                    <Input
+                    <MoneyInput
                         id="precio"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="Ej. 360000"
-                        value={form.data.precio}
-                        onChange={(e) => form.setData('precio', e.target.value)}
+                        placeholder="Ej. 360.000,00"
+                        value={form.data.precio === '' ? null : Number(form.data.precio)}
+                        onValueChange={(n) => form.setData('precio', n == null ? '' : String(n))}
                     />
                     <InputError message={form.errors.precio} />
                 </div>

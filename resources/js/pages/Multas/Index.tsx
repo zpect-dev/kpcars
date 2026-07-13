@@ -32,6 +32,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
@@ -1551,14 +1552,10 @@ function CobrarMultaForm({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="cobro-monto">Monto que pagó</Label>
-                                <Input
+                                <MoneyInput
                                     id="cobro-monto"
-                                    type="number"
-                                    min="0"
-                                    max={falta}
-                                    step="0.01"
-                                    value={form.data.monto}
-                                    onChange={(e) => form.setData('monto', e.target.value)}
+                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
+                                    onValueChange={(n) => form.setData('monto', n == null ? '' : String(n))}
                                 />
                                 {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
                             </div>
@@ -1797,18 +1794,15 @@ function RegistrarMultaModal({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="multa-monto">Monto total</Label>
-                                <Input
+                                <MoneyInput
                                     id="multa-monto"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
                                     placeholder={
-                                        puntoRojo ? 'Sin monto' : '0.00'
+                                        puntoRojo ? 'Sin monto' : '0,00'
                                     }
-                                    value={form.data.monto}
+                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
                                     disabled={puntoRojo}
-                                    onChange={(e) =>
-                                        form.setData('monto', e.target.value)
+                                    onValueChange={(n) =>
+                                        form.setData('monto', n == null ? '' : String(n))
                                     }
                                     className={cn(
                                         puntoRojo &&
@@ -2043,15 +2037,12 @@ function EditarMultaForm({
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="edit-monto">Monto total</Label>
-                                <Input
+                                <MoneyInput
                                     id="edit-monto"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={form.data.monto}
-                                    onChange={(e) =>
-                                        form.setData('monto', e.target.value)
+                                    placeholder="0,00"
+                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
+                                    onValueChange={(n) =>
+                                        form.setData('monto', n == null ? '' : String(n))
                                     }
                                 />
                                 {form.errors.monto && (

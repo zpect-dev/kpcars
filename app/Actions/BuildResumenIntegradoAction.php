@@ -20,15 +20,23 @@ class BuildResumenIntegradoAction
      * Respeta la empresa activa: Cobro vía TenantScope y Gasto vía
      * GastoTenantScope.
      */
-    public function execute(): Collection
+    /**
+     * @param  string|null  $desde  Límite inferior exclusivo (created_at > desde). Solo aplica en modo histórico.
+     * @param  string|null  $hasta  Límite superior inclusivo (created_at <= hasta). Si es null, se resume el período actual (pendientes).
+     */
+    public function execute(?string $desde = null, ?string $hasta = null): Collection
     {
-        // Mismo período que los cobros pendientes: posterior al último cierre
-        // de caja de la empresa activa (CierreCaja está scopeado por empresa).
-        $ultimoCierreCajaAt = CierreCaja::latest()->value('created_at');
+        // Modo histórico: se acota por rango de fecha del cierre. Modo actual
+        // (hasta === null): mismo período que los cobros pendientes, posterior
+        // al último cierre de caja de la empresa activa.
+        $historico = $hasta !== null;
+        $ultimoCierreCajaAt = $historico ? null : CierreCaja::latest()->value('created_at');
 
-        // Cobros pendientes, una línea por transacción.
+        // Cobros del período, una línea por transacción.
         $cobros = Cobro::query()
-            ->pendientes()
+            ->when(! $historico, fn ($q) => $q->pendientes())
+            ->when($historico && $desde, fn ($q) => $q->where('cobros.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('cobros.created_at', '<=', $hasta))
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
             ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
@@ -55,7 +63,9 @@ class BuildResumenIntegradoAction
         $gastos = Gasto::query()
             ->where('gastos.tipo', 'vehiculo')
             ->whereNotNull('gastos.vehiculo_id')
-            ->when($ultimoCierreCajaAt, fn ($q) => $q->where('gastos.created_at', '>', $ultimoCierreCajaAt))
+            ->when(! $historico && $ultimoCierreCajaAt, fn ($q) => $q->where('gastos.created_at', '>', $ultimoCierreCajaAt))
+            ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
             ->join('vehiculos', 'gastos.vehiculo_id', '=', 'vehiculos.id')
             ->join('inversiones', 'vehiculos.inversion_id', '=', 'inversiones.id')
             ->join('empresas', 'vehiculos.empresa_id', '=', 'empresas.id')
