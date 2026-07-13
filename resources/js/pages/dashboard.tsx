@@ -86,6 +86,29 @@ function estadoPatenteBadge(estado: EstadoPatente): { label: string; badge: stri
     }
 }
 
+/**
+ * Documentos del vehículo. Cédula y título están completos con un PDF o con
+ * frente + dorso; el seguro con su archivo. "Falta" si no hay ninguna modalidad.
+ */
+function faltaCedula(v: Vehiculo): boolean {
+    const c = v.documentos?.cedula;
+    return !c?.pdf && !(c?.frente && c?.dorso);
+}
+
+function faltaTitulo(v: Vehiculo): boolean {
+    const t = v.documentos?.titulo;
+    return !t?.pdf && !(t?.frente && t?.dorso);
+}
+
+function faltaSeguroDoc(v: Vehiculo): boolean {
+    return !v.documentos?.seguro?.archivo;
+}
+
+/** Al vehículo le falta al menos un documento (cédula, título o seguro). */
+function faltaAlgunDocVehiculo(v: Vehiculo): boolean {
+    return faltaCedula(v) || faltaTitulo(v) || faltaSeguroDoc(v);
+}
+
 interface Filters {
     empresa_id?: string;
     inversion_id?: string;
@@ -152,6 +175,7 @@ return null;
     const [filterVtv, setFilterVtv] = useState('');
     const [filterGnc, setFilterGnc] = useState('');
     const [filterSeguro, setFilterSeguro] = useState('');
+    const [filterDocs, setFilterDocs] = useState('');
     const [openFilterSection, setOpenFilterSection] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -309,8 +333,13 @@ continue;
         if (filterSeguro === 'none') result = result.filter((v) => !v.seguro_vencimiento);
         else if (filterSeguro) result = result.filter((v) => !!v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === filterSeguro);
 
+        if (filterDocs === 'faltan') result = result.filter(faltaAlgunDocVehiculo);
+        else if (filterDocs === 'cedula') result = result.filter(faltaCedula);
+        else if (filterDocs === 'titulo') result = result.filter(faltaTitulo);
+        else if (filterDocs === 'seguro') result = result.filter(faltaSeguroDoc);
+
         return result;
-    }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro]);
+    }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro, filterDocs]);
 
     function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
         if (!showSearchDropdown || suggestions.length === 0) {
@@ -390,15 +419,16 @@ active.inversion_id = inversionId;
         setFilterVtv('');
         setFilterGnc('');
         setFilterSeguro('');
+        setFilterDocs('');
         setOpenFilterSection({});
     }
 
     const hasActiveFilters = !!(
         search || empresaId || inversionId || asignacionFiltro !== 'all' ||
-        filterEstadoPatente || filterTitular || filterVtv || filterGnc || filterSeguro
+        filterEstadoPatente || filterTitular || filterVtv || filterGnc || filterSeguro || filterDocs
     );
 
-    const advancedFilterCount = [filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro].filter(Boolean).length;
+    const advancedFilterCount = [filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro, filterDocs].filter(Boolean).length;
 
     const vCounts = useMemo(() => ({
         estadoPatente: {
@@ -425,6 +455,12 @@ active.inversion_id = inversionId;
             warning: vehiculos.filter((v) => v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === 'warning').length,
             expired: vehiculos.filter((v) => v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === 'expired').length,
             none:    vehiculos.filter((v) => !v.seguro_vencimiento).length,
+        },
+        docs: {
+            faltan: vehiculos.filter(faltaAlgunDocVehiculo).length,
+            cedula: vehiculos.filter(faltaCedula).length,
+            titulo: vehiculos.filter(faltaTitulo).length,
+            seguro: vehiculos.filter(faltaSeguroDoc).length,
         },
     }), [vehiculos]);
 
@@ -728,6 +764,10 @@ params.set('search', search.trim());
 
                                     if (filterSeguro) {
                                         params.set('seguro', filterSeguro);
+                                    }
+
+                                    if (filterDocs) {
+                                        params.set('docs', filterDocs);
                                     }
 
                                     const qs = params.toString();
@@ -1181,6 +1221,47 @@ params.set('search', search.trim());
                                                         const isActive = filterSeguro === opt.value;
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterSeguro(isActive ? '' : opt.value)}
+                                                                className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
+                                                            >
+                                                                <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>
+                                                                    {isActive && <Check className="h-3 w-3 text-background" />}
+                                                                </div>
+                                                                <div className="flex min-w-0 flex-1 flex-col">
+                                                                    <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
+                                                                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
+                                                                </div>
+                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Documentos (archivos: cédula, título, seguro) */}
+                                        <div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setOpenFilterSection((s) => ({ ...s, docs: !s.docs }))}
+                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium text-foreground">Documentos</span>
+                                                    {filterDocs && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
+                                                </div>
+                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', openFilterSection.docs && 'rotate-180')} />
+                                            </button>
+                                            {openFilterSection.docs && (
+                                                <div className="px-1.5 pb-1.5">
+                                                    {[
+                                                        { value: 'faltan', label: 'Faltan documentos', desc: 'Le falta la cédula, el título o el seguro', count: vCounts.docs.faltan },
+                                                        { value: 'cedula', label: 'Sin cédula',        desc: 'Sin PDF ni frente/dorso de la cédula',     count: vCounts.docs.cedula },
+                                                        { value: 'titulo', label: 'Sin título',        desc: 'Sin PDF ni frente/dorso del título',       count: vCounts.docs.titulo },
+                                                        { value: 'seguro', label: 'Sin seguro',        desc: 'Sin archivo de seguro cargado',            count: vCounts.docs.seguro },
+                                                    ].map((opt) => {
+                                                        const isActive = filterDocs === opt.value;
+                                                        return (
+                                                            <button key={opt.value} type="button" onClick={() => setFilterDocs(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
                                                             >
                                                                 <div className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent')}>

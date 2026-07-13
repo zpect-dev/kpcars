@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactCrop, { cropToCanvas, type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Crop as CropIcon, RotateCcw, RotateCw } from 'lucide-react';
@@ -38,6 +38,42 @@ async function canvasToFile(
     const base = sourceName.replace(/\.[^.]+$/, '') || 'imagen';
 
     return new File([blob], `${base}.${ext}`, { type });
+}
+
+/**
+ * Rota una imagen (múltiplos de 90°) redibujándola en un canvas con las
+ * dimensiones intercambiadas y devuelve un objectURL. Así la imagen rotada
+ * ocupa realmente su nuevo tamaño (vertical -> horizontal) y el área de
+ * recorte deja de estar limitada al ancho original.
+ */
+function rotateImage(src: string, degrees: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            const swap = degrees === 90 || degrees === 270;
+            const canvas = document.createElement('canvas');
+            canvas.width = swap ? image.naturalHeight : image.naturalWidth;
+            canvas.height = swap ? image.naturalWidth : image.naturalHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                reject(new Error('No 2d context'));
+                return;
+            }
+            ctx.imageSmoothingQuality = 'high';
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate((degrees * Math.PI) / 180);
+            ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    reject(new Error('No se pudo rotar la imagen.'));
+                    return;
+                }
+                resolve(URL.createObjectURL(blob));
+            }, 'image/png');
+        };
+        image.onerror = () => reject(new Error('No se pudo cargar la imagen.'));
+        image.src = src;
+    });
 }
 
 interface PendingCrop {
@@ -143,8 +179,46 @@ function ImageCropperDialog({
     const [completedCrop, setCompletedCrop] = useState<PixelCrop | null>(null);
     const [scale, setScale] = useState(1);
     const [rotate, setRotate] = useState(0);
+    const [displaySrc, setDisplaySrc] = useState(pending.src);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Al rotar (múltiplos de 90°) generamos una imagen realmente rotada para que
+    // el recorte use las nuevas dimensiones. Reseteamos el recorte porque el
+    // encuadre anterior deja de ser válido con la orientación nueva.
+    useEffect(() => {
+        let cancelled = false;
+        let objectUrl: string | null = null;
+
+        if (rotate === 0) {
+            setDisplaySrc(pending.src);
+        } else {
+            rotateImage(pending.src, rotate)
+                .then((url) => {
+                    if (cancelled) {
+                        URL.revokeObjectURL(url);
+                        return;
+                    }
+                    objectUrl = url;
+                    setDisplaySrc(url);
+                })
+                .catch(() => {
+                    if (!cancelled) {
+                        setError('No se pudo rotar la imagen.');
+                    }
+                });
+        }
+
+        setCrop(undefined);
+        setCompletedCrop(null);
+
+        return () => {
+            cancelled = true;
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [rotate, pending.src]);
 
     const rotateBy = (delta: number) =>
         setRotate((r) => ((r + delta) % 360 + 360) % 360);
@@ -155,6 +229,7 @@ function ImageCropperDialog({
         setBusy(true);
         setError(null);
         try {
+            // La rotación ya está aplicada en `displaySrc`, por eso pasamos 0.
             const pixelCrop: PixelCrop =
                 completedCrop && completedCrop.width && completedCrop.height
                     ? completedCrop
@@ -166,7 +241,7 @@ function ImageCropperDialog({
                           height: img.height,
                       };
             const canvas = document.createElement('canvas');
-            await cropToCanvas(img, canvas, pixelCrop, scale, rotate);
+            await cropToCanvas(img, canvas, pixelCrop, scale, 0);
             const file = await canvasToFile(canvas, pending.name, pending.type);
             onConfirm(file);
         } catch {
@@ -200,10 +275,10 @@ function ImageCropperDialog({
                     >
                         <img
                             ref={imgRef}
-                            src={pending.src}
+                            src={displaySrc}
                             alt="Imagen a recortar"
                             style={{
-                                transform: `scale(${scale}) rotate(${rotate}deg)`,
+                                transform: `scale(${scale})`,
                                 maxHeight: '56vh',
                                 maxWidth: '100%',
                             }}

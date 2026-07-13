@@ -190,7 +190,7 @@ function AvatarDropzone({
     );
 }
 
-type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito' | 'deposito_bajo' | 'falta_doc_dni' | 'falta_doc_licencia';
+type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito' | 'deposito_bajo' | 'falta_docs' | 'falta_doc_dni' | 'falta_doc_licencia';
 
 const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     all:                  'Todos',
@@ -202,6 +202,7 @@ const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     falta_correo:         'Sin correo',
     falta_deposito:       'Sin depósito',
     deposito_bajo:        'Depósito bajo',
+    falta_docs:           'Faltan documentos',
     falta_doc_dni:        'Sin foto DNI',
     falta_doc_licencia:   'Sin foto licencia',
 };
@@ -218,6 +219,7 @@ const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: s
     {
         label: 'Documentos',
         items: [
+            { val: 'falta_docs',         label: 'Faltan documentos',   desc: 'Le falta el DNI, la licencia o la foto de perfil' },
             { val: 'falta_doc_dni',      label: 'Sin foto de DNI',     desc: 'Le falta frente o dorso del DNI' },
             { val: 'falta_doc_licencia', label: 'Sin foto de licencia', desc: 'No tiene foto ni PDF de licencia cargado' },
         ],
@@ -371,6 +373,21 @@ function sinDeposito(u: User): boolean {
     return (u.depositos?.length ?? 0) === 0;
 }
 
+/** Al chofer le falta el DNI (frente o dorso sin cargar). */
+function faltaDocDni(u: User): boolean {
+    return !u.documentos?.dni?.frente || !u.documentos?.dni?.dorso;
+}
+
+/** Al chofer le falta la licencia (sin foto de frente ni PDF). */
+function faltaDocLicencia(u: User): boolean {
+    return !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf;
+}
+
+/** Al chofer le falta algún documento: DNI, licencia o foto de perfil. */
+function faltaAlgunDocChofer(u: User): boolean {
+    return faltaDocDni(u) || faltaDocLicencia(u) || u.falta_foto === true;
+}
+
 export default function UsersIndex({ users, roles, empresas, monedas, choferCounts, cotizacionDolar = 0, inversionesDisponibles = null }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [inversorConfig, setInversorConfig] = useState<User | null>(null);
@@ -417,8 +434,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
                 if (filterAlert === 'sin_licencia') return u.sin_licencia === true;
                 if (filterAlert === 'falta_foto') return u.falta_foto === true;
-                if (filterAlert === 'falta_doc_dni') return !u.documentos?.dni?.frente || !u.documentos?.dni?.dorso;
-                if (filterAlert === 'falta_doc_licencia') return !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf;
+                if (filterAlert === 'falta_docs') return faltaAlgunDocChofer(u);
+                if (filterAlert === 'falta_doc_dni') return faltaDocDni(u);
+                if (filterAlert === 'falta_doc_licencia') return faltaDocLicencia(u);
                 if (filterAlert === 'falta_telefono') return !u.telefono;
                 if (filterAlert === 'falta_correo') return !u.correo;
                 if (filterAlert === 'falta_deposito') return sinDeposito(u);
@@ -433,7 +451,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0, deposito_bajo: 0 };
+        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_docs: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0, deposito_bajo: 0 };
         const today = new Date(); today.setHours(0, 0, 0, 0);
         return {
             licencia_vencida: users.filter((u) => {
@@ -443,8 +461,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
             sin_licencia: users.filter((u) => u.sin_licencia).length,
             falta_foto: users.filter((u) => u.falta_foto).length,
-            falta_doc_dni: users.filter((u) => !u.documentos?.dni?.frente || !u.documentos?.dni?.dorso).length,
-            falta_doc_licencia: users.filter((u) => !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf).length,
+            falta_docs: users.filter((u) => faltaAlgunDocChofer(u)).length,
+            falta_doc_dni: users.filter((u) => faltaDocDni(u)).length,
+            falta_doc_licencia: users.filter((u) => faltaDocLicencia(u)).length,
             falta_telefono: users.filter((u) => !u.telefono).length,
             falta_correo: users.filter((u) => !u.correo).length,
             falta_deposito: users.filter((u) => sinDeposito(u)).length,

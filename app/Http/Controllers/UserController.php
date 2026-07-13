@@ -642,6 +642,10 @@ class UserController extends Controller
                 '_falta_foto' => $u->profile_photo_path === null,
                 '_falta_doc_dni' => $u->dni_frente_path === null || $u->dni_dorso_path === null,
                 '_falta_doc_licencia' => $u->licencia_frente_path === null && $u->licencia_pdf_path === null,
+                // Combinado: le falta DNI, licencia o foto de perfil.
+                '_falta_docs' => ($u->dni_frente_path === null || $u->dni_dorso_path === null)
+                    || ($u->licencia_frente_path === null && $u->licencia_pdf_path === null)
+                    || $u->profile_photo_path === null,
                 '_falta_telefono' => empty($u->telefono),
                 '_falta_correo' => empty($u->correo),
                 '_sin_deposito' => $u->depositos->isEmpty(),
@@ -662,6 +666,7 @@ class UserController extends Controller
             'licencia_por_vencer' => '_licencia_por_vencer',
             'sin_licencia' => '_sin_licencia',
             'falta_foto' => '_falta_foto',
+            'falta_docs' => '_falta_docs',
             'falta_doc_dni' => '_falta_doc_dni',
             'falta_doc_licencia' => '_falta_doc_licencia',
             'falta_telefono' => '_falta_telefono',
@@ -681,6 +686,7 @@ class UserController extends Controller
             'licencia_por_vencer' => 'Licencia por vencer',
             'sin_licencia' => 'Sin licencia',
             'falta_foto' => 'Sin foto',
+            'falta_docs' => 'Faltan documentos',
             'falta_doc_dni' => 'Falta doc. DNI',
             'falta_doc_licencia' => 'Falta doc. licencia',
             'falta_telefono' => 'Sin teléfono',

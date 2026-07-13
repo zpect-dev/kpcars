@@ -2,47 +2,27 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Cobros</title>
+    <title>Cobros con gastos</title>
     @include('pdf._styles')
 </head>
 <body>
-    @if($inversiones->isEmpty())
+    <div class="section-title">Cobros con gastos — {{ now()->format('d/m/Y') }}</div>
+
+    @if($resumen->isEmpty())
         <table>
-            <thead><tr><th>No hay cobros pendientes</th></tr></thead>
+            <thead><tr><th>No hay cobros ni gastos en el período</th></tr></thead>
         </table>
     @else
-        @foreach($inversiones as $nombre => $cobros)
-            @php
-                $nombreFormateado = preg_replace('/^INV_(\d+)$/i', 'Inversión $1', $nombre);
-                $total = 0;
-            @endphp
-            <div class="section-title">{{ $nombreFormateado }}</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th style="width:50%">Artículo</th>
-                        <th class="center" style="width:10%">Cant.</th>
-                        <th style="width:20%">Patente</th>
-                        <th class="numeric" style="width:20%">Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($cobros as $cobro)
-                        @php $total += $cobro->subtotal; @endphp
-                        <tr>
-                            <td>{{ $cobro->articulo_descripcion }}</td>
-                            <td class="center">{{ $cobro->cantidad }}</td>
-                            <td>{{ $cobro->patente ?: 'N/A' }}</td>
-                            <td class="numeric">${{ number_format($cobro->subtotal, 0, ',', '.') }}</td>
-                        </tr>
-                    @endforeach
-                    <tr class="total-row">
-                        <td colspan="3">Total {{ strtolower($nombreFormateado) }}</td>
-                        <td class="numeric">${{ number_format($total, 0, ',', '.') }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        @endforeach
+        @include('pdf._cobros-vehiculos', ['inversiones' => $resumen])
+
+        <table>
+            <tbody>
+                <tr class="total-row">
+                    <td style="width:80%">TOTAL GENERAL (cobros + gastos)</td>
+                    <td class="numeric" style="width:20%">${{ number_format((float) $total, 0, ',', '.') }}</td>
+                </tr>
+            </tbody>
+        </table>
     @endif
 </body>
 </html>

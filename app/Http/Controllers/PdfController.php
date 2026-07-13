@@ -327,31 +327,14 @@ class PdfController extends Controller
         return $pdf->download('resumen-cobros-gastos-'.now()->format('Y-m-d').'.pdf');
     }
 
-    public function cobros(Request $request): Response
+    public function cobros(Request $request, BuildResumenIntegradoAction $action): Response
     {
-        // Acceso: middleware role:administrador.
-        // Cobro auto-scopea por empresa activa (TenantScope); no requiere filtro manual.
-        $cobros = Cobro::query()
-            ->pendientes()
-            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
-            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
-            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
-            ->join('inversiones', 'cobros.inversion_id', '=', 'inversiones.id')
-            ->select([
-                'inversiones.nombre as inversion_nombre',
-                'articulos.descripcion as articulo_descripcion',
-                'vehiculos.patente',
-                'transacciones.cantidad',
-                'articulos.precio',
-            ])
-            ->selectRaw('articulos.precio * transacciones.cantidad as subtotal')
-            ->orderBy('inversiones.nombre')
-            ->get();
+        // Acceso: middleware role:administrador. Reusa el resumen integrado
+        // (cobros + gastos de flota por vehículo) del período actual.
+        $resumen = $action->execute();
+        $total = $resumen->sum('total');
 
-        // Group by inversion
-        $inversiones = $cobros->groupBy('inversion_nombre');
-
-        $pdf = Pdf::loadView('pdf.cobros', compact('inversiones'))
+        $pdf = Pdf::loadView('pdf.cobros', compact('resumen', 'total'))
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cobros-'.now()->format('Y-m-d').'.pdf');
@@ -489,7 +472,7 @@ class PdfController extends Controller
         // Acceso: middleware role:administrador,administrativo.
         // Refleja TODOS los filtros del dashboard de vehículos, incluidos los
         // avanzados (estado de patente, titular, VTV y GNC).
-        $filters = $request->only(['inversion_id', 'search', 'asignacion', 'estado_patente', 'titular', 'vtv', 'gnc', 'seguro']);
+        $filters = $request->only(['inversion_id', 'search', 'asignacion', 'estado_patente', 'titular', 'vtv', 'gnc', 'seguro', 'docs']);
         $search = trim((string) ($filters['search'] ?? ''));
         $asignacion = $filters['asignacion'] ?? null;
         $estadoPatente = $filters['estado_patente'] ?? null;
@@ -497,6 +480,18 @@ class PdfController extends Controller
         $vtv = $filters['vtv'] ?? null;
         $gnc = $filters['gnc'] ?? null;
         $seguro = $filters['seguro'] ?? null;
+        $docs = $filters['docs'] ?? null;
+
+        // Documento faltante = sin PDF y sin frente+dorso completos (cédula/título);
+        // el seguro falta si no tiene archivo. Misma lógica que el dashboard.
+        $faltaCedula = function ($q): void {
+            $q->whereNull('cedula_pdf_path')
+                ->where(fn ($x) => $x->whereNull('cedula_frente_path')->orWhereNull('cedula_dorso_path'));
+        };
+        $faltaTitulo = function ($q): void {
+            $q->whereNull('titulo_pdf_path')
+                ->where(fn ($x) => $x->whereNull('titulo_frente_path')->orWhereNull('titulo_dorso_path'));
+        };
 
         $vehiculos = Vehiculo::with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre'])
             ->where('patente', '!=', 'EXTERNO')
@@ -519,6 +514,12 @@ class PdfController extends Controller
             ->when($vtv === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_vtv'))
             ->when($gnc === 'none', fn ($q) => $q->whereNull('fecha_vencimiento_gnc'))
             ->when($seguro === 'none', fn ($q) => $q->whereNull('seguro_vencimiento'))
+            ->when($docs === 'cedula', fn ($q) => $q->where($faltaCedula))
+            ->when($docs === 'titulo', fn ($q) => $q->where($faltaTitulo))
+            ->when($docs === 'seguro', fn ($q) => $q->whereNull('seguro_path'))
+            ->when($docs === 'faltan', fn ($q) => $q->where(function ($w) use ($faltaCedula, $faltaTitulo) {
+                $w->where($faltaCedula)->orWhere($faltaTitulo)->orWhereNull('seguro_path');
+            }))
             ->get();
 
         // VTV/GNC por estado (ok/warning/expired) se calcula sobre fin de mes,
@@ -689,47 +690,28 @@ class PdfController extends Controller
     /**
      * Generate PDF with the detail of a historical cierre de caja.
      */
-    public function cierreCaja(Request $request, CierreCaja $cierre): Response
+    public function cierreCaja(Request $request, CierreCaja $cierre, BuildResumenIntegradoAction $action): Response
     {
-        // Acceso: middleware role:administrador.
-
+        // Acceso: middleware role:administrador. Reusa el resumen integrado
+        // (cobros + gastos por vehículo) acotado al período del cierre.
         $previousCierreDate = CierreCaja::where('created_at', '<', $cierre->created_at)
             ->latest()
             ->value('created_at');
 
-        // Cobro auto-scopea por empresa activa vía TenantScope.
-        $cobros = Cobro::query()
-            ->where('cobros.created_at', '<=', $cierre->created_at)
-            ->when($previousCierreDate, fn ($q) => $q->where('cobros.created_at', '>', $previousCierreDate))
-            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
-            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
-            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
-            ->join('inversiones', 'cobros.inversion_id', '=', 'inversiones.id')
-            ->join('empresas', 'cobros.empresa_id', '=', 'empresas.id')
-            ->select([
-                'empresas.nombre as empresa_nombre',
-                'inversiones.nombre as inversion_nombre',
-                'articulos.descripcion as articulo_descripcion',
-                'vehiculos.patente',
-                'transacciones.cantidad',
-                'articulos.precio',
-            ])
-            ->selectRaw('articulos.precio * transacciones.cantidad as subtotal')
-            ->get();
+        $resumen = $action->execute(
+            $previousCierreDate?->toDateTimeString(),
+            $cierre->created_at->toDateTimeString(),
+        );
+        $total = $resumen->sum('total');
 
-        // Group naturally: empresa -> inversion -> rows
-        $empresas = $cobros
+        // Agrupar por empresa → inversiones (cada inversión ya trae sus vehículos).
+        $empresas = $resumen
             ->groupBy('empresa_nombre')
-            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE)
-            ->map(function ($empresaCobros) {
-                return $empresaCobros
-                    ->groupBy('inversion_nombre')
-                    ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
-            });
+            ->sortKeys(SORT_NATURAL | SORT_FLAG_CASE);
 
         $cierre->load('user:id,name');
 
-        $pdf = Pdf::loadView('pdf.cierre-caja', compact('cierre', 'empresas'))
+        $pdf = Pdf::loadView('pdf.cierre-caja', compact('cierre', 'empresas', 'total'))
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cierre-caja-'.$cierre->id.'-'.$cierre->created_at->format('Y-m-d').'.pdf');
