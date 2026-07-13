@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Camera, Download, FileText } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Camera, Check, Copy, Download, FileText, Share2 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 import { cn } from '@/lib/utils';
 import InputError from '@/components/input-error';
@@ -29,6 +29,63 @@ export type OnDocPreview = (url: string, name: string, type: 'image' | 'pdf') =>
 const IMG_ACCEPT = { 'image/*': ['.jpeg', '.jpg', '.png', '.webp'] };
 const PDF_ACCEPT = { 'application/pdf': ['.pdf'] };
 
+async function shareDoc(url: string, name: string) {
+    if (!navigator.share) {
+        await navigator.clipboard.writeText(url);
+        return 'copied';
+    }
+    try {
+        const res = await fetch(url);
+        const blob = await res.blob();
+        const ext = blob.type.includes('pdf') ? '.pdf' : blob.type.includes('png') ? '.png' : '.jpg';
+        const file = new File([blob], `${name}${ext}`, { type: blob.type });
+        if (navigator.canShare?.({ files: [file] })) {
+            await navigator.share({ files: [file], title: name });
+            return 'shared';
+        }
+    } catch {
+        // si falla el fetch o el canShare, intento con URL
+    }
+    try {
+        await navigator.share({ url, title: name });
+        return 'shared';
+    } catch {
+        // usuario canceló
+    }
+    return null;
+}
+
+function ShareButton({ url, name, className }: { url: string; name: string; className?: string }) {
+    const [state, setState] = useState<'idle' | 'copied'>('idle');
+
+    async function handleShare() {
+        const result = await shareDoc(url, name);
+        if (result === 'copied') {
+            setState('copied');
+            setTimeout(() => setState('idle'), 2000);
+        }
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={handleShare}
+            className={cn(
+                'inline-flex items-center gap-1 text-xs font-medium transition-colors',
+                state === 'copied'
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-muted-foreground hover:text-foreground',
+                className,
+            )}
+        >
+            {state === 'copied'
+                ? <><Copy className="h-3.5 w-3.5" /> Copiado</>
+                : <><Share2 className="h-3.5 w-3.5" /> Compartir</>
+            }
+        </button>
+    );
+}
+
 export function DocImageDropzone({
     label,
     file,
@@ -54,6 +111,8 @@ export function DocImageDropzone({
         () => (file ? URL.createObjectURL(file) : existingUrl),
         [file, existingUrl],
     );
+
+    const isExisting = !file && !!existingUrl;
 
     return (
         <div className="flex flex-col gap-1">
@@ -93,6 +152,20 @@ export function DocImageDropzone({
                     </button>
                 )}
             </div>
+            {isExisting && (
+                <div className="flex items-center gap-3">
+                    <a
+                        href={existingUrl!}
+                        download
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                        <Download className="h-3 w-3" /> Descargar
+                    </a>
+                    <ShareButton url={existingUrl!} name={label} className="text-[11px]" />
+                </div>
+            )}
         </div>
     );
 }
@@ -123,6 +196,8 @@ export function DocPdfDropzone({
         [file, existingUrl],
     );
 
+    const isExisting = !file && !!existingUrl;
+
     return (
         <div
             {...getRootProps()}
@@ -134,7 +209,6 @@ export function DocPdfDropzone({
             <input {...getInputProps()} />
             {previewUrl ? (
                 <>
-                    {/* Miniatura: clic para ampliar */}
                     <div
                         onClick={() => onPreview(previewUrl, title, 'pdf')}
                         className="group relative h-36 cursor-zoom-in overflow-hidden rounded border border-border bg-white"
@@ -149,14 +223,18 @@ export function DocPdfDropzone({
                         </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                        <a
-                            href={previewUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-2 hover:underline"
-                        >
-                            <Download className="h-3.5 w-3.5" /> Descargar
-                        </a>
+                        <div className="flex items-center gap-3">
+                            <a
+                                href={previewUrl}
+                                download
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-2 hover:underline"
+                            >
+                                <Download className="h-3.5 w-3.5" /> Descargar
+                            </a>
+                            {isExisting && <ShareButton url={existingUrl!} name={title} />}
+                        </div>
                         <button
                             type="button"
                             onClick={open}
@@ -249,9 +327,7 @@ export function DocumentSection({
 }
 
 /**
- * Dropzone para un documento de un único archivo (PDF o imagen). Detecta el
- * tipo del archivo nuevo o usa `existingIsPdf` para el ya cargado, y muestra la
- * previsualización adecuada (iframe para PDF, imagen para foto). Clic = ampliar.
+ * Dropzone para un documento de un único archivo (PDF o imagen).
  */
 export function DocSingleDropzone({
     title,
@@ -281,6 +357,7 @@ export function DocSingleDropzone({
         [file, existingUrl],
     );
     const isPdf = file ? file.type === 'application/pdf' : !!existingIsPdf;
+    const isExisting = !file && !!existingUrl;
 
     return (
         <div
@@ -311,14 +388,18 @@ export function DocSingleDropzone({
                         </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                        <a
-                            href={previewUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-2 hover:underline"
-                        >
-                            <Download className="h-3.5 w-3.5" /> Descargar
-                        </a>
+                        <div className="flex items-center gap-3">
+                            <a
+                                href={previewUrl}
+                                download
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs font-medium text-foreground underline-offset-2 hover:underline"
+                            >
+                                <Download className="h-3.5 w-3.5" /> Descargar
+                            </a>
+                            {isExisting && <ShareButton url={existingUrl!} name={title} />}
+                        </div>
                         <button
                             type="button"
                             onClick={open}
