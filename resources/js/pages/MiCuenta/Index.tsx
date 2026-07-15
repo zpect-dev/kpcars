@@ -1,7 +1,8 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     Calendar,
     ChevronDown,
+    ChevronRight,
     Clock,
     Coins,
     Download,
@@ -178,18 +179,29 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
                         </div>
                     </div>
 
-                    {/* Recaudación último cierre */}
-                    <HeroStat
-                        label="Recaudación · último cierre"
-                        value={ultimoCierreUSD != null
-                            ? formatUSD(ultimoCierreUSD)
-                            : ultimoCierre ? formatARS(ultimoCierre.total) : '—'}
-                        sub={ultimoCierre
-                            ? (ultimoCierreUSD != null ? formatARS(ultimoCierre.total) + ' · ' : '') + formatFecha(ultimoCierre.fecha)
-                            : 'Sin cierres aún'}
-                        icon={Coins}
-                        tone="orange"
-                    />
+                    {/* Recaudación último cierre → estado del cierre */}
+                    {ultimoCierre ? (
+                        <Link
+                            href={`/mi-cuenta/cierres/${ultimoCierre.id}`}
+                            className="block h-full rounded-2xl ring-primary/40 transition hover:ring-2"
+                        >
+                            <HeroStat
+                                label="Recaudación · último cierre"
+                                value={ultimoCierreUSD != null ? formatUSD(ultimoCierreUSD) : formatARS(ultimoCierre.total)}
+                                sub={(ultimoCierreUSD != null ? formatARS(ultimoCierre.total) + ' · ' : '') + formatFecha(ultimoCierre.fecha) + ' · Ver estado →'}
+                                icon={Coins}
+                                tone="orange"
+                            />
+                        </Link>
+                    ) : (
+                        <HeroStat
+                            label="Recaudación · último cierre"
+                            value="—"
+                            sub="Sin cierres aún"
+                            icon={Coins}
+                            tone="orange"
+                        />
+                    )}
 
                     {/* Próximo cierre */}
                     <HeroStat
@@ -269,24 +281,27 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
                                 const isOpen = expandedCierres.has(c.id);
                                 return (
                                     <div key={c.id} className={cn(!isLast && 'border-b border-border')}>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleCierre(c.id)}
-                                            className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/40"
-                                        >
-                                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                                <Calendar className="h-4 w-4" />
-                                            </div>
-                                            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                                <span className="text-sm font-semibold text-foreground">
-                                                    Cierre #{c.id}
-                                                </span>
-                                                <span className="text-xs text-muted-foreground">
-                                                    {formatFecha(c.fecha)}
-                                                    {c.abonado > 0 && ` · abonaste ${formatARS(c.abonado)} de deuda`}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3 shrink-0">
+                                        <div className="flex items-center gap-1 pr-3">
+                                            {/* El cuerpo del cierre navega al estado completo */}
+                                            <Link
+                                                href={`/mi-cuenta/cierres/${c.id}`}
+                                                className="flex flex-1 items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/40"
+                                            >
+                                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                    <Calendar className="h-4 w-4" />
+                                                </div>
+                                                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                                                    <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                                        Cierre #{c.id}
+                                                        <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-primary">
+                                                            Ver estado <ChevronRight className="h-3 w-3" />
+                                                        </span>
+                                                    </span>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {formatFecha(c.fecha)}
+                                                        {c.abonado > 0 && ` · abonaste ${formatARS(c.abonado)} de deuda`}
+                                                    </span>
+                                                </div>
                                                 <div className="flex flex-col items-end gap-0.5">
                                                     <span className="font-mono text-sm font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
                                                         + {cUSD != null ? formatUSD(cUSD) : formatARS(c.total)}
@@ -297,12 +312,20 @@ export default function MiCuentaIndex({ inversiones, cierres, tasaActual }: Prop
                                                         </span>
                                                     )}
                                                 </div>
+                                            </Link>
+                                            {/* Chevron: desglose rápido inline (opcional) */}
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleCierre(c.id)}
+                                                title="Ver desglose rápido"
+                                                className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                                            >
                                                 <ChevronDown className={cn(
-                                                    'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                                                    'h-4 w-4 transition-transform duration-200',
                                                     isOpen && 'rotate-180',
                                                 )} />
-                                            </div>
-                                        </button>
+                                            </button>
+                                        </div>
 
                                         {isOpen && c.detalles.length > 0 && (
                                             <CierreDetalle cierre={c} />
