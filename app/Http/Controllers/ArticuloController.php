@@ -191,6 +191,39 @@ class ArticuloController extends Controller
     }
 
     /**
+     * Update item metadata: descripcion, min_stock, codigo, repuestos, costo.
+     */
+    public function update(Request $request, Articulo $articulo): RedirectResponse
+    {
+        $this->authorize('update', $articulo);
+
+        $validated = $request->validate([
+            'descripcion' => ['required', 'string', 'max:255'],
+            'codigo'      => ['nullable', 'string', 'max:255'],
+            'repuestos'   => ['required', 'boolean'],
+            'min_stock'   => ['required', 'integer', 'min:0'],
+            'costo'       => ['nullable', 'numeric', 'min:0'],
+        ]);
+
+        $data = [
+            'descripcion' => trim($validated['descripcion']),
+            'codigo'      => $validated['codigo'] ?? null,
+            'repuestos'   => (bool) $validated['repuestos'],
+            'min_stock'   => (int) $validated['min_stock'],
+        ];
+
+        if (array_key_exists('costo', $validated) && $validated['costo'] !== null) {
+            $costo = (float) $validated['costo'];
+            $data['costo'] = $costo;
+            $data['precio'] = Articulo::precioDesdeCosto($costo);
+        }
+
+        $articulo->update($data);
+
+        return redirect()->back()->with('success', "Artículo \"{$articulo->descripcion}\" actualizado correctamente.");
+    }
+
+    /**
      * Update the cost for a given item. El precio de venta se recalcula
      * automáticamente sumándole el 45% al costo (precio = costo * 1.45).
      */

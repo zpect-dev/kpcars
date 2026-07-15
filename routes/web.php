@@ -53,6 +53,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Inventario
         Route::get('articulos', [ArticuloController::class, 'index'])->name('articulos.index');
         Route::post('articulos', [ArticuloController::class, 'store'])->name('articulos.store');
+        Route::patch('articulos/{articulo}', [ArticuloController::class, 'update'])->name('articulos.update');
         Route::post('articulos/{articulo}/movimiento', [ArticuloController::class, 'storeMovement'])->name('articulos.movimiento');
         Route::post('articulos/salida-multiple', [ArticuloController::class, 'salidaMultiple'])->name('articulos.salida-multiple');
 

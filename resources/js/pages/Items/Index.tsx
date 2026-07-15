@@ -8,9 +8,11 @@ import {
     History,
     Loader2,
     Minus,
+    Package,
     Pencil,
     Plus,
     Search,
+    Settings2,
     Sparkles,
     Trash2,
     TrendingUp,
@@ -34,7 +36,7 @@ import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { index, salidaMultiple, store, updateCosto } from '@/routes/articulos';
+import { index, salidaMultiple, store, update, updateCosto } from '@/routes/articulos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -85,6 +87,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
         return map;
     }, [items]);
+
+    // ─── Modal de edición de artículo ────────────────────────────────────────
+    const [editando, setEditando] = useState<Articulo | null>(null);
 
     // ─── Pestaña activa: Repuestos (repuestos=1) vs Galpón (repuestos=0) ──────
     const [activeTab, setActiveTab] = useState<InventarioTab>('repuestos');
@@ -617,13 +622,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     >
                                         Precio
                                     </th>
+                                    {canWrite && <th scope="col" className="w-[48px]" />}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {filteredItems.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={5}
+                                            colSpan={canWrite ? 6 : 5}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay artículos registrados o no
@@ -776,10 +782,20 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
-                                                    {formatARS(
-                                                        Number(item.precio),
-                                                    )}
+                                                    {formatARS(Number(item.precio))}
                                                 </td>
+                                                {canWrite && (
+                                                    <td className="pr-3">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditando(item)}
+                                                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
+                                                            title="Editar artículo"
+                                                        >
+                                                            <Settings2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </td>
+                                                )}
                                             </tr>
                                         );
                                     })
@@ -804,8 +820,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             return (
                                 <div
                                     key={item.id}
+                                    role={canWrite ? 'button' : undefined}
+                                    onClick={canWrite ? () => setEditando(item) : undefined}
                                     className={cn(
                                         'flex items-center gap-3 rounded-xl border border-l-4 bg-card p-3 shadow-sm',
+                                        canWrite && 'cursor-pointer active:opacity-80',
                                         sinStock
                                             ? 'border-l-red-500'
                                             : lowStock
@@ -857,6 +876,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     )}
                 </div>
             </div>
+
+            {/* ─── Modal Edición de artículo ───────────────────────────────────── */}
+            <EditarArticuloModal
+                item={editando}
+                isAdmin={isAdmin}
+                canWrite={canWrite}
+                onClose={() => setEditando(null)}
+            />
 
             {/* ─── Modal Egreso (OUT múltiple) ────────────────────────────────── */}
             <Dialog
@@ -1738,3 +1765,209 @@ ItemsIndex.layout = {
         },
     ],
 };
+
+// ─── Modal de edición de artículo ────────────────────────────────────────────
+
+function EditarArticuloModal({
+    item,
+    isAdmin,
+    canWrite,
+    onClose,
+}: {
+    item: Articulo | null;
+    isAdmin: boolean;
+    canWrite: boolean;
+    onClose: () => void;
+}) {
+    const form = useForm({
+        descripcion: '',
+        codigo: '',
+        repuestos: true as boolean,
+        min_stock: '0',
+        costo: '',
+    });
+
+    const [lastId, setLastId] = useState<number | null>(null);
+    if (item && item.id !== lastId) {
+        form.setData({
+            descripcion: item.descripcion,
+            codigo: item.codigo ?? '',
+            repuestos: Boolean(item.repuestos),
+            min_stock: String(item.min_stock),
+            costo: item.costo != null ? String(item.costo) : '',
+        });
+        setLastId(item.id);
+    }
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!item) return;
+        form.patch(update.url(item.id), {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: onClose,
+        });
+    }
+
+    const sinStock = item ? item.stock === 0 : false;
+    const lowStock = item ? item.stock > 0 && item.stock <= item.min_stock : false;
+
+    const costoNum = parseFloat(form.data.costo);
+    const precioPreview = !isNaN(costoNum) && costoNum > 0
+        ? precioDesdeCosto(costoNum)
+        : item?.precio ?? 0;
+
+    return (
+        <Dialog open={!!item} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                {/* Header */}
+                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <DialogTitle className="truncate text-base font-semibold">
+                            {item?.descripcion}
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            {item?.repuestos ? 'Repuesto' : 'Galpón'}
+                            {item?.codigo ? ` · Cód. ${item.codigo}` : ''}
+                        </DialogDescription>
+                    </div>
+                </div>
+
+                {/* Stock actual — info destacada */}
+                <div className="flex items-center gap-6 border-b border-border bg-muted/30 px-5 py-4">
+                    <div className="flex flex-col">
+                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Stock actual</span>
+                        <div className="flex items-baseline gap-1.5">
+                            <span className={cn(
+                                'text-3xl font-bold tabular-nums',
+                                sinStock ? 'text-red-500' : lowStock ? 'text-amber-500' : 'text-foreground',
+                            )}>
+                                {item?.stock ?? 0}
+                            </span>
+                            <span className="text-sm text-muted-foreground">unidades</span>
+                        </div>
+                    </div>
+                    {(sinStock || lowStock) && (
+                        <div className={cn(
+                            'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium',
+                            sinStock
+                                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                        )}>
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {sinStock ? 'Sin stock' : 'Por debajo del mínimo'}
+                        </div>
+                    )}
+                </div>
+
+                <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-5">
+                    {/* Descripción */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="edit-descripcion" className="text-sm font-medium">Descripción</Label>
+                        <Input
+                            id="edit-descripcion"
+                            value={form.data.descripcion}
+                            onChange={(e) => form.setData('descripcion', e.target.value)}
+                            disabled={!canWrite}
+                        />
+                        <InputError message={form.errors.descripcion} />
+                    </div>
+
+                    {/* Stock mínimo con stepper */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label className="text-sm font-medium">Stock mínimo</Label>
+                        <p className="text-xs text-muted-foreground">
+                            Si el stock cae por debajo de este número, aparece una alerta.
+                        </p>
+                        <div className="flex items-center gap-3">
+                            <div className="flex overflow-hidden rounded-lg border border-border">
+                                <button
+                                    type="button"
+                                    onClick={() => form.setData('min_stock', String(Math.max(0, Number(form.data.min_stock) - 1)))}
+                                    className="flex h-10 w-10 items-center justify-center border-r border-border bg-muted transition-colors hover:bg-muted/70"
+                                >
+                                    <Minus className="h-4 w-4" />
+                                </button>
+                                <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min="0"
+                                    value={form.data.min_stock}
+                                    onChange={(e) => form.setData('min_stock', e.target.value)}
+                                    className="w-16 bg-card text-center text-xl font-bold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => form.setData('min_stock', String(Number(form.data.min_stock) + 1))}
+                                    className="flex h-10 w-10 items-center justify-center border-l border-border bg-muted transition-colors hover:bg-muted/70"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                </button>
+                            </div>
+                            <span className="text-sm text-muted-foreground">unidades mínimas</span>
+                        </div>
+                        <InputError message={form.errors.min_stock} />
+                    </div>
+
+                    {/* Tipo */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label className="text-sm font-medium">Tipo</Label>
+                        <div className="flex gap-1 rounded-xl bg-muted p-1">
+                            <button
+                                type="button"
+                                onClick={() => form.setData('repuestos', true)}
+                                className={cn(
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
+                                    form.data.repuestos ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                <Wrench className="h-3.5 w-3.5" /> Repuesto
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => form.setData('repuestos', false)}
+                                className={cn(
+                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
+                                    !form.data.repuestos ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
+                                )}
+                            >
+                                <Warehouse className="h-3.5 w-3.5" /> Galpón
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Costo — solo admin */}
+                    {isAdmin && (
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="edit-costo" className="text-sm font-medium">Costo (ARS)</Label>
+                            <MoneyInput
+                                id="edit-costo"
+                                value={form.data.costo === '' ? null : Number(form.data.costo)}
+                                onValueChange={(n) => form.setData('costo', n == null ? '' : String(n))}
+                                placeholder="0,00"
+                            />
+                            {precioPreview > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    Precio de venta (+45%): <span className="font-semibold text-foreground">{formatARS(precioPreview)}</span>
+                                </p>
+                            )}
+                            <InputError message={form.errors.costo} />
+                        </div>
+                    )}
+
+                    <DialogFooter className="flex-row gap-2 border-t border-border pt-4">
+                        <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={form.processing} className="flex-1">
+                            {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar cambios</>}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
