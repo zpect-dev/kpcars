@@ -464,6 +464,16 @@ active.inversion_id = inversionId;
         },
     }), [vehiculos]);
 
+    const alertCounts = useMemo(() => ({
+        vtvExpired:    vehiculos.filter((v) => vtvStatus(v.fecha_vencimiento_vtv) === 'expired').length,
+        vtvWarning:    vehiculos.filter((v) => vtvStatus(v.fecha_vencimiento_vtv) === 'warning').length,
+        gncExpired:    vehiculos.filter((v) => vtvStatus(v.fecha_vencimiento_gnc) === 'expired').length,
+        seguroExpired: vehiculos.filter((v) => seguroStatus(v.seguro_vencimiento) === 'expired').length,
+        seguroWarning: vehiculos.filter((v) => seguroStatus(v.seguro_vencimiento) === 'warning').length,
+        sinConductor:  vehiculos.filter((v) => !v.user_id).length,
+        docsFaltan:    vehiculos.filter(faltaAlgunDocVehiculo).length,
+    }), [vehiculos]);
+
     // --- Create form ---
     const createForm = useForm({
         patente: '',
@@ -922,6 +932,61 @@ params.set('search', search.trim());
                     )}
                 </div>
 
+                {/* Alert overview chips */}
+                {!isInversor && (alertCounts.vtvExpired + alertCounts.gncExpired + alertCounts.seguroExpired + alertCounts.vtvWarning + alertCounts.seguroWarning + alertCounts.sinConductor + alertCounts.docsFaltan) > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        {alertCounts.vtvExpired > 0 && (
+                            <button type="button" onClick={() => setFilterVtv('expired')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                {alertCounts.vtvExpired} VTV vencida{alertCounts.vtvExpired !== 1 ? 's' : ''}
+                            </button>
+                        )}
+                        {alertCounts.gncExpired > 0 && (
+                            <button type="button" onClick={() => setFilterGnc('expired')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                {alertCounts.gncExpired} GNC vencido{alertCounts.gncExpired !== 1 ? 's' : ''}
+                            </button>
+                        )}
+                        {alertCounts.seguroExpired > 0 && (
+                            <button type="button" onClick={() => setFilterSeguro('expired')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                {alertCounts.seguroExpired} seguro{alertCounts.seguroExpired !== 1 ? 's' : ''} vencido{alertCounts.seguroExpired !== 1 ? 's' : ''}
+                            </button>
+                        )}
+                        {alertCounts.vtvWarning > 0 && (
+                            <button type="button" onClick={() => setFilterVtv('warning')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                {alertCounts.vtvWarning} VTV por vencer
+                            </button>
+                        )}
+                        {alertCounts.seguroWarning > 0 && (
+                            <button type="button" onClick={() => setFilterSeguro('warning')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                {alertCounts.seguroWarning} seguro{alertCounts.seguroWarning !== 1 ? 's' : ''} por vencer
+                            </button>
+                        )}
+                        {alertCounts.sinConductor > 0 && (
+                            <button type="button" onClick={() => setAsignacionFiltro('sin')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                {alertCounts.sinConductor} sin conductor
+                            </button>
+                        )}
+                        {alertCounts.docsFaltan > 0 && (
+                            <button type="button" onClick={() => setFilterDocs('faltan')}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                {alertCounts.docsFaltan} doc{alertCounts.docsFaltan !== 1 ? 's' : ''} faltante{alertCounts.docsFaltan !== 1 ? 's' : ''}
+                            </button>
+                        )}
+                    </div>
+                )}
+
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
                     <div className="flex flex-wrap items-end gap-3">
@@ -1301,10 +1366,10 @@ params.set('search', search.trim());
                     </div>
                 </div>
 
-                {/* Tabla + cards */}
-                <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                {/* Tabla desktop */}
+                <div className="hidden w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
                     {/* Desktop */}
-                    <div className="hidden overflow-x-auto md:block">
+                    <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm text-muted-foreground">
                             <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
                                 <tr>
@@ -1564,202 +1629,141 @@ params.set('search', search.trim());
                         </table>
                     </div>
 
-                    {/* Mobile cards */}
-                    <ul className="divide-y divide-border md:hidden">
-                        {filteredVehiculos.length === 0 ? (
-                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No hay vehículos que coincidan con los filtros.
-                            </li>
-                        ) : (
-                            filteredVehiculos.map((vehiculo) => (
-                                <li
-                                    key={vehiculo.id}
-                                    onClick={() => !isInversor && openEdit(vehiculo)}
-                                    className={cn('flex flex-col gap-2 p-4', !isInversor && 'cursor-pointer hover:bg-muted/40 transition-colors')}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="flex flex-col items-start gap-1">
-                                            <span className="font-mono text-base font-semibold text-foreground">
-                                                {vehiculo.patente}
-                                            </span>
-                                            {vehiculo.estado_patente && (() => {
-                                                const b = estadoPatenteBadge(vehiculo.estado_patente);
-
-                                                return (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
-                                                        title="Editar estado de la patente"
-                                                        className={cn(
-                                                            'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
-                                                            b.badge,
-                                                        )}
-                                                    >
-                                                        <span className={cn('h-1 w-1 rounded-full', b.dot)} />
-                                                        Patente: {b.label}
-                                                    </button>
-                                                );
-                                            })()}
-                                        </div>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="-mt-1 -mr-2 shrink-0"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                    <span className="sr-only">
-                                                        Acciones
-                                                    </span>
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>
-                                                    Acciones
-                                                </DropdownMenuLabel>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onSelect={() =>
-                                                        router.get(
-                                                            `/vehiculos/${vehiculo.id}/asignaciones`,
-                                                        )
-                                                    }
-                                                >
-                                                    <History className="h-4 w-4" />
-                                                    Historial conductores
-                                                </DropdownMenuItem>
-                                                {!isInversor &&
-                                                    vehiculo.user_id && (
-                                                        <DropdownMenuItem
-                                                            onSelect={() =>
-                                                                setUnassigningVehiculo(
-                                                                    vehiculo,
-                                                                )
-                                                            }
-                                                        >
-                                                            <UserX className="h-4 w-4" />
-                                                            Desasignar conductor
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                {!isInversor && (
-                                                    <>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onSelect={() =>
-                                                                openEdit(
-                                                                    vehiculo,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                            Editar
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onSelect={() =>
-                                                                setDeletingVehiculo(
-                                                                    vehiculo,
-                                                                )
-                                                            }
-                                                            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                            Eliminar
-                                                        </DropdownMenuItem>
-                                                    </>
-                                                )}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-foreground">
-                                            {vehiculo.marca} {vehiculo.modelo}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                            Año: {vehiculo.anio}
-                                        </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {!hideEmpresa &&
-                                            (vehiculo.empresa?.nombre ? (
-                                                <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
-                                                    {vehiculo.empresa.nombre}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-muted-foreground italic">
-                                                    Sin empresa
-                                                </span>
-                                            ))}
-                                        {vehiculo.inversion?.nombre ? (
-                                            <span className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground uppercase">
-                                                {vehiculo.inversion.nombre}
-                                            </span>
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground italic">
-                                                Sin inversión
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        Conductor:{' '}
-                                        {vehiculo.user?.name ? (
-                                            <span className="font-medium text-foreground">
-                                                {vehiculo.user.name}
-                                            </span>
-                                        ) : (
-                                            <span className="italic">
-                                                No asignado
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        VTV:{' '}
-                                        {vehiculo.fecha_vencimiento_vtv ? (
-                                            <span
-                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_vtv)}`}
-                                            >
-                                                {formatVtv(
-                                                    vehiculo.fecha_vencimiento_vtv,
-                                                )}
-                                            </span>
-                                        ) : (
-                                            <span className="italic">N/A</span>
-                                        )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        GNC:{' '}
-                                        {vehiculo.fecha_vencimiento_gnc ? (
-                                            <span
-                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${vtvColorClass(vehiculo.fecha_vencimiento_gnc)}`}
-                                            >
-                                                {formatVtv(
-                                                    vehiculo.fecha_vencimiento_gnc,
-                                                )}
-                                            </span>
-                                        ) : (
-                                            <span className="italic">N/A</span>
-                                        )}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        Seguro:{' '}
-                                        {vehiculo.seguro_vencimiento ? (
-                                            <span
-                                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${seguroColorClass(vehiculo.seguro_vencimiento)}`}
-                                            >
-                                                {formatSeguro(
-                                                    vehiculo.seguro_vencimiento,
-                                                )}
-                                            </span>
-                                        ) : (
-                                            <span className="italic">N/A</span>
-                                        )}
-                                    </div>
-                                </li>
-                            ))
-                        )}
-                    </ul>
                 </div>
+            </div>
+
+            {/* Tarjetas mobile */}
+            <div className="flex flex-col gap-2 pb-2 md:hidden">
+                {filteredVehiculos.length === 0 ? (
+                    <div className="py-12 text-center text-sm text-muted-foreground">
+                        No hay vehículos que coincidan con los filtros.
+                    </div>
+                ) : (
+                    filteredVehiculos.map((vehiculo) => {
+                        const alertBorder = (
+                            vtvStatus(vehiculo.fecha_vencimiento_vtv) === 'expired' ||
+                            vtvStatus(vehiculo.fecha_vencimiento_gnc) === 'expired' ||
+                            seguroStatus(vehiculo.seguro_vencimiento) === 'expired'
+                        ) ? 'border-l-red-500' : (
+                            vtvStatus(vehiculo.fecha_vencimiento_vtv) === 'warning' ||
+                            vtvStatus(vehiculo.fecha_vencimiento_gnc) === 'warning' ||
+                            seguroStatus(vehiculo.seguro_vencimiento) === 'warning' ||
+                            !vehiculo.user_id ||
+                            faltaAlgunDocVehiculo(vehiculo)
+                        ) ? 'border-l-amber-500' : 'border-l-border';
+
+                        return (
+                            <div
+                                key={vehiculo.id}
+                                onClick={() => !isInversor && openEdit(vehiculo)}
+                                className={cn(
+                                    'flex flex-col gap-2 rounded-xl border border-l-4 bg-card p-3 shadow-sm transition-colors',
+                                    !isInversor && 'cursor-pointer active:bg-muted/30',
+                                    alertBorder,
+                                )}
+                            >
+                                {/* Patente + acciones */}
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <div className="font-mono text-base font-semibold text-foreground">{vehiculo.patente}</div>
+                                        <div className="text-xs text-muted-foreground">{vehiculo.marca} {vehiculo.modelo} · {vehiculo.anio}</div>
+                                    </div>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="-mr-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                <MoreHorizontal className="h-4 w-4" />
+                                                <span className="sr-only">Acciones</span>
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onSelect={() => router.get(`/vehiculos/${vehiculo.id}/asignaciones`)}>
+                                                <History className="h-4 w-4" /> Historial conductores
+                                            </DropdownMenuItem>
+                                            {!isInversor && (
+                                                <DropdownMenuItem onSelect={() => openDocumentos(vehiculo)}>
+                                                    <FileText className="h-4 w-4" /> Documentos
+                                                </DropdownMenuItem>
+                                            )}
+                                            {!isInversor && vehiculo.user_id && (
+                                                <DropdownMenuItem onSelect={() => setUnassigningVehiculo(vehiculo)}>
+                                                    <UserX className="h-4 w-4" /> Desasignar conductor
+                                                </DropdownMenuItem>
+                                            )}
+                                            {!isInversor && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onSelect={() => openEdit(vehiculo)}>
+                                                        <Pencil className="h-4 w-4" /> Editar
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => setDeletingVehiculo(vehiculo)} className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400">
+                                                        <Trash2 className="h-4 w-4" /> Eliminar
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+
+                                {/* Conductor */}
+                                <div>
+                                    {vehiculo.user?.name ? (
+                                        <span className="text-sm text-foreground">{vehiculo.user.name}</span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                            <UserX className="h-3 w-3" /> Sin conductor
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Chips de estado */}
+                                <div className="flex flex-wrap gap-1.5">
+                                    {vehiculo.inversion?.nombre && (
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+                                            {vehiculo.inversion.nombre}
+                                        </span>
+                                    )}
+                                    {vehiculo.estado_patente && (() => {
+                                        const b = estadoPatenteBadge(vehiculo.estado_patente);
+                                        return (
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
+                                                className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80', b.badge)}>
+                                                <span className={cn('h-1.5 w-1.5 rounded-full', b.dot)} />
+                                                {b.label}
+                                            </button>
+                                        );
+                                    })()}
+                                    {vehiculo.fecha_vencimiento_vtv ? (
+                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_vtv))}>
+                                            VTV {formatVtv(vehiculo.fecha_vencimiento_vtv)}
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin VTV</span>
+                                    )}
+                                    {vehiculo.fecha_vencimiento_gnc && (
+                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_gnc))}>
+                                            GNC {formatVtv(vehiculo.fecha_vencimiento_gnc)}
+                                        </span>
+                                    )}
+                                    {vehiculo.seguro_vencimiento ? (
+                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', seguroColorClass(vehiculo.seguro_vencimiento))}>
+                                            Seg. {formatSeguro(vehiculo.seguro_vencimiento)}
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin seguro</span>
+                                    )}
+                                    {faltaAlgunDocVehiculo(vehiculo) && (
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); openDocumentos(vehiculo); }}
+                                            className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                            Faltan docs
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
             </div>
 
             {/* Edit Dialog */}
