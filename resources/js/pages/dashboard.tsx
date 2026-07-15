@@ -140,7 +140,7 @@ export default function Dashboard({
 
     useEffect(() => {
         if (isInversor) {
-            router.replace('/mi-cuenta');
+            router.visit('/mi-cuenta', { replace: true });
         }
     }, [isInversor]);
 

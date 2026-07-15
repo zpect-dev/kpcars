@@ -247,7 +247,7 @@ export function AppointmentCalendar({
 
                 {/* Legend */}
                 {showLegend && viewMode !== 'week' && (
-                    <div className={cn("flex flex-wrap items-center gap-3 text-[10px] sm:text-xs font-medium text-muted-foreground", viewMode === 'week' ? "mt-4" : "mt-8")}>
+                    <div className={cn("flex flex-wrap items-center gap-3 text-[10px] sm:text-xs font-medium text-muted-foreground mt-8")}>
                         {!isFilterMode ? (
                             <>
                                 <div className="flex items-center gap-2">
