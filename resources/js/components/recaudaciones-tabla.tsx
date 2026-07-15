@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
 import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -300,11 +300,33 @@ function useRecaudacionForm(fila: RecaudacionFila, endpoint: (fila: RecaudacionF
     return { form, efectivo, transferencia, descuento, total, precioEfectivo, excede, estado, deuda, save, onKeyDown };
 }
 
+// Buscador inicial: se toma del query `?q=` para que sobreviva al cambio de
+// empresa (el switch hace redirect()->back() a la misma URL con su query).
+function initialSearch(): string {
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('q') ?? '';
+}
+
 export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: RecaudacionesTablaProps) {
-    const [search, setSearch] = useState('');
+    const [search, setSearch] = useState(initialSearch);
     const [estadoFiltro, setEstadoFiltro] = useState<'all' | 'pagado' | 'deuda'>('all');
     const [sortKey, setSortKey] = useState<SortCol | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    // Reflejar el buscador en la URL (sin recargar) para conservarlo al
+    // cambiar de empresa u otras navegaciones que vuelvan a esta página.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        if (search.trim()) {
+            params.set('q', search);
+        } else {
+            params.delete('q');
+        }
+        const qs = params.toString();
+        const url = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+        window.history.replaceState(window.history.state, '', url);
+    }, [search]);
 
     function toggleSort(key: SortCol) {
         if (sortKey === key) {

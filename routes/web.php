@@ -222,6 +222,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('mi-cuenta', [MiCuentaController::class, 'index'])->name('mi-cuenta.index');
         Route::get('pdf/mi-cuenta', [PdfController::class, 'miCuenta'])->name('pdf.mi-cuenta');
         Route::get('excel/mi-cuenta', [ExcelController::class, 'miCuenta'])->name('excel.mi-cuenta');
+        // Estado del cierre para el socio (recaudación, gastos y sueldo del cierre).
+        Route::get('mi-cuenta/cierres/{cierreSueldo}', [MiCuentaController::class, 'estadoCierre'])->name('mi-cuenta.estado-cierre');
+        Route::get('pdf/mi-cuenta/cierres/{cierreSueldo}', [PdfController::class, 'miCuentaCierre'])->name('pdf.mi-cuenta-cierre');
     });
 });
 
