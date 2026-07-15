@@ -260,7 +260,7 @@ class MultaController extends Controller
         $multas = $query->get()->map(function (Multa $m) {
             // Importe vigente hoy (con el descuento CABA si corresponde) y lo
             // efectivamente cobrado / adeudado, contemplando pagos parciales.
-            $efectivo = $m->punto_rojo ? 0.0 : $this->montoACobrar($m);
+            $efectivo = $m->punto_rojo ? 0.0 : $m->montoACobrar();
             $cobrado = (float) $m->monto_cobrado;
 
             return [
@@ -374,7 +374,7 @@ class MultaController extends Controller
             return redirect()->back()->with('success', 'Multa cobrada por completo.');
         }
 
-        $falta = max(round($this->montoACobrar($multa) - (float) $multa->monto_cobrado, 2), 0);
+        $falta = max(round($multa->montoACobrar() - (float) $multa->monto_cobrado, 2), 0);
 
         return redirect()->back()->with('success', 'Pago parcial registrado. Falta $'.number_format($falta, 2, ',', '.').'.');
     }
@@ -405,7 +405,7 @@ class MultaController extends Controller
     private function recomputarCobro(Multa $multa): bool
     {
         $suma = round((float) $multa->pagos()->sum('monto'), 2);
-        $total = $this->montoACobrar($multa);
+        $total = $multa->montoACobrar();
         $completo = $suma > 0 && $suma + 0.001 >= $total;
 
         $multa->update([
@@ -415,19 +415,5 @@ class MultaController extends Controller
         ]);
 
         return $completo;
-    }
-
-    /**
-     * Total a cobrar hoy: 50% si es de CABA y todavía no venció, si no el total.
-     */
-    private function montoACobrar(Multa $multa): float
-    {
-        $monto = (float) $multa->monto;
-
-        $conDescuento = $multa->jurisdiccion === 'CABA'
-            && $multa->fecha_vencimiento !== null
-            && today()->lte($multa->fecha_vencimiento);
-
-        return $conDescuento ? $monto * 0.5 : $monto;
     }
 }

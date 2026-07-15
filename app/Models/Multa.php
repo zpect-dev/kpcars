@@ -51,4 +51,31 @@ class Multa extends Model
     {
         return $this->hasMany(MultaPago::class)->orderByDesc('fecha')->orderByDesc('id');
     }
+
+    /**
+     * Total a cobrar hoy: 50% si es de CABA y todavía no venció, si no el total.
+     */
+    public function montoACobrar(): float
+    {
+        $monto = (float) $this->monto;
+
+        $conDescuento = $this->jurisdiccion === 'CABA'
+            && $this->fecha_vencimiento !== null
+            && today()->lte($this->fecha_vencimiento);
+
+        return $conDescuento ? $monto * 0.5 : $monto;
+    }
+
+    /**
+     * Saldo que el chofer todavía adeuda, contemplando pagos parciales. Cero si
+     * es de punto rojo (sin importe) o si ya quedó cobrada por completo.
+     */
+    public function montoAdeudado(): float
+    {
+        if ($this->punto_rojo || $this->cobrado) {
+            return 0.0;
+        }
+
+        return max(round($this->montoACobrar() - (float) $this->monto_cobrado, 2), 0);
+    }
 }

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AppointmentSyncController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\MultaController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\VehiculoController;
 use App\Http\Middleware\EnsurePasswordChanged;
@@ -33,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::patch('me', [ProfileController::class, 'update']);
         Route::get('mi-vehiculo', [VehiculoController::class, 'show']);
         Route::get('mi-historial-vehiculos', [VehiculoController::class, 'history']);
+        Route::get('mis-multas', [MultaController::class, 'index']);
         Route::get('mis-turnos', [AppointmentController::class, 'index']);
         Route::post('mis-turnos', [AppointmentController::class, 'store']);
 

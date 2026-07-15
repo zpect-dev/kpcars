@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\BuildEstadoCierreSocioAction;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoAbono;
 use App\Models\CierreSueldoPago;
-use App\Models\CierreSueldoParticipacion;
 use App\Models\Scopes\TenantScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -90,26 +88,5 @@ class MiCuentaController extends Controller
             'cierres' => $cierres,
             'tasaActual' => $tasaActual ? (float) $tasaActual : null,
         ]);
-    }
-
-    /**
-     * Estado del cierre para el socio autenticado: recaudación (sus inversiones
-     * + total de la empresa), gastos por categoría (flota + globales
-     * prorrateados) y su sueldo. Sólo puede ver los cierres en los que participó.
-     */
-    public function estadoCierre(Request $request, CierreSueldo $cierreSueldo, BuildEstadoCierreSocioAction $action): Response
-    {
-        Gate::authorize('view-mi-cuenta');
-
-        $user = $request->user();
-
-        $participo = CierreSueldoParticipacion::withoutGlobalScope(TenantScope::class)
-            ->where('cierre_sueldo_id', $cierreSueldo->id)
-            ->where('user_id', $user->id)
-            ->exists();
-
-        abort_unless($participo, 404);
-
-        return Inertia::render('MiCuenta/EstadoCierre', $action->execute($cierreSueldo, $user));
     }
 }

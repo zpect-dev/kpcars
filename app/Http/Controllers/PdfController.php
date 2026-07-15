@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Actions\BuildEstadoCierreSocioAction;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Models\AperturaRecaudacion;
 use App\Models\Appointment;
@@ -14,7 +13,6 @@ use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoPago;
-use App\Models\CierreSueldoParticipacion;
 use App\Models\Cobro;
 use App\Models\Empresa;
 use App\Models\Gasto;
@@ -413,31 +411,6 @@ class PdfController extends Controller
     /**
      * Generate PDF for the current user's Mi Cuenta.
      */
-    /**
-     * PDF del estado de un cierre para el socio autenticado (recaudación,
-     * gastos por categoría y sueldo). Sólo cierres en los que participó.
-     */
-    public function miCuentaCierre(Request $request, CierreSueldo $cierreSueldo, BuildEstadoCierreSocioAction $action): Response
-    {
-        Gate::authorize('view-mi-cuenta');
-
-        $user = $request->user();
-
-        $participo = CierreSueldoParticipacion::withoutGlobalScope(TenantScope::class)
-            ->where('cierre_sueldo_id', $cierreSueldo->id)
-            ->where('user_id', $user->id)
-            ->exists();
-
-        abort_unless($participo, 404);
-
-        $estado = $action->execute($cierreSueldo, $user);
-
-        $pdf = Pdf::loadView('pdf.estado-cierre-socio', ['estado' => $estado])
-            ->setPaper('a4', 'portrait');
-
-        return $pdf->download('estado-cierre-'.$cierreSueldo->id.'-'.$user->id.'.pdf');
-    }
-
     public function miCuenta(Request $request): Response
     {
         // Acceso: middleware role:inversor. El Gate valida que tenga inversiones.
