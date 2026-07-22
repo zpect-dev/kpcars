@@ -83,28 +83,48 @@ interface Props {
     maxSlots: number;
 }
 
-const STATUS_STYLES: Record<AppointmentStatus, string> = {
-    agendado: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-    en_proceso: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-    completado: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-    cancelado: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+// Icono + color por estado. Cada estado tiene su propio color de acento e ícono
+// para poder distinguirlos de un vistazo, sin depender solo del tono del badge.
+const STATUS_META: Record<AppointmentStatus, { label: string; icon: typeof Clock; badge: string; border: string; cardBg: string }> = {
+    agendado: {
+        label: 'Agendado',
+        icon: Clock,
+        badge: 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/20',
+        border: 'border-l-amber-500',
+        cardBg: 'bg-amber-50/50 dark:bg-amber-500/[0.06]',
+    },
+    en_proceso: {
+        label: 'En curso',
+        icon: Wrench,
+        badge: 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/20',
+        border: 'border-l-blue-500',
+        cardBg: 'bg-blue-50/50 dark:bg-blue-500/[0.06]',
+    },
+    completado: {
+        // Badge sólido (no pastel) para que un turno terminado resalte de inmediato en la lista.
+        label: 'Completado',
+        icon: CheckCircle2,
+        badge: 'bg-emerald-600 text-white font-bold shadow-sm dark:bg-emerald-500 dark:text-emerald-950',
+        border: 'border-l-emerald-500',
+        cardBg: 'bg-emerald-50/50 dark:bg-emerald-500/[0.06]',
+    },
+    cancelado: {
+        // Gris en vez de rojo: el rojo queda reservado exclusivamente para "Emergencia",
+        // así ambos conceptos no compiten por el mismo color.
+        label: 'Cancelado',
+        icon: Ban,
+        badge: 'bg-zinc-200 text-zinc-600 ring-1 ring-inset ring-zinc-400/30 dark:bg-zinc-700/40 dark:text-zinc-400 dark:ring-zinc-500/30',
+        border: 'border-l-zinc-400',
+        cardBg: 'bg-zinc-100/60 dark:bg-zinc-500/[0.06]',
+    },
 };
 
-const STATUS_LABEL: Record<AppointmentStatus, string> = {
-    agendado: 'Agendado',
-    en_proceso: 'En curso',
-    completado: 'Completado',
-    cancelado: 'Cancelado',
-};
-
-const TYPE_STYLES: Record<AppointmentType, string> = {
-    normal: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-    emergencia: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-};
-
-const TYPE_LABEL: Record<AppointmentType, string> = {
-    normal: 'Normal',
-    emergencia: 'Emergencia',
+// Prioridad visual: lo urgente/pendiente primero, lo cerrado (completado/cancelado) al final.
+const STATUS_ORDER: Record<AppointmentStatus, number> = {
+    en_proceso: 0,
+    agendado: 1,
+    completado: 2,
+    cancelado: 3,
 };
 
 // Dot color + active bg/text per status tab
@@ -226,8 +246,11 @@ export default function AppointmentsIndex({
     }), [appointments.data]);
 
     const filteredAppointments = useMemo(() => {
-        if (statusTab === 'all') return appointments.data;
-        return appointments.data.filter((a) => a.status === statusTab);
+        const data = statusTab === 'all'
+            ? appointments.data
+            : appointments.data.filter((a) => a.status === statusTab);
+        // Orden por estado: lo pendiente/en curso arriba, lo completado/cancelado abajo.
+        return [...data].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
     }, [appointments.data, statusTab]);
 
     function clearFilters() {
@@ -569,10 +592,19 @@ export default function AppointmentsIndex({
                             No hay turnos que coincidan con los filtros.
                         </div>
                     ) : (
-                        filteredAppointments.map((a) => (
+                        filteredAppointments.map((a) => {
+                            const statusMeta = STATUS_META[a.status];
+                            const StatusIcon = statusMeta.icon;
+                            const isEmergencia = a.type === 'emergencia';
+                            return (
                             <div
                                 key={a.id}
-                                className="flex gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+                                className={cn(
+                                    'flex gap-3 rounded-xl border border-border p-4 shadow-sm border-l-4 transition-colors',
+                                    statusMeta.border,
+                                    isEmergencia ? 'border-t-4 border-t-red-500 bg-red-50/60 dark:bg-red-950/10' : statusMeta.cardBg,
+                                    a.status === 'cancelado' && 'opacity-70',
+                                )}
                             >
                                 {/* Number badge */}
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
@@ -587,17 +619,18 @@ export default function AppointmentsIndex({
                                             <span className="font-semibold leading-snug text-foreground">
                                                 {a.service}
                                             </span>
+                                            {isEmergencia && (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
+                                                    <AlertTriangle className="h-3 w-3" />
+                                                    Emergencia
+                                                </span>
+                                            )}
                                             <span className={cn(
-                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                                TYPE_STYLES[a.type],
+                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                statusMeta.badge,
                                             )}>
-                                                {TYPE_LABEL[a.type]}
-                                            </span>
-                                            <span className={cn(
-                                                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                                STATUS_STYLES[a.status],
-                                            )}>
-                                                {STATUS_LABEL[a.status]}
+                                                <StatusIcon className="h-3 w-3" />
+                                                {statusMeta.label}
                                             </span>
                                         </div>
 
@@ -690,7 +723,8 @@ export default function AppointmentsIndex({
                                     )}
                                 </div>
                             </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
