@@ -1,6 +1,6 @@
 import { useForm } from '@inertiajs/react';
-import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail, Wallet, X, type LucideIcon } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -258,6 +258,108 @@ function SortHeader({
     );
 }
 
+type MetodoPago = 'efectivo' | 'transferencia' | 'mixto';
+type MetodoFiltro = 'all' | MetodoPago;
+
+// Clasifica una fila por método de pago según lo cargado. Los que no pagaron
+// nada (efectivo=0 y transferencia=0) devuelven null y no entran al desglose.
+function clasificarMetodo(f: RecaudacionFila): MetodoPago | null {
+    const e = Number(f.efectivo) > 0;
+    const t = Number(f.transferencia) > 0;
+    if (e && t) return 'mixto';
+    if (e) return 'efectivo';
+    if (t) return 'transferencia';
+    return null;
+}
+
+const METODOS: { key: MetodoPago; label: string; icon: LucideIcon; color: string }[] = [
+    { key: 'efectivo',      label: 'Efectivo',      icon: Banknote,       color: 'text-emerald-500' },
+    { key: 'transferencia', label: 'Transferencia', icon: ArrowLeftRight, color: 'text-blue-500' },
+    { key: 'mixto',         label: 'Mixto',         icon: Wallet,         color: 'text-violet-500' },
+];
+
+const METODO_LABEL: Record<MetodoPago, string> = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transferencia',
+    mixto: 'Mixto',
+};
+
+// Card con popover en hover que desglosa un estado (pagado / deuda) por método
+// de pago. Cada fila del popover filtra la lista por ese estado + método.
+function MetodoBreakdownCard({
+    estado,
+    counts,
+    estadoFiltro,
+    metodoFiltro,
+    onSelect,
+    children,
+}: {
+    estado: 'pagado' | 'deuda';
+    counts: Record<MetodoPago, number>;
+    estadoFiltro: 'all' | 'pagado' | 'deuda';
+    metodoFiltro: MetodoFiltro;
+    onSelect: (estado: 'pagado' | 'deuda', metodo: MetodoPago) => void;
+    children: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(false);
+    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const cancelClose = () => {
+        if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    };
+    const openNow = () => { cancelClose(); setOpen(true); };
+    const scheduleClose = () => { cancelClose(); closeTimer.current = setTimeout(() => setOpen(false), 90); };
+
+    const total = counts.efectivo + counts.transferencia + counts.mixto;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild onMouseEnter={openNow} onMouseLeave={scheduleClose}>
+                {children}
+            </PopoverTrigger>
+            <PopoverContent
+                align="center"
+                sideOffset={6}
+                className="w-56 p-1"
+                onMouseEnter={openNow}
+                onMouseLeave={scheduleClose}
+            >
+                <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    {estado === 'pagado' ? 'Pagados por método' : 'Pago parcial por método'}
+                </p>
+                {total === 0 ? (
+                    <p className="px-2 py-2 text-xs italic text-muted-foreground">Sin pagos registrados.</p>
+                ) : (
+                    <>
+                        {METODOS.map((m) => {
+                            const count = counts[m.key];
+                            const active = estadoFiltro === estado && metodoFiltro === m.key;
+                            return (
+                                <button
+                                    key={m.key}
+                                    type="button"
+                                    disabled={count === 0}
+                                    onClick={() => onSelect(estado, m.key)}
+                                    className={cn(
+                                        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                                        active ? 'bg-primary/10' : 'hover:bg-muted',
+                                        count === 0 && 'cursor-default opacity-40 hover:bg-transparent',
+                                    )}
+                                >
+                                    <m.icon className={cn('h-4 w-4 shrink-0', m.color)} />
+                                    <span className={cn('flex-1 text-left', active ? 'font-medium text-primary' : 'text-foreground')}>{m.label}</span>
+                                    <span className="font-semibold tabular-nums text-foreground">{count}</span>
+                                </button>
+                            );
+                        })}
+                        <p className="px-2 pt-1 text-[10px] text-muted-foreground">Click para filtrar</p>
+                    </>
+                )}
+            </PopoverContent>
+        </Popover>
+    );
+}
+
 interface RecaudacionesTablaProps {
     filas: RecaudacionFila[];
     editable: boolean;
@@ -310,6 +412,7 @@ function initialSearch(): string {
 export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: RecaudacionesTablaProps) {
     const [search, setSearch] = useState(initialSearch);
     const [estadoFiltro, setEstadoFiltro] = useState<'all' | 'pagado' | 'deuda'>('all');
+    const [metodoFiltro, setMetodoFiltro] = useState<MetodoFiltro>('all');
     const [sortKey, setSortKey] = useState<SortCol | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -337,10 +440,29 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
         }
     }
 
+    // Cambiar el estado desde los botones resetea el filtro de método.
+    function cambiarEstado(val: 'all' | 'pagado' | 'deuda') {
+        setEstadoFiltro(val);
+        setMetodoFiltro('all');
+    }
+
+    // Click en una fila del popover de método: filtra por estado + método.
+    // Si ya estaba activo ese mismo par, se limpia (toggle).
+    function seleccionarMetodo(estado: 'pagado' | 'deuda', metodo: MetodoPago) {
+        if (estadoFiltro === estado && metodoFiltro === metodo) {
+            setEstadoFiltro('all');
+            setMetodoFiltro('all');
+        } else {
+            setEstadoFiltro(estado);
+            setMetodoFiltro(metodo);
+        }
+    }
+
     const filtradas = useMemo(() => {
         const q = search.toLowerCase().trim();
         let result = filas.filter((f) => {
             if (estadoFiltro !== 'all' && f.estado !== estadoFiltro) return false;
+            if (metodoFiltro !== 'all' && clasificarMetodo(f) !== metodoFiltro) return false;
             if (q) return f.patente.toLowerCase().includes(q) || f.chofer.toLowerCase().includes(q);
             return true;
         });
@@ -357,7 +479,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
         }
 
         return result;
-    }, [filas, search, estadoFiltro, sortKey, sortDir]);
+    }, [filas, search, estadoFiltro, metodoFiltro, sortKey, sortDir]);
 
     // Los stats se calculan SIEMPRE sobre el set completo (`filas`), no sobre
     // `filtradas`: la búsqueda y los filtros de estado no deben recalcular las
@@ -370,6 +492,21 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
         deudores:     filas.filter((f) => f.estado === 'deuda').length,
         totalDeuda:   filas.reduce((s, f) => s + Number(f.deuda), 0),
     }), [filas]);
+
+    // Desglose por método de pago (efectivo / transferencia / mixto), separado
+    // por estado. Se calcula sobre el set completo, igual que los stats, para
+    // que el tooltip no cambie al buscar o filtrar.
+    const metodoBreakdown = useMemo(() => {
+        const vacio = (): Record<MetodoPago, number> => ({ efectivo: 0, transferencia: 0, mixto: 0 });
+        const pagado = vacio();
+        const deuda = vacio();
+        for (const f of filas) {
+            const m = clasificarMetodo(f);
+            if (!m) continue;
+            (f.estado === 'pagado' ? pagado : deuda)[m]++;
+        }
+        return { pagado, deuda };
+    }, [filas]);
 
     return (
         <div className="flex flex-col gap-4">
@@ -401,7 +538,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                                 <button
                                     key={val}
                                     type="button"
-                                    onClick={() => setEstadoFiltro(val)}
+                                    onClick={() => cambiarEstado(val)}
                                     className={cn(
                                         'flex h-full items-center justify-center rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                         estadoFiltro === val
@@ -416,6 +553,19 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                             ))}
                         </div>
                     </div>
+                    {metodoFiltro !== 'all' && (
+                        <div className="flex w-full flex-col gap-2 lg:w-auto">
+                            <Label>Método</Label>
+                            <button
+                                type="button"
+                                onClick={() => setMetodoFiltro('all')}
+                                className="flex h-9 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 text-xs font-medium text-primary transition-colors hover:bg-primary/20"
+                            >
+                                {METODO_LABEL[metodoFiltro]}
+                                <X className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -448,26 +598,30 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                             </div>
                         </div>
                         <div className="overflow-hidden rounded-xl border border-green-500/20 bg-green-500/5 shadow-sm">
-                            <div className="flex items-center justify-between px-4 py-2.5">
-                                <div className="flex items-center gap-2.5">
-                                    <Users className="h-4 w-4 text-green-500" />
-                                    <span className="text-sm text-green-700 dark:text-green-400">Pagados</span>
+                            <MetodoBreakdownCard estado="pagado" counts={metodoBreakdown.pagado} estadoFiltro={estadoFiltro} metodoFiltro={metodoFiltro} onSelect={seleccionarMetodo}>
+                                <div className="flex cursor-pointer items-center justify-between px-4 py-2.5 transition-colors hover:bg-green-500/10">
+                                    <div className="flex items-center gap-2.5">
+                                        <Users className="h-4 w-4 text-green-500" />
+                                        <span className="text-sm text-green-700 dark:text-green-400">Pagados</span>
+                                    </div>
+                                    <span className="font-bold text-foreground">
+                                        {stats.pagados}
+                                        <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
+                                    </span>
                                 </div>
-                                <span className="font-bold text-foreground">
-                                    {stats.pagados}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between border-t border-green-500/20 px-4 py-2.5">
-                                <div className="flex items-center gap-2.5">
-                                    <AlertCircle className="h-4 w-4 text-red-500" />
-                                    <span className="text-sm text-red-700 dark:text-red-400">Deben</span>
+                            </MetodoBreakdownCard>
+                            <MetodoBreakdownCard estado="deuda" counts={metodoBreakdown.deuda} estadoFiltro={estadoFiltro} metodoFiltro={metodoFiltro} onSelect={seleccionarMetodo}>
+                                <div className="flex cursor-pointer items-center justify-between border-t border-green-500/20 px-4 py-2.5 transition-colors hover:bg-green-500/10">
+                                    <div className="flex items-center gap-2.5">
+                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                        <span className="text-sm text-red-700 dark:text-red-400">Deben</span>
+                                    </div>
+                                    <span className="font-bold text-foreground">
+                                        {stats.deudores}
+                                        <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
+                                    </span>
                                 </div>
-                                <span className="font-bold text-foreground">
-                                    {stats.deudores}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
-                                </span>
-                            </div>
+                            </MetodoBreakdownCard>
                         </div>
                         <div className="overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5 shadow-sm">
                             <div className="flex items-center justify-between px-4 py-2.5">
@@ -511,26 +665,30 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
 
                         {/* Grupo 2: conteo pagados / deben */}
                         <div className="flex overflow-hidden rounded-xl border border-green-500/20 bg-green-500/5 shadow-sm divide-x divide-green-500/20">
-                            <div className="flex flex-col gap-1 px-4 py-3">
-                                <div className="flex items-center gap-1.5">
-                                    <Users className="h-4 w-4 text-green-500" />
-                                    <p className="text-xs text-green-700 dark:text-green-400">Pagados</p>
+                            <MetodoBreakdownCard estado="pagado" counts={metodoBreakdown.pagado} estadoFiltro={estadoFiltro} metodoFiltro={metodoFiltro} onSelect={seleccionarMetodo}>
+                                <div className="flex cursor-pointer flex-col gap-1 px-4 py-3 transition-colors hover:bg-green-500/10">
+                                    <div className="flex items-center gap-1.5">
+                                        <Users className="h-4 w-4 text-green-500" />
+                                        <p className="text-xs text-green-700 dark:text-green-400">Pagados</p>
+                                    </div>
+                                    <p className="font-bold text-foreground">
+                                        {stats.pagados}
+                                        <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
+                                    </p>
                                 </div>
-                                <p className="font-bold text-foreground">
-                                    {stats.pagados}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
-                                </p>
-                            </div>
-                            <div className="flex flex-col gap-1 px-4 py-3">
-                                <div className="flex items-center gap-1.5">
-                                    <AlertCircle className="h-4 w-4 text-red-500" />
-                                    <p className="text-xs text-red-700 dark:text-red-400">Deben</p>
+                            </MetodoBreakdownCard>
+                            <MetodoBreakdownCard estado="deuda" counts={metodoBreakdown.deuda} estadoFiltro={estadoFiltro} metodoFiltro={metodoFiltro} onSelect={seleccionarMetodo}>
+                                <div className="flex cursor-pointer flex-col gap-1 px-4 py-3 transition-colors hover:bg-green-500/10">
+                                    <div className="flex items-center gap-1.5">
+                                        <AlertCircle className="h-4 w-4 text-red-500" />
+                                        <p className="text-xs text-red-700 dark:text-red-400">Deben</p>
+                                    </div>
+                                    <p className="font-bold text-foreground">
+                                        {stats.deudores}
+                                        <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
+                                    </p>
                                 </div>
-                                <p className="font-bold text-foreground">
-                                    {stats.deudores}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
-                                </p>
-                            </div>
+                            </MetodoBreakdownCard>
                         </div>
 
                         {/* Grupo 3: monto deuda */}
