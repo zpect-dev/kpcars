@@ -359,14 +359,17 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
         return result;
     }, [filas, search, estadoFiltro, sortKey, sortDir]);
 
+    // Los stats se calculan SIEMPRE sobre el set completo (`filas`), no sobre
+    // `filtradas`: la búsqueda y los filtros de estado no deben recalcular las
+    // cards de Total, Efectivo, Transferencia, Pagados, Deben ni Monto deuda.
     const stats = useMemo(() => ({
-        total:        filtradas.reduce((s, f) => s + Number(f.total), 0),
-        efectivo:     filtradas.reduce((s, f) => s + Number(f.efectivo), 0),
-        transferencia:filtradas.reduce((s, f) => s + Number(f.transferencia), 0),
-        pagados:      filtradas.filter((f) => f.estado === 'pagado').length,
-        deudores:     filtradas.filter((f) => f.estado === 'deuda').length,
-        totalDeuda:   filtradas.reduce((s, f) => s + Number(f.deuda), 0),
-    }), [filtradas]);
+        total:        filas.reduce((s, f) => s + Number(f.total), 0),
+        efectivo:     filas.reduce((s, f) => s + Number(f.efectivo), 0),
+        transferencia:filas.reduce((s, f) => s + Number(f.transferencia), 0),
+        pagados:      filas.filter((f) => f.estado === 'pagado').length,
+        deudores:     filas.filter((f) => f.estado === 'deuda').length,
+        totalDeuda:   filas.reduce((s, f) => s + Number(f.deuda), 0),
+    }), [filas]);
 
     return (
         <div className="flex flex-col gap-4">
@@ -416,8 +419,8 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                 </div>
             </div>
 
-            {/* Stats */}
-            {filtradas.length > 0 && (
+            {/* Stats — siempre sobre el total del período, no sobre lo filtrado */}
+            {filas.length > 0 && (
                 <>
                     {/* Mobile: 3 grupos como lista */}
                     <div className="flex flex-col gap-3 sm:hidden">
@@ -452,7 +455,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                                 </div>
                                 <span className="font-bold text-foreground">
                                     {stats.pagados}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
                                 </span>
                             </div>
                             <div className="flex items-center justify-between border-t border-green-500/20 px-4 py-2.5">
@@ -462,7 +465,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                                 </div>
                                 <span className="font-bold text-foreground">
                                     {stats.deudores}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
                                 </span>
                             </div>
                         </div>
@@ -515,7 +518,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                                 </div>
                                 <p className="font-bold text-foreground">
                                     {stats.pagados}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
                                 </p>
                             </div>
                             <div className="flex flex-col gap-1 px-4 py-3">
@@ -525,7 +528,7 @@ export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: 
                                 </div>
                                 <p className="font-bold text-foreground">
                                     {stats.deudores}
-                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filtradas.length}</span>
+                                    <span className="ml-1 text-xs font-normal text-muted-foreground">/ {filas.length}</span>
                                 </p>
                             </div>
                         </div>
