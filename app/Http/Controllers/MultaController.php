@@ -30,53 +30,76 @@ class MultaController extends Controller
     {
         $this->authorize('view-multas');
 
-        $multas = Multa::query()
-            ->with([
-                'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)->select('id', 'patente', 'marca', 'modelo'),
-                'conductor:id,name,inactivo',
-                'pagos',
-            ])
-            ->orderByDesc('fecha')
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn (Multa $m) => [
-                'id' => $m->id,
-                'vehiculo_id' => $m->vehiculo_id,
-                'patente' => $m->vehiculo?->patente ?? 'N/A',
-                'marca' => $m->vehiculo?->marca,
-                'modelo' => $m->vehiculo?->modelo,
-                'conductor_id' => $m->conductor_id,
-                'conductor' => $m->conductor?->name,
-                'conductor_inactivo' => (bool) ($m->conductor?->inactivo ?? false),
-                'fecha' => $m->fecha?->toDateString(),
-                'fecha_vencimiento' => $m->fecha_vencimiento?->toDateString(),
-                'monto' => (float) $m->monto,
-                'descripcion' => $m->descripcion,
-                'punto_rojo' => $m->punto_rojo,
-                'jurisdiccion' => $m->jurisdiccion,
-                'pdf_url' => $m->pdf_path ? Storage::disk('public')->url($m->pdf_path) : null,
-                'pagado' => $m->pagado,
-                'cobrado' => $m->cobrado,
-                'cobrada_en' => $m->cobrada_en?->toDateString(),
-                'monto_cobrado' => (float) $m->monto_cobrado,
-                'pagos' => $m->pagos->map(fn (MultaPago $p) => [
-                    'id' => $p->id,
-                    'fecha' => $p->fecha?->toDateString(),
-                    'monto' => (float) $p->monto,
-                    'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
-                    'con_deposito' => $p->con_deposito,
-                ])->values(),
-            ]);
-
-        // Combo de patentes: todos los vehículos (global), menos el ficticio EXTERNO.
-        $vehiculos = Vehiculo::withoutGlobalScope(TenantScope::class)
-            ->where('patente', '!=', 'EXTERNO')
-            ->orderBy('patente')
-            ->get(['id', 'patente', 'marca', 'modelo']);
-
+        // Props como closures: en recargas parciales (`only: ['multas']`, que
+        // dispara el frontend al crear/editar/cobrar/eliminar una multa) solo se
+        // evalúa la consulta pedida y se evita re-consultar el combo de vehículos.
         return Inertia::render('Multas/Index', [
-            'multas' => $multas,
-            'vehiculos' => $vehiculos,
+            'multas' => fn () => Multa::query()
+                ->with([
+                    'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)->select('id', 'patente', 'marca', 'modelo'),
+                    'conductor:id,name,inactivo',
+                    'pagos',
+                ])
+                ->orderByDesc('fecha')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn (Multa $m) => [
+                    'id' => $m->id,
+                    'vehiculo_id' => $m->vehiculo_id,
+                    'patente' => $m->vehiculo?->patente ?? 'N/A',
+                    'marca' => $m->vehiculo?->marca,
+                    'modelo' => $m->vehiculo?->modelo,
+                    'conductor_id' => $m->conductor_id,
+                    'conductor' => $m->conductor?->name,
+                    'conductor_inactivo' => (bool) ($m->conductor?->inactivo ?? false),
+                    'fecha' => $m->fecha?->toDateString(),
+                    'fecha_vencimiento' => $m->fecha_vencimiento?->toDateString(),
+                    'monto' => (float) $m->monto,
+                    'descripcion' => $m->descripcion,
+                    'punto_rojo' => $m->punto_rojo,
+                    'jurisdiccion' => $m->jurisdiccion,
+                    'pdf_url' => $m->pdf_path ? Storage::disk('public')->url($m->pdf_path) : null,
+                    'pagado' => $m->pagado,
+                    'pagada_en' => $m->pagada_en?->toDateString(),
+                    'cobrado' => $m->cobrado,
+                    'cobrada_en' => $m->cobrada_en?->toDateString(),
+                    'monto_cobrado' => (float) $m->monto_cobrado,
+                    'created_at' => $m->created_at?->toDateString(),
+                    'pagos' => $m->pagos->map(fn (MultaPago $p) => [
+                        'id' => $p->id,
+                        'fecha' => $p->fecha?->toDateString(),
+                        'monto' => (float) $p->monto,
+                        'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
+                        'con_deposito' => $p->con_deposito,
+                    ])->values(),
+                ]),
+
+            // Combo de patentes: todos los vehículos (global), menos el ficticio EXTERNO.
+            'vehiculos' => fn () => Vehiculo::withoutGlobalScope(TenantScope::class)
+                ->where('patente', '!=', 'EXTERNO')
+                ->orderBy('patente')
+                ->get(['id', 'patente', 'marca', 'modelo']),
+
+            // Multas eliminadas (soft-deleted): solo para el reporte de auditoría.
+            // No entran en las otras vistas (el scope global las excluye).
+            'eliminadas' => fn () => Multa::onlyTrashed()
+                ->with([
+                    'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class)->select('id', 'patente'),
+                    'conductor:id,name,inactivo',
+                ])
+                ->orderByDesc('deleted_at')
+                ->get()
+                ->map(fn (Multa $m) => [
+                    'id' => $m->id,
+                    'patente' => $m->vehiculo?->patente ?? 'N/A',
+                    'conductor' => $m->conductor?->name,
+                    'conductor_inactivo' => (bool) ($m->conductor?->inactivo ?? false),
+                    'monto' => (float) $m->monto,
+                    'punto_rojo' => $m->punto_rojo,
+                    'fecha' => $m->fecha?->toDateString(),
+                    'descripcion' => $m->descripcion,
+                    'deleted_at' => $m->deleted_at?->toDateString(),
+                ]),
         ]);
     }
 
@@ -312,13 +335,23 @@ class MultaController extends Controller
     {
         $this->authorize('manage-multas');
 
-        if ($multa->pdf_path) {
-            Storage::disk('public')->delete($multa->pdf_path);
-        }
-
+        // Soft delete: se conservan pagos y PDF por si el usuario deshace. El
+        // toast con "Deshacer" lo muestra el frontend (por eso no flasheamos acá).
         $multa->delete();
 
-        return redirect()->back()->with('success', 'Multa eliminada.');
+        return redirect()->back();
+    }
+
+    /**
+     * Restaura una multa eliminada (acción "Deshacer" del toast).
+     */
+    public function restaurar(Request $request, int $multa): RedirectResponse
+    {
+        $this->authorize('manage-multas');
+
+        Multa::withTrashed()->findOrFail($multa)->restore();
+
+        return redirect()->back()->with('success', 'Multa restaurada.');
     }
 
     /**

@@ -121,6 +121,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('multas/{multa}/cobrado', [MultaController::class, 'registrarCobro'])->name('multas.cobrado');
         Route::delete('multas/{multa}/pagos/{pago}', [MultaController::class, 'eliminarPago'])->name('multas.pagos.destroy');
         Route::delete('multas/{multa}', [MultaController::class, 'destroy'])->name('multas.destroy');
+        Route::patch('multas/{multa}/restaurar', [MultaController::class, 'restaurar'])->name('multas.restaurar');
         Route::get('multas/pdf', [MultaController::class, 'pdf'])->name('multas.pdf');
 
         // Transacciones (vista)

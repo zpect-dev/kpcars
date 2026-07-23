@@ -1,11 +1,17 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowDownUp,
     Building2,
     CalendarDays,
+    CalendarRange,
     Car,
     Check,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsDownUp,
+    ChevronsUpDown,
     Download,
     FileText,
     FileX,
@@ -18,11 +24,19 @@ import {
     User as UserIcon,
     UserX,
     X,
+    type LucideIcon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -54,9 +68,11 @@ interface Multa {
     jurisdiccion: 'CABA' | 'GBA' | null;
     pdf_url: string | null;
     pagado: boolean;
+    pagada_en: string | null;
     cobrado: boolean;
     cobrada_en: string | null;
     monto_cobrado: number;
+    created_at: string;
     pagos: Pago[];
 }
 
@@ -66,6 +82,18 @@ interface Pago {
     monto: number;
     comprobante_url: string | null;
     con_deposito: boolean;
+}
+
+interface MultaEliminada {
+    id: number;
+    patente: string;
+    conductor: string | null;
+    conductor_inactivo: boolean;
+    monto: number;
+    punto_rojo: boolean;
+    fecha: string;
+    descripcion: string;
+    deleted_at: string;
 }
 
 /** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
@@ -83,9 +111,10 @@ interface VehiculoOpt {
 interface Props {
     multas: Multa[];
     vehiculos: VehiculoOpt[];
+    eliminadas: MultaEliminada[];
 }
 
-type Tab = 'vehiculo' | 'chofer' | 'ex-chofer' | 'ranking';
+type Tab = 'vehiculo' | 'chofer' | 'ex-chofer' | 'ranking' | 'reporte';
 
 function formatFecha(d: string): string {
     const [y, m, day] = d.slice(0, 10).split('-');
@@ -170,24 +199,96 @@ function periodoRango(p: FiltroPeriodo): { desde: string; hasta: string } {
     return { desde: '', hasta: '' };
 }
 
-export default function MultasIndex({ multas, vehiculos }: Props) {
-    const [tab, setTab] = useState<Tab>('vehiculo');
-    const [search, setSearch] = useState('');
+type Orden = 'pendientes' | 'monto' | 'cantidad' | 'alfabetico';
+
+const ORDEN_LABEL: Record<Orden, string> = {
+    pendientes: 'Pendientes primero',
+    monto: 'Mayor monto',
+    cantidad: 'Más multas',
+    alfabetico: 'Alfabético',
+};
+
+const TABS: Tab[] = ['vehiculo', 'chofer', 'ex-chofer', 'ranking', 'reporte'];
+
+function readParams(): URLSearchParams {
+    if (typeof window === 'undefined') return new URLSearchParams();
+    return new URLSearchParams(window.location.search);
+}
+
+function normEstado(v: string | null): FiltroEstado {
+    return v === 'si' || v === 'no' ? v : '';
+}
+
+/** Resalta las coincidencias de `query` dentro de `text` (búsqueda en vivo). */
+function Highlight({ text, query }: { text: string; query: string }) {
+    const q = query.trim();
+    if (!q) return <>{text}</>;
+    const idx = text.toLowerCase().indexOf(q.toLowerCase());
+    if (idx === -1) return <>{text}</>;
+    return (
+        <>
+            {text.slice(0, idx)}
+            <mark className="rounded-[3px] bg-amber-200 px-0.5 text-inherit dark:bg-amber-400/30">
+                {text.slice(idx, idx + q.length)}
+            </mark>
+            {text.slice(idx + q.length)}
+        </>
+    );
+}
+
+export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Props) {
+    // Estado inicial tomado de la URL: sobrevive a recargas y permite compartir
+    // el link con la misma vista (tab, búsqueda, filtros y orden).
+    const [tab, setTab] = useState<Tab>(() => {
+        const t = readParams().get('tab') as Tab;
+        return TABS.includes(t) ? t : 'vehiculo';
+    });
+    const [search, setSearch] = useState(() => readParams().get('q') ?? '');
+    const [orden, setOrden] = useState<Orden>(() => {
+        const o = readParams().get('orden') as Orden;
+        return o in ORDEN_LABEL ? o : 'pendientes';
+    });
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [processingId, setProcessingId] = useState<number | null>(null);
     const [showModal, setShowModal] = useState(false);
     const [editing, setEditing] = useState<Multa | null>(null);
     const [cobrando, setCobrando] = useState<Multa | null>(null);
 
     // Filtros
-    const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>('');
-    const [fSistema, setFSistema] = useState<FiltroEstado>('');
-    const [fChofer, setFChofer] = useState<FiltroEstado>('');
-    const [fPuntoRojo, setFPuntoRojo] = useState(false);
+    const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>(() => {
+        const v = readParams().get('jur');
+        return v === 'CABA' || v === 'GBA' ? v : '';
+    });
+    const [fSistema, setFSistema] = useState<FiltroEstado>(() => normEstado(readParams().get('sis')));
+    const [fChofer, setFChofer] = useState<FiltroEstado>(() => normEstado(readParams().get('cob')));
+    const [fPuntoRojo, setFPuntoRojo] = useState(() => readParams().get('pr') === '1');
     const [fVencimiento, setFVencimiento] = useState<
         '' | 'vencida' | 'no-vencida'
-    >('');
-    const [fDesde, setFDesde] = useState('');
-    const [fHasta, setFHasta] = useState('');
+    >(() => {
+        const v = readParams().get('venc');
+        return v === 'vencida' || v === 'no-vencida' ? v : '';
+    });
+    const [fDesde, setFDesde] = useState(() => readParams().get('desde') ?? '');
+    const [fHasta, setFHasta] = useState(() => readParams().get('hasta') ?? '');
+
+    // Reflejar tab + búsqueda + filtros + orden en la URL (sin recargar).
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const p = new URLSearchParams();
+        if (tab !== 'vehiculo') p.set('tab', tab);
+        if (search.trim()) p.set('q', search);
+        if (orden !== 'pendientes') p.set('orden', orden);
+        if (fJurisdiccion) p.set('jur', fJurisdiccion);
+        if (fSistema) p.set('sis', fSistema);
+        if (fChofer) p.set('cob', fChofer);
+        if (fPuntoRojo) p.set('pr', '1');
+        if (fVencimiento) p.set('venc', fVencimiento);
+        if (fDesde) p.set('desde', fDesde);
+        if (fHasta) p.set('hasta', fHasta);
+        const qs = p.toString();
+        const url = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+        window.history.replaceState(window.history.state, '', url);
+    }, [tab, search, orden, fJurisdiccion, fSistema, fChofer, fPuntoRojo, fVencimiento, fDesde, fHasta]);
 
     // Periodo activo: se deriva comparando fechas con cada preset
     const fPeriodoActivo = useMemo<FiltroPeriodo>(() => {
@@ -363,22 +464,27 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
             map.get(key)!.multas.push(m);
         }
 
+        const alfa = (a: Grupo, b: Grupo) =>
+            a.titulo.localeCompare(b.titulo, 'es', { numeric: true });
+
         return Array.from(map.values())
             .map((g) => ({
                 ...g,
                 pendientes: g.multas.filter(pendiente).length,
                 total: g.multas.reduce((s, m) => s + montoEfectivo(m), 0),
             }))
-            .sort(
-                (a, b) =>
-                    b.pendientes - a.pendientes ||
-                    b.total - a.total ||
-                    a.titulo.localeCompare(b.titulo, 'es', { numeric: true }),
-            );
+            .sort((a, b) => {
+                if (orden === 'monto') return b.total - a.total || alfa(a, b);
+                if (orden === 'cantidad') return b.multas.length - a.multas.length || alfa(a, b);
+                if (orden === 'alfabetico') return alfa(a, b);
+                // 'pendientes' (default)
+                return b.pendientes - a.pendientes || b.total - a.total || alfa(a, b);
+            });
     }, [
         multas,
         tab,
         search,
+        orden,
         fJurisdiccion,
         fSistema,
         fChofer,
@@ -397,12 +503,30 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
         });
     }
 
+    // Solo estos tabs muestran el buscador/filtros y la lista agrupada.
+    const esTabGrupo =
+        tab === 'vehiculo' || tab === 'chofer' || tab === 'ex-chofer';
+
+    // Opciones comunes a todas las mutaciones: recarga parcial (multas +
+    // eliminadas para el reporte, más flash para los toasts) conservando el
+    // estado local (grupos abiertos, tab, búsqueda y filtros).
+    const visitaMulta = {
+        preserveScroll: true,
+        preserveState: true,
+        only: ['multas', 'eliminadas', 'flash'],
+    };
+
+    // Como visitaMulta pero marcando la fila como "procesando" (feedback visual).
+    function visitaFila(id: number) {
+        return {
+            ...visitaMulta,
+            onStart: () => setProcessingId(id),
+            onFinish: () => setProcessingId(null),
+        };
+    }
+
     function togglePagado(id: number) {
-        router.patch(
-            `/multas/${id}/pagado`,
-            {},
-            { preserveScroll: true, preserveState: true },
-        );
+        router.patch(`/multas/${id}/pagado`, {}, visitaFila(id));
     }
 
     function toggleCobrado(m: Multa) {
@@ -411,7 +535,7 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
             router.patch(
                 `/multas/${m.id}/cobrado`,
                 m.cobrado ? { reset: true } : { fecha_cobro: HOY },
-                { preserveScroll: true, preserveState: true },
+                visitaFila(m.id),
             );
             return;
         }
@@ -420,8 +544,40 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
     }
 
     function deleteMulta(id: number) {
-        router.delete(`/multas/${id}`, { preserveScroll: true });
+        router.delete(`/multas/${id}`, {
+            ...visitaMulta,
+            onSuccess: () => {
+                setEditing(null);
+                toast.success('Multa eliminada', {
+                    action: {
+                        label: 'Deshacer',
+                        onClick: () =>
+                            router.patch(`/multas/${id}/restaurar`, {}, visitaMulta),
+                    },
+                });
+            },
+        });
     }
+
+    // Expandir / colapsar todos los grupos visibles de una vez.
+    const allExpanded =
+        grupos.length > 0 && grupos.every((g) => expanded.has(g.key));
+
+    function toggleExpandAll() {
+        setExpanded(allExpanded ? new Set() : new Set(grupos.map((g) => g.key)));
+    }
+
+    // Contador de multas pendientes por tab (para el badge).
+    const tabPendientes = useMemo<Record<Tab, number>>(
+        () => ({
+            vehiculo: multas.filter(pendiente).length,
+            chofer: multas.filter(pendiente).length,
+            'ex-chofer': multas.filter((m) => m.conductor_inactivo && pendiente(m)).length,
+            ranking: 0,
+            reporte: 0,
+        }),
+        [multas],
+    );
 
     return (
         <>
@@ -550,7 +706,7 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap gap-1.5">
                     {(
                         [
                             {
@@ -569,23 +725,45 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                 icon: UserX,
                             },
                             { val: 'ranking', label: 'Ranking', icon: Medal },
+                            {
+                                val: 'reporte',
+                                label: 'Reporte',
+                                icon: CalendarRange,
+                            },
                         ] as const
-                    ).map(({ val, label, icon: Icon }) => (
-                        <button
-                            key={val}
-                            type="button"
-                            onClick={() => setTab(val)}
-                            className={cn(
-                                'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all active:scale-[0.98]',
-                                tab === val
-                                    ? 'border-primary/30 bg-primary/10 text-primary'
-                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
-                            )}
-                        >
-                            <Icon className="h-4 w-4" />
-                            {label}
-                        </button>
-                    ))}
+                    ).map(({ val, label, icon: Icon }) => {
+                        const activo = tab === val;
+                        const pend = tabPendientes[val];
+                        return (
+                            <button
+                                key={val}
+                                type="button"
+                                onClick={() => setTab(val)}
+                                className={cn(
+                                    'inline-flex items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-all active:scale-[0.98]',
+                                    activo
+                                        ? 'border-primary/30 bg-primary/10 text-primary'
+                                        : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                )}
+                            >
+                                <Icon className="h-4 w-4" />
+                                {label}
+                                {pend > 0 && (
+                                    <span
+                                        className={cn(
+                                            'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums',
+                                            activo
+                                                ? 'bg-primary/20 text-primary'
+                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+                                        )}
+                                        title={`${pend} multa${pend !== 1 ? 's' : ''} pendiente${pend !== 1 ? 's' : ''}`}
+                                    >
+                                        {pend}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* Ranking */}
@@ -704,8 +882,8 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 )}
 
                 {/* Filtros */}
-                {tab !== 'ranking' && (
-                    <div className="rounded-xl border border-border bg-card shadow-sm">
+                {esTabGrupo && (
+                    <div className="sticky top-0 z-20 rounded-xl border border-border bg-card shadow-sm">
                         {/* Buscador */}
                         <div className="flex items-center gap-2 px-3 py-3">
                             <div className="relative flex-1">
@@ -868,18 +1046,108 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                     </div>
                 )}
 
+                {/* Reporte semanal */}
+                {tab === 'reporte' && (
+                    <ReporteSemanal multas={multas} eliminadas={eliminadas} />
+                )}
+
                 {/* Lista agrupada */}
-                {tab !== 'ranking' &&
+                {esTabGrupo &&
                     (grupos.length === 0 ? (
-                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                            {multas.length === 0
-                                ? 'Todavía no hay multas registradas.'
-                                : 'No hay multas que coincidan con los filtros.'}
+                        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-14 text-center shadow-sm">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
+                                {multas.length === 0 ? (
+                                    <Siren className="h-6 w-6 text-muted-foreground" />
+                                ) : (
+                                    <Search className="h-6 w-6 text-muted-foreground" />
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-foreground">
+                                    {multas.length === 0
+                                        ? 'Todavía no hay multas registradas'
+                                        : 'No hay multas que coincidan'}
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {multas.length === 0
+                                        ? 'Registrá la primera multa para empezar a hacer seguimiento.'
+                                        : 'Probá ajustar la búsqueda o limpiar los filtros.'}
+                                </p>
+                            </div>
+                            {multas.length === 0 ? (
+                                <Button size="sm" onClick={() => setShowModal(true)}>
+                                    <Plus className="h-4 w-4" /> Registrar multa
+                                </Button>
+                            ) : (
+                                (filtrosActivos > 0 || search) && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            limpiarFiltros();
+                                            setSearch('');
+                                        }}
+                                    >
+                                        <X className="h-4 w-4" /> Limpiar filtros
+                                    </Button>
+                                )
+                            )}
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2 pb-4">
+                            {/* Toolbar: resumen + orden + expandir todo */}
+                            <div className="flex items-center justify-between gap-2 px-1">
+                                <span className="text-xs text-muted-foreground tabular-nums">
+                                    {grupos.length}{' '}
+                                    {tab === 'vehiculo'
+                                        ? grupos.length === 1 ? 'vehículo' : 'vehículos'
+                                        : grupos.length === 1 ? 'chofer' : 'choferes'}
+                                    {' · '}
+                                    {grupos.reduce((s, g) => s + g.multas.length, 0)} multas
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                            >
+                                                <ArrowDownUp className="h-3.5 w-3.5" />
+                                                <span className="hidden sm:inline">{ORDEN_LABEL[orden]}</span>
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            {(Object.keys(ORDEN_LABEL) as Orden[]).map((o) => (
+                                                <DropdownMenuItem
+                                                    key={o}
+                                                    onClick={() => setOrden(o)}
+                                                    className={cn(orden === o && 'bg-muted font-medium')}
+                                                >
+                                                    {ORDEN_LABEL[o]}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <button
+                                        type="button"
+                                        onClick={toggleExpandAll}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    >
+                                        {allExpanded ? (
+                                            <ChevronsDownUp className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <ChevronsUpDown className="h-3.5 w-3.5" />
+                                        )}
+                                        <span className="hidden sm:inline">
+                                            {allExpanded ? 'Colapsar todo' : 'Expandir todo'}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                             {grupos.map((g) => {
-                                const isOpen = expanded.has(g.key);
+                                // Al buscar, los grupos se abren solos para ver las coincidencias.
+                                const isOpen =
+                                    search.trim().length > 0 || expanded.has(g.key);
                                 return (
                                     <div
                                         key={g.key}
@@ -901,12 +1169,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                 />
                                                 {tab === 'vehiculo' ? (
                                                     <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold tracking-wide text-foreground uppercase">
-                                                        {g.titulo}
+                                                        <Highlight text={g.titulo} query={search} />
                                                     </span>
                                                 ) : (
                                                     <span className="flex min-w-0 shrink items-center gap-1.5">
                                                         <span className="truncate text-sm font-semibold text-foreground">
-                                                            {g.titulo}
+                                                            <Highlight text={g.titulo} query={search} />
                                                         </span>
                                                         {g.multas[0]
                                                             ?.conductor_inactivo && (
@@ -1127,10 +1395,17 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                         </button>
                                                     );
 
+                                                    const procesando =
+                                                        processingId === m.id;
+
                                                     return (
                                                         <div
                                                             key={m.id}
-                                                            className="divide-y divide-border border-b border-border last:border-b-0"
+                                                            className={cn(
+                                                                'divide-y divide-border border-b border-border transition-opacity last:border-b-0',
+                                                                procesando &&
+                                                                    'pointer-events-none opacity-50',
+                                                            )}
                                                         >
                                                             {/* ── MOBILE ── */}
                                                             <div className="flex flex-col gap-3 px-4 py-3 sm:hidden">
@@ -1191,9 +1466,10 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                             {tab !==
                                                                                 'vehiculo' && (
                                                                                 <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground uppercase">
-                                                                                    {
-                                                                                        m.patente
-                                                                                    }
+                                                                                    <Highlight
+                                                                                        text={m.patente}
+                                                                                        query={search}
+                                                                                    />
                                                                                 </span>
                                                                             )}
                                                                         </div>
@@ -1205,7 +1481,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                         {tab ===
                                                                             'vehiculo' && (
                                                                             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                                                {m.conductor ?? (
+                                                                                {m.conductor ? (
+                                                                                    <Highlight
+                                                                                        text={m.conductor}
+                                                                                        query={search}
+                                                                                    />
+                                                                                ) : (
                                                                                     <span className="italic opacity-50">
                                                                                         Sin
                                                                                         chofer
@@ -1288,7 +1569,12 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                     'vehiculo' ? (
                                                                         <span className="flex items-center gap-1 truncate text-xs text-muted-foreground">
                                                                             <span className="truncate">
-                                                                                {m.conductor ?? (
+                                                                                {m.conductor ? (
+                                                                                    <Highlight
+                                                                                        text={m.conductor}
+                                                                                        query={search}
+                                                                                    />
+                                                                                ) : (
                                                                                     <span className="italic opacity-50">
                                                                                         Sin
                                                                                         chofer
@@ -1301,9 +1587,10 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                                                                         </span>
                                                                     ) : (
                                                                         <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
-                                                                            {
-                                                                                m.patente
-                                                                            }
+                                                                            <Highlight
+                                                                                text={m.patente}
+                                                                                query={search}
+                                                                            />
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -1361,6 +1648,313 @@ export default function MultasIndex({ multas, vehiculos }: Props) {
                 onClose={() => setCobrando(null)}
             />
         </>
+    );
+}
+
+/** Lunes de la semana de la fecha dada (semana lun–dom). */
+function lunesDe(d: Date): Date {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dow = (x.getDay() + 6) % 7; // 0 = lunes
+    x.setDate(x.getDate() - dow);
+    return x;
+}
+
+function isoDate(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Celda compacta patente + chofer, reutilizada en las tablas del reporte. */
+function PatenteChofer({
+    patente,
+    conductor,
+    inactivo,
+}: {
+    patente: string;
+    conductor: string | null;
+    inactivo?: boolean;
+}) {
+    return (
+        <div className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
+                {patente}
+            </span>
+            <span className="truncate text-xs text-muted-foreground">
+                {conductor ?? <span className="italic opacity-60">Sin chofer</span>}
+            </span>
+            {inactivo && <InactivoBadge />}
+        </div>
+    );
+}
+
+/** Tarjeta métrica del resumen del reporte. */
+function ReporteStat({
+    icon: Icon,
+    color,
+    label,
+    value,
+    sub,
+}: {
+    icon: LucideIcon;
+    color: string;
+    label: string;
+    value: string;
+    sub?: string;
+}) {
+    return (
+        <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+            <span className={cn('flex items-center gap-1.5 text-xs font-medium', color)}>
+                <Icon className="h-3.5 w-3.5" /> {label}
+            </span>
+            <span className="text-xl font-bold text-foreground tabular-nums">{value}</span>
+            {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+        </div>
+    );
+}
+
+/** Sección con encabezado + contador; muestra vacío si no hay filas. */
+function ReporteSeccion({
+    icon: Icon,
+    color,
+    title,
+    count,
+    children,
+}: {
+    icon: LucideIcon;
+    color: string;
+    title: string;
+    count: number;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
+                <Icon className={cn('h-4 w-4', color)} />
+                <span className="text-sm font-medium text-foreground">{title}</span>
+                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                    {count}
+                </span>
+            </div>
+            {count === 0 ? (
+                <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    Sin novedades esta semana.
+                </p>
+            ) : (
+                <div className="divide-y divide-border">{children}</div>
+            )}
+        </div>
+    );
+}
+
+/** Reporte semanal de actividad de multas (tab "Reporte"). */
+function ReporteSemanal({
+    multas,
+    eliminadas,
+}: {
+    multas: Multa[];
+    eliminadas: MultaEliminada[];
+}) {
+    const [offset, setOffset] = useState(0); // 0 = semana en curso
+
+    const { desde, hasta } = useMemo(() => {
+        const inicio = lunesDe(new Date());
+        inicio.setDate(inicio.getDate() + offset * 7);
+        const fin = new Date(inicio);
+        fin.setDate(fin.getDate() + 6);
+        return { desde: isoDate(inicio), hasta: isoDate(fin) };
+    }, [offset]);
+
+    const rep = useMemo(() => {
+        const en = (d: string | null | undefined) => !!d && d >= desde && d <= hasta;
+        const nuevas = multas.filter((m) => en(m.created_at));
+        const pagadas = multas.filter((m) => en(m.pagada_en));
+        const cobros = multas.flatMap((m) =>
+            m.pagos
+                .filter((p) => en(p.fecha))
+                .map((p) => ({ multa: m, pago: p })),
+        );
+        const saldadas = multas.filter((m) => m.cobrado && en(m.cobrada_en));
+        const borradas = eliminadas.filter((e) => en(e.deleted_at));
+        return {
+            nuevas,
+            pagadas,
+            cobros,
+            saldadas,
+            borradas,
+            montoNuevas: nuevas.reduce((s, m) => s + montoEfectivo(m), 0),
+            montoPagadas: pagadas.reduce((s, m) => s + montoEfectivo(m), 0),
+            montoCobrado: cobros.reduce((s, c) => s + Number(c.pago.monto), 0),
+        };
+    }, [multas, eliminadas, desde, hasta]);
+
+    const esActual = offset === 0;
+
+    return (
+        <div className="flex flex-col gap-4 pb-4">
+            {/* Navegador de semana */}
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
+                <button
+                    type="button"
+                    onClick={() => setOffset((o) => o - 1)}
+                    title="Semana anterior"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
+                <div className="flex items-center gap-2 px-1">
+                    <CalendarRange className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                        {formatFecha(desde)} – {formatFecha(hasta)}
+                    </span>
+                    {esActual && (
+                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            Esta semana
+                        </span>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => setOffset((o) => o + 1)}
+                    disabled={esActual}
+                    title="Semana siguiente"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </button>
+                <div className="ml-auto flex items-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setOffset(-1)}
+                        className={cn(
+                            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                            offset === -1
+                                ? 'border-primary/30 bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                        )}
+                    >
+                        Semana pasada
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setOffset(0)}
+                        className={cn(
+                            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
+                            esActual
+                                ? 'border-primary/30 bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
+                        )}
+                    >
+                        Esta semana
+                    </button>
+                </div>
+            </div>
+
+            {/* Resumen */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <ReporteStat
+                    icon={Plus}
+                    color="text-primary"
+                    label="Nuevas multas"
+                    value={String(rep.nuevas.length)}
+                    sub={rep.montoNuevas > 0 ? formatARS(rep.montoNuevas) : 'Sin monto'}
+                />
+                <ReporteStat
+                    icon={Building2}
+                    color="text-emerald-600 dark:text-emerald-400"
+                    label="Pagadas al sistema"
+                    value={String(rep.pagadas.length)}
+                    sub={rep.montoPagadas > 0 ? formatARS(rep.montoPagadas) : '—'}
+                />
+                <ReporteStat
+                    icon={UserIcon}
+                    color="text-green-600 dark:text-green-400"
+                    label="Cobrado a choferes"
+                    value={formatARS(rep.montoCobrado)}
+                    sub={`${rep.cobros.length} pago${rep.cobros.length !== 1 ? 's' : ''} · ${rep.saldadas.length} saldada${rep.saldadas.length !== 1 ? 's' : ''}`}
+                />
+                <ReporteStat
+                    icon={Trash2}
+                    color="text-red-600 dark:text-red-400"
+                    label="Eliminadas"
+                    value={String(rep.borradas.length)}
+                    sub={rep.borradas.length > 0 ? 'ver detalle' : 'Ninguna'}
+                />
+            </div>
+
+            {/* Nuevas multas */}
+            <ReporteSeccion icon={Plus} color="text-primary" title="Nuevas multas registradas" count={rep.nuevas.length}>
+                {rep.nuevas.map((m) => (
+                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{formatFecha(m.created_at)}</span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                            {m.punto_rojo ? '—' : formatARS(montoEfectivo(m))}
+                        </span>
+                    </div>
+                ))}
+            </ReporteSeccion>
+
+            {/* Pagadas al sistema */}
+            <ReporteSeccion icon={Building2} color="text-emerald-500" title="Pagadas al sistema de infracciones" count={rep.pagadas.length}>
+                {rep.pagadas.map((m) => (
+                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.pagada_en ? formatFecha(m.pagada_en) : ''}</span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                            {m.punto_rojo ? '—' : formatARS(montoEfectivo(m))}
+                        </span>
+                    </div>
+                ))}
+            </ReporteSeccion>
+
+            {/* Cobros a choferes */}
+            <ReporteSeccion icon={UserIcon} color="text-green-500" title="Cobros a choferes" count={rep.cobros.length}>
+                {rep.cobros.map(({ multa: m, pago: p }) => (
+                    <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
+                        <span className="ml-auto flex shrink-0 items-center gap-2">
+                            {p.con_deposito && (
+                                <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">Depósito</span>
+                            )}
+                            {!m.cobrado && (
+                                <span className="rounded border border-orange-300 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Parcial</span>
+                            )}
+                            <span className="text-xs text-muted-foreground tabular-nums">{formatFecha(p.fecha)}</span>
+                            <span className="w-24 text-right text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">{formatARS(Number(p.monto))}</span>
+                        </span>
+                    </div>
+                ))}
+            </ReporteSeccion>
+
+            {/* Saldadas por completo */}
+            <ReporteSeccion icon={Check} color="text-green-500" title="Saldadas por completo" count={rep.saldadas.length}>
+                {rep.saldadas.map((m) => (
+                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.cobrada_en ? formatFecha(m.cobrada_en) : ''}</span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                            {m.punto_rojo ? '—' : formatARS(Number(m.monto_cobrado))}
+                        </span>
+                    </div>
+                ))}
+            </ReporteSeccion>
+
+            {/* Eliminadas */}
+            <ReporteSeccion icon={Trash2} color="text-red-500" title="Multas eliminadas" count={rep.borradas.length}>
+                {rep.borradas.map((e) => (
+                    <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
+                        <PatenteChofer patente={e.patente} conductor={e.conductor} inactivo={e.conductor_inactivo} />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{e.descripcion}</span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0" title="Fecha de eliminación">{formatFecha(e.deleted_at)}</span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-muted-foreground line-through">
+                            {e.punto_rojo ? '—' : formatARS(Number(e.monto))}
+                        </span>
+                    </div>
+                ))}
+            </ReporteSeccion>
+        </div>
     );
 }
 
@@ -1457,6 +2051,8 @@ function CobrarMultaForm({
         form.transform((data) => ({ ...data, _method: 'patch' }));
         form.post(`/multas/${multa.id}/cobrado`, {
             preserveScroll: true,
+            preserveState: true,
+            only: ['multas', 'flash'],
             forceFormData: true,
             onSuccess: () => onClose(),
         });
@@ -1466,13 +2062,15 @@ function CobrarMultaForm({
         router.patch(
             `/multas/${multa.id}/cobrado`,
             { reset: true },
-            { preserveScroll: true, onSuccess: () => onClose() },
+            { preserveScroll: true, preserveState: true, only: ['multas', 'flash'], onSuccess: () => onClose() },
         );
     }
 
     function eliminarPago(pagoId: number) {
         router.delete(`/multas/${multa.id}/pagos/${pagoId}`, {
             preserveScroll: true,
+            preserveState: true,
+            only: ['multas', 'flash'],
             onSuccess: () => onClose(),
         });
     }
@@ -1680,6 +2278,8 @@ function RegistrarMultaModal({
         e.preventDefault();
         form.post('/multas', {
             preserveScroll: true,
+            preserveState: true,
+            only: ['multas', 'flash'],
             onSuccess: () => {
                 form.reset();
                 form.setData('fecha', today);
@@ -2018,6 +2618,8 @@ function EditarMultaForm({
         form.transform((data) => ({ ...data, _method: 'patch' }));
         form.post(`/multas/${multa.id}`, {
             preserveScroll: true,
+            preserveState: true,
+            only: ['multas', 'flash'],
             forceFormData: true,
             onSuccess: () => onClose(),
         });
