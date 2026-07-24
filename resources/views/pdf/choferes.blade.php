@@ -28,6 +28,7 @@
             <th style="width:80px">DNI</th>
             <th style="width:100px">Teléfono</th>
             <th>Correo</th>
+            <th>Domicilio</th>
             <th style="width:80px" class="center">Venc. licencia</th>
             <th style="width:70px" class="center">Vehículo</th>
             <th>Depósito</th>
@@ -41,6 +42,7 @@
                 <td>{{ $f['dni'] }}</td>
                 <td>{{ $f['telefono'] ?: '—' }}</td>
                 <td>{{ $f['correo'] ?: '—' }}</td>
+                <td>{{ $f['direccion'] ?: '—' }}</td>
                 <td class="center">{{ $f['venc_licencia'] ?? '—' }}</td>
                 <td class="center">{{ $f['vehiculo'] ?? '—' }}</td>
                 <td>{!! count($f['depositos']) ? implode(' · ', $f['depositos']) : '<span class="muted">—</span>' !!}</td>
@@ -51,7 +53,7 @@
                 </td>
             </tr>
         @empty
-            <tr><td colspan="8" style="text-align:center;color:#6b7280">Sin choferes que coincidan con los filtros.</td></tr>
+            <tr><td colspan="9" style="text-align:center;color:#6b7280">Sin choferes que coincidan con los filtros.</td></tr>
         @endforelse
     </tbody>
 </table>

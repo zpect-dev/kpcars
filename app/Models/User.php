@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'dni', 'password', 'inactivo', 'estado_actualizado_en', 'must_change_password', 'role', 'empresa_default_id', 'empresa_restringida_id', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])]
+#[Fillable(['name', 'dni', 'password', 'inactivo', 'estado_actualizado_en', 'must_change_password', 'role', 'empresa_default_id', 'empresa_restringida_id', 'correo', 'telefono', 'direccion', 'fecha_ingreso', 'fecha_vencimiento_licencia', 'profile_photo_path', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])]
 class User extends Authenticatable
 {
@@ -42,6 +42,7 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
             'role' => UserRole::class,
             'fecha_vencimiento_licencia' => 'date',
+            'fecha_ingreso' => 'date',
         ];
     }
 

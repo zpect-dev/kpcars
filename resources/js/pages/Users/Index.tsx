@@ -53,6 +53,8 @@ interface User {
     baja_fecha?: string | null;
     correo?: string | null;
     telefono?: string | null;
+    direccion?: string | null;
+    fecha_ingreso?: string | null;
     fecha_vencimiento_licencia?: string | null;
     profile_photo_url?: string | null;
     empresa_default_id?: number | null;
@@ -499,6 +501,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         role: 'chofer',
         correo: '',
         telefono: '+54 ',
+        direccion: '',
+        fecha_ingreso: '',
         fecha_vencimiento_licencia: '',
         profile_photo: null as File | null,
         empresas: [] as number[],
@@ -521,6 +525,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         dni: '',
         correo: '',
         telefono: '',
+        direccion: '',
+        fecha_ingreso: '',
         fecha_vencimiento_licencia: '',
         alta_fecha: '' as string,
         baja_fecha: '' as string,
@@ -564,6 +570,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             dni: user.dni,
             correo: user.correo || '',
             telefono: user.telefono || '+54 ',
+            direccion: user.direccion || '',
+            fecha_ingreso: toDateInput(user.fecha_ingreso),
             fecha_vencimiento_licencia: formattedDate,
             alta_fecha: toDateInput(user.alta_fecha),
             baja_fecha: toDateInput(user.baja_fecha),
@@ -1201,6 +1209,11 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                                 Inversiones ({user.inversiones?.length ?? 0})
                                                             </Button>
                                                         )}
+                                                        {(user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 )}
                                             </td>
@@ -1372,6 +1385,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <span className="text-muted-foreground/50 italic">N/A</span>
                                             )}
                                         </div>
+                                        {(user.role === 'administrativo' || user.role === 'mecanico') && (
+                                            <div className="flex flex-col gap-0.5">
+                                                <span className="tracking-wider text-muted-foreground uppercase">
+                                                    Ingreso
+                                                </span>
+                                                {user.fecha_ingreso ? (
+                                                    <span className="font-medium text-foreground">
+                                                        {formatLicenciaFecha(user.fecha_ingreso)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted-foreground/50 italic">—</span>
+                                                )}
+                                            </div>
+                                        )}
                                         {filterRole === 'chofer' && (
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="tracking-wider text-muted-foreground uppercase">
@@ -1562,7 +1589,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         <InputError message={createForm.errors.fecha_vencimiento_licencia} />
                                     </div>
                                 </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="direccion">Dirección</Label>
+                                    <Input id="direccion" value={createForm.data.direccion} onChange={(e) => createForm.setData('direccion', e.target.value)} placeholder="Calle, número, localidad..." />
+                                    <InputError message={createForm.errors.direccion} />
+                                </div>
                             </>
+                        )}
+
+                        {(createForm.data.role === 'administrativo' || createForm.data.role === 'mecanico') && (
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="fecha_ingreso">Fecha de ingreso</Label>
+                                <Input id="fecha_ingreso" type="date" value={createForm.data.fecha_ingreso} onChange={(e) => createForm.setData('fecha_ingreso', e.target.value)} />
+                                <InputError message={createForm.errors.fecha_ingreso} />
+                            </div>
                         )}
 
                         <div className="flex items-center gap-2">
@@ -1715,6 +1755,22 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 <InputError message={editForm.errors.fecha_vencimiento_licencia} />
                             </div>
                         </div>
+
+                        {userToEdit?.role === 'chofer' && (
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-direccion">Dirección</Label>
+                                <Input id="edit-direccion" value={editForm.data.direccion} onChange={(e) => editForm.setData('direccion', e.target.value)} placeholder="Calle, número, localidad..." />
+                                <InputError message={editForm.errors.direccion} />
+                            </div>
+                        )}
+
+                        {(userToEdit?.role === 'administrativo' || userToEdit?.role === 'mecanico') && (
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-fecha_ingreso">Fecha de ingreso</Label>
+                                <Input id="edit-fecha_ingreso" type="date" value={editForm.data.fecha_ingreso} onChange={(e) => editForm.setData('fecha_ingreso', e.target.value)} />
+                                <InputError message={editForm.errors.fecha_ingreso} />
+                            </div>
+                        )}
 
                         {userToEdit?.role === 'chofer' && (
                             <>

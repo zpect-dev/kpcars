@@ -94,6 +94,8 @@ class UserController extends Controller
             'role' => ['required', Rule::enum(UserRole::class)],
             'correo' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
+            'direccion' => ['nullable', 'string', 'max:255'],
+            'fecha_ingreso' => ['nullable', 'date'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresas' => ['nullable', 'array'],
@@ -113,6 +115,10 @@ class UserController extends Controller
         // La restricción de empresa sólo aplica a admin/administrativo.
         $esGestor = in_array($validated['role'], [UserRole::ADMINISTRADOR->value, UserRole::ADMINISTRATIVO->value], true);
 
+        // La dirección es dato del chofer; la fecha de ingreso, de administrativos y mecánicos.
+        $esChofer = $validated['role'] === UserRole::CHOFER->value;
+        $tieneIngreso = in_array($validated['role'], [UserRole::ADMINISTRATIVO->value, UserRole::MECANICO->value], true);
+
         // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
         $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)).$validated['dni'];
 
@@ -124,6 +130,8 @@ class UserController extends Controller
             'must_change_password' => true,
             'correo' => $validated['correo'] ?? null,
             'telefono' => $validated['telefono'] ?? null,
+            'direccion' => $esChofer ? ($validated['direccion'] ?? null) : null,
+            'fecha_ingreso' => $tieneIngreso ? ($validated['fecha_ingreso'] ?? null) : null,
             'fecha_vencimiento_licencia' => $validated['fecha_vencimiento_licencia'] ?? null,
             'profile_photo_path' => $photoPath,
             'empresa_restringida_id' => $esGestor ? ($validated['empresa_restringida_id'] ?? null) : null,
@@ -216,7 +224,7 @@ class UserController extends Controller
         }
 
         $users = $query
-            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'estado_actualizado_en', 'created_at', 'correo', 'telefono', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])
+            ->get(['id', 'name', 'dni', 'role', 'inactivo', 'estado_actualizado_en', 'created_at', 'correo', 'telefono', 'direccion', 'fecha_ingreso', 'fecha_vencimiento_licencia', 'profile_photo_path', 'empresa_default_id', 'empresa_restringida_id', 'licencia_pdf_path', 'licencia_frente_path', 'licencia_dorso_path', 'dni_pdf_path', 'dni_frente_path', 'dni_dorso_path'])
             ->append(['profile_photo_url', 'documentos']);
 
         if ($isChoferFilter) {
@@ -433,6 +441,8 @@ class UserController extends Controller
             'dni' => ['required', 'string', 'max:20', Rule::unique('users')->ignore($user->id)],
             'correo' => ['nullable', 'email', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
+            'direccion' => ['nullable', 'string', 'max:255'],
+            'fecha_ingreso' => ['nullable', 'date'],
             'fecha_vencimiento_licencia' => ['nullable', 'date'],
             'profile_photo' => ['nullable', 'image', 'max:2048'],
             'empresas' => ['nullable', 'array'],
@@ -445,6 +455,15 @@ class UserController extends Controller
             'baja_fecha' => ['nullable', 'date'],
             ...$this->documentRules(),
         ]);
+
+        // La dirección sólo aplica a choferes; la fecha de ingreso, a
+        // administrativos y mecánicos. En otros roles se fuerzan a null.
+        if (! $user->isChofer()) {
+            $validated['direccion'] = null;
+        }
+        if (! ($user->isAdministrativo() || $user->isMechanic())) {
+            $validated['fecha_ingreso'] = null;
+        }
 
         // Las fechas de alta/baja no son columnas del usuario: se aplican a la
         // auditoría (chofer_eventos) más abajo, no al mass-assignment.
@@ -630,6 +649,7 @@ class UserController extends Controller
                 'dni' => $u->dni,
                 'telefono' => $u->telefono,
                 'correo' => $u->correo,
+                'direccion' => $u->direccion,
                 'inactivo' => $u->inactivo,
                 'venc_licencia' => $venc?->format('d/m/Y'),
                 'depositos' => $u->depositos->map(fn (UserDeposito $d) => $d->moneda->value.' '
