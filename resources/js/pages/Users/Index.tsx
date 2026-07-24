@@ -1209,7 +1209,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                                 Inversiones ({user.inversiones?.length ?? 0})
                                                             </Button>
                                                         )}
-                                                        {(user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
+                                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
                                                             <span className="text-xs text-muted-foreground">
                                                                 Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
                                                             </span>
@@ -1385,7 +1385,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <span className="text-muted-foreground/50 italic">N/A</span>
                                             )}
                                         </div>
-                                        {(user.role === 'administrativo' || user.role === 'mecanico') && (
+                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && (
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="tracking-wider text-muted-foreground uppercase">
                                                     Ingreso
@@ -1597,7 +1597,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </>
                         )}
 
-                        {(createForm.data.role === 'administrativo' || createForm.data.role === 'mecanico') && (
+                        {(createForm.data.role === 'administrador' || createForm.data.role === 'administrativo' || createForm.data.role === 'mecanico') && (
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="fecha_ingreso">Fecha de ingreso</Label>
                                 <Input id="fecha_ingreso" type="date" value={createForm.data.fecha_ingreso} onChange={(e) => createForm.setData('fecha_ingreso', e.target.value)} />
@@ -1764,7 +1764,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             </div>
                         )}
 
-                        {(userToEdit?.role === 'administrativo' || userToEdit?.role === 'mecanico') && (
+                        {(userToEdit?.role === 'administrador' || userToEdit?.role === 'administrativo' || userToEdit?.role === 'mecanico') && (
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="edit-fecha_ingreso">Fecha de ingreso</Label>
                                 <Input id="edit-fecha_ingreso" type="date" value={editForm.data.fecha_ingreso} onChange={(e) => editForm.setData('fecha_ingreso', e.target.value)} />

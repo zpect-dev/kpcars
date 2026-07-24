@@ -115,9 +115,10 @@ class UserController extends Controller
         // La restricción de empresa sólo aplica a admin/administrativo.
         $esGestor = in_array($validated['role'], [UserRole::ADMINISTRADOR->value, UserRole::ADMINISTRATIVO->value], true);
 
-        // La dirección es dato del chofer; la fecha de ingreso, de administrativos y mecánicos.
+        // La dirección es dato del chofer; la fecha de ingreso, del personal
+        // interno (administrador, administrativo y mecánico).
         $esChofer = $validated['role'] === UserRole::CHOFER->value;
-        $tieneIngreso = in_array($validated['role'], [UserRole::ADMINISTRATIVO->value, UserRole::MECANICO->value], true);
+        $tieneIngreso = in_array($validated['role'], [UserRole::ADMINISTRADOR->value, UserRole::ADMINISTRATIVO->value, UserRole::MECANICO->value], true);
 
         // Automatización de contraseña: Primera letra del nombre (Mayúscula) + DNI
         $generatedPassword = strtoupper(mb_substr($validated['name'], 0, 1)).$validated['dni'];
@@ -461,7 +462,7 @@ class UserController extends Controller
         if (! $user->isChofer()) {
             $validated['direccion'] = null;
         }
-        if (! ($user->isAdministrativo() || $user->isMechanic())) {
+        if (! ($user->isAdmin() || $user->isAdministrativo() || $user->isMechanic())) {
             $validated['fecha_ingreso'] = null;
         }
 
