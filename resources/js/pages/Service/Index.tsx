@@ -211,11 +211,11 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                         </h1>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                             {counts.vencido} vencidos
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                             {counts.al_dia} al día
                         </span>
@@ -318,7 +318,7 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                             </h3>
                                             <span
                                                 className={cn(
-                                                    'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                                                    'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium',
                                                     cfg.badge,
                                                 )}
                                             >

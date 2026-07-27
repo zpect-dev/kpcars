@@ -59,11 +59,11 @@ export default function HistorialDetalle({ cierre }: Props) {
                         </div>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                             {revisadosCount} revisados
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        <span className="inline-flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
                             <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
                             {noRevisadosCount} pendientes
                         </span>
@@ -87,12 +87,12 @@ export default function HistorialDetalle({ cierre }: Props) {
                                     <p className="mt-1 text-sm text-muted-foreground">{detalle.vehiculo.marca} {detalle.vehiculo.modelo}</p>
                                 </div>
                                 {detalle.estado === 'revisado' ? (
-                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         Revisado
                                     </span>
                                 ) : (
-                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
                                         <AlertCircle className="h-3.5 w-3.5" />
                                         No Revisado
                                     </span>

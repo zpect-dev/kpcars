@@ -280,7 +280,7 @@ export default function CobrosIndex({
                                     <Lock className="h-3.5 w-3.5" />
                                     {historico.fecha ? formatDate(historico.fecha) : '—'}
                                     {historico.user?.name ? ` · cerró ${historico.user.name}` : ''}
-                                    <span className="ml-1 rounded-full border border-border bg-muted/60 px-2 py-0.5">
+                                    <span className="ml-1 rounded-md border border-border bg-muted/60 px-2 py-0.5">
                                         Solo lectura
                                     </span>
                                 </p>

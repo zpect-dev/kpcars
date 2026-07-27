@@ -280,7 +280,7 @@ function FilterPopoverItem({
                 )}
             </div>
             <span className={cn(
-                'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                'shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums',
                 isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
             )}>
                 {count}
@@ -765,7 +765,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <div>
                                 <div className="flex items-center gap-3">
                                     <h1 className="text-lg font-semibold text-foreground sm:text-xl">Choferes</h1>
-                                    <span className="inline-flex items-center rounded-full border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                                    <span className="inline-flex items-center rounded-md border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                                         {choferCounts?.activos ?? 0} activos
                                     </span>
                                 </div>
@@ -1116,7 +1116,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         {(() => {
                                                             const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
                                                             return s ? (
-                                                                <span className={cn('inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                                <span className={cn('inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
                                                                     {s.label}
                                                                 </span>
                                                             ) : null;
@@ -1135,7 +1135,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     }}
                                                     disabled={user.id === auth.user.id || isInversor}
                                                     className={cn(
-                                                        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
+                                                        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                         user.inactivo
                                                             ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
                                                             : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
@@ -1306,7 +1306,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             }}
                                             disabled={user.id === auth.user.id || isInversor}
                                             className={cn(
-                                                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
+                                                'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                 user.inactivo
                                                     ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
                                                     : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
@@ -1382,7 +1382,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     {(() => {
                                                         const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
                                                         return s ? (
-                                                            <span className={cn('inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                            <span className={cn('inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
                                                                 {s.label}
                                                             </span>
                                                         ) : null;

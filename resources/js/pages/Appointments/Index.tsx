@@ -324,7 +324,7 @@ export default function AppointmentsIndex({
                             Turnos Asignados
                         </h1>
                         <span className={cn(
-                            'inline-flex w-fit items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+                            'inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium',
                             remainingToday > 0
                                 ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
                                 : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
@@ -560,7 +560,7 @@ export default function AppointmentsIndex({
                                 type="button"
                                 onClick={() => setStatusTab(key)}
                                 className={cn(
-                                    'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all',
+                                    'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-all',
                                     isActive
                                         ? cfg.active
                                         : 'bg-muted text-muted-foreground hover:text-foreground',
@@ -573,7 +573,7 @@ export default function AppointmentsIndex({
                                 )} />
                                 {label}
                                 <span className={cn(
-                                    'min-w-[1.25rem] rounded-full px-1 py-px text-center text-[10px] font-bold tabular-nums',
+                                    'min-w-[1.25rem] rounded-md px-1 py-px text-center text-[10px] font-bold tabular-nums',
                                     isActive
                                         ? 'bg-black/10 dark:bg-white/20'
                                         : 'bg-background text-foreground/60',
@@ -620,13 +620,13 @@ export default function AppointmentsIndex({
                                                 {a.service}
                                             </span>
                                             {isEmergencia && (
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
+                                                <span className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
                                                     <AlertTriangle className="h-3 w-3" />
                                                     Emergencia
                                                 </span>
                                             )}
                                             <span className={cn(
-                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold',
                                                 statusMeta.badge,
                                             )}>
                                                 <StatusIcon className="h-3 w-3" />

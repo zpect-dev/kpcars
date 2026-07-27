@@ -147,11 +147,11 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                     {activo ? (
-                                                        <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                        <span className="inline-flex items-center rounded-md bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-400">
                                                             Activo
                                                         </span>
                                                     ) : (
-                                                        <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                                                             Finalizado
                                                         </span>
                                                     )}
@@ -190,11 +190,11 @@ export default function AsignacionesIndex({ vehiculo, asignaciones }: Props) {
                                                 </p>
                                             </div>
                                             {activo ? (
-                                                <span className="inline-flex shrink-0 items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                                <span className="inline-flex shrink-0 items-center rounded-md bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/30 dark:text-green-400">
                                                     Activo
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex shrink-0 items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+                                                <span className="inline-flex shrink-0 items-center rounded-md bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
                                                     Finalizado
                                                 </span>
                                             )}

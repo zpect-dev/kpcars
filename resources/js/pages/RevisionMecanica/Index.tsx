@@ -90,7 +90,7 @@ function formatDateTime(iso: string): string {
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
     const p = PRIORIDAD[prioridad];
     return (
-        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold', p.badge)}>
+        <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold', p.badge)}>
             <span className={cn('h-1.5 w-1.5 rounded-full', p.dot)} />
             {p.label}
         </span>
@@ -205,7 +205,7 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                                 type="button"
                                 onClick={() => toggleFiltro(s.key)}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                    'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
                                     active
                                         ? 'border-primary bg-primary text-primary-foreground'
                                         : 'border-border bg-card text-muted-foreground hover:text-foreground',
@@ -273,7 +273,7 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                                                     <span
                                                         key={pr.label}
                                                         className={cn(
-                                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                                            'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium',
                                                             pr.g === 5 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                                             : pr.g === 4 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                                                             : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
@@ -293,7 +293,7 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                                     <div className="flex shrink-0 flex-col items-end gap-1">
                                         {f.revision
                                             ? <PrioridadBadge prioridad={f.revision.prioridad} />
-                                            : <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Sin revisar</span>
+                                            : <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Sin revisar</span>
                                         }
                                         {f.revision && (
                                             <span className="text-[11px] tabular-nums text-muted-foreground">{formatDateTime(f.revision.fecha)}</span>
@@ -422,7 +422,7 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
                                         <span
                                             key={it.key}
                                             className={cn(
-                                                'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+                                                'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
                                                 g === 5 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                                 : g === 4 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
                                                 : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',

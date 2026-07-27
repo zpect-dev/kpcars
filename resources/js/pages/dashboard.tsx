@@ -177,6 +177,7 @@ return null;
     const [filterSeguro, setFilterSeguro] = useState('');
     const [filterDocs, setFilterDocs] = useState('');
     const [openFilterSection, setOpenFilterSection] = useState<Record<string, boolean>>({});
+    const [isAlertsOpen, setIsAlertsOpen] = useState(false);
 
     useEffect(() => {
         try {
@@ -474,6 +475,55 @@ active.inversion_id = inversionId;
         docsFaltan:    vehiculos.filter(faltaAlgunDocVehiculo).length,
     }), [vehiculos]);
 
+    // Lista de alertas para el resumen compacto (reemplaza los chips sueltos por un solo control).
+    const alertItems = useMemo(() => [
+        {
+            count: alertCounts.vtvExpired,
+            tone: 'red' as const,
+            label: `VTV vencida${alertCounts.vtvExpired !== 1 ? 's' : ''}`,
+            onSelect: () => setFilterVtv('expired'),
+        },
+        {
+            count: alertCounts.gncExpired,
+            tone: 'red' as const,
+            label: `GNC vencido${alertCounts.gncExpired !== 1 ? 's' : ''}`,
+            onSelect: () => setFilterGnc('expired'),
+        },
+        {
+            count: alertCounts.seguroExpired,
+            tone: 'red' as const,
+            label: `Seguro${alertCounts.seguroExpired !== 1 ? 's' : ''} vencido${alertCounts.seguroExpired !== 1 ? 's' : ''}`,
+            onSelect: () => setFilterSeguro('expired'),
+        },
+        {
+            count: alertCounts.docsFaltan,
+            tone: 'red' as const,
+            label: `Doc${alertCounts.docsFaltan !== 1 ? 's' : ''} faltante${alertCounts.docsFaltan !== 1 ? 's' : ''}`,
+            onSelect: () => setFilterDocs('faltan'),
+        },
+        {
+            count: alertCounts.vtvWarning,
+            tone: 'amber' as const,
+            label: 'VTV por vencer',
+            onSelect: () => setFilterVtv('warning'),
+        },
+        {
+            count: alertCounts.seguroWarning,
+            tone: 'amber' as const,
+            label: `Seguro${alertCounts.seguroWarning !== 1 ? 's' : ''} por vencer`,
+            onSelect: () => setFilterSeguro('warning'),
+        },
+        {
+            count: alertCounts.sinConductor,
+            tone: 'amber' as const,
+            label: 'Sin conductor',
+            onSelect: () => setAsignacionFiltro('sin'),
+        },
+    ].filter((item) => item.count > 0), [alertCounts]);
+
+    const totalAlerts = useMemo(() => alertItems.reduce((sum, item) => sum + item.count, 0), [alertItems]);
+    const hasUrgentAlerts = useMemo(() => alertItems.some((item) => item.tone === 'red'), [alertItems]);
+
     // --- Create form ---
     const createForm = useForm({
         patente: '',
@@ -724,12 +774,54 @@ return;
                             <h1 className="text-lg font-semibold text-foreground sm:text-xl">
                                 Vehículos
                             </h1>
-                            <span className="inline-flex items-center rounded-full border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                            <span className="inline-flex items-center rounded-md border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                                 {filteredVehiculos.length}{' '}
                                 {filteredVehiculos.length === 1
                                     ? 'vehículo'
                                     : 'vehículos'}
                             </span>
+
+                            {/* Resumen de alertas: un solo control discreto en vez de varios chips de color */}
+                            {!isInversor && alertItems.length > 0 && (
+                                <Popover open={isAlertsOpen} onOpenChange={setIsAlertsOpen}>
+                                    <PopoverTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 bg-transparent px-2.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <span className={cn(
+                                                'h-1.5 w-1.5 rounded-full',
+                                                hasUrgentAlerts ? 'bg-red-500' : 'bg-amber-500',
+                                            )} />
+                                            {totalAlerts} {totalAlerts === 1 ? 'alerta' : 'alertas'}
+                                            <ChevronDown className="h-3 w-3" />
+                                        </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="start" className="w-72 p-1.5">
+                                        <div className="flex flex-col">
+                                            {alertItems.map((item) => (
+                                                <button
+                                                    key={item.label}
+                                                    type="button"
+                                                    onClick={() => { item.onSelect(); setIsAlertsOpen(false); }}
+                                                    className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
+                                                >
+                                                    <span className="flex items-center gap-2 text-foreground">
+                                                        <span className={cn(
+                                                            'h-1.5 w-1.5 rounded-full',
+                                                            item.tone === 'red' ? 'bg-red-500' : 'bg-amber-500',
+                                                        )} />
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="text-xs font-semibold text-muted-foreground">
+                                                        {item.count}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
                         </div>
                     </div>
                     {!isInversor && (
@@ -932,61 +1024,6 @@ params.set('search', search.trim());
                     )}
                 </div>
 
-                {/* Alert overview chips */}
-                {!isInversor && (alertCounts.vtvExpired + alertCounts.gncExpired + alertCounts.seguroExpired + alertCounts.vtvWarning + alertCounts.seguroWarning + alertCounts.sinConductor + alertCounts.docsFaltan) > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        {alertCounts.vtvExpired > 0 && (
-                            <button type="button" onClick={() => setFilterVtv('expired')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                {alertCounts.vtvExpired} VTV vencida{alertCounts.vtvExpired !== 1 ? 's' : ''}
-                            </button>
-                        )}
-                        {alertCounts.gncExpired > 0 && (
-                            <button type="button" onClick={() => setFilterGnc('expired')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                {alertCounts.gncExpired} GNC vencido{alertCounts.gncExpired !== 1 ? 's' : ''}
-                            </button>
-                        )}
-                        {alertCounts.seguroExpired > 0 && (
-                            <button type="button" onClick={() => setFilterSeguro('expired')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                {alertCounts.seguroExpired} seguro{alertCounts.seguroExpired !== 1 ? 's' : ''} vencido{alertCounts.seguroExpired !== 1 ? 's' : ''}
-                            </button>
-                        )}
-                        {alertCounts.vtvWarning > 0 && (
-                            <button type="button" onClick={() => setFilterVtv('warning')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                {alertCounts.vtvWarning} VTV por vencer
-                            </button>
-                        )}
-                        {alertCounts.seguroWarning > 0 && (
-                            <button type="button" onClick={() => setFilterSeguro('warning')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                {alertCounts.seguroWarning} seguro{alertCounts.seguroWarning !== 1 ? 's' : ''} por vencer
-                            </button>
-                        )}
-                        {alertCounts.sinConductor > 0 && (
-                            <button type="button" onClick={() => setAsignacionFiltro('sin')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-600 transition-colors hover:bg-amber-500/20 dark:text-amber-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                                {alertCounts.sinConductor} sin conductor
-                            </button>
-                        )}
-                        {alertCounts.docsFaltan > 0 && (
-                            <button type="button" onClick={() => setFilterDocs('faltan')}
-                                className="inline-flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/20 dark:text-red-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                                {alertCounts.docsFaltan} doc{alertCounts.docsFaltan !== 1 ? 's' : ''} faltante{alertCounts.docsFaltan !== 1 ? 's' : ''}
-                            </button>
-                        )}
-                    </div>
-                )}
-
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
                     <div className="flex flex-wrap items-end gap-3">
@@ -1172,7 +1209,7 @@ params.set('search', search.trim());
                                                                     <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
                                                                     <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
                                                                 </div>
-                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                                <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -1213,7 +1250,7 @@ params.set('search', search.trim());
                                                                     <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
                                                                     <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
                                                                 </div>
-                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                                <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -1254,7 +1291,7 @@ params.set('search', search.trim());
                                                                     <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
                                                                     <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
                                                                 </div>
-                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                                <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -1295,7 +1332,7 @@ params.set('search', search.trim());
                                                                     <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
                                                                     <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
                                                                 </div>
-                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                                <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -1336,7 +1373,7 @@ params.set('search', search.trim());
                                                                     <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>{opt.label}</span>
                                                                     <span className="mt-0.5 text-xs leading-tight text-muted-foreground">{opt.desc}</span>
                                                                 </div>
-                                                                <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
+                                                                <span className={cn('shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums', isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground')}>{opt.count}</span>
                                                             </button>
                                                         );
                                                     })}
@@ -1437,7 +1474,7 @@ params.set('search', search.trim());
                                                                 onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
                                                                 title="Editar estado de la patente"
                                                                 className={cn(
-                                                                    'inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
+                                                                    'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
                                                                     b.badge,
                                                                 )}
                                                             >
@@ -1711,7 +1748,7 @@ params.set('search', search.trim());
                                     {vehiculo.user?.name ? (
                                         <span className="text-sm text-foreground">{vehiculo.user.name}</span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                                             <UserX className="h-3 w-3" /> Sin conductor
                                         </span>
                                     )}
@@ -1728,34 +1765,34 @@ params.set('search', search.trim());
                                         const b = estadoPatenteBadge(vehiculo.estado_patente);
                                         return (
                                             <button type="button" onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
-                                                className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80', b.badge)}>
+                                                className={cn('inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80', b.badge)}>
                                                 <span className={cn('h-1.5 w-1.5 rounded-full', b.dot)} />
                                                 {b.label}
                                             </button>
                                         );
                                     })()}
                                     {vehiculo.fecha_vencimiento_vtv ? (
-                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_vtv))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_vtv))}>
                                             VTV {formatVtv(vehiculo.fecha_vencimiento_vtv)}
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin VTV</span>
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin VTV</span>
                                     )}
                                     {vehiculo.fecha_vencimiento_gnc && (
-                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_gnc))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_gnc))}>
                                             GNC {formatVtv(vehiculo.fecha_vencimiento_gnc)}
                                         </span>
                                     )}
                                     {vehiculo.seguro_vencimiento ? (
-                                        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', seguroColorClass(vehiculo.seguro_vencimiento))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', seguroColorClass(vehiculo.seguro_vencimiento))}>
                                             Seg. {formatSeguro(vehiculo.seguro_vencimiento)}
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin seguro</span>
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin seguro</span>
                                     )}
                                     {faltaAlgunDocVehiculo(vehiculo) && (
                                         <button type="button" onClick={(e) => { e.stopPropagation(); openDocumentos(vehiculo); }}
-                                            className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                            className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
                                             Faltan docs
                                         </button>
                                     )}

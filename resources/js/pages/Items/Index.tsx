@@ -535,7 +535,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     >
                         <Wrench className="h-4 w-4" />
                         Repuestos
-                        <span className="ml-1 rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
+                        <span className="ml-1 rounded-md bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
                             {counts.repuestos}
                         </span>
                     </button>
@@ -551,7 +551,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     >
                         <Warehouse className="h-4 w-4" />
                         Galpón
-                        <span className="ml-1 rounded-full bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
+                        <span className="ml-1 rounded-md bg-muted px-1.5 text-xs text-muted-foreground tabular-nums">
                             {counts.galpon}
                         </span>
                     </button>
@@ -572,7 +572,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 type="button"
                                 onClick={() => setStockFilter((p) => p === s.key ? 'all' : s.key)}
                                 className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+                                    'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
                                     active
                                         ? 'border-primary bg-primary text-primary-foreground'
                                         : 'border-border bg-card text-muted-foreground hover:text-foreground',
@@ -1544,7 +1544,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     </span>
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-500">
+                                            <div className="flex items-center gap-1 rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-500">
                                                 <TrendingUp className="h-3 w-3" />
                                                 +{createForm.data.stock}
                                             </div>
