@@ -42,13 +42,13 @@ function getInitials(name: string): string {
 export function EstadoBadge({ estado, deuda }: { estado: 'pagado' | 'deuda'; deuda: number }) {
     if (estado === 'pagado') {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+            <span className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
                 <Check className="h-3 w-3" /> Pagado
             </span>
         );
     }
     return (
-        <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+        <span className="inline-flex items-center rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
             Debe {formatARS(deuda)}
         </span>
     );
@@ -134,12 +134,12 @@ export function ResumenRecaudacionModal({
                                             {/* Badges de resumen rápido */}
                                             <div className="mb-2 flex gap-2">
                                                 {pagados > 0 && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                                         <Check className="h-3 w-3" /> {pagados} pagado{pagados !== 1 ? 's' : ''}
                                                     </span>
                                                 )}
                                                 {deudores > 0 && (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
                                                         {deudores} deben
                                                     </span>
                                                 )}

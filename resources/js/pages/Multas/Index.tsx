@@ -751,7 +751,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                 {pend > 0 && (
                                     <span
                                         className={cn(
-                                            'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums',
+                                            'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-md px-1 text-[10px] font-bold tabular-nums',
                                             activo
                                                 ? 'bg-primary/20 text-primary'
                                                 : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
@@ -1192,14 +1192,14 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                         : ''}
                                                 </span>
                                                 {g.pendientes > 0 ? (
-                                                    <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    <span className="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                                                         {g.pendientes} pendiente
                                                         {g.pendientes !== 1
                                                             ? 's'
                                                             : ''}
                                                     </span>
                                                 ) : (
-                                                    <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                    <span className="shrink-0 rounded-md bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
                                                         Al día
                                                     </span>
                                                 )}
@@ -1329,7 +1329,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                             : 'Marcar como pagada en el sistema de infracciones'
                                                                     }
                                                                     className={cn(
-                                                                        'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
                                                                         m.pagado
                                                                             ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                                             : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -1355,7 +1355,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                                 : 'Registrar cobro al chofer'
                                                                     }
                                                                     className={cn(
-                                                                        'flex flex-1 items-center justify-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
                                                                         estadoCobro(m) === 'cobrada'
                                                                             ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
                                                                             : estadoCobro(m) === 'parcial'
@@ -1730,7 +1730,7 @@ function ReporteSeccion({
             <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
                 <Icon className={cn('h-4 w-4', color)} />
                 <span className="text-sm font-medium text-foreground">{title}</span>
-                <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
                     {count}
                 </span>
             </div>
@@ -1806,7 +1806,7 @@ function ReporteSemanal({
                         {formatFecha(desde)} – {formatFecha(hasta)}
                     </span>
                     {esActual && (
-                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                        <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                             Esta semana
                         </span>
                     )}
@@ -2831,7 +2831,7 @@ function Chip({
             type="button"
             onClick={onClick}
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97]',
+                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97]',
                 activo
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',

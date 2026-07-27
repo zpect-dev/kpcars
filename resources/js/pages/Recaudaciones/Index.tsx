@@ -399,7 +399,7 @@ export default function RecaudacionesIndex({
                                 <button
                                     type="button"
                                     onClick={() => setFilterInversionDescuento('')}
-                                    className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === '' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                                    className={`rounded-lg border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === '' ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
                                 >
                                     Todas
                                 </button>
@@ -408,7 +408,7 @@ export default function RecaudacionesIndex({
                                         key={inv}
                                         type="button"
                                         onClick={() => setFilterInversionDescuento(inv === filterInversionDescuento ? '' : inv)}
-                                        className={`rounded-full border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === inv ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
+                                        className={`rounded-lg border px-3 py-0.5 text-xs font-medium transition-colors ${filterInversionDescuento === inv ? 'border-primary/30 bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted'}`}
                                     >
                                         {inv}
                                     </button>
@@ -534,11 +534,11 @@ export default function RecaudacionesIndex({
                                     </p>
                                 </div>
                                 {e.apertura_abierta ? (
-                                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                    <span className="rounded-md bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                                         Abierta
                                     </span>
                                 ) : (
-                                    <span className="rounded-full bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                    <span className="rounded-md bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
                                         Cerrada
                                     </span>
                                 )}

@@ -367,7 +367,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <UserPlus className="h-4 w-4 text-green-500" />
                         Altas de choferes
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{altas.length}</span>
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{altas.length}</span>
                     </h2>
                     {altas.length === 0 ? (
                         <div className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
@@ -387,7 +387,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <UserMinus className="h-4 w-4 text-red-500" />
                         Bajas de choferes
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{bajas.length}</span>
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{bajas.length}</span>
                     </h2>
                     {bajas.length === 0 ? (
                         <div className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
@@ -407,7 +407,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                         <Car className="h-4 w-4 text-indigo-500" />
                         Cambios de vehículo
-                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{cambios.length}</span>
+                        <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{cambios.length}</span>
                     </h2>
                     {cambios.length === 0 ? (
                         <div className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">

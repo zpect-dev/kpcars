@@ -170,7 +170,7 @@ function DetalleInversiones({ detalles, abonoTotal }: { detalles: Detalle[]; abo
                                 <td className="px-3 py-2">
                                     {g.base ? (
                                         <span className={cn(
-                                            'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                            'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium',
                                             CONCEPTO_PILL[g.base.concepto] ?? 'border-border bg-muted text-muted-foreground',
                                         )}>
                                             {CONCEPTO_LABEL[g.base.concepto] ?? g.base.concepto}
@@ -254,15 +254,15 @@ export default function CierreSueldoShow({ cierre, empresas, porSocio, abonos, s
                             Cierre de Sueldos #{cierre.id}
                         </h1>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                            <span className="rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-muted-foreground">
+                            <span className="rounded-md border border-border bg-muted/60 px-2.5 py-0.5 text-muted-foreground">
                                 {formatFecha(cierre.fecha)}
                             </span>
                             {cierre.ejecutado_por && (
-                                <span className="rounded-full border border-border bg-muted/60 px-2.5 py-0.5 text-muted-foreground">
+                                <span className="rounded-md border border-border bg-muted/60 px-2.5 py-0.5 text-muted-foreground">
                                     Por {cierre.ejecutado_por.name}
                                 </span>
                             )}
-                            <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 font-medium text-primary">
+                            <span className="rounded-md border border-primary/25 bg-primary/10 px-2.5 py-0.5 font-medium text-primary">
                                 Tasa {formatARS(cierre.tasa)} / USD
                             </span>
                         </div>
@@ -673,12 +673,12 @@ function EmpresaSection({
                                                 <span className="truncate text-sm font-medium text-foreground">
                                                     {row.user.name}
                                                 </span>
-                                                <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium', estado.badge)}>
+                                                <span className={cn('inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium', estado.badge)}>
                                                     <span className="h-1.5 w-1.5 rounded-full bg-current" />
                                                     {estado.label}
                                                 </span>
                                                 {abono && (
-                                                    <span className="inline-flex items-center rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <span className="inline-flex items-center rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
                                                         Abonó {formatARS(abono.total)}
                                                     </span>
                                                 )}
