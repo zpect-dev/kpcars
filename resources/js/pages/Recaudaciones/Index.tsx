@@ -106,6 +106,19 @@ export default function RecaudacionesIndex({
     const [processingCierre, setProcessingCierre] = useState(false);
     const [processingAbrir, setProcessingAbrir] = useState(false);
 
+    // Filtros activos de la tabla (los reporta RecaudacionesTabla), para que la
+    // exportación "según filtros" refleje exactamente la vista actual.
+    const [exportFiltros, setExportFiltros] = useState({ q: '', estado: 'all', metodo: 'all' });
+
+    function exportQuery(): string {
+        const p = new URLSearchParams();
+        if (exportFiltros.q.trim()) p.set('q', exportFiltros.q.trim());
+        if (exportFiltros.estado !== 'all') p.set('estado', exportFiltros.estado);
+        if (exportFiltros.metodo !== 'all') p.set('metodo', exportFiltros.metodo);
+        const qs = p.toString();
+        return qs ? `?${qs}` : '';
+    }
+
     const hayDeudores = useMemo(
         () => filas.some((f) => f.estado === 'deuda'),
         [filas],
@@ -307,23 +320,25 @@ export default function RecaudacionesIndex({
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={() => window.open('/pdf/recaudaciones-actuales', '_blank')}>
+                                        <DropdownMenuItem onClick={() => window.open('/pdf/recaudaciones-actuales' + exportQuery(), '_blank')}>
                                             <Download className="mr-2 h-4 w-4" />
-                                            PDF período actual
+                                            PDF (según filtros)
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => window.open('/excel/recaudaciones-actuales', '_blank')}>
+                                        <DropdownMenuItem onClick={() => window.open('/excel/recaudaciones-actuales' + exportQuery(), '_blank')}>
                                             <FileSpreadsheet className="mr-2 h-4 w-4" />
-                                            Excel período actual
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem
-                                            onClick={() => window.open('/pdf/recaudaciones-deudores', '_blank')}
-                                            disabled={!hayDeudores}
-                                        >
-                                            <FileDown className="mr-2 h-4 w-4" />
-                                            PDF deudores
+                                            Excel (según filtros)
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open('/pdf/recaudaciones-deudores', '_blank')}
+                                    disabled={!hayDeudores}
+                                >
+                                    <FileDown className="mr-1.5 h-4 w-4" />
+                                    Deudores
+                                </Button>
                                 {isAdmin && (
                                     <Button
                                         size="sm"
@@ -373,6 +388,7 @@ export default function RecaudacionesIndex({
                         filas={filas}
                         editable={isAdmin}
                         endpoint={(f) => `/recaudaciones/${f.vehiculo_id}`}
+                        onFiltrosChange={setExportFiltros}
                     />
                 )}
             </div>

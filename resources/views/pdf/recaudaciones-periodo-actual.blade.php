@@ -7,9 +7,12 @@
 </head>
 <body>
     <div class="section-title">
-        Recaudaciones — Período actual
+        Recaudaciones — {{ $encabezado ?? 'Período actual' }}
         <span style="font-weight:normal;font-size:11px;">(al {{ now()->format('d/m/Y H:i') }})</span>
     </div>
+    @if(!empty($filtroDesc))
+        <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">Filtros aplicados: {{ $filtroDesc }}</div>
+    @endif
 
     @if($porInversion->isEmpty())
         <table>

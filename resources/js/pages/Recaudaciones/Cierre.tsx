@@ -1,8 +1,14 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { ClipboardList, FileDown, History } from 'lucide-react';
+import { ChevronDown, ClipboardList, Download, FileDown, FileSpreadsheet, History } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { formatDate, RecaudacionesTabla, ResumenRecaudacionModal } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { RecaudacionFila } from '@/types';
 
 interface Props {
@@ -22,6 +28,18 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
     const [showResumenModal, setShowResumenModal] = useState(false);
 
     const hayDeudores = useMemo(() => filas.some((f) => f.estado === 'deuda'), [filas]);
+
+    // Filtros activos de la tabla, para exportar según la vista actual del cierre.
+    const [exportFiltros, setExportFiltros] = useState({ q: '', estado: 'all', metodo: 'all' });
+
+    function exportQuery(): string {
+        const p = new URLSearchParams();
+        if (exportFiltros.q.trim()) p.set('q', exportFiltros.q.trim());
+        if (exportFiltros.estado !== 'all') p.set('estado', exportFiltros.estado);
+        if (exportFiltros.metodo !== 'all') p.set('metodo', exportFiltros.metodo);
+        const qs = p.toString();
+        return qs ? `?${qs}` : '';
+    }
 
     return (
         <>
@@ -50,6 +68,25 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
                             <ClipboardList className="mr-1.5 h-4 w-4" />
                             Resumen
                         </Button>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" disabled={filas.length === 0}>
+                                    <Download className="mr-1.5 h-4 w-4" />
+                                    Exportar
+                                    <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => window.open(`/pdf/recaudaciones-actuales/cierre/${cierre.id}` + exportQuery(), '_blank')}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    PDF (según filtros)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => window.open(`/excel/recaudaciones-actuales/cierre/${cierre.id}` + exportQuery(), '_blank')}>
+                                    <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                    Excel (según filtros)
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button
                             variant="outline"
                             size="sm"
@@ -59,7 +96,7 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
                             disabled={!hayDeudores}
                         >
                             <FileDown className="mr-1.5 h-4 w-4" />
-                            Imprimir deudores
+                            Deudores
                         </Button>
                     </div>
                 </div>
@@ -76,6 +113,7 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
                         editable={isAdmin}
                         endpoint={(f) => `/recaudaciones/registro/${f.id}`}
                         emptyMessage="No hay registros que coincidan con la búsqueda."
+                        onFiltrosChange={setExportFiltros}
                     />
                 )}
             </div>

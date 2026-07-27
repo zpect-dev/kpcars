@@ -8,20 +8,20 @@ use App\Models\Transaccion;
 use App\Models\User;
 
 /**
- * Transacciones de stock. Históricamente mecánico se excluye del listado
- * (entra a /articulos para su flujo operativo). Anular es admin-only por
- * impacto en auditoría.
+ * Transacciones de stock. Admin, administrativo y mecánico pueden ver el
+ * historial (el mecánico opera el inventario y necesita consultarlo). Anular
+ * sigue siendo admin-only por su impacto en auditoría.
  */
 class TransaccionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdminOrAdministrativo();
+        return $user->isAdminOrAdministrativo() || $user->isMechanic();
     }
 
     public function view(User $user, Transaccion $transaccion): bool
     {
-        return $user->isAdminOrAdministrativo();
+        return $user->isAdminOrAdministrativo() || $user->isMechanic();
     }
 
     public function annul(User $user, Transaccion $transaccion): bool

@@ -57,6 +57,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('articulos/{articulo}/movimiento', [ArticuloController::class, 'storeMovement'])->name('articulos.movimiento');
         Route::post('articulos/salida-multiple', [ArticuloController::class, 'salidaMultiple'])->name('articulos.salida-multiple');
 
+        // Historial de transacciones de stock (solo lectura; anular es admin-only).
+        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
+        Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
+
         // Turnos (mecánico puede ver y cambiar status; create lo limita la Policy).
         Route::get('appointments', [AppointmentController::class, 'index'])->name('appointments.index');
         Route::post('appointments', [AppointmentController::class, 'store'])->name('appointments.store');
@@ -124,9 +128,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('multas/{multa}/restaurar', [MultaController::class, 'restaurar'])->name('multas.restaurar');
         Route::get('multas/pdf', [MultaController::class, 'pdf'])->name('multas.pdf');
 
-        // Transacciones (vista)
-        Route::get('transactions', [TransactionController::class, 'index'])->name('transactions.index');
-
         // Historial de movimientos de personal (altas/bajas de choferes y cambios
         // de vehículo) con stats, filtros y ajuste de fechas inline.
         Route::get('historial', [HistorialController::class, 'index'])->name('historial.index');
@@ -135,7 +136,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         // PDFs operativos
         Route::get('pdf/vehiculos', [PdfController::class, 'vehiculos'])->name('pdf.vehiculos');
-        Route::get('pdf/transactions', [PdfController::class, 'transactions'])->name('pdf.transactions');
     });
 
     // ─────────────────────────────────────────────────────────────────────
@@ -204,6 +204,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('excel/recaudaciones-descuentos', [ExcelController::class, 'recaudacionesDescuentos'])->name('excel.recaudaciones-descuentos');
         Route::get('pdf/recaudaciones-deudores', [PdfController::class, 'recaudacionesDeudores'])->name('pdf.recaudaciones-deudores');
         Route::get('pdf/recaudaciones-deudores/cierre/{cierreRecaudacion}', [PdfController::class, 'recaudacionesDeudoresCierre'])->name('pdf.recaudaciones-deudores-cierre');
+        Route::get('pdf/recaudaciones-actuales/cierre/{cierreRecaudacion}', [PdfController::class, 'recaudacionesActualesCierre'])->name('pdf.recaudaciones-actuales-cierre');
+        Route::get('excel/recaudaciones-actuales/cierre/{cierreRecaudacion}', [ExcelController::class, 'recaudacionesActualesCierre'])->name('excel.recaudaciones-actuales-cierre');
         Route::get('pdf/cobros', [PdfController::class, 'cobros'])->name('pdf.cobros');
         Route::get('pdf/cobros-integrado', [PdfController::class, 'cobrosIntegrado'])->name('pdf.cobros-integrado');
         Route::get('excel/cobros-integrado', [ExcelController::class, 'cobrosIntegrado'])->name('excel.cobros-integrado');

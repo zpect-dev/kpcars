@@ -171,7 +171,47 @@ class PdfController extends Controller
             ->latest()
             ->first();
 
-        $filas = ($apertura?->recaudaciones ?? collect())
+        return $this->pdfRecaudaciones(
+            $apertura?->recaudaciones ?? collect(),
+            $request,
+            'Período actual',
+            'recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.pdf',
+        );
+    }
+
+    /**
+     * Igual que recaudacionesActuales pero para una recaudación ya cerrada
+     * (historial). Respeta los mismos filtros de la vista.
+     */
+    public function recaudacionesActualesCierre(Request $request, CierreRecaudacion $cierreRecaudacion): Response
+    {
+        $cierreRecaudacion->load([
+            'recaudaciones.vehiculo:id,patente,inversion_id',
+            'recaudaciones.vehiculo.inversion:id,nombre',
+            'recaudaciones.chofer:id,name',
+        ]);
+
+        return $this->pdfRecaudaciones(
+            $cierreRecaudacion->recaudaciones,
+            $request,
+            'Cierre #'.$cierreRecaudacion->id.' — '.$cierreRecaudacion->created_at->format('d/m/Y'),
+            'recaudaciones-cierre-'.$cierreRecaudacion->id.'.pdf',
+        );
+    }
+
+    /**
+     * Genera el PDF de recaudaciones (período actual o cierre) a partir de una
+     * colección de recaudaciones, aplicando los filtros de la vista.
+     *
+     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
+     */
+    private function pdfRecaudaciones($recaudaciones, Request $request, string $encabezado, string $filename): Response
+    {
+        // Respeta los filtros de la tabla (búsqueda, estado y método de pago).
+        $recaudaciones = self::filtrarRecaudaciones($recaudaciones, $request);
+        $filtroDesc = self::describirFiltros($request);
+
+        $filas = $recaudaciones
             ->map(fn (Recaudacion $r) => [
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                 'patente'   => $r->vehiculo?->patente ?? 'N/A',
@@ -189,10 +229,86 @@ class PdfController extends Controller
         $totalTransferencia = $filas->sum('transf');
         $totalGeneral = $filas->sum('total');
 
-        $pdf = Pdf::loadView('pdf.recaudaciones-periodo-actual', compact('porInversion', 'totalEfectivo', 'totalTransferencia', 'totalGeneral'))
+        $pdf = Pdf::loadView('pdf.recaudaciones-periodo-actual', compact('porInversion', 'totalEfectivo', 'totalTransferencia', 'totalGeneral', 'filtroDesc', 'encabezado'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.pdf');
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Aplica los filtros de la vista de recaudaciones (búsqueda por patente/chofer,
+     * estado pagado/deuda y método efectivo/transferencia/mixto) a la colección de
+     * recaudaciones. Replica exactamente el filtrado del frontend.
+     *
+     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
+     * @return \Illuminate\Support\Collection<int, Recaudacion>
+     */
+    public static function filtrarRecaudaciones($recaudaciones, Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $estado = $request->query('estado'); // 'pagado' | 'deuda' | null
+        $metodo = $request->query('metodo'); // 'efectivo' | 'transferencia' | 'mixto' | null
+        $needle = mb_strtolower($q);
+
+        return $recaudaciones->filter(function (Recaudacion $r) use ($q, $estado, $metodo, $needle) {
+            $pagado = (float) $r->total >= max((float) $r->precio - (float) $r->descuento, 0);
+            if ($estado === 'pagado' && ! $pagado) {
+                return false;
+            }
+            if ($estado === 'deuda' && $pagado) {
+                return false;
+            }
+
+            $e = (float) $r->efectivo > 0;
+            $t = (float) $r->transferencia > 0;
+            if ($metodo === 'efectivo' && ! ($e && ! $t)) {
+                return false;
+            }
+            if ($metodo === 'transferencia' && ! ($t && ! $e)) {
+                return false;
+            }
+            if ($metodo === 'mixto' && ! ($e && $t)) {
+                return false;
+            }
+
+            if ($q !== '') {
+                $patente = mb_strtolower($r->vehiculo?->patente ?? '');
+                $chofer = mb_strtolower($r->chofer?->name ?? '');
+                if (! str_contains($patente, $needle) && ! str_contains($chofer, $needle)) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Texto legible con los filtros aplicados, para el encabezado del export.
+     */
+    public static function describirFiltros(Request $request): ?string
+    {
+        $partes = [];
+
+        $estado = $request->query('estado');
+        if ($estado === 'pagado') {
+            $partes[] = 'Pagados';
+        } elseif ($estado === 'deuda') {
+            $partes[] = 'Deudores';
+        }
+
+        $metodo = $request->query('metodo');
+        $etiquetasMetodo = ['efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'mixto' => 'Mixto'];
+        if (isset($etiquetasMetodo[$metodo])) {
+            $partes[] = $etiquetasMetodo[$metodo];
+        }
+
+        $q = trim((string) $request->query('q', ''));
+        if ($q !== '') {
+            $partes[] = 'Búsqueda: "'.$q.'"';
+        }
+
+        return $partes === [] ? null : implode(' · ', $partes);
     }
 
     public function recaudacionesDescuentos(): Response
@@ -246,7 +362,7 @@ class PdfController extends Controller
      */
     public function transactions(Request $request): Response
     {
-        // Acceso: middleware role:administrador,administrativo.
+        // Acceso: middleware role:administrador,administrativo,mecanico.
         // Inventario es global: el historial abarca todas las empresas.
         $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
         $articleId = $filters['article'] ?? null;

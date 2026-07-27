@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Models\AperturaRecaudacion;
 use App\Models\CierreGasto;
+use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
@@ -252,7 +253,41 @@ class ExcelController extends Controller
             ->latest()
             ->first();
 
-        $filas = ($apertura?->recaudaciones ?? collect())
+        return $this->excelRecaudaciones(
+            $apertura?->recaudaciones ?? collect(),
+            $request,
+            'recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.xlsx',
+        );
+    }
+
+    /**
+     * Igual que recaudacionesActuales pero para una recaudación ya cerrada
+     * (historial). Respeta los mismos filtros de la vista.
+     */
+    public function recaudacionesActualesCierre(Request $request, CierreRecaudacion $cierreRecaudacion): StreamedResponse
+    {
+        $cierreRecaudacion->load([
+            'recaudaciones.vehiculo:id,patente,inversion_id',
+            'recaudaciones.vehiculo.inversion:id,nombre',
+            'recaudaciones.chofer:id,name',
+        ]);
+
+        return $this->excelRecaudaciones(
+            $cierreRecaudacion->recaudaciones,
+            $request,
+            'recaudaciones-cierre-'.$cierreRecaudacion->id.'.xlsx',
+        );
+    }
+
+    /**
+     * Escribe el Excel de recaudaciones a partir de una colección, aplicando los
+     * filtros de la vista (reusa el filtrado de PdfController).
+     *
+     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
+     */
+    private function excelRecaudaciones($recaudaciones, Request $request, string $filename): StreamedResponse
+    {
+        $filas = PdfController::filtrarRecaudaciones($recaudaciones, $request)
             ->map(fn (Recaudacion $r) => [
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                 'patente'   => $r->vehiculo?->patente ?? 'N/A',
@@ -265,7 +300,6 @@ class ExcelController extends Controller
             ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
             ->values();
 
-        $filename = 'recaudaciones-periodo-actual-'.now()->format('Y-m-d').'.xlsx';
         $writer = SimpleExcelWriter::streamDownload($filename);
         $writer->addHeader(['Inversión', 'Patente', 'Chofer', 'Efectivo', 'Transferencia', 'Total', 'Estado']);
 

@@ -365,6 +365,8 @@ interface RecaudacionesTablaProps {
     editable: boolean;
     endpoint: (fila: RecaudacionFila) => string;
     emptyMessage?: string;
+    // Reporta los filtros activos al padre (para exportar según la vista actual).
+    onFiltrosChange?: (f: { q: string; estado: string; metodo: string }) => void;
 }
 
 function useRecaudacionForm(fila: RecaudacionFila, endpoint: (fila: RecaudacionFila) => string, editable: boolean) {
@@ -409,12 +411,18 @@ function initialSearch(): string {
     return new URLSearchParams(window.location.search).get('q') ?? '';
 }
 
-export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage }: RecaudacionesTablaProps) {
+export function RecaudacionesTabla({ filas, editable, endpoint, emptyMessage, onFiltrosChange }: RecaudacionesTablaProps) {
     const [search, setSearch] = useState(initialSearch);
     const [estadoFiltro, setEstadoFiltro] = useState<'all' | 'pagado' | 'deuda'>('all');
     const [metodoFiltro, setMetodoFiltro] = useState<MetodoFiltro>('all');
     const [sortKey, setSortKey] = useState<SortCol | null>(null);
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    // Informar al padre los filtros activos (búsqueda, estado y método) para que
+    // las exportaciones respeten la vista actual.
+    useEffect(() => {
+        onFiltrosChange?.({ q: search, estado: estadoFiltro, metodo: metodoFiltro });
+    }, [search, estadoFiltro, metodoFiltro, onFiltrosChange]);
 
     // Reflejar el buscador en la URL (sin recargar) para conservarlo al
     // cambiar de empresa u otras navegaciones que vuelvan a esta página.

@@ -1058,12 +1058,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                             className="h-8 w-8 shrink-0 cursor-zoom-in rounded-full border border-border bg-muted object-cover transition hover:opacity-80"
                                                         />
                                                     )}
-                                                    <span
-                                                        className="max-w-[150px] truncate font-semibold text-foreground"
-                                                        title={user.name}
-                                                    >
-                                                        {user.name}
-                                                    </span>
+                                                    <div className="flex min-w-0 flex-col">
+                                                        <span
+                                                            className="max-w-[150px] truncate font-semibold text-foreground"
+                                                            title={user.name}
+                                                        >
+                                                            {user.name}
+                                                        </span>
+                                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
@@ -1209,11 +1216,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                                 Inversiones ({user.inversiones?.length ?? 0})
                                                             </Button>
                                                         )}
-                                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
-                                                            </span>
-                                                        )}
                                                     </div>
                                                 )}
                                             </td>
@@ -1279,6 +1281,11 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 >
                                                     {user.name}
                                                 </p>
+                                                {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
+                                                    <p className="truncate text-xs text-muted-foreground">
+                                                        Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
+                                                    </p>
+                                                )}
                                                 <p className="truncate text-xs text-muted-foreground">
                                                     {roles.find(
                                                         (r) =>
@@ -1385,20 +1392,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <span className="text-muted-foreground/50 italic">N/A</span>
                                             )}
                                         </div>
-                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && (
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="tracking-wider text-muted-foreground uppercase">
-                                                    Ingreso
-                                                </span>
-                                                {user.fecha_ingreso ? (
-                                                    <span className="font-medium text-foreground">
-                                                        {formatLicenciaFecha(user.fecha_ingreso)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground/50 italic">—</span>
-                                                )}
-                                            </div>
-                                        )}
                                         {filterRole === 'chofer' && (
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="tracking-wider text-muted-foreground uppercase">
