@@ -14,6 +14,7 @@ use App\Http\Controllers\InversionController;
 use App\Http\Controllers\HistorialController;
 use App\Http\Controllers\MultaController;
 use App\Http\Controllers\RecaudacionController;
+use App\Http\Controllers\ResumenController;
 use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
@@ -168,6 +169,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
         Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
         Route::get('pdf/gastos', [PdfController::class, 'gastos'])->name('pdf.gastos');
+
+        // Resumen financiero (ingresos vs egresos). Vista y exportaciones
+        // consumen la misma CalcularResumenAction con los mismos filtros.
+        Route::get('resumen', [ResumenController::class, 'index'])->name('resumen.index');
+        Route::get('pdf/resumen', [PdfController::class, 'resumen'])->name('pdf.resumen');
+        Route::get('excel/resumen', [ExcelController::class, 'resumen'])->name('excel.resumen');
 
         // Cierres de gastos (solo detalle: el cierre se ejecuta unificado desde Cobros.
         // El index/store standalone se removió con el refactor de cobros+gastos).

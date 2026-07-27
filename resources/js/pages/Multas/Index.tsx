@@ -149,9 +149,19 @@ function montoEfectivo(m: Multa): number {
     return tieneDescuento(m) ? m.monto * 0.5 : m.monto;
 }
 
-/** Lo que falta cobrarle al chofer hoy (0 si ya está cobrada del todo o es punto rojo). */
+/**
+ * Punto rojo "de seguimiento" sin importe (monto 0): no tiene precio, se muestra
+ * como "—" y queda fuera de todos los cálculos financieros. Un punto rojo con
+ * monto cargado (monto > 0) cuenta como una multa normal a todos los efectos;
+ * solo lleva además la marca roja.
+ */
+function sinImporte(m: { punto_rojo: boolean; monto: number }): boolean {
+    return m.punto_rojo && m.monto <= 0;
+}
+
+/** Lo que falta cobrarle al chofer hoy (0 si ya está cobrada del todo o no tiene importe). */
 function faltante(m: Multa): number {
-    if (m.cobrado || m.punto_rojo) return 0;
+    if (m.cobrado || sinImporte(m)) return 0;
     return Math.max(montoEfectivo(m) - m.monto_cobrado, 0);
 }
 
@@ -341,14 +351,14 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
     }
 
     const stats = useMemo(() => {
-        const conMonto = multas.filter((m) => !m.punto_rojo);
+        const conMonto = multas.filter((m) => !sinImporte(m));
         // Solo CABA: son las únicas que pierden descuento al vencer (GBA no tiene).
         const proximasVencer = multas.filter(
             (m) =>
                 m.jurisdiccion === 'CABA' &&
                 m.fecha_vencimiento &&
                 !m.cobrado &&
-                !m.punto_rojo &&
+                !sinImporte(m) &&
                 m.fecha_vencimiento >= HOY &&
                 m.fecha_vencimiento <= HOY_PLUS_7,
         );
@@ -381,7 +391,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
             }
         >();
         for (const m of multas) {
-            if (m.punto_rojo) continue;
+            if (sinImporte(m)) continue;
             const key = m.conductor_id ? `c${m.conductor_id}` : 'sin';
             if (!map.has(key))
                 map.set(key, {
@@ -530,7 +540,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
     }
 
     function toggleCobrado(m: Multa) {
-        if (m.punto_rojo) {
+        if (sinImporte(m)) {
             // Sin importe: cobro sí/no directo (sin monto).
             router.patch(
                 `/multas/${m.id}/cobrado`,
@@ -1274,7 +1284,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                         dias <= 7;
 
                                                     const montoNode =
-                                                        m.punto_rojo ? (
+                                                        sinImporte(m) ? (
                                                             <span className="text-sm text-muted-foreground">
                                                                 —
                                                             </span>
@@ -1371,7 +1381,7 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                             : 'Sin cobrar'}
                                                                 </button>
                                                             </div>
-                                                            {!m.punto_rojo && estadoCobro(m) !== 'sin' && (
+                                                            {!sinImporte(m) && estadoCobro(m) !== 'sin' && (
                                                                 <span className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
                                                                     <UserIcon className="h-2.5 w-2.5 shrink-0" />
                                                                     {estadoCobro(m) === 'cobrada'
@@ -1888,7 +1898,7 @@ function ReporteSemanal({
                         <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
                         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{formatFecha(m.created_at)}</span>
                         <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-                            {m.punto_rojo ? '—' : formatARS(montoEfectivo(m))}
+                            {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
                         </span>
                     </div>
                 ))}
@@ -1902,7 +1912,7 @@ function ReporteSemanal({
                         <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
                         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.pagada_en ? formatFecha(m.pagada_en) : ''}</span>
                         <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-                            {m.punto_rojo ? '—' : formatARS(montoEfectivo(m))}
+                            {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
                         </span>
                     </div>
                 ))}
@@ -1935,7 +1945,7 @@ function ReporteSemanal({
                         <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
                         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.cobrada_en ? formatFecha(m.cobrada_en) : ''}</span>
                         <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-                            {m.punto_rojo ? '—' : formatARS(Number(m.monto_cobrado))}
+                            {sinImporte(m) ? '—' : formatARS(Number(m.monto_cobrado))}
                         </span>
                     </div>
                 ))}
@@ -1949,7 +1959,7 @@ function ReporteSemanal({
                         <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{e.descripcion}</span>
                         <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0" title="Fecha de eliminación">{formatFecha(e.deleted_at)}</span>
                         <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-muted-foreground line-through">
-                            {e.punto_rojo ? '—' : formatARS(Number(e.monto))}
+                            {sinImporte(e) ? '—' : formatARS(Number(e.monto))}
                         </span>
                     </div>
                 ))}
@@ -2609,13 +2619,19 @@ function EditarMultaForm({
     const form = useForm({
         monto: String(multa.monto),
         fecha_vencimiento: multa.fecha_vencimiento ?? '',
+        punto_rojo: multa.punto_rojo,
         pdf: null as File | null,
     });
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
         // El PDF se sube por multipart; en rutas PATCH hay que falsear el método.
-        form.transform((data) => ({ ...data, _method: 'patch' }));
+        // Los booleanos van como '1'/'0' porque FormData serializa todo a texto.
+        form.transform((data) => ({
+            ...data,
+            punto_rojo: data.punto_rojo ? '1' : '0',
+            _method: 'patch',
+        }));
         form.post(`/multas/${multa.id}`, {
             preserveScroll: true,
             preserveState: true,
@@ -2625,8 +2641,12 @@ function EditarMultaForm({
         });
     }
 
-    const camposOk = multa.punto_rojo
-        ? form.data.pdf !== null
+    // Un punto rojo puede conservar su importe: si se deja el monto en blanco
+    // queda como seguimiento sin precio, y si se carga se comporta como una
+    // multa normal (suma en totales y se le cobra al chofer).
+    const conImporte = form.data.monto !== '' && Number(form.data.monto) > 0;
+    const camposOk = form.data.punto_rojo
+        ? !conImporte || form.data.fecha_vencimiento !== ''
         : form.data.monto !== '' && form.data.fecha_vencimiento !== '';
 
     return (
@@ -2650,53 +2670,75 @@ function EditarMultaForm({
 
             <form onSubmit={submit}>
                 <div className="flex flex-col gap-4 px-5 py-5">
-                    {multa.punto_rojo ? (
-                        <p className="text-xs text-muted-foreground">
-                            Multa de punto rojo: no tiene monto ni vencimiento.
-                            Solo podés cambiar el PDF.
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-monto">Monto total</Label>
-                                <MoneyInput
-                                    id="edit-monto"
-                                    placeholder="0,00"
-                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
-                                    onValueChange={(n) =>
-                                        form.setData('monto', n == null ? '' : String(n))
-                                    }
-                                />
-                                {form.errors.monto && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.monto}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-vto">
-                                    Fecha de vencimiento
-                                </Label>
-                                <Input
-                                    id="edit-vto"
-                                    type="date"
-                                    value={form.data.fecha_vencimiento}
-                                    min={multa.fecha}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'fecha_vencimiento',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                {form.errors.fecha_vencimiento && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.fecha_vencimiento}
-                                    </p>
-                                )}
-                            </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="edit-monto">Monto total</Label>
+                            <MoneyInput
+                                id="edit-monto"
+                                placeholder="0,00"
+                                value={form.data.monto === '' ? null : Number(form.data.monto)}
+                                onValueChange={(n) =>
+                                    form.setData('monto', n == null ? '' : String(n))
+                                }
+                            />
+                            {form.errors.monto && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.monto}
+                                </p>
+                            )}
                         </div>
-                    )}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="edit-vto">
+                                Fecha de vencimiento
+                            </Label>
+                            <Input
+                                id="edit-vto"
+                                type="date"
+                                value={form.data.fecha_vencimiento}
+                                min={multa.fecha}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'fecha_vencimiento',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                            {form.errors.fecha_vencimiento && (
+                                <p className="text-xs text-red-600">
+                                    {form.errors.fecha_vencimiento}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
+                            <input
+                                type="checkbox"
+                                checked={form.data.punto_rojo}
+                                onChange={(e) =>
+                                    form.setData('punto_rojo', e.target.checked)
+                                }
+                                className="h-4 w-4 rounded border-input accent-red-500"
+                            />
+                            <span className="flex items-center gap-1.5 text-sm text-foreground">
+                                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                                Punto rojo
+                            </span>
+                        </label>
+                        {form.data.punto_rojo && (
+                            <p className="text-xs text-muted-foreground">
+                                {conImporte
+                                    ? 'Conserva el monto: se sigue mostrando el precio y cuenta en los totales y cobros.'
+                                    : 'Sin monto: es solo seguimiento, se muestra como "—" y no cuenta en totales ni cobros.'}
+                            </p>
+                        )}
+                        {form.errors.punto_rojo && (
+                            <p className="text-xs text-red-600">
+                                {form.errors.punto_rojo}
+                            </p>
+                        )}
+                    </div>
 
                     <div className="flex flex-col gap-1.5">
                         <Label>PDF de la multa</Label>

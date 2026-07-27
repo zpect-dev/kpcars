@@ -56,6 +56,7 @@ export type Permissions = Partial<{
     can_manage_recaudaciones: boolean;
     can_view_gastos: boolean;
     can_manage_gastos: boolean;
+    can_view_resumen: boolean;
     can_manage_inversiones: boolean;
     can_view_cierres_sueldo: boolean;
     can_manage_cierres_sueldo: boolean;

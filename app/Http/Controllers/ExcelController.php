@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\BuildResumenIntegradoAction;
+use App\Actions\CalcularResumenAction;
+use App\Http\Requests\ResumenFiltrosRequest;
 use App\Models\AperturaRecaudacion;
 use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
@@ -18,6 +20,60 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExcelController extends Controller
 {
+    /**
+     * Excel del Resumen financiero: mismos filtros y misma Action que la
+     * vista (las cifras exportadas nunca divergen de la pantalla).
+     */
+    public function resumen(ResumenFiltrosRequest $request, CalcularResumenAction $action): StreamedResponse
+    {
+        $filtros = $request->filtros();
+        $resumen = $action->execute($filtros);
+
+        $filename = 'resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Sección', 'Detalle', 'Ingresos', 'Egresos', 'Neto']);
+
+        $writer->addRow([
+            'Totales',
+            $filtros['desde'].' al '.$filtros['hasta'],
+            round($resumen['totales']['ingresos'], 2),
+            round($resumen['totales']['egresos'], 2),
+            round($resumen['totales']['neto'], 2),
+        ]);
+
+        if ($resumen['abierto']['total'] > 0) {
+            $writer->addRow([
+                'Período en curso',
+                $resumen['abierto']['incluido'] ? 'Incluido en ingresos' : 'NO incluido en ingresos',
+                round($resumen['abierto']['total'], 2),
+                '',
+                '',
+            ]);
+        }
+
+        foreach ($resumen['por_vehiculo'] as $f) {
+            $writer->addRow([
+                'Vehículo',
+                trim($f['patente'].' '.($f['marca'] ?? '').' '.($f['modelo'] ?? '')).' — '.($f['inversion_nombre'] ?? 'Sin inversión'),
+                round($f['ingresos'], 2),
+                round($f['egresos'], 2),
+                round($f['neto'], 2),
+            ]);
+        }
+
+        foreach ($resumen['por_tipo'] as $t) {
+            $writer->addRow([
+                'Egresos por tipo',
+                $t['label'].' ('.$t['porcentaje'].'%)',
+                '',
+                round($t['total'], 2),
+                '',
+            ]);
+        }
+
+        return $writer->toBrowser();
+    }
+
     /**
      * Excel del resumen integrado: cobros + gastos por vehículo e inversión.
      */

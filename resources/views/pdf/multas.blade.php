@@ -45,7 +45,7 @@
         $colExtra = $tipo === 'vehiculo' ? 'Conductor' : 'Patente';
         $filas = '';
         foreach ($ms as $m) {
-            $monto = $m['punto_rojo'] ? '—' : '$' . number_format($m['monto_efectivo'], 2, ',', '.');
+            $monto = $m['sin_importe'] ? '—' : '$' . number_format($m['monto_efectivo'], 2, ',', '.');
             $vto   = $m['fecha_vencimiento'] ?? '—';
             $extra = $tipo === 'vehiculo' ? ($m['conductor'] ?? 'Sin chofer') : '<strong>' . $m['patente'] . '</strong>';
             $pr    = $m['punto_rojo'] ? '<span class="badge-pr"></span> ' : '';
@@ -101,9 +101,9 @@
             $desglose = $multas->groupBy('conductor')->map(fn($ms) => [
                 'label'    => $ms->first()['conductor'] ?? 'Sin chofer',
                 'cantidad' => $ms->count(),
-                'total'    => $ms->where('punto_rojo', false)->sum('monto_efectivo'),
-                'pagado'   => $ms->where('punto_rojo', false)->sum('monto_cobrado'),
-                'adeudado' => $ms->where('punto_rojo', false)->sum('adeudado'),
+                'total'    => $ms->where('sin_importe', false)->sum('monto_efectivo'),
+                'pagado'   => $ms->where('sin_importe', false)->sum('monto_cobrado'),
+                'adeudado' => $ms->where('sin_importe', false)->sum('adeudado'),
             ])->values();
             $desgloseHeader = 'Conductor';
             $desgloseTitulo = 'Desglose por conductor';
@@ -111,9 +111,9 @@
             $desglose = $multas->groupBy('patente')->map(fn($ms) => [
                 'label'    => $ms->first()['patente'],
                 'cantidad' => $ms->count(),
-                'total'    => $ms->where('punto_rojo', false)->sum('monto_efectivo'),
-                'pagado'   => $ms->where('punto_rojo', false)->sum('monto_cobrado'),
-                'adeudado' => $ms->where('punto_rojo', false)->sum('adeudado'),
+                'total'    => $ms->where('sin_importe', false)->sum('monto_efectivo'),
+                'pagado'   => $ms->where('sin_importe', false)->sum('monto_cobrado'),
+                'adeudado' => $ms->where('sin_importe', false)->sum('adeudado'),
             ])->values();
             $desgloseHeader = 'Vehículo';
             $desgloseTitulo = 'Desglose por vehículo';

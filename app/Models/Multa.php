@@ -70,12 +70,25 @@ class Multa extends Model
     }
 
     /**
+     * Punto rojo de seguimiento puro: marcado como punto rojo y sin importe.
+     *
+     * Un punto rojo puede conservar su monto (se le carga un importe al pasarlo
+     * a punto rojo); en ese caso el precio queda visible y la multa cuenta como
+     * una normal en totales y cobros. Sin monto, en cambio, queda fuera de todo
+     * cálculo financiero.
+     */
+    public function sinImporte(): bool
+    {
+        return $this->punto_rojo && (float) $this->monto <= 0;
+    }
+
+    /**
      * Saldo que el chofer todavía adeuda, contemplando pagos parciales. Cero si
-     * es de punto rojo (sin importe) o si ya quedó cobrada por completo.
+     * no tiene importe o si ya quedó cobrada por completo.
      */
     public function montoAdeudado(): float
     {
-        if ($this->punto_rojo || $this->cobrado) {
+        if ($this->sinImporte() || $this->cobrado) {
             return 0.0;
         }
 

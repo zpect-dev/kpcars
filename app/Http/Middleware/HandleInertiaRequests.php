@@ -28,6 +28,7 @@ class HandleInertiaRequests extends Middleware
         'view-cobros', 'manage-cobros',
         'view-recaudaciones', 'manage-recaudaciones',
         'view-gastos', 'manage-gastos',
+        'view-resumen',
         'manage-inversiones',
         'view-cierres-sueldo', 'manage-cierres-sueldo',
         'annul-transactions', 'import-asignaciones',

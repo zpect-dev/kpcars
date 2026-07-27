@@ -192,7 +192,7 @@ function AvatarDropzone({
     );
 }
 
-type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_deposito' | 'deposito_bajo' | 'falta_docs' | 'falta_doc_dni' | 'falta_doc_licencia';
+type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_direccion' | 'con_direccion' | 'falta_deposito' | 'deposito_bajo' | 'falta_docs' | 'falta_doc_dni' | 'falta_doc_licencia';
 
 const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     all:                  'Todos',
@@ -202,6 +202,8 @@ const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
     falta_foto:           'Sin foto',
     falta_telefono:       'Sin teléfono',
     falta_correo:         'Sin correo',
+    falta_direccion:      'Sin dirección',
+    con_direccion:        'Con dirección',
     falta_deposito:       'Sin depósito',
     deposito_bajo:        'Depósito bajo',
     falta_docs:           'Faltan documentos',
@@ -232,6 +234,13 @@ const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: s
             { val: 'falta_foto',     label: 'Sin foto de perfil', desc: 'Sin imagen de identificación' },
             { val: 'falta_telefono', label: 'Sin teléfono',       desc: 'Sin número de contacto' },
             { val: 'falta_correo',   label: 'Sin correo',         desc: 'Sin dirección de email' },
+        ],
+    },
+    {
+        label: 'Domicilio',
+        items: [
+            { val: 'falta_direccion', label: 'Sin dirección', desc: 'No tiene domicilio cargado' },
+            { val: 'con_direccion',   label: 'Con dirección', desc: 'Tiene el domicilio cargado' },
         ],
     },
     {
@@ -385,6 +394,11 @@ function faltaDocLicencia(u: User): boolean {
     return !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf;
 }
 
+/** El chofer no tiene domicilio cargado (nulo o sólo espacios). */
+function sinDireccion(u: User): boolean {
+    return !u.direccion?.trim();
+}
+
 /** Al chofer le falta algún documento: DNI, licencia o foto de perfil. */
 function faltaAlgunDocChofer(u: User): boolean {
     return faltaDocDni(u) || faltaDocLicencia(u) || u.falta_foto === true;
@@ -441,6 +455,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'falta_doc_licencia') return faltaDocLicencia(u);
                 if (filterAlert === 'falta_telefono') return !u.telefono;
                 if (filterAlert === 'falta_correo') return !u.correo;
+                if (filterAlert === 'falta_direccion') return sinDireccion(u);
+                if (filterAlert === 'con_direccion') return !sinDireccion(u);
                 if (filterAlert === 'falta_deposito') return sinDeposito(u);
                 if (filterAlert === 'deposito_bajo') {
                     if (!u.vehiculo?.precio) return false;
@@ -453,7 +469,7 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_docs: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_deposito: 0, deposito_bajo: 0 };
+        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_docs: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_direccion: 0, con_direccion: 0, falta_deposito: 0, deposito_bajo: 0 };
         const today = new Date(); today.setHours(0, 0, 0, 0);
         return {
             licencia_vencida: users.filter((u) => {
@@ -468,6 +484,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             falta_doc_licencia: users.filter((u) => faltaDocLicencia(u)).length,
             falta_telefono: users.filter((u) => !u.telefono).length,
             falta_correo: users.filter((u) => !u.correo).length,
+            falta_direccion: users.filter((u) => sinDireccion(u)).length,
+            con_direccion: users.filter((u) => !sinDireccion(u)).length,
             falta_deposito: users.filter((u) => sinDeposito(u)).length,
             deposito_bajo: users.filter((u) => {
                 if (!u.vehiculo?.precio) return false;

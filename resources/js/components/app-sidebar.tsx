@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -44,15 +44,19 @@ setOpenMobile(false);
     if (perms.can_view_vehiculos) {
         flotaItems.push({ title: 'Vehículos', href: dashboard.url(), icon: CarFront });
     }
+
     if (perms.can_view_multas) {
         flotaItems.push({ title: 'Multas', href: '/multas', icon: Siren });
     }
+
     if (perms.can_view_revisiones) {
         flotaItems.push({ title: 'Revisiones', href: '/revisiones', icon: ClipboardCheck });
     }
+
     if (perms.can_view_revision_mecanica) {
         flotaItems.push({ title: 'Revisión Mecánica', href: '/revision-mecanica', icon: Wrench });
     }
+
     if (perms.can_view_service) {
         flotaItems.push({ title: 'Service', href: '/services', icon: Gauge });
     }
@@ -63,6 +67,7 @@ setOpenMobile(false);
     if (perms.can_view_turnos) {
         tallerItems.push({ title: 'Turnos', href: '/appointments', icon: CalendarClock });
     }
+
     if (perms.can_view_inventario) {
         tallerItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });
     }
@@ -73,12 +78,19 @@ setOpenMobile(false);
     if (perms.can_view_cobros) {
         cajaItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
     }
+
     if (perms.can_view_recaudaciones) {
         cajaItems.push({ title: 'Recaudaciones', href: '/recaudaciones', icon: Coins });
     }
+
     if (perms.can_view_gastos) {
         cajaItems.push({ title: 'Gastos', href: gastosIndex.url(), icon: HandCoins });
     }
+
+    if (perms.can_view_resumen) {
+        cajaItems.push({ title: 'Resumen', href: '/resumen', icon: ChartColumn });
+    }
+
     if (perms.can_view_cierres_sueldo) {
         cajaItems.push({ title: 'Cierres de Sueldo', href: '/cierres-sueldo', icon: Lock });
     }
@@ -122,12 +134,29 @@ setOpenMobile(false);
     // ── Ensamblado ──────────────────────────────────────────────────────
     const groups: NavGroup[] = [];
 
-    if (miCuentaItems.length)  groups.push({ items: miCuentaItems });
-    if (flotaItems.length)     groups.push({ label: 'Flota',    items: flotaItems });
-    if (tallerItems.length)    groups.push({ label: 'Taller',   items: tallerItems });
-    if (cajaItems.length)      groups.push({ label: 'Caja',     items: cajaItems });
-    if (personalItems.length)  groups.push({ label: 'Personal', items: personalItems });
-    if (bottomItems.length)    groups.push({ items: bottomItems });
+    if (miCuentaItems.length)  {
+groups.push({ items: miCuentaItems });
+}
+
+    if (flotaItems.length)     {
+groups.push({ label: 'Flota',    items: flotaItems });
+}
+
+    if (tallerItems.length)    {
+groups.push({ label: 'Taller',   items: tallerItems });
+}
+
+    if (cajaItems.length)      {
+groups.push({ label: 'Caja',     items: cajaItems });
+}
+
+    if (personalItems.length)  {
+groups.push({ label: 'Personal', items: personalItems });
+}
+
+    if (bottomItems.length)    {
+groups.push({ items: bottomItems });
+}
 
     // ── Destino del logo ────────────────────────────────────────────────
     const role = auth.user?.role;

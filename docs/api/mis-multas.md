@@ -35,41 +35,43 @@ Accept: application/json
 
 ```json
 {
-  "multas": [
-    {
-      "id": 42,
-      "fecha": "2026-05-01",
-      "fecha_vencimiento": "2026-06-01",
-      "descripcion": "Exceso de velocidad en Av. Libertador",
-      "jurisdiccion": "CABA",
-      "punto_rojo": false,
-      "patente": "ABC123",
-      "monto": 20000,
-      "monto_adeudado": 10000,
-      "cobrado": false,
-      "pdf_url": "https://<host>/storage/multas/abcd1234.pdf"
-    }
-  ],
-  "total_adeudado": 10000
+    "multas": [
+        {
+            "id": 42,
+            "fecha": "2026-05-01",
+            "fecha_vencimiento": "2026-06-01",
+            "descripcion": "Exceso de velocidad en Av. Libertador",
+            "jurisdiccion": "CABA",
+            "punto_rojo": false,
+            "sin_importe": false,
+            "patente": "ABC123",
+            "monto": 20000,
+            "monto_adeudado": 10000,
+            "cobrado": false,
+            "pdf_url": "https://<host>/storage/multas/abcd1234.pdf"
+        }
+    ],
+    "total_adeudado": 10000
 }
 ```
 
 ### Campos
 
-| Campo               | Tipo             | Descripción                                                                                     |
-| ------------------- | ---------------- | ----------------------------------------------------------------------------------------------- |
-| `id`                | int              | Identificador de la multa.                                                                       |
-| `fecha`             | string (`Y-m-d`) | Fecha de la infracción.                                                                          |
-| `fecha_vencimiento` | string \| null   | Fecha límite para el descuento (ver `monto_adeudado`). `null` en multas de punto rojo.          |
-| `descripcion`       | string           | Detalle de la infracción.                                                                        |
-| `jurisdiccion`      | string           | `CABA` o `GBA`.                                                                                  |
-| `punto_rojo`        | bool             | Multa de seguimiento sin importe. Si es `true`, `monto` y `monto_adeudado` son `0`.             |
-| `patente`           | string \| null   | Patente del vehículo de la infracción.                                                           |
-| `monto`             | number           | Importe **base** de la multa.                                                                    |
-| `monto_adeudado`    | number           | Saldo que el chofer todavía debe. Ver reglas abajo.                                              |
-| `cobrado`           | bool             | `true` si la empresa ya le cobró la multa por completo al chofer.                               |
-| `pdf_url`           | string \| null   | URL pública al PDF de la multa. `null` si no se adjuntó PDF.                                     |
-| `total_adeudado`    | number           | Suma de `monto_adeudado` de todas las multas del chofer.                                         |
+| Campo               | Tipo             | Descripción                                                                                    |
+| ------------------- | ---------------- | ---------------------------------------------------------------------------------------------- |
+| `id`                | int              | Identificador de la multa.                                                                     |
+| `fecha`             | string (`Y-m-d`) | Fecha de la infracción.                                                                        |
+| `fecha_vencimiento` | string \| null   | Fecha límite para el descuento (ver `monto_adeudado`). `null` en puntos rojos sin importe.     |
+| `descripcion`       | string           | Detalle de la infracción.                                                                      |
+| `jurisdiccion`      | string           | `CABA` o `GBA`.                                                                                |
+| `punto_rojo`        | bool             | Marca de punto rojo. Por sí sola no implica que la multa no tenga importe (ver `sin_importe`). |
+| `sin_importe`       | bool             | Punto rojo de seguimiento puro (sin monto). Si es `true`, `monto` y `monto_adeudado` son `0`.  |
+| `patente`           | string \| null   | Patente del vehículo de la infracción.                                                         |
+| `monto`             | number           | Importe **base** de la multa.                                                                  |
+| `monto_adeudado`    | number           | Saldo que el chofer todavía debe. Ver reglas abajo.                                            |
+| `cobrado`           | bool             | `true` si la empresa ya le cobró la multa por completo al chofer.                              |
+| `pdf_url`           | string \| null   | URL pública al PDF de la multa. `null` si no se adjuntó PDF.                                   |
+| `total_adeudado`    | number           | Suma de `monto_adeudado` de todas las multas del chofer.                                       |
 
 ### Reglas de `monto_adeudado`
 
@@ -81,10 +83,10 @@ Accept: application/json
 
 ### Errores
 
-| Código             | Motivo                                                                                  |
-| ------------------ | --------------------------------------------------------------------------------------- |
-| `401 Unauthorized` | Falta el token o es inválido.                                                            |
-| `403 Forbidden`    | El chofer aún no cambió su contraseña inicial (`EnsurePasswordChanged`).                 |
+| Código             | Motivo                                                                   |
+| ------------------ | ------------------------------------------------------------------------ |
+| `401 Unauthorized` | Falta el token o es inválido.                                            |
+| `403 Forbidden`    | El chofer aún no cambió su contraseña inicial (`EnsurePasswordChanged`). |
 
 ### Notas
 

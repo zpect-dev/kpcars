@@ -103,6 +103,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-recaudaciones', fn (User $user) => $user->isAdmin());
         Gate::define('view-gastos', fn (User $user) => $user->isAdmin());
         Gate::define('manage-gastos', fn (User $user) => $user->isAdmin());
+        Gate::define('view-resumen', fn (User $user) => $user->isAdmin());
         Gate::define('manage-inversiones', fn (User $user) => $user->isAdmin());
         Gate::define('view-cierres-sueldo', fn (User $user) => $user->isAdmin());
         Gate::define('manage-cierres-sueldo', fn (User $user) => $user->isAdmin());

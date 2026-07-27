@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[ScopedBy([GastoTenantScope::class])]
 class Gasto extends Model
@@ -58,6 +59,15 @@ class Gasto extends Model
     public function cierre(): BelongsTo
     {
         return $this->belongsTo(CierreGasto::class, 'cierre_gasto_id');
+    }
+
+    /**
+     * Réplica consultable del reparto entre inversores (una fila por
+     * inversor). El JSON `distribucion` sigue siendo la foto canónica.
+     */
+    public function distribuciones(): HasMany
+    {
+        return $this->hasMany(GastoDistribucion::class, 'gasto_id');
     }
 
     /**

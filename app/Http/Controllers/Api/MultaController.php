@@ -40,6 +40,9 @@ class MultaController extends Controller
             'descripcion' => $m->descripcion,
             'jurisdiccion' => $m->jurisdiccion,
             'punto_rojo' => $m->punto_rojo,
+            // Punto rojo de seguimiento puro: no tiene importe que mostrar. Un
+            // punto rojo con monto conserva su precio y se cobra normalmente.
+            'sin_importe' => $m->sinImporte(),
             'patente' => $m->vehiculo?->patente,
             'monto' => (float) $m->monto,
             'monto_adeudado' => $m->montoAdeudado(),

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\BuildResumenIntegradoAction;
+use App\Actions\CalcularResumenAction;
+use App\Http\Requests\ResumenFiltrosRequest;
 use App\Models\AperturaRecaudacion;
 use App\Models\Appointment;
 use App\Models\Articulo;
@@ -74,6 +76,23 @@ class PdfController extends Controller
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('gastos-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * PDF del Resumen financiero: mismos filtros y misma Action que la vista
+     * (las cifras exportadas nunca divergen de la pantalla).
+     */
+    public function resumen(ResumenFiltrosRequest $request, CalcularResumenAction $action): Response
+    {
+        $filtros = $request->filtros();
+        $resumen = $action->execute($filtros);
+
+        $pdf = Pdf::loadView('pdf.resumen', [
+            'filtros' => $filtros,
+            'resumen' => $resumen,
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.pdf');
     }
 
     /**

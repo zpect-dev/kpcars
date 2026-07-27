@@ -669,6 +669,8 @@ class UserController extends Controller
                     || $u->profile_photo_path === null,
                 '_falta_telefono' => empty($u->telefono),
                 '_falta_correo' => empty($u->correo),
+                '_falta_direccion' => trim((string) $u->direccion) === '',
+                '_con_direccion' => trim((string) $u->direccion) !== '',
                 '_sin_deposito' => $u->depositos->isEmpty(),
                 '_deposito_bajo' => $veh !== null && (float) $veh->precio > 0 && $depTotalArs < 1.5 * (float) $veh->precio,
             ];
@@ -692,6 +694,8 @@ class UserController extends Controller
             'falta_doc_licencia' => '_falta_doc_licencia',
             'falta_telefono' => '_falta_telefono',
             'falta_correo' => '_falta_correo',
+            'falta_direccion' => '_falta_direccion',
+            'con_direccion' => '_con_direccion',
             'falta_deposito' => '_sin_deposito',
             'deposito_bajo' => '_deposito_bajo',
             default => null,
@@ -712,6 +716,8 @@ class UserController extends Controller
             'falta_doc_licencia' => 'Falta doc. licencia',
             'falta_telefono' => 'Sin teléfono',
             'falta_correo' => 'Sin correo',
+            'falta_direccion' => 'Sin dirección',
+            'con_direccion' => 'Con dirección',
             'falta_deposito' => 'Sin depósito',
             'deposito_bajo' => 'Depósito bajo',
         ];

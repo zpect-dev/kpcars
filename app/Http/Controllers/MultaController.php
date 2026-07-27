@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -164,28 +165,38 @@ class MultaController extends Controller
     }
 
     /**
-     * Edita una multa: el PDF en todos los casos, y el monto + vencimiento solo
-     * si no es de punto rojo (esas no tienen importe ni vencimiento).
+     * Edita una multa: el PDF, el monto + vencimiento y la marca de punto rojo.
+     *
+     * Una multa se puede pasar a punto rojo conservando su importe: en ese caso
+     * el precio sigue visible y la multa sigue contando en totales y cobros. Si
+     * el punto rojo se deja sin monto, vuelve a ser seguimiento puro (sin
+     * importe ni vencimiento) y queda fuera de los cálculos financieros.
      */
     public function update(Request $request, Multa $multa): RedirectResponse
     {
         $this->authorize('manage-multas');
 
-        $rules = ['pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240']];
+        $esPuntoRojo = $request->boolean('punto_rojo');
+        // Punto rojo sin importe: monto y vencimiento pasan a ser opcionales.
+        $sinImporte = $esPuntoRojo && (float) $request->input('monto', 0) <= 0;
 
-        if (! $multa->punto_rojo) {
-            $rules['monto'] = ['required', 'numeric', 'min:0'];
-            $rules['fecha_vencimiento'] = ['required', 'date', 'after_or_equal:'.$multa->fecha->toDateString()];
-        }
+        $validated = $request->validate([
+            'pdf' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+            'punto_rojo' => ['boolean'],
+            'monto' => [Rule::requiredIf(! $sinImporte), 'nullable', 'numeric', 'min:0'],
+            'fecha_vencimiento' => [
+                Rule::requiredIf(! $sinImporte),
+                'nullable',
+                'date',
+                'after_or_equal:'.$multa->fecha->toDateString(),
+            ],
+        ]);
 
-        $validated = $request->validate($rules);
-
-        $updates = [];
-
-        if (! $multa->punto_rojo) {
-            $updates['monto'] = $validated['monto'];
-            $updates['fecha_vencimiento'] = $validated['fecha_vencimiento'];
-        }
+        $updates = [
+            'punto_rojo' => $esPuntoRojo,
+            'monto' => $sinImporte ? 0 : $validated['monto'],
+            'fecha_vencimiento' => $sinImporte ? null : $validated['fecha_vencimiento'],
+        ];
 
         if ($request->hasFile('pdf')) {
             if ($multa->pdf_path) {
@@ -194,9 +205,16 @@ class MultaController extends Controller
             $updates['pdf_path'] = $request->file('pdf')->store('multas', 'public');
         }
 
-        if ($updates !== []) {
+        DB::transaction(function () use ($multa, $updates): void {
             $multa->update($updates);
-        }
+
+            // Cambiar el monto mueve el total a cobrar: hay que recalcular si la
+            // multa quedó saldada o no. Solo si tiene pagos, para no pisar el
+            // estado sí/no que se marca a mano en los puntos rojos sin importe.
+            if ($multa->pagos()->exists()) {
+                $this->recomputarCobro($multa);
+            }
+        });
 
         return redirect()->back()->with('success', 'Multa actualizada.');
     }
@@ -283,7 +301,7 @@ class MultaController extends Controller
         $multas = $query->get()->map(function (Multa $m) {
             // Importe vigente hoy (con el descuento CABA si corresponde) y lo
             // efectivamente cobrado / adeudado, contemplando pagos parciales.
-            $efectivo = $m->punto_rojo ? 0.0 : $m->montoACobrar();
+            $efectivo = $m->sinImporte() ? 0.0 : $m->montoACobrar();
             $cobrado = (float) $m->monto_cobrado;
 
             return [
@@ -294,6 +312,7 @@ class MultaController extends Controller
                 'descripcion'      => $m->descripcion,
                 'jurisdiccion'     => $m->jurisdiccion,
                 'punto_rojo'       => $m->punto_rojo,
+                'sin_importe'      => $m->sinImporte(),
                 'monto'            => (float) $m->monto,
                 'monto_efectivo'   => $efectivo,
                 'monto_cobrado'    => $cobrado,
@@ -303,11 +322,13 @@ class MultaController extends Controller
             ];
         });
 
-        $noPr = $multas->where('punto_rojo', false);
-        $totalMonto     = $noPr->sum('monto_efectivo');
-        $pagadoChoferes = $noPr->sum('monto_cobrado');
-        $sinCobrar      = $noPr->sum('adeudado');
-        $sinPagar       = $multas->where('pagado', false)->where('punto_rojo', false)->sum('monto_efectivo');
+        // Los puntos rojos sin importe no suman en ningún total (los que
+        // conservan monto sí, como cualquier multa).
+        $conImporte = $multas->where('sin_importe', false);
+        $totalMonto     = $conImporte->sum('monto_efectivo');
+        $pagadoChoferes = $conImporte->sum('monto_cobrado');
+        $sinCobrar      = $conImporte->sum('adeudado');
+        $sinPagar       = $conImporte->where('pagado', false)->sum('monto_efectivo');
 
         // Export global: agrupar por vehículo o chofer
         $grupos = null;
@@ -318,8 +339,8 @@ class MultaController extends Controller
             )->map(fn ($ms) => [
                 'label'    => $ms->first()[$tipo === 'chofer' ? 'conductor' : 'patente'] ?? 'Sin chofer',
                 'multas'   => $ms,
-                'total'    => $ms->where('punto_rojo', false)->sum('monto_efectivo'),
-                'adeudado' => $ms->where('punto_rojo', false)->sum('adeudado'),
+                'total'    => $ms->where('sin_importe', false)->sum('monto_efectivo'),
+                'adeudado' => $ms->where('sin_importe', false)->sum('adeudado'),
             ])->sortByDesc('adeudado')->values();
         }
 
@@ -376,8 +397,9 @@ class MultaController extends Controller
             return redirect()->back()->with('success', 'Cobro reiniciado.');
         }
 
-        // Punto rojo: sin importe, es un simple sí/no con su fecha (sin pagos).
-        if ($multa->punto_rojo) {
+        // Punto rojo sin importe: es un simple sí/no con su fecha (sin pagos).
+        // Los que conservan monto se cobran como cualquier otra multa.
+        if ($multa->sinImporte()) {
             $validated = $request->validate(['fecha_cobro' => ['required', 'date']]);
             $multa->update(['cobrado' => true, 'cobrada_en' => $validated['fecha_cobro']]);
 

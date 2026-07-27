@@ -51,8 +51,35 @@ class CreateGastoAction
 
             $gasto->save();
 
+            $this->replicarDistribuciones($gasto);
+
             return $gasto->load('vehiculo:id,patente,marca,modelo');
         });
+    }
+
+    /**
+     * Réplica consultable del reparto: una fila por inversor en
+     * `gasto_distribuciones`. El JSON de la fila sigue siendo la foto
+     * canónica; la tabla permite agregar por inversor a nivel SQL (resumen).
+     */
+    protected function replicarDistribuciones(Gasto $gasto): void
+    {
+        $now = now();
+        $rows = [];
+
+        foreach ($gasto->distribucion ?? [] as $userId => $monto) {
+            $rows[] = [
+                'gasto_id' => $gasto->id,
+                'user_id' => (int) $userId,
+                'monto' => round((float) $monto, 2),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if ($rows !== []) {
+            DB::table('gasto_distribuciones')->insert($rows);
+        }
     }
 
     /**
