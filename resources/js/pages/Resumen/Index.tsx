@@ -35,6 +35,8 @@ interface FilaVehiculo {
     inversion_nombre: string | null;
     empresa_nombre: string | null;
     ingresos: number;
+    gastos: number;
+    repuestos: number;
     egresos: number;
     neto: number;
 }
@@ -343,7 +345,7 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                             </Select>
                         </div>
                         <div className="flex flex-col gap-2">
-                            <Label htmlFor="tipo">Tipo de gasto (egresos)</Label>
+                            <Label htmlFor="tipo">Categoría (egresos)</Label>
                             <Select value={tipo || 'all'} onValueChange={(v) => setTipo(v === 'all' ? '' : v)}>
                                 <SelectTrigger id="tipo" className="w-full">
                                     <SelectValue placeholder="Todos" />
@@ -446,6 +448,8 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                                         <th className="px-3 py-2 font-medium">Inversión</th>
                                         <th className="px-3 py-2 font-medium">Empresa</th>
                                         <th className="px-3 py-2 text-right font-medium">Ingresos</th>
+                                        <th className="px-3 py-2 text-right font-medium">Gastos</th>
+                                        <th className="px-3 py-2 text-right font-medium">Repuestos</th>
                                         <th className="px-3 py-2 text-right font-medium">Egresos</th>
                                         <th className="px-3 py-2 text-right font-medium">Neto</th>
                                     </tr>
@@ -464,6 +468,12 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-foreground">
                                                 {formatARS(f.ingresos)}
                                             </td>
+                                            <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                                                {formatARS(f.gastos)}
+                                            </td>
+                                            <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-muted-foreground">
+                                                {formatARS(f.repuestos)}
+                                            </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-foreground">
                                                 {formatARS(f.egresos)}
                                             </td>
@@ -481,17 +491,16 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                             </table>
                         </div>
                     )}
-                    {!filtroFlota && (
-                        <p className="text-xs text-muted-foreground">
-                            Los egresos por vehículo incluyen sólo gastos directos de flota; los gastos globales (galpón, taller,
-                            oficina, Kevin, stock) cuentan en los totales y en el desglose por tipo.
-                        </p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                        El egreso de cada vehículo suma sus gastos propios más los repuestos que se le colocaron desde
+                        inventario, valuados a precio de venta.
+                        {!filtroFlota && ' Los gastos de galpón no se reparten por vehículo: cuentan en los totales y en el desglose por categoría.'}
+                    </p>
                 </div>
 
                 {/* Por tipo de gasto */}
                 <div className="flex flex-col gap-3 pb-4">
-                    <h2 className="text-sm font-semibold text-foreground">Egresos por tipo de gasto</h2>
+                    <h2 className="text-sm font-semibold text-foreground">Egresos por categoría</h2>
                     {resumen.por_tipo.length === 0 ? (
                         <div className="rounded-xl border border-border bg-card py-8 text-center text-sm text-muted-foreground shadow-sm">
                             Sin egresos para los filtros aplicados.
@@ -501,7 +510,7 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Tipo</th>
+                                        <th className="px-3 py-2 font-medium">Categoría</th>
                                         <th className="px-3 py-2 text-right font-medium">Monto</th>
                                         <th className="px-3 py-2 text-right font-medium">% del total</th>
                                     </tr>

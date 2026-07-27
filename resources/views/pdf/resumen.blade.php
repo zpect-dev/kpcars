@@ -38,12 +38,13 @@
     <table>
         <thead>
             <tr>
-                <th style="width:14%">Patente</th>
-                <th style="width:22%">Vehículo</th>
-                <th style="width:16%">Inversión</th>
-                <th style="width:15%">Empresa</th>
+                <th style="width:12%">Patente</th>
+                <th style="width:18%">Vehículo</th>
+                <th style="width:14%">Inversión</th>
+                <th style="width:12%">Empresa</th>
                 <th class="numeric" style="width:11%">Ingresos</th>
-                <th class="numeric" style="width:11%">Egresos</th>
+                <th class="numeric" style="width:11%">Gastos</th>
+                <th class="numeric" style="width:11%">Repuestos</th>
                 <th class="numeric" style="width:11%">Neto</th>
             </tr>
         </thead>
@@ -55,20 +56,26 @@
                     <td>{{ $f['inversion_nombre'] ?? '—' }}</td>
                     <td>{{ $f['empresa_nombre'] ?? '—' }}</td>
                     <td class="numeric">${{ number_format($f['ingresos'], 2, ',', '.') }}</td>
-                    <td class="numeric">${{ number_format($f['egresos'], 2, ',', '.') }}</td>
+                    <td class="numeric">${{ number_format($f['gastos'], 2, ',', '.') }}</td>
+                    <td class="numeric">${{ number_format($f['repuestos'], 2, ',', '.') }}</td>
                     <td class="numeric">${{ number_format($f['neto'], 2, ',', '.') }}</td>
                 </tr>
             @empty
-                <tr><td colspan="7" class="center">Sin movimientos por vehículo en el rango.</td></tr>
+                <tr><td colspan="8" class="center">Sin movimientos por vehículo en el rango.</td></tr>
             @endforelse
         </tbody>
     </table>
 
-    <div class="section-title" style="margin-top:14px;">Egresos por tipo de gasto</div>
+    <p style="font-size:10px; margin:6px 0 0;">
+        El egreso de cada vehículo suma sus gastos propios más los repuestos de inventario (a precio de venta).
+        Los gastos de galpón no se reparten por vehículo: cuentan sólo en los totales y en el desglose por categoría.
+    </p>
+
+    <div class="section-title" style="margin-top:14px;">Egresos por categoría</div>
     <table>
         <thead>
             <tr>
-                <th style="width:50%">Tipo</th>
+                <th style="width:50%">Categoría</th>
                 <th class="numeric" style="width:25%">Monto</th>
                 <th class="numeric" style="width:25%">% del total</th>
             </tr>

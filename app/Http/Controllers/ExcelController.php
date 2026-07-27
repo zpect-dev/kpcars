@@ -31,12 +31,14 @@ class ExcelController extends Controller
 
         $filename = 'resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
         $writer = SimpleExcelWriter::streamDownload($filename);
-        $writer->addHeader(['Sección', 'Detalle', 'Ingresos', 'Egresos', 'Neto']);
+        $writer->addHeader(['Sección', 'Detalle', 'Ingresos', 'Gastos', 'Repuestos', 'Egresos', 'Neto']);
 
         $writer->addRow([
             'Totales',
             $filtros['desde'].' al '.$filtros['hasta'],
             round($resumen['totales']['ingresos'], 2),
+            '',
+            '',
             round($resumen['totales']['egresos'], 2),
             round($resumen['totales']['neto'], 2),
         ]);
@@ -48,6 +50,8 @@ class ExcelController extends Controller
                 round($resumen['abierto']['total'], 2),
                 '',
                 '',
+                '',
+                '',
             ]);
         }
 
@@ -56,6 +60,8 @@ class ExcelController extends Controller
                 'Vehículo',
                 trim($f['patente'].' '.($f['marca'] ?? '').' '.($f['modelo'] ?? '')).' — '.($f['inversion_nombre'] ?? 'Sin inversión'),
                 round($f['ingresos'], 2),
+                round($f['gastos'], 2),
+                round($f['repuestos'], 2),
                 round($f['egresos'], 2),
                 round($f['neto'], 2),
             ]);
@@ -63,8 +69,10 @@ class ExcelController extends Controller
 
         foreach ($resumen['por_tipo'] as $t) {
             $writer->addRow([
-                'Egresos por tipo',
+                'Egresos por categoría',
                 $t['label'].' ('.$t['porcentaje'].'%)',
+                '',
+                '',
                 '',
                 round($t['total'], 2),
                 '',

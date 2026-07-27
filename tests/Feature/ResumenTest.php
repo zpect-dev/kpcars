@@ -6,11 +6,14 @@ use App\Actions\CalcularResumenAction;
 use App\Actions\CreateGastoAction;
 use App\Enums\UserRole;
 use App\Models\AperturaRecaudacion;
+use App\Models\Articulo;
 use App\Models\CierreRecaudacion;
+use App\Models\Cobro;
 use App\Models\Empresa;
 use App\Models\Gasto;
 use App\Models\Inversion;
 use App\Models\Recaudacion;
+use App\Models\Transaccion;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Support\Facades\DB;
@@ -75,6 +78,47 @@ function gastoBase(array $overrides = []): Gasto
         'metodo_pago' => 'efectivo',
         'tipo' => 'galpon',
     ], $overrides));
+}
+
+/**
+ * Simula una salida de inventario hacia un vehículo: artículo, transacción y
+ * su cobro, tal como los deja ProcessStockMovementAction. `precio` es el de
+ * venta (costo + markup), que es como el resumen valúa el repuesto.
+ */
+function repuestoParaVehiculo(
+    Vehiculo $vehiculo,
+    float $precio,
+    int $cantidad,
+    string $fecha,
+    bool $inactiva = false,
+): void {
+    $articulo = Articulo::create([
+        'descripcion' => 'Repuesto '.fake()->unique()->bothify('??##'),
+        'codigo' => fake()->unique()->bothify('COD-####'),
+        'repuestos' => true,
+        'stock' => 100,
+        'min_stock' => 1,
+        'costo' => round($precio / Articulo::MARKUP, 2),
+        'precio' => $precio,
+    ]);
+
+    $transaccion = Transaccion::create([
+        'articulo_id' => $articulo->id,
+        'user_id' => test()->admin->id,
+        'vehiculo_id' => $vehiculo->id,
+        'solicitante' => 'Taller',
+        'tipo' => 'OUT',
+        'cantidad' => $cantidad,
+        'inactiva' => $inactiva,
+    ]);
+    $transaccion->created_at = $fecha;
+    $transaccion->save();
+
+    Cobro::create([
+        'inversion_id' => $vehiculo->inversion_id,
+        'transaccion_id' => $transaccion->id,
+        'empresa_id' => $vehiculo->empresa_id,
+    ]);
 }
 
 /** Ejecuta la Action con julio 2026 como rango por defecto. */
@@ -192,9 +236,79 @@ it('con filtro de empresa los globales aportan la parte congelada de esa empresa
     expect($r['totales']['egresos'])->toBe(60.0)
         ->and($r['por_tipo']->pluck('total', 'tipo')->all())->toBe(['galpon' => 60.0]);
 
+    // Sin filtro: el gasto de galpón entero. Kevin queda excluido del resumen.
     $r = resumen();
 
-    expect($r['totales']['egresos'])->toBe(600.0);
+    expect($r['totales']['egresos'])->toBe(100.0);
+});
+
+it('unifica galpón, taller y oficina en una sola categoría', function () {
+    gastoBase(['tipo' => 'galpon', 'monto' => 100]);
+    gastoBase(['tipo' => 'taller', 'monto' => 50, 'fecha' => '2026-07-06']);
+    gastoBase(['tipo' => 'oficina', 'monto' => 25, 'fecha' => '2026-07-07']);
+
+    $r = resumen();
+
+    expect($r['por_tipo']->pluck('total', 'tipo')->all())->toBe(['galpon' => 175.0])
+        ->and($r['por_tipo'][0]['label'])->toBe('Galpón')
+        ->and($r['totales']['egresos'])->toBe(175.0);
+});
+
+it('excluye del resumen los gastos de kevin y stock', function () {
+    gastoBase(['tipo' => 'kevin', 'monto' => 500]);
+    gastoBase(['tipo' => 'stock', 'monto' => 300, 'fecha' => '2026-07-06']);
+    gastoBase(['tipo' => 'galpon', 'monto' => 100, 'fecha' => '2026-07-07']);
+
+    $r = resumen();
+
+    expect($r['totales']['egresos'])->toBe(100.0)
+        ->and($r['por_tipo']->pluck('total', 'tipo')->all())->toBe(['galpon' => 100.0]);
+});
+
+it('suma al egreso del vehículo los repuestos de inventario a precio de venta', function () {
+    gastoBase(['tipo' => 'vehiculo', 'vehiculo_id' => $this->vehiculo->id, 'monto' => 200]);
+    repuestoParaVehiculo($this->vehiculo, precio: 1500, cantidad: 2, fecha: '2026-07-08');
+    // Fuera del rango: no debe contar.
+    repuestoParaVehiculo($this->vehiculo, precio: 9999, cantidad: 1, fecha: '2026-08-08');
+
+    $r = resumen();
+
+    expect($r['totales']['egresos'])->toBe(3200.0)
+        ->and($r['por_tipo']->pluck('total', 'tipo')->all())->toBe(['repuesto' => 3000.0, 'vehiculo' => 200.0])
+        ->and($r['por_vehiculo'])->toHaveCount(1);
+
+    $fila = $r['por_vehiculo'][0];
+
+    expect($fila['gastos'])->toBe(200.0)
+        ->and($fila['repuestos'])->toBe(3000.0)
+        ->and($fila['egresos'])->toBe(3200.0)
+        ->and($fila['neto'])->toBe(-3200.0);
+});
+
+it('ignora los repuestos de transacciones anuladas', function () {
+    repuestoParaVehiculo($this->vehiculo, precio: 1000, cantidad: 1, fecha: '2026-07-08');
+    repuestoParaVehiculo($this->vehiculo, precio: 5000, cantidad: 1, fecha: '2026-07-09', inactiva: true);
+
+    $r = resumen();
+
+    expect($r['totales']['egresos'])->toBe(1000.0);
+});
+
+it('acota los repuestos al filtrar por vehículo', function () {
+    $vehiculo2 = Vehiculo::factory()->create([
+        'inversion_id' => $this->inversion->id,
+        'empresa_id' => $this->empresa->id,
+        'precio' => 100000,
+    ]);
+
+    repuestoParaVehiculo($this->vehiculo, precio: 1000, cantidad: 1, fecha: '2026-07-08');
+    repuestoParaVehiculo($vehiculo2, precio: 7000, cantidad: 1, fecha: '2026-07-08');
+
+    $r = resumen(['vehiculo_ids' => [$vehiculo2->id]]);
+
+    expect($r['totales']['egresos'])->toBe(7000.0)
+        ->and($r['por_vehiculo'])->toHaveCount(1)
+        ->and($r['por_vehiculo'][0]['repuestos'])->toBe(7000.0);
 });
 
 it('replica el reparto del gasto en gasto_distribuciones al crearlo', function () {

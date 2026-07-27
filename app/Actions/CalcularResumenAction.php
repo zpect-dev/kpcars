@@ -13,9 +13,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Resumen financiero: ingresos (recaudaciones) vs egresos (gastos) para un
- * rango de fechas, con filtros combinables de empresa, inversión, vehículos
- * y tipo de gasto. Es la única fuente de cifras del módulo Resumen: la vista
+ * Resumen financiero: ingresos (recaudaciones) vs egresos para un rango de
+ * fechas, con filtros combinables de empresa, inversión, vehículos y
+ * categoría. Es la única fuente de cifras del módulo Resumen: la vista
  * Inertia y las exportaciones PDF/Excel consumen esta misma Action.
  *
  * Reglas de atribución:
@@ -23,24 +23,30 @@ use Illuminate\Support\Facades\DB;
  *    cierre) cae dentro del rango. La granularidad real es el período: un
  *    período cerrado dentro del rango cuenta completo. El período abierto se
  *    reporta aparte y sólo suma si `incluir_abierto` es true.
- *  - Egresos: gastos por su columna `fecha` (día exacto).
- *  - Gastos globales (galpón/taller/oficina/kevin/stock) no se prorratean
- *    por vehículo: aparecen sólo en los totales y en el desglose por tipo.
- *  - Con filtro de empresa, los globales aportan la parte de esa empresa
- *    según el reparto congelado (`distribucion_empresas`); kevin/stock no
- *    tienen dimensión de empresa y quedan fuera.
- *  - Con filtro de inversión o vehículos, sólo cuentan gastos de flota
- *    (tipo `vehiculo`) de ese subconjunto.
+ *  - Egresos de un vehículo = gastos de tipo `vehiculo` (por su columna
+ *    `fecha`) MÁS los repuestos que se le colocaron desde inventario,
+ *    valuados a precio de venta (el mismo importe que se le cobra a la
+ *    inversión y que muestra el módulo de Cobros).
+ *  - Categorías del resumen (ver TIPO_LABELS): los gastos de galpón, taller
+ *    y oficina se presentan unificados bajo "Galpón"; kevin y stock quedan
+ *    excluidos del reporte. Nada de esto altera cómo se cargan los gastos:
+ *    es agrupación de presentación, los datos siguen intactos.
+ *  - Galpón no se prorratea por vehículo: aparece sólo en los totales y en
+ *    el desglose por categoría. Con filtro de empresa aporta la parte de esa
+ *    empresa según el reparto congelado (`distribucion_empresas`).
+ *  - Con filtro de inversión o vehículos sólo cuentan los conceptos
+ *    atribuibles a esa flota (gastos de vehículo y repuestos).
  */
 class CalcularResumenAction
 {
+    /**
+     * Categorías de egreso del resumen. `vehiculo` y `repuesto` bajan a nivel
+     * vehículo; `galpon` agrupa los gastos globales (galpón/taller/oficina).
+     */
     public const TIPO_LABELS = [
-        'galpon' => 'Galpón',
-        'taller' => 'Taller',
-        'oficina' => 'Oficina',
-        'kevin' => 'Kevin',
-        'stock' => 'Stock',
         'vehiculo' => 'Vehículo',
+        'repuesto' => 'Repuestos (inventario)',
+        'galpon' => 'Galpón',
     ];
 
     /**
@@ -88,14 +94,15 @@ class CalcularResumenAction
             ->count();
 
         // ── Egresos ─────────────────────────────────────────────────────────
-        $egresosPorVehiculo = $this->gastosDeFlotaPorVehiculo($desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo);
-        $egresosPorTipo = $this->egresosPorTipo($desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo);
+        $gastosPorVehiculo = $this->gastosDeFlotaPorVehiculo($desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo);
+        $repuestosPorVehiculo = $this->repuestosPorVehiculo($desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo);
+        $egresosPorTipo = $this->egresosPorTipo($gastosPorVehiculo, $repuestosPorVehiculo, $desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo);
 
         // ── Armado de filas ─────────────────────────────────────────────────
         $totalIngresos = round((float) $ingresosPorVehiculo->sum(), 2);
         $totalEgresos = round((float) $egresosPorTipo->sum(), 2);
 
-        $porVehiculo = $this->filasPorVehiculo($ingresosPorVehiculo, $egresosPorVehiculo);
+        $porVehiculo = $this->filasPorVehiculo($ingresosPorVehiculo, $gastosPorVehiculo, $repuestosPorVehiculo);
 
         $porTipo = $egresosPorTipo
             ->map(fn (float $total, string $t) => [
@@ -167,8 +174,7 @@ class CalcularResumenAction
     }
 
     /**
-     * Gastos de flota (tipo `vehiculo`) agrupados por vehículo, en el rango.
-     * Un filtro de tipo distinto de `vehiculo` vacía esta dimensión.
+     * Gastos de tipo `vehiculo` agrupados por vehículo, en el rango.
      *
      * @param  array<int, int>  $vehiculoIds
      * @return Collection<int, float> vehiculo_id => total
@@ -199,13 +205,20 @@ class CalcularResumenAction
     }
 
     /**
-     * Egresos agrupados por tipo de gasto. Su suma es el total de egresos del
-     * resumen (los globales cuentan acá aunque no bajen a nivel vehículo).
+     * Repuestos salidos de inventario hacia cada vehículo, valuados a precio
+     * de venta (costo + markup) — el mismo importe que se le cobra a la
+     * inversión y que muestra el módulo de Cobros.
+     *
+     * Se parte de `cobros` porque es el registro que vincula la salida de
+     * stock con el vehículo y su inversión; anular una transacción borra su
+     * cobro, así que las anuladas no cuentan. El filtro explícito sobre
+     * `inactiva` protege igual, porque consultar la tabla directamente no
+     * aplica el global scope `activa` de Transaccion.
      *
      * @param  array<int, int>  $vehiculoIds
-     * @return Collection<string, float> tipo => total
+     * @return Collection<int, float> vehiculo_id => total
      */
-    private function egresosPorTipo(
+    private function repuestosPorVehiculo(
         CarbonImmutable $desde,
         CarbonImmutable $hasta,
         ?int $empresaId,
@@ -213,66 +226,118 @@ class CalcularResumenAction
         array $vehiculoIds,
         ?string $tipo,
     ): Collection {
-        // Filtro de flota: sólo gastos de vehículo del subconjunto.
-        if ($inversionId !== null || $vehiculoIds !== []) {
-            $total = (float) $this->gastosDeFlotaPorVehiculo($desde, $hasta, $empresaId, $inversionId, $vehiculoIds, $tipo)->sum();
-
-            return $total > 0 ? collect(['vehiculo' => $total]) : collect();
+        if ($tipo !== null && $tipo !== 'repuesto') {
+            return collect();
         }
 
-        // Sin filtro de empresa: agregación directa en SQL.
-        if ($empresaId === null) {
-            return DB::table('gastos')
-                ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
-                ->when($tipo !== null, fn ($q) => $q->where('tipo', $tipo))
-                ->groupBy('tipo')
-                ->selectRaw('tipo, SUM(monto) as total')
-                ->pluck('total', 'tipo')
-                ->map(fn ($total) => (float) $total);
-        }
-
-        // Con filtro de empresa: flota por empresa del vehículo + parte de la
-        // empresa en los globales según el reparto congelado. Kevin/stock no
-        // son atribuibles a una empresa y quedan fuera.
-        $porTipo = collect();
-
-        if ($tipo === null || $tipo === 'vehiculo') {
-            $flota = (float) $this->gastosDeFlotaPorVehiculo($desde, $hasta, $empresaId, null, [], 'vehiculo')->sum();
-            if ($flota > 0) {
-                $porTipo->put('vehiculo', $flota);
-            }
-        }
-
-        if ($tipo === null || in_array($tipo, Gasto::TIPOS_GLOBALES, true)) {
-            $globales = Gasto::query()
-                ->withoutGlobalScope(GastoTenantScope::class)
-                ->whereIn('tipo', $tipo !== null ? [$tipo] : Gasto::TIPOS_GLOBALES)
-                ->whereBetween('fecha', [$desde->toDateString(), $hasta->toDateString()])
-                ->cursor();
-
-            foreach ($globales as $gasto) {
-                $parte = (float) (($gasto->distribucion_empresas ?? [])[$empresaId] ?? 0);
-                if ($parte > 0) {
-                    $porTipo->put($gasto->tipo, (float) $porTipo->get($gasto->tipo, 0) + $parte);
-                }
-            }
-        }
-
-        return $porTipo->map(fn ($total) => (float) $total);
+        return DB::table('cobros')
+            ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
+            ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
+            ->join('vehiculos', 'transacciones.vehiculo_id', '=', 'vehiculos.id')
+            ->where('transacciones.inactiva', false)
+            ->whereBetween('transacciones.created_at', [$desde, $hasta])
+            ->when($empresaId !== null, fn ($q) => $q->where('vehiculos.empresa_id', $empresaId))
+            ->when($inversionId !== null, fn ($q) => $q->where('vehiculos.inversion_id', $inversionId))
+            ->when($vehiculoIds !== [], fn ($q) => $q->whereIn('transacciones.vehiculo_id', $vehiculoIds))
+            ->groupBy('transacciones.vehiculo_id')
+            ->selectRaw('transacciones.vehiculo_id as vehiculo_id, SUM(articulos.precio * transacciones.cantidad) as total')
+            ->pluck('total', 'vehiculo_id')
+            ->map(fn ($total) => (float) $total);
     }
 
     /**
-     * Filas por vehículo (ingresos, egresos directos, neto), con metadata de
-     * inversión y empresa, ordenadas como el dashboard: inversión natural y
-     * patente dentro de cada inversión.
+     * Egresos agrupados por categoría del resumen. Su suma es el total de
+     * egresos (galpón cuenta acá aunque no baje a nivel vehículo).
+     *
+     * @param  Collection<int, float>  $gastosPorVehiculo
+     * @param  Collection<int, float>  $repuestosPorVehiculo
+     * @param  array<int, int>  $vehiculoIds
+     * @return Collection<string, float> categoría => total
+     */
+    private function egresosPorTipo(
+        Collection $gastosPorVehiculo,
+        Collection $repuestosPorVehiculo,
+        CarbonImmutable $desde,
+        CarbonImmutable $hasta,
+        ?int $empresaId,
+        ?int $inversionId,
+        array $vehiculoIds,
+        ?string $tipo,
+    ): Collection {
+        $porTipo = collect();
+
+        $flota = round((float) $gastosPorVehiculo->sum(), 2);
+        if ($flota > 0) {
+            $porTipo->put('vehiculo', $flota);
+        }
+
+        $repuestos = round((float) $repuestosPorVehiculo->sum(), 2);
+        if ($repuestos > 0) {
+            $porTipo->put('repuesto', $repuestos);
+        }
+
+        // Galpón no es atribuible a vehículos concretos: un filtro de flota
+        // (inversión o patentes) lo deja fuera.
+        $pideGalpon = $tipo === null || $tipo === 'galpon';
+        if ($pideGalpon && $inversionId === null && $vehiculoIds === []) {
+            $galpon = $this->totalGalpon($desde, $hasta, $empresaId);
+            if ($galpon > 0) {
+                $porTipo->put('galpon', $galpon);
+            }
+        }
+
+        return $porTipo;
+    }
+
+    /**
+     * Total de la categoría Galpón (galpón + taller + oficina unificados).
+     * Con filtro de empresa toma la parte congelada de esa empresa en cada
+     * gasto; kevin y stock nunca entran, quedan fuera del resumen.
+     */
+    private function totalGalpon(CarbonImmutable $desde, CarbonImmutable $hasta, ?int $empresaId): float
+    {
+        $rango = [$desde->toDateString(), $hasta->toDateString()];
+
+        if ($empresaId === null) {
+            return round((float) DB::table('gastos')
+                ->whereIn('tipo', Gasto::TIPOS_GLOBALES)
+                ->whereBetween('fecha', $rango)
+                ->sum('monto'), 2);
+        }
+
+        $total = 0.0;
+
+        $gastos = Gasto::query()
+            ->withoutGlobalScope(GastoTenantScope::class)
+            ->whereIn('tipo', Gasto::TIPOS_GLOBALES)
+            ->whereBetween('fecha', $rango)
+            ->cursor();
+
+        foreach ($gastos as $gasto) {
+            $total += (float) (($gasto->distribucion_empresas ?? [])[$empresaId] ?? 0);
+        }
+
+        return round($total, 2);
+    }
+
+    /**
+     * Filas por vehículo con el egreso ya unificado (gastos propios más
+     * repuestos de inventario), más metadata de inversión y empresa.
+     * Ordenadas como el dashboard: inversión natural y patente dentro de
+     * cada inversión.
      *
      * @param  Collection<int, float>  $ingresos
-     * @param  Collection<int, float>  $egresos
+     * @param  Collection<int, float>  $gastos
+     * @param  Collection<int, float>  $repuestos
      * @return Collection<int, array<string, mixed>>
      */
-    private function filasPorVehiculo(Collection $ingresos, Collection $egresos): Collection
+    private function filasPorVehiculo(Collection $ingresos, Collection $gastos, Collection $repuestos): Collection
     {
-        $ids = $ingresos->keys()->merge($egresos->keys())->unique()->values();
+        $ids = $ingresos->keys()
+            ->merge($gastos->keys())
+            ->merge($repuestos->keys())
+            ->unique()
+            ->values();
 
         if ($ids->isEmpty()) {
             return collect();
@@ -288,9 +353,11 @@ class CalcularResumenAction
             ])
             ->whereIn('id', $ids)
             ->get(['id', 'patente', 'marca', 'modelo', 'inversion_id', 'empresa_id'])
-            ->map(function (Vehiculo $v) use ($ingresos, $egresos) {
+            ->map(function (Vehiculo $v) use ($ingresos, $gastos, $repuestos) {
                 $ing = round((float) ($ingresos[$v->id] ?? 0), 2);
-                $egr = round((float) ($egresos[$v->id] ?? 0), 2);
+                $gas = round((float) ($gastos[$v->id] ?? 0), 2);
+                $rep = round((float) ($repuestos[$v->id] ?? 0), 2);
+                $egr = round($gas + $rep, 2);
 
                 return [
                     'vehiculo_id' => $v->id,
@@ -300,6 +367,8 @@ class CalcularResumenAction
                     'inversion_nombre' => $v->inversion?->nombre,
                     'empresa_nombre' => $v->empresa?->nombre,
                     'ingresos' => $ing,
+                    'gastos' => $gas,
+                    'repuestos' => $rep,
                     'egresos' => $egr,
                     'neto' => round($ing - $egr, 2),
                 ];
