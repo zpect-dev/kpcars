@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
@@ -24,12 +25,18 @@ class ExcelController extends Controller
      * Excel del Resumen financiero: mismos filtros y misma Action que la
      * vista (las cifras exportadas nunca divergen de la pantalla).
      */
-    public function resumen(ResumenFiltrosRequest $request, CalcularResumenAction $action): StreamedResponse
-    {
+    public function resumen(
+        ResumenFiltrosRequest $request,
+        CalcularResumenAction $action,
+        AplicarSeleccionResumenAction $seleccionAction,
+    ): StreamedResponse {
         $filtros = $request->filtros();
         $resumen = $action->execute($filtros);
 
-        $filename = 'resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
+        $seleccion = $request->seleccion();
+        $resumen = $seleccionAction->execute($resumen, $seleccion['vehiculo_ids'], $seleccion['tipos']);
+
+        $filename = ($resumen['seleccion']['activa'] ? 'resumen-seleccion-' : 'resumen-').$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
         $writer = SimpleExcelWriter::streamDownload($filename);
         $writer->addHeader(['Sección', 'Detalle', 'Ingresos', 'Gastos', 'Repuestos', 'Egresos', 'Neto']);
 
@@ -67,6 +74,19 @@ class ExcelController extends Controller
             ]);
         }
 
+        if ($resumen['seleccion']['activa'] && $seleccion['vehiculo_ids'] !== []) {
+            $sv = $resumen['seleccion']['vehiculo'];
+            $writer->addRow([
+                'TOTAL SELECCIÓN (vehículos)',
+                count($resumen['por_vehiculo']).' vehículo(s) seleccionado(s)',
+                round($sv['ingresos'], 2),
+                round($sv['gastos'], 2),
+                round($sv['repuestos'], 2),
+                round($sv['egresos'], 2),
+                round($sv['neto'], 2),
+            ]);
+        }
+
         foreach ($resumen['por_tipo'] as $t) {
             $writer->addRow([
                 'Egresos por categoría',
@@ -75,6 +95,18 @@ class ExcelController extends Controller
                 '',
                 '',
                 round($t['total'], 2),
+                '',
+            ]);
+        }
+
+        if ($resumen['seleccion']['activa'] && $seleccion['tipos'] !== []) {
+            $writer->addRow([
+                'TOTAL SELECCIÓN (categorías)',
+                count($resumen['por_tipo']).' categoría(s) seleccionada(s)',
+                '',
+                '',
+                '',
+                round($resumen['seleccion']['tipo_total'], 2),
                 '',
             ]);
         }

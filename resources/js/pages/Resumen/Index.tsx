@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { CalendarIcon, Download, Scale, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { CalendarIcon, ChevronDown, ChevronsUpDown, ChevronUp, Download, Scale, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -56,6 +56,9 @@ interface Resumen {
     por_tipo: FilaTipo[];
 }
 
+type SortVehiculoCol = 'patente' | 'vehiculo' | 'inversion' | 'empresa' | 'ingresos' | 'gastos' | 'repuestos' | 'egresos' | 'neto';
+type SortTipoCol = 'categoria' | 'total' | 'porcentaje';
+
 interface Props {
     filters: Filters;
     resumen: Resumen;
@@ -78,6 +81,41 @@ function formatDateRange(iso: string): string {
     const [y, m, day] = d.split('-');
 
     return `${day}/${m}/${y}`;
+}
+
+function SortHeader<T extends string>({
+    label,
+    col,
+    sortKey,
+    sortDir,
+    onSort,
+    right = false,
+}: {
+    label: string;
+    col: T;
+    sortKey: T | null;
+    sortDir: 'asc' | 'desc';
+    onSort: (col: T) => void;
+    right?: boolean;
+}) {
+    const active = sortKey === col;
+    const Icon = active ? (sortDir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
+    return (
+        <th className={cn('px-3 py-2 font-medium', right && 'text-right')}>
+            <button
+                type="button"
+                onClick={() => onSort(col)}
+                className={cn(
+                    'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+                    right && 'w-full justify-end',
+                    active ? 'text-foreground' : 'text-muted-foreground',
+                )}
+            >
+                {label}
+                <Icon className="h-3 w-3 shrink-0" />
+            </button>
+        </th>
+    );
 }
 
 function StatCard({
@@ -117,6 +155,157 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
     const [vehiculoIds, setVehiculoIds] = useState<string[]>(filters.vehiculo_ids.map(String));
     const [tipo, setTipo] = useState(filters.tipo ?? '');
     const [incluirAbierto, setIncluirAbierto] = useState(filters.incluir_abierto);
+
+    // Selección de filas tildadas en las tablas (independiente de los
+    // filtros): permite pedir un reporte de exactamente lo que se eligió,
+    // al estilo "seleccionar filas y exportar" de una planilla de cálculo.
+    const [selectedVehiculos, setSelectedVehiculos] = useState<Set<number>>(new Set());
+    const [selectedTipos, setSelectedTipos] = useState<Set<string>>(new Set());
+
+    // Si cambian los filtros (nuevos datos del servidor), la selección deja
+    // de tener sentido: se limpia para no exportar filas que ya no se ven.
+    useEffect(() => {
+        setSelectedVehiculos(new Set());
+        setSelectedTipos(new Set());
+    }, [resumen]);
+
+    function toggleVehiculo(id: number) {
+        setSelectedVehiculos((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }
+
+    function toggleAllVehiculos() {
+        setSelectedVehiculos((prev) =>
+            prev.size === resumen.por_vehiculo.length
+                ? new Set()
+                : new Set(resumen.por_vehiculo.map((f) => f.vehiculo_id)),
+        );
+    }
+
+    function toggleTipo(t: string) {
+        setSelectedTipos((prev) => {
+            const next = new Set(prev);
+            if (next.has(t)) next.delete(t);
+            else next.add(t);
+            return next;
+        });
+    }
+
+    function toggleAllTipos() {
+        setSelectedTipos((prev) =>
+            prev.size === resumen.por_tipo.length
+                ? new Set()
+                : new Set(resumen.por_tipo.map((t) => t.tipo)),
+        );
+    }
+
+    function clearSelection() {
+        setSelectedVehiculos(new Set());
+        setSelectedTipos(new Set());
+    }
+
+    const seleccionVehiculo = useMemo(() => {
+        const filas = resumen.por_vehiculo.filter((f) => selectedVehiculos.has(f.vehiculo_id));
+        return {
+            ingresos: filas.reduce((s, f) => s + f.ingresos, 0),
+            egresos: filas.reduce((s, f) => s + f.egresos, 0),
+            neto: filas.reduce((s, f) => s + f.neto, 0),
+        };
+    }, [resumen.por_vehiculo, selectedVehiculos]);
+
+    const seleccionTipoTotal = useMemo(
+        () => resumen.por_tipo.filter((t) => selectedTipos.has(t.tipo)).reduce((s, t) => s + t.total, 0),
+        [resumen.por_tipo, selectedTipos],
+    );
+
+    const totalSeleccionados = selectedVehiculos.size + selectedTipos.size;
+
+    // Orden de las tablas (client-side, sobre las filas ya filtradas por el servidor).
+    const [sortVehiculoKey, setSortVehiculoKey] = useState<SortVehiculoCol | null>(null);
+    const [sortVehiculoDir, setSortVehiculoDir] = useState<'asc' | 'desc'>('asc');
+    const [sortTipoKey, setSortTipoKey] = useState<SortTipoCol | null>(null);
+    const [sortTipoDir, setSortTipoDir] = useState<'asc' | 'desc'>('asc');
+
+    function toggleSortVehiculo(col: SortVehiculoCol) {
+        if (sortVehiculoKey === col) {
+            setSortVehiculoDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortVehiculoKey(col);
+            setSortVehiculoDir(col === 'ingresos' || col === 'gastos' || col === 'repuestos' || col === 'egresos' || col === 'neto' ? 'desc' : 'asc');
+        }
+    }
+
+    function toggleSortTipo(col: SortTipoCol) {
+        if (sortTipoKey === col) {
+            setSortTipoDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortTipoKey(col);
+            setSortTipoDir(col === 'categoria' ? 'asc' : 'desc');
+        }
+    }
+
+    const sortedPorVehiculo = useMemo(() => {
+        if (!sortVehiculoKey) return resumen.por_vehiculo;
+        const dir = sortVehiculoDir === 'asc' ? 1 : -1;
+        return [...resumen.por_vehiculo].sort((a, b) => {
+            let cmp = 0;
+            switch (sortVehiculoKey) {
+                case 'patente':
+                    cmp = a.patente.localeCompare(b.patente, 'es', { numeric: true });
+                    break;
+                case 'vehiculo':
+                    cmp = [a.marca, a.modelo].filter(Boolean).join(' ')
+                        .localeCompare([b.marca, b.modelo].filter(Boolean).join(' '), 'es');
+                    break;
+                case 'inversion':
+                    cmp = (a.inversion_nombre ?? '').localeCompare(b.inversion_nombre ?? '', 'es', { numeric: true });
+                    break;
+                case 'empresa':
+                    cmp = (a.empresa_nombre ?? '').localeCompare(b.empresa_nombre ?? '', 'es', { numeric: true });
+                    break;
+                case 'ingresos':
+                    cmp = a.ingresos - b.ingresos;
+                    break;
+                case 'gastos':
+                    cmp = a.gastos - b.gastos;
+                    break;
+                case 'repuestos':
+                    cmp = a.repuestos - b.repuestos;
+                    break;
+                case 'egresos':
+                    cmp = a.egresos - b.egresos;
+                    break;
+                case 'neto':
+                    cmp = a.neto - b.neto;
+                    break;
+            }
+            return cmp * dir;
+        });
+    }, [resumen.por_vehiculo, sortVehiculoKey, sortVehiculoDir]);
+
+    const sortedPorTipo = useMemo(() => {
+        if (!sortTipoKey) return resumen.por_tipo;
+        const dir = sortTipoDir === 'asc' ? 1 : -1;
+        return [...resumen.por_tipo].sort((a, b) => {
+            let cmp = 0;
+            switch (sortTipoKey) {
+                case 'categoria':
+                    cmp = a.label.localeCompare(b.label, 'es');
+                    break;
+                case 'total':
+                    cmp = a.total - b.total;
+                    break;
+                case 'porcentaje':
+                    cmp = a.porcentaje - b.porcentaje;
+                    break;
+            }
+            return cmp * dir;
+        });
+    }, [resumen.por_tipo, sortTipoKey, sortTipoDir]);
 
     const isMounted = useRef(false);
 
@@ -220,6 +409,15 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
         return p.toString();
     }, [desde, hasta, empresaId, inversionId, vehiculoIds, tipo, incluirAbierto]);
 
+    // Igual que exportQs, pero agregando la selección tildada: el backend
+    // recorta el reporte a exactamente esas filas.
+    const selectionExportQs = useMemo(() => {
+        const p = new URLSearchParams(exportQs);
+        selectedVehiculos.forEach((id) => p.append('sel_vehiculo_ids[]', String(id)));
+        selectedTipos.forEach((t) => p.append('sel_tipos[]', t));
+        return p.toString();
+    }, [exportQs, selectedVehiculos, selectedTipos]);
+
     const vehiculoOptions: ComboboxOption[] = useMemo(
         () =>
             vehiculos
@@ -245,7 +443,7 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
         <>
             <Head title="Resumen" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <div className={cn('flex h-full flex-1 flex-col gap-4 p-4', totalSeleccionados > 0 && 'pb-24')}>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
@@ -443,20 +641,46 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Patente</th>
-                                        <th className="px-3 py-2 font-medium">Vehículo</th>
-                                        <th className="px-3 py-2 font-medium">Inversión</th>
-                                        <th className="px-3 py-2 font-medium">Empresa</th>
-                                        <th className="px-3 py-2 text-right font-medium">Ingresos</th>
-                                        <th className="px-3 py-2 text-right font-medium">Gastos</th>
-                                        <th className="px-3 py-2 text-right font-medium">Repuestos</th>
-                                        <th className="px-3 py-2 text-right font-medium">Egresos</th>
-                                        <th className="px-3 py-2 text-right font-medium">Neto</th>
+                                        <th className="w-8 px-3 py-2">
+                                            <Checkbox
+                                                aria-label="Seleccionar todos los vehículos"
+                                                checked={
+                                                    selectedVehiculos.size === 0
+                                                        ? false
+                                                        : selectedVehiculos.size === resumen.por_vehiculo.length
+                                                            ? true
+                                                            : 'indeterminate'
+                                                }
+                                                onCheckedChange={toggleAllVehiculos}
+                                            />
+                                        </th>
+                                        <SortHeader label="Patente" col="patente" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} />
+                                        <SortHeader label="Vehículo" col="vehiculo" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} />
+                                        <SortHeader label="Inversión" col="inversion" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} />
+                                        <SortHeader label="Empresa" col="empresa" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} />
+                                        <SortHeader label="Ingresos" col="ingresos" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} right />
+                                        <SortHeader label="Gastos" col="gastos" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} right />
+                                        <SortHeader label="Repuestos" col="repuestos" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} right />
+                                        <SortHeader label="Egresos" col="egresos" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} right />
+                                        <SortHeader label="Neto" col="neto" sortKey={sortVehiculoKey} sortDir={sortVehiculoDir} onSort={toggleSortVehiculo} right />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {resumen.por_vehiculo.map((f) => (
-                                        <tr key={f.vehiculo_id} className="hover:bg-muted/20">
+                                    {sortedPorVehiculo.map((f) => (
+                                        <tr
+                                            key={f.vehiculo_id}
+                                            className={cn(
+                                                'hover:bg-muted/20',
+                                                selectedVehiculos.has(f.vehiculo_id) && 'bg-primary/5 hover:bg-primary/10',
+                                            )}
+                                        >
+                                            <td className="px-3 py-2">
+                                                <Checkbox
+                                                    aria-label={`Seleccionar ${f.patente}`}
+                                                    checked={selectedVehiculos.has(f.vehiculo_id)}
+                                                    onCheckedChange={() => toggleVehiculo(f.vehiculo_id)}
+                                                />
+                                            </td>
                                             <td className="px-3 py-2 font-mono text-xs font-semibold uppercase whitespace-nowrap text-foreground">
                                                 {f.patente}
                                             </td>
@@ -510,14 +734,40 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
                                     <tr>
-                                        <th className="px-3 py-2 font-medium">Categoría</th>
-                                        <th className="px-3 py-2 text-right font-medium">Monto</th>
-                                        <th className="px-3 py-2 text-right font-medium">% del total</th>
+                                        <th className="w-8 px-3 py-2">
+                                            <Checkbox
+                                                aria-label="Seleccionar todas las categorías"
+                                                checked={
+                                                    selectedTipos.size === 0
+                                                        ? false
+                                                        : selectedTipos.size === resumen.por_tipo.length
+                                                            ? true
+                                                            : 'indeterminate'
+                                                }
+                                                onCheckedChange={toggleAllTipos}
+                                            />
+                                        </th>
+                                        <SortHeader label="Categoría" col="categoria" sortKey={sortTipoKey} sortDir={sortTipoDir} onSort={toggleSortTipo} />
+                                        <SortHeader label="Monto" col="total" sortKey={sortTipoKey} sortDir={sortTipoDir} onSort={toggleSortTipo} right />
+                                        <SortHeader label="% del total" col="porcentaje" sortKey={sortTipoKey} sortDir={sortTipoDir} onSort={toggleSortTipo} right />
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {resumen.por_tipo.map((t) => (
-                                        <tr key={t.tipo} className="hover:bg-muted/20">
+                                    {sortedPorTipo.map((t) => (
+                                        <tr
+                                            key={t.tipo}
+                                            className={cn(
+                                                'hover:bg-muted/20',
+                                                selectedTipos.has(t.tipo) && 'bg-primary/5 hover:bg-primary/10',
+                                            )}
+                                        >
+                                            <td className="px-3 py-2">
+                                                <Checkbox
+                                                    aria-label={`Seleccionar ${t.label}`}
+                                                    checked={selectedTipos.has(t.tipo)}
+                                                    onCheckedChange={() => toggleTipo(t.tipo)}
+                                                />
+                                            </td>
                                             <td className="px-3 py-2 text-foreground">{t.label}</td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums text-foreground">
                                                 {formatARS(t.total)}
@@ -533,6 +783,67 @@ export default function ResumenIndex({ filters, resumen, empresas, inversiones, 
                     )}
                 </div>
             </div>
+
+            {/* Barra flotante: aparece con selección activa, para pedir el reporte de exactamente lo tildado */}
+            {totalSeleccionados > 0 && (
+                <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+                    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
+                        <span className="text-sm font-medium text-foreground">
+                            {selectedVehiculos.size > 0 && (
+                                <>{selectedVehiculos.size} {selectedVehiculos.size === 1 ? 'vehículo' : 'vehículos'}</>
+                            )}
+                            {selectedVehiculos.size > 0 && selectedTipos.size > 0 && ' y '}
+                            {selectedTipos.size > 0 && (
+                                <>{selectedTipos.size} {selectedTipos.size === 1 ? 'categoría' : 'categorías'}</>
+                            )}
+                            {' seleccionados'}
+                        </span>
+
+                        {selectedVehiculos.size > 0 && (
+                            <span className={cn(
+                                'text-sm font-bold tabular-nums',
+                                seleccionVehiculo.neto < 0 ? 'text-red-600' : 'text-foreground',
+                            )}>
+                                Neto: {formatARS(seleccionVehiculo.neto)}
+                            </span>
+                        )}
+                        {selectedTipos.size > 0 && (
+                            <span className="text-sm font-bold tabular-nums text-foreground">
+                                Categorías: {formatARS(seleccionTipoTotal)}
+                            </span>
+                        )}
+
+                        <div className="h-5 w-px bg-border" />
+
+                        <a
+                            href={`/pdf/resumen?${selectionExportQs}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            PDF
+                        </a>
+                        <a
+                            href={`/excel/resumen?${selectionExportQs}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-transparent px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Download className="h-3.5 w-3.5" />
+                            Excel
+                        </a>
+                        <button
+                            type="button"
+                            onClick={clearSelection}
+                            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            Limpiar
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

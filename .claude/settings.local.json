@@ -5,7 +5,14 @@
       "Bash(git stash *)",
       "Bash(npx tsc *)",
       "WebFetch(domain:api.anthropic.com)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(php -l app/Actions/AplicarSeleccionResumenAction.php)",
+      "Bash(php -l app/Http/Controllers/ExcelController.php)",
+      "Bash(php -l app/Http/Controllers/PdfController.php)",
+      "Bash(php -l app/Http/Requests/ResumenFiltrosRequest.php)",
+      "Bash(php -m)",
+      "Bash(php --ini)",
+      "Bash(php -v)"
     ]
   }
 }
