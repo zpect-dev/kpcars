@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -69,14 +69,14 @@ class User extends Authenticatable
 
         return Attribute::get(fn (): array => [
             'licencia' => [
-                'pdf'    => $url($this->licencia_pdf_path),
+                'pdf' => $url($this->licencia_pdf_path),
                 'frente' => $url($this->licencia_frente_path),
-                'dorso'  => $url($this->licencia_dorso_path),
+                'dorso' => $url($this->licencia_dorso_path),
             ],
             'dni' => [
-                'pdf'    => $url($this->dni_pdf_path),
+                'pdf' => $url($this->dni_pdf_path),
                 'frente' => $url($this->dni_frente_path),
-                'dorso'  => $url($this->dni_dorso_path),
+                'dorso' => $url($this->dni_dorso_path),
             ],
         ]);
     }
@@ -145,7 +145,7 @@ class User extends Authenticatable
      * Para admin/administrativo la pivot no se usa — ellos pueden ver todas
      * las empresas y switchear vía el Gate switch-empresa.
      */
-    public function empresas(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function empresas(): BelongsToMany
     {
         return $this->belongsToMany(Empresa::class, 'empresa_user')->withTimestamps();
     }
@@ -188,12 +188,13 @@ class User extends Authenticatable
 
     /**
      * Inversiones en las que el usuario participa como inversor.
-     * El pivot lleva la deuda como monto simple: deudor = deuda > 0.
+     * El pivot lleva la deuda (en USD) y el flag `es_deudor` (deudor sin monto,
+     * para inversiones incompletas).
      */
-    public function inversiones(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function inversiones(): BelongsToMany
     {
         return $this->belongsToMany(Inversion::class, 'inversion_user')
-            ->withPivot(['es_financiador', 'deuda'])
+            ->withPivot(['es_financiador', 'deuda', 'es_deudor'])
             ->withTimestamps();
     }
 }

@@ -244,34 +244,39 @@ class CierreSueldoController extends Controller
 
         $recaudadoPorInv = $recaudadoPorInversion->keyBy('inversion_id');
 
-        // Pool de inversores por empresa para los candidatos a sumar.
-        $empresaIds = $inversiones->pluck('empresa_id')->unique()->all();
-        $inversoresPorEmpresa = [];
-        if ($empresaIds !== []) {
-            User::query()
-                ->where('role', UserRole::INVERSOR)
-                ->where('inactivo', false)
-                ->whereHas('empresas', fn ($q) => $q->whereIn('empresas.id', $empresaIds))
-                ->with('empresas:id')
-                ->get(['id', 'name', 'dni'])
-                ->each(function (User $u) use (&$inversoresPorEmpresa) {
-                    foreach ($u->empresas as $e) {
-                        $inversoresPorEmpresa[$e->id][] = $u;
-                    }
-                });
-        }
+        // Autos reales por inversión (sin el ficticio EXTERNO): definen si la
+        // inversión está completa (>= 10) o incompleta.
+        $autosPorInversion = $inversionIds === [] ? collect() : DB::table('vehiculos')
+            ->whereIn('inversion_id', $inversionIds)
+            ->where('patente', '!=', 'EXTERNO')
+            ->groupBy('inversion_id')
+            ->selectRaw('inversion_id, COUNT(*) as total')
+            ->pluck('total', 'inversion_id');
 
-        return Empresa::whereIn('id', $empresaIds)
-            ->orderBy('id')
+        // Pool de inversores por empresa (todas las empresas) para los candidatos.
+        $inversoresPorEmpresa = [];
+        User::query()
+            ->where('role', UserRole::INVERSOR)
+            ->where('inactivo', false)
+            ->with('empresas:id')
+            ->get(['id', 'name', 'dni'])
+            ->each(function (User $u) use (&$inversoresPorEmpresa) {
+                foreach ($u->empresas as $e) {
+                    $inversoresPorEmpresa[$e->id][] = $u;
+                }
+            });
+
+        // Todas las empresas, cada una con sus inversiones del cierre (si tiene).
+        return Empresa::orderBy('id')
             ->get(['id', 'nombre'])
-            ->map(function (Empresa $empresa) use ($participaciones, $inversiones, $recaudadoPorInv, $inversoresPorEmpresa) {
+            ->map(function (Empresa $empresa) use ($participaciones, $inversiones, $recaudadoPorInv, $autosPorInversion, $inversoresPorEmpresa) {
                 $invsEmpresa = $inversiones->where('empresa_id', $empresa->id)
                     ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE);
 
                 return [
                     'id' => $empresa->id,
                     'nombre' => $empresa->nombre,
-                    'inversiones' => $invsEmpresa->map(function (Inversion $inv) use ($participaciones, $recaudadoPorInv, $inversoresPorEmpresa) {
+                    'inversiones' => $invsEmpresa->map(function (Inversion $inv) use ($participaciones, $recaudadoPorInv, $autosPorInversion, $inversoresPorEmpresa) {
                         $socios = $participaciones->where('inversion_id', $inv->id)
                             ->sortBy(fn (CierreSueldoParticipacion $p) => mb_strtolower($p->user?->name ?? ''))
                             ->values();
@@ -284,10 +289,14 @@ class CierreSueldoController extends Controller
                             ->values()
                             ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'dni' => $u->dni]);
 
+                        $autos = (int) ($autosPorInversion[$inv->id] ?? 0);
+
                         return [
                             'id' => $inv->id,
                             'nombre' => $inv->nombre,
                             'recaudado' => (float) ($recaudadoPorInv->get($inv->id)?->total ?? 0),
+                            'autos' => $autos,
+                            'completa' => $autos >= Inversion::AUTOS_COMPLETA,
                             'socios' => $socios->map(fn (CierreSueldoParticipacion $p) => [
                                 'user' => [
                                     'id' => $p->user->id,
@@ -296,6 +305,7 @@ class CierreSueldoController extends Controller
                                 ],
                                 'saldo' => (float) $p->saldo,
                                 'es_financiador' => (bool) $p->es_financiador,
+                                'es_deudor' => (bool) $p->es_deudor,
                             ])->values(),
                             'candidatos' => $candidatos,
                         ];
@@ -325,6 +335,7 @@ class CierreSueldoController extends Controller
             'pertenece' => ['required', 'boolean'],
             'saldo' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
             'es_financiador' => ['required', 'boolean'],
+            'es_deudor' => ['required', 'boolean'],
         ]);
 
         $inv = Inversion::withoutGlobalScope(TenantScope::class)
@@ -332,6 +343,8 @@ class CierreSueldoController extends Controller
             ->findOrFail($inversion);
 
         $saldo = round((float) ($validated['saldo'] ?? 0), 2);
+        // Un financiador nunca es deudor; y cargar un monto implica ser deudor.
+        $esDeudor = ! $validated['es_financiador'] && ($validated['es_deudor'] || $saldo > 0);
         $yaEsta = $inv->inversores->contains('id', $user->id);
 
         // Tope de inversores por inversión (sólo al sumar uno nuevo).
@@ -342,7 +355,7 @@ class CierreSueldoController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($cierreSueldo, $inv, $user, $validated, $saldo, $recalc) {
+        DB::transaction(function () use ($cierreSueldo, $inv, $user, $validated, $saldo, $esDeudor, $recalc) {
             // Restaurar la deuda viva a su base antes de tocar montos.
             $recalc->revertirAbonos($cierreSueldo);
 
@@ -351,6 +364,7 @@ class CierreSueldoController extends Controller
                     $user->id => [
                         'deuda' => $saldo,
                         'es_financiador' => $validated['es_financiador'],
+                        'es_deudor' => $esDeudor,
                     ],
                 ]);
 
@@ -364,6 +378,7 @@ class CierreSueldoController extends Controller
                         'empresa_id' => $inv->empresa_id,
                         'saldo' => $saldo,
                         'es_financiador' => $validated['es_financiador'],
+                        'es_deudor' => $esDeudor,
                     ],
                 );
             } else {
@@ -376,13 +391,13 @@ class CierreSueldoController extends Controller
             }
 
             // La fila de decisión (abona/monto) existe sólo mientras el socio sea
-            // deudor en alguna inversión del cierre.
-            $esDeudor = CierreSueldoParticipacion::where('cierre_sueldo_id', $cierreSueldo->id)
+            // deudor (flag) en alguna inversión del cierre.
+            $sigueDeudor = CierreSueldoParticipacion::where('cierre_sueldo_id', $cierreSueldo->id)
                 ->where('user_id', $user->id)
-                ->where('saldo', '>', 0)
+                ->where('es_deudor', true)
                 ->exists();
 
-            if ($esDeudor) {
+            if ($sigueDeudor) {
                 CierreSueldoSocio::firstOrCreate(
                     ['cierre_sueldo_id' => $cierreSueldo->id, 'user_id' => $user->id],
                     ['abona' => true, 'abono_monto' => 0],

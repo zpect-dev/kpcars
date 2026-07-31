@@ -63,8 +63,8 @@
             <tr>
                 <th>Inversión</th>
                 <th>Estado</th>
-                <th class="text-right">Saldo deuda ARS</th>
-                @if($tasaActual)<th class="text-right">Saldo deuda USD</th>@endif
+                <th class="text-right">Saldo deuda USD</th>
+                @if($tasaActual)<th class="text-right">Saldo deuda ARS</th>@endif
             </tr>
         </thead>
         <tbody>
@@ -72,7 +72,7 @@
                 <tr>
                     <td>{{ $inv['nombre'] }}</td>
                     <td>
-                        @if($inv['deuda'] > 0)
+                        @if($inv['es_deudor'])
                             <span class="badge badge-deuda">En deuda</span>
                         @elseif($inv['es_financiador'])
                             <span class="badge badge-financ">Financia</span>
@@ -82,7 +82,7 @@
                     </td>
                     <td class="text-right @if($inv['deuda'] > 0) deuda-color @endif">
                         @if($inv['deuda'] > 0)
-                            $ {{ number_format($inv['deuda'], 2, ',', '.') }}
+                            USD {{ number_format($inv['deuda'], 2, '.', ',') }}
                         @else
                             —
                         @endif
@@ -90,7 +90,7 @@
                     @if($tasaActual)
                         <td class="text-right @if($inv['deuda'] > 0) deuda-color @endif">
                             @if($inv['deuda'] > 0)
-                                USD {{ number_format($inv['deuda'] / $tasaActual, 2, '.', ',') }}
+                                $ {{ number_format($inv['deuda'] * $tasaActual, 2, ',', '.') }}
                             @else
                                 —
                             @endif

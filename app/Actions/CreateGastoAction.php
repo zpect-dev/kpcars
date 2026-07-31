@@ -7,7 +7,6 @@ namespace App\Actions;
 use App\Models\Gasto;
 use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
-use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Support\Facades\DB;
 
@@ -98,7 +97,7 @@ class CreateGastoAction
      * equitativo entre todos los inversores activos.
      *
      * @return array{0: array<int, float>, 1: array<int, float>}
-     *         [ user_id => monto , empresa_id => monto ]
+     *                                                           [ user_id => monto , empresa_id => monto ]
      */
     protected function distribuirGlobal(float $monto): array
     {
@@ -216,21 +215,22 @@ class CreateGastoAction
             ->filter(fn ($i) => strnatcasecmp($i->nombre, $inversionActual->nombre) < 0)
             ->last();
 
-        // Deudor = deuda > 0 en el pivot (la deuda ahora es un monto simple).
+        // Deudor = flag `es_deudor` en el pivot (independiente del monto).
         $deudaPrevia = [];
         if ($inversionPrevia) {
             foreach ($inversionPrevia->inversores as $inv) {
-                $deudaPrevia[$inv->id] = (float) $inv->pivot->deuda > 0;
+                $deudaPrevia[$inv->id] = (bool) $inv->pivot->es_deudor;
             }
         }
 
         $elegibles = [];
         foreach ($inversionActual->inversores as $inv) {
-            $tieneDeudaActual = (float) $inv->pivot->deuda > 0;
+            $tieneDeudaActual = (bool) $inv->pivot->es_deudor;
 
             if (! $tieneDeudaActual) {
                 // No-deudor actual: ya pagó esta inversión → incluido.
                 $elegibles[] = $inv->id;
+
                 continue;
             }
 

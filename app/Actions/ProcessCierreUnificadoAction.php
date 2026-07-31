@@ -86,7 +86,7 @@ class ProcessCierreUnificadoAction
                     );
                 }
 
-                $tieneDeudores = $inv->inversores->contains(fn (User $u) => (float) $u->pivot->deuda > 0);
+                $tieneDeudores = $inv->inversores->contains(fn (User $u) => (bool) $u->pivot->es_deudor);
                 $tieneFinanciadores = $inv->inversores->contains(fn (User $u) => (bool) $u->pivot->es_financiador);
 
                 if ($tieneDeudores && ! $tieneFinanciadores) {
@@ -130,9 +130,10 @@ class ProcessCierreUnificadoAction
                         'empresa_id' => $inv->empresa_id,
                         'saldo' => (float) $u->pivot->deuda,
                         'es_financiador' => (bool) $u->pivot->es_financiador,
+                        'es_deudor' => (bool) $u->pivot->es_deudor,
                     ]);
 
-                    if ((float) $u->pivot->deuda > 0) {
+                    if ((bool) $u->pivot->es_deudor) {
                         $deudorIds[$u->id] = true;
                     }
                 }

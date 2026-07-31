@@ -60,12 +60,16 @@ interface ComposicionSocio {
     user: { id: number; name: string; dni: string | null };
     saldo: number;
     es_financiador: boolean;
+    es_deudor: boolean;
 }
 
 interface ComposicionInversion {
     id: number;
     nombre: string;
     recaudado: number;
+    autos: number;
+    /** Completa = tiene los 10 autos; si no, la deuda se marca con un check. */
+    completa: boolean;
     socios: ComposicionSocio[];
     candidatos: { id: number; name: string; dni: string | null }[];
 }
@@ -544,29 +548,45 @@ export default function CierreSueldoShow({
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex flex-col gap-5 p-5">
+                            <div className="flex flex-col gap-3 p-4 sm:p-5">
                                 {composicion.map((emp) => (
-                                    <div
+                                    <details
                                         key={emp.id}
-                                        className="flex flex-col gap-3"
+                                        className="group overflow-hidden rounded-xl border border-border"
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                                            <h3 className="text-sm font-semibold text-foreground">
-                                                {emp.nombre}
-                                            </h3>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                                            {emp.inversiones.map((inv) => (
-                                                <InversionComposicion
-                                                    key={inv.id}
-                                                    cierreId={cierre.id}
-                                                    inversion={inv}
-                                                    tasa={cierre.tasa}
-                                                />
-                                            ))}
-                                        </div>
-                                    </div>
+                                        <summary className="flex cursor-pointer items-center justify-between gap-3 bg-muted/40 px-4 py-2.5 select-none [&::-webkit-details-marker]:hidden">
+                                            <span className="flex items-center gap-2">
+                                                <Building2 className="h-4 w-4 text-muted-foreground" />
+                                                <h3 className="text-sm font-semibold text-foreground">
+                                                    {emp.nombre}
+                                                </h3>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {emp.inversiones.length}{' '}
+                                                    {emp.inversiones.length ===
+                                                    1
+                                                        ? 'inversión'
+                                                        : 'inversiones'}
+                                                </span>
+                                            </span>
+                                            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-180" />
+                                        </summary>
+                                        {emp.inversiones.length === 0 ? (
+                                            <p className="px-4 py-3 text-xs text-muted-foreground">
+                                                Sin inversiones en este cierre.
+                                            </p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-3 p-3 xl:grid-cols-2">
+                                                {emp.inversiones.map((inv) => (
+                                                    <InversionComposicion
+                                                        key={inv.id}
+                                                        cierreId={cierre.id}
+                                                        inversion={inv}
+                                                        tasa={cierre.tasa}
+                                                    />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </details>
                                 ))}
                             </div>
                         </div>
@@ -1115,7 +1135,12 @@ function InversionComposicion({
 
     function patch(
         userId: number,
-        body: { pertenece: boolean; saldo: number; es_financiador: boolean },
+        body: {
+            pertenece: boolean;
+            saldo: number;
+            es_financiador: boolean;
+            es_deudor: boolean;
+        },
     ) {
         setSaving(true);
         router.patch(
@@ -1141,8 +1166,18 @@ function InversionComposicion({
             )}
         >
             <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-2">
-                <span className="truncate text-sm font-semibold text-foreground">
-                    {inversion.nombre}
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-sm font-semibold text-foreground">
+                        {inversion.nombre}
+                    </span>
+                    {!inversion.completa && (
+                        <span
+                            className="shrink-0 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                            title={`Inversión incompleta (${inversion.autos}/10 autos): la deuda se marca con un check, sin monto.`}
+                        >
+                            Incompleta {inversion.autos}/10
+                        </span>
+                    )}
                 </span>
                 <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                     Recaudado {formatARS(inversion.recaudado)}
@@ -1161,18 +1196,29 @@ function InversionComposicion({
                             socio={s}
                             tasa={tasa}
                             saving={saving}
+                            completa={inversion.completa}
                             onSaldo={(saldo) =>
                                 patch(s.user.id, {
                                     pertenece: true,
                                     saldo,
                                     es_financiador: s.es_financiador,
+                                    es_deudor: saldo > 0,
+                                })
+                            }
+                            onDeudor={(esDeudor) =>
+                                patch(s.user.id, {
+                                    pertenece: true,
+                                    saldo: 0,
+                                    es_financiador: s.es_financiador,
+                                    es_deudor: esDeudor,
                                 })
                             }
                             onFinanciador={(esFin) =>
                                 patch(s.user.id, {
                                     pertenece: true,
-                                    saldo: s.saldo,
+                                    saldo: esFin ? 0 : s.saldo,
                                     es_financiador: esFin,
+                                    es_deudor: esFin ? false : s.es_deudor,
                                 })
                             }
                             onQuitar={() =>
@@ -1180,6 +1226,7 @@ function InversionComposicion({
                                     pertenece: false,
                                     saldo: 0,
                                     es_financiador: false,
+                                    es_deudor: false,
                                 })
                             }
                         />
@@ -1202,6 +1249,7 @@ function InversionComposicion({
                                 pertenece: true,
                                 saldo: 0,
                                 es_financiador: false,
+                                es_deudor: false,
                             })
                         }
                     />
@@ -1212,26 +1260,32 @@ function InversionComposicion({
 }
 
 /**
- * Fila de un socio dentro de una inversión: input de deuda, toggle financiador
- * y botón de quitar. La deuda commitea al salir del input; el resto al click.
+ * Fila de un socio dentro de una inversión: financiador, quitar, y — según si
+ * la inversión está completa — un monto de deuda (USD) o un check "Deudor".
+ * El monto commitea al salir del input; el resto al click.
  */
 function SocioComposicionRow({
     socio,
     tasa,
     saving,
+    completa,
     onSaldo,
+    onDeudor,
     onFinanciador,
     onQuitar,
 }: {
     socio: ComposicionSocio;
     tasa: number;
     saving: boolean;
+    completa: boolean;
     onSaldo: (saldo: number) => void;
+    onDeudor: (esDeudor: boolean) => void;
     onFinanciador: (esFinanciador: boolean) => void;
     onQuitar: () => void;
 }) {
     const [saldo, setSaldo] = useState(String(socio.saldo));
-    const usd = toUSD(socio.saldo, tasa);
+    // La deuda está en USD; mostramos su equivalente en pesos a la tasa del cierre.
+    const ars = socio.saldo * tasa;
 
     function commitSaldo() {
         if (saving) {
@@ -1258,13 +1312,13 @@ function SocioComposicionRow({
                 </span>
             </div>
 
-            {/* Financiador */}
+            {/* Financiador (excluyente con deudor) */}
             <button
                 type="button"
-                disabled={saving}
+                disabled={saving || socio.es_deudor}
                 onClick={() => onFinanciador(!socio.es_financiador)}
                 className={cn(
-                    'inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed',
+                    'inline-flex shrink-0 items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                     socio.es_financiador
                         ? 'border-violet-500/30 bg-violet-500/10 text-violet-500 dark:text-violet-400'
                         : 'border-border bg-transparent text-muted-foreground hover:bg-muted',
@@ -1274,34 +1328,61 @@ function SocioComposicionRow({
                 Financiador
             </button>
 
-            {/* Deuda */}
-            <div className="flex shrink-0 flex-col items-end">
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-muted-foreground">
-                        Deuda
-                    </span>
-                    <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={saldo}
-                        disabled={saving}
-                        onChange={(e) => setSaldo(e.target.value)}
-                        onBlur={commitSaldo}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                (e.target as HTMLInputElement).blur();
-                            }
-                        }}
-                        className="h-8 w-28 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums focus:ring-1 focus:ring-ring focus:outline-none disabled:opacity-60"
-                    />
+            {/* Deuda: monto en USD si la inversión está completa; si no, un
+                check "Deudor" (todavía sin monto fijado). */}
+            {completa ? (
+                <div className="flex shrink-0 flex-col items-end">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted-foreground">
+                            Deuda USD
+                        </span>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={saldo}
+                            disabled={saving || socio.es_financiador}
+                            onChange={(e) => setSaldo(e.target.value)}
+                            onBlur={commitSaldo}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    (e.target as HTMLInputElement).blur();
+                                }
+                            }}
+                            className="h-8 w-28 rounded-md border border-input bg-background px-2 text-right text-sm tabular-nums focus:ring-1 focus:ring-ring focus:outline-none disabled:opacity-60"
+                        />
+                    </div>
+                    {socio.saldo > 0 && tasa > 0 && (
+                        <span className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
+                            {formatARS(ars)}
+                        </span>
+                    )}
                 </div>
-                {usd != null && socio.saldo > 0 && (
-                    <span className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
-                        {formatUSD(usd)}
+            ) : (
+                <button
+                    type="button"
+                    disabled={saving || socio.es_financiador}
+                    onClick={() => onDeudor(!socio.es_deudor)}
+                    className={cn(
+                        'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                        socio.es_deudor
+                            ? 'border-red-500/30 bg-red-500/10 text-red-500 dark:text-red-400'
+                            : 'border-border bg-transparent text-muted-foreground hover:bg-muted',
+                    )}
+                >
+                    <span
+                        className={cn(
+                            'flex h-3.5 w-3.5 items-center justify-center rounded-sm border',
+                            socio.es_deudor
+                                ? 'border-red-500 bg-red-500 text-white'
+                                : 'border-muted-foreground/50',
+                        )}
+                    >
+                        {socio.es_deudor && <Check className="h-2.5 w-2.5" />}
                     </span>
-                )}
-            </div>
+                    Deudor
+                </button>
+            )}
 
             {/* Quitar */}
             <button

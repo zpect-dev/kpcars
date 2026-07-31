@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * su saldo de deuda y si es financiador. Base para recalcular el sueldo aunque
  * después cambien las deudas vivas.
  */
-#[Fillable(['cierre_sueldo_id', 'inversion_id', 'user_id', 'empresa_id', 'saldo', 'es_financiador'])]
+#[Fillable(['cierre_sueldo_id', 'inversion_id', 'user_id', 'empresa_id', 'saldo', 'es_financiador', 'es_deudor'])]
 class CierreSueldoParticipacion extends Model
 {
     protected $table = 'cierre_sueldo_participaciones';
@@ -21,6 +21,7 @@ class CierreSueldoParticipacion extends Model
     protected $casts = [
         'saldo' => 'decimal:2',
         'es_financiador' => 'boolean',
+        'es_deudor' => 'boolean',
     ];
 
     public function user(): BelongsTo

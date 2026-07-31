@@ -27,8 +27,10 @@ use Illuminate\Support\Facades\DB;
  *      · Si no abona, o está 3º+ → 0 (cede la parte completa).
  *  - Lo cedido se redistribuye en partes iguales entre los financiadores.
  *
- * Deuda: se REVIERTEN los abonos previos de este cierre y se re-aplican según
- * las decisiones actuales, así el saldo vivo queda consistente en cada edición.
+ * Deuda: está denominada en DÓLARES. El abono (porción del sueldo en pesos) se
+ * convierte a USD a la tasa del cierre y baja la deuda en dólares. Se REVIERTEN
+ * los abonos previos y se re-aplican según las decisiones actuales, así el saldo
+ * vivo (USD) queda consistente en cada edición.
  */
 class RecalcularSueldosAction
 {
@@ -61,11 +63,13 @@ class RecalcularSueldosAction
             $decisiones = $cierre->socios()->get()->keyBy('user_id');
 
             // Índices desde la foto.
+            // Deudor = flag `es_deudor` (no el monto): una inversión incompleta
+            // puede tener deudores sin deuda fijada todavía.
             $deudaSnapshot = [];      // [user_id][inversion_id] = saldo
             $rankingPorEmpresa = [];  // [empresa_id][user_id] = [inversion_id, ...]
             foreach ($inversiones as $inv) {
                 foreach ($porInversion->get($inv->id, collect()) as $p) {
-                    if ((float) $p->saldo > 0) {
+                    if ($p->es_deudor) {
                         $deudaSnapshot[$p->user_id][$inv->id] = (float) $p->saldo;
                         $rankingPorEmpresa[$inv->empresa_id][$p->user_id][] = $inv->id;
                     }
@@ -148,48 +152,55 @@ class RecalcularSueldosAction
             }
 
             // ---- 2) Abonos / deuda (revertir prior + re-aplicar) ----
+            // La deuda está en DÓLARES. El abono es una porción del sueldo (en
+            // pesos) que se convierte a USD a la tasa de ESTE cierre y baja la
+            // deuda en dólares. El registro del abono queda en USD (lo restado),
+            // así el revert le devuelve dólares a la deuda.
             $this->revertirAbonos($cierre);
 
+            $tasa = (float) $cierre->tasa;
+
             foreach ($decisiones as $userId => $dec) {
-                if (! $dec->abona) {
+                if (! $dec->abona || $tasa <= 0) {
                     continue;
                 }
-                $pendiente = (float) $dec->abono_monto;
-                if ($pendiente <= 0) {
+                // Sueldo destinado a la deuda (pesos) → dólares a la tasa del cierre.
+                $pendienteUsd = round((float) $dec->abono_monto / $tasa, 2);
+                if ($pendienteUsd <= 0) {
                     continue;
                 }
 
                 foreach ($inversiones as $inv) {
-                    if ($pendiente <= 0) {
+                    if ($pendienteUsd <= 0) {
                         break;
                     }
                     if (! isset($deudaSnapshot[$userId][$inv->id])) {
                         continue; // solo en las inversiones donde debe
                     }
 
-                    $vivo = (float) DB::table('inversion_user')
+                    $vivoUsd = (float) DB::table('inversion_user')
                         ->where('inversion_id', $inv->id)
                         ->where('user_id', $userId)
                         ->value('deuda');
-                    if ($vivo <= 0) {
+                    if ($vivoUsd <= 0) {
                         continue;
                     }
 
-                    $aplicar = round(min($pendiente, $vivo), 2);
+                    $aplicarUsd = round(min($pendienteUsd, $vivoUsd), 2);
 
                     DB::table('inversion_user')
                         ->where('inversion_id', $inv->id)
                         ->where('user_id', $userId)
-                        ->update(['deuda' => round($vivo - $aplicar, 2), 'updated_at' => $ahora]);
+                        ->update(['deuda' => round($vivoUsd - $aplicarUsd, 2), 'updated_at' => $ahora]);
 
                     CierreSueldoAbono::create([
                         'cierre_sueldo_id' => $cierre->id,
                         'user_id' => $userId,
                         'inversion_id' => $inv->id,
-                        'monto' => $aplicar,
+                        'monto' => $aplicarUsd,
                     ]);
 
-                    $pendiente -= $aplicar;
+                    $pendienteUsd -= $aplicarUsd;
                 }
             }
         });
