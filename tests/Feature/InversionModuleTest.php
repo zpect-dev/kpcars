@@ -3,9 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\UserRole;
+use App\Models\AperturaRecaudacion;
+use App\Models\Articulo;
+use App\Models\CierreRecaudacion;
+use App\Models\Cobro;
 use App\Models\Empresa;
+use App\Models\Gasto;
 use App\Models\Inversion;
+use App\Models\Recaudacion;
+use App\Models\Setting;
+use App\Models\Transaccion;
 use App\Models\User;
+use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -130,5 +139,195 @@ it('mi cuenta muestra las inversiones con deuda y estado del inversor', function
             ->where('inversiones.0.nombre', 'INV_1')
             ->where('inversiones.0.deuda', 350)
             ->where('inversiones.0.es_financiador', false)
+        );
+});
+
+it('mi cuenta totaliza autos y recaudación del período abierto por inversión', function () {
+    Setting::set('cotizacion_dolar', '1000');
+
+    $socio = moduloInversor('20000009');
+    $inv = Inversion::create(['nombre' => 'INV_R', 'empresa_id' => $this->empresa->id]);
+    $inv->inversores()->attach($socio->id, ['es_financiador' => false, 'deuda' => 0]);
+
+    $apertura = AperturaRecaudacion::withoutGlobalScopes()->create([
+        'empresa_id' => $this->empresa->id,
+        'user_id' => $this->admin->id,
+    ]);
+
+    // Dos autos reales de la inversión con recaudación en el período abierto.
+    foreach ([500, 300] as $i => $monto) {
+        $veh = Vehiculo::withoutGlobalScopes()->create([
+            'inversion_id' => $inv->id,
+            'empresa_id' => $this->empresa->id,
+            'patente' => "REAL_{$i}",
+            'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+        ]);
+        Recaudacion::withoutGlobalScopes()->create([
+            'vehiculo_id' => $veh->id, 'empresa_id' => $this->empresa->id,
+            'apertura_id' => $apertura->id, 'efectivo' => $monto, 'transferencia' => 0,
+            'total' => $monto, 'descuento' => 0, 'precio' => $monto,
+        ]);
+    }
+
+    // El vehículo ficticio EXTERNO no cuenta como auto ni suma su recaudación.
+    $externo = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv->id, 'empresa_id' => $this->empresa->id,
+        'patente' => 'EXTERNO', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+    Recaudacion::withoutGlobalScopes()->create([
+        'vehiculo_id' => $externo->id, 'empresa_id' => $this->empresa->id,
+        'apertura_id' => $apertura->id, 'efectivo' => 999, 'transferencia' => 0,
+        'total' => 999, 'descuento' => 0, 'precio' => 999,
+    ]);
+
+    // Recaudación ya cerrada (otro período): no debe sumar al total abierto.
+    $cierre = CierreRecaudacion::withoutGlobalScopes()->create([
+        'empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id,
+    ]);
+    $vehCerrado = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv->id, 'empresa_id' => $this->empresa->id,
+        'patente' => 'CERR_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+    Recaudacion::withoutGlobalScopes()->create([
+        'vehiculo_id' => $vehCerrado->id, 'empresa_id' => $this->empresa->id,
+        'apertura_id' => $apertura->id, 'cierre_id' => $cierre->id,
+        'efectivo' => 700, 'transferencia' => 0, 'total' => 700, 'descuento' => 0, 'precio' => 700,
+    ]);
+
+    $this->actingAs($socio)
+        ->get('/mi-cuenta')
+        ->assertOk()
+        ->assertInertia(fn ($p) => $p
+            ->component('MiCuenta/Index')
+            ->where('cotizacionDolar', 1000)
+            ->has('inversiones', 1)
+            ->where('inversiones.0.nombre', 'INV_R')
+            // 3 autos reales creados (2 abiertos + 1 cerrado); EXTERNO excluido.
+            ->where('inversiones.0.autos', 3)
+            // Sólo período abierto y sin EXTERNO: 500 + 300 = 800.
+            ->where('inversiones.0.recaudado', 800)
+        );
+});
+
+it('mi cuenta arma los gastos del período: flota de sus inversiones y globales con su parte', function () {
+    Setting::set('cotizacion_dolar', '1000');
+
+    $socio = moduloInversor('20000010');
+    $otro = moduloInversor('20000011');
+
+    $inv = Inversion::create(['nombre' => 'INV_G', 'empresa_id' => $this->empresa->id]);
+    $inv->inversores()->attach($socio->id, ['es_financiador' => false, 'deuda' => 0]);
+
+    $veh = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv->id, 'empresa_id' => $this->empresa->id,
+        'patente' => 'GAS_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+
+    // Gasto de flota de su inversión: monto completo al total, mitad le toca.
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 400,
+        'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
+        'vehiculo_id' => $veh->id,
+        'distribucion' => [$socio->id => 200, $otro->id => 200],
+    ]);
+
+    // Gasto global (galpón): monto completo al total, sólo su parte en mi_parte.
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 1000,
+        'user_id' => $this->admin->id, 'recibio' => 'Galpón',
+        'metodo_pago' => 'efectivo', 'tipo' => 'galpon',
+        'vehiculo_id' => null,
+        'distribucion' => [$socio->id => 100, $otro->id => 900],
+    ]);
+
+    // Gasto de flota de una inversión ajena: no debe aparecer.
+    $invAjena = Inversion::create(['nombre' => 'INV_AJENA', 'empresa_id' => $this->empresa->id]);
+    $vehAjeno = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $invAjena->id, 'empresa_id' => $this->empresa->id,
+        'patente' => 'AJENO_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 555,
+        'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
+        'vehiculo_id' => $vehAjeno->id,
+        'distribucion' => [$otro->id => 555],
+    ]);
+
+    $this->actingAs($socio)
+        ->get('/mi-cuenta')
+        ->assertOk()
+        ->assertInertia(fn ($p) => $p
+            ->component('MiCuenta/Index')
+            // 400 flota propia + 1000 galpón; la flota ajena (555) no suma.
+            ->where('gastos.total', 1400)
+            ->where('gastos.globales.total', 1000)
+            ->where('gastos.globales.mi_parte', 100)
+            ->has('gastos.globales.items', 1)
+            ->has('gastos.flota', 1)
+            ->where('gastos.flota.0.inversion_id', $inv->id)
+            ->where('gastos.flota.0.total', 400)
+            ->where('gastos.flota.0.mi_parte', 200)
+            ->has('gastos.flota.0.items', 1)
+            ->where('gastos.flota.0.items.0.vehiculo', 'GAS_1 · Test Test')
+        );
+});
+
+it('mi cuenta incluye los repuestos de inventario en la flota, con parte igualitaria', function () {
+    $socio = moduloInversor('20000012');
+    $otro = moduloInversor('20000013');
+
+    // Inversión con DOS inversores: el repuesto se reparte en partes iguales.
+    $inv = Inversion::create(['nombre' => 'INV_R', 'empresa_id' => $this->empresa->id]);
+    $inv->inversores()->attach($socio->id, ['es_financiador' => false, 'deuda' => 0]);
+    $inv->inversores()->attach($otro->id, ['es_financiador' => false, 'deuda' => 0]);
+
+    $veh = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv->id, 'empresa_id' => $this->empresa->id,
+        'patente' => 'REP_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+
+    // Gasto de flota: su parte viene del reparto congelado.
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 400,
+        'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
+        'vehiculo_id' => $veh->id,
+        'distribucion' => [$socio->id => 200, $otro->id => 200],
+    ]);
+
+    // Repuesto colocado al auto desde inventario: 2 × 300 = 600, valuado a
+    // precio de venta. Sin cierre de caja previo → cuenta como del período.
+    $articulo = Articulo::create([
+        'descripcion' => 'Filtro de aceite', 'codigo' => 'FIL-1',
+        'stock' => 10, 'min_stock' => 1, 'costo' => 200, 'precio' => 300,
+    ]);
+    $tx = Transaccion::create([
+        'articulo_id' => $articulo->id, 'user_id' => $this->admin->id,
+        'vehiculo_id' => $veh->id, 'solicitante' => 'Taller',
+        'tipo' => 'OUT', 'cantidad' => 2, 'inactiva' => false,
+    ]);
+    Cobro::create([
+        'inversion_id' => $inv->id, 'transaccion_id' => $tx->id,
+        'empresa_id' => $this->empresa->id,
+    ]);
+
+    $this->actingAs($socio)
+        ->get('/mi-cuenta')
+        ->assertOk()
+        ->assertInertia(fn ($p) => $p
+            ->component('MiCuenta/Index')
+            // 400 gasto + 600 repuesto (sin dividir).
+            ->where('gastos.total', 1000)
+            ->has('gastos.flota', 1)
+            ->where('gastos.flota.0.total', 1000)
+            // 200 (gasto, reparto) + 300 (repuesto 600 / 2 inversores).
+            ->where('gastos.flota.0.mi_parte', 500)
+            // Gasto + repuesto en el detalle; el repuesto va después.
+            ->has('gastos.flota.0.items', 2)
+            ->where('gastos.flota.0.items.1.tipo', 'repuesto')
+            ->where('gastos.flota.0.items.1.monto', 600)
+            ->where('gastos.flota.0.items.1.vehiculo', 'REP_1 · Test Test')
         );
 });

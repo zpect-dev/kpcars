@@ -128,7 +128,7 @@ setOpenMobile(false);
     const miCuentaItems: NavItem[] = [];
 
     if (perms.can_view_mi_cuenta) {
-        miCuentaItems.push({ title: 'Mi Cuenta', href: '/mi-cuenta', icon: Wallet });
+        miCuentaItems.push({ title: 'Recaudación', href: '/mi-cuenta', icon: Wallet });
     }
 
     // ── Ensamblado ──────────────────────────────────────────────────────

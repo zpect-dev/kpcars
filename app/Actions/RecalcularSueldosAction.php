@@ -10,7 +10,6 @@ use App\Models\CierreSueldoPago;
 use App\Models\CierreSueldoParticipacion;
 use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -98,6 +97,7 @@ class RecalcularSueldosAction
 
                     if (! $esDeudor) {
                         $pagosInv[] = $this->pago($cierre->id, $p->user_id, $inv, CierreSueldoPago::CONCEPTO_PARTE_COMPLETA, $parte, $ahora);
+
                         continue;
                     }
 
@@ -148,13 +148,7 @@ class RecalcularSueldosAction
             }
 
             // ---- 2) Abonos / deuda (revertir prior + re-aplicar) ----
-            foreach ($cierre->abonos()->get() as $a) {
-                DB::table('inversion_user')
-                    ->where('inversion_id', $a->inversion_id)
-                    ->where('user_id', $a->user_id)
-                    ->increment('deuda', (float) $a->monto, ['updated_at' => $ahora]);
-            }
-            $cierre->abonos()->delete();
+            $this->revertirAbonos($cierre);
 
             foreach ($decisiones as $userId => $dec) {
                 if (! $dec->abona) {
@@ -199,6 +193,27 @@ class RecalcularSueldosAction
                 }
             }
         });
+    }
+
+    /**
+     * Revierte los abonos vigentes del cierre: devuelve cada monto abonado a la
+     * deuda viva (`inversion_user.deuda`) y borra los registros. Deja el saldo
+     * vivo en su base, listo para reaplicar. Es idempotente: el recálculo lo
+     * llama al inicio, y el endpoint de composición lo usa antes de editar la
+     * deuda para que el monto tipeado sea la base real (sin doble conteo).
+     */
+    public function revertirAbonos(CierreSueldo $cierre): void
+    {
+        $ahora = now();
+
+        foreach ($cierre->abonos()->get() as $a) {
+            DB::table('inversion_user')
+                ->where('inversion_id', $a->inversion_id)
+                ->where('user_id', $a->user_id)
+                ->increment('deuda', (float) $a->monto, ['updated_at' => $ahora]);
+        }
+
+        $cierre->abonos()->delete();
     }
 
     /**
