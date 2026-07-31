@@ -148,6 +148,14 @@ class ProcessCierreUnificadoAction
                 ]);
             }
 
+            // 4b. Cerrar también la caja (cobros + gastos) de cada empresa junto
+            //     con la recaudación. Tolerante: si una empresa no tiene un período
+            //     de caja abierto, se saltea (no rompe el cierre unificado).
+            $cierreCaja = app(ProcessCierreCajaAction::class);
+            foreach ($empresas as $empresa) {
+                $cierreCaja->cerrarEmpresa($empresa->id, $admin, tolerante: true);
+            }
+
             $recalc = app(RecalcularSueldosAction::class);
 
             // 5. Primer cálculo (sueldos "como si todos abonaran"; sin abonos aún).

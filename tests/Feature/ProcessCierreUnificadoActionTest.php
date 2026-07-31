@@ -5,16 +5,24 @@ declare(strict_types=1);
 use App\Actions\ProcessCierreUnificadoAction;
 use App\Actions\RecalcularSueldosAction;
 use App\Enums\UserRole;
+use App\Models\AperturaCaja;
 use App\Models\AperturaRecaudacion;
+use App\Models\Articulo;
+use App\Models\CierreCaja;
+use App\Models\CierreDetalle;
+use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoAbono;
 use App\Models\CierreSueldoPago;
 use App\Models\CierreSueldoParticipacion;
 use App\Models\CierreSueldoSocio;
+use App\Models\Cobro;
 use App\Models\Empresa;
+use App\Models\Gasto;
 use App\Models\Inversion;
 use App\Models\Recaudacion;
+use App\Models\Transaccion;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -190,6 +198,54 @@ it('congela las recaudaciones de ambas empresas y las vincula al cierre de sueld
 
     expect($ap1->fresh()->cierre_id)->not->toBeNull()
         ->and($ap2->fresh()->cierre_id)->not->toBeNull();
+});
+
+it('el cierre unificado también cierra la caja (cobros + gastos) de cada empresa', function () {
+    $invs = unificadoInversores(1);
+    $inv = unificadoInversion('INV_1', $this->empresa1, [$invs[0]]);
+
+    $veh = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv->id, 'empresa_id' => $this->empresa1->id,
+        'patente' => 'CAJA_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+
+    // Aperturas de recaudación (requeridas por el cierre unificado).
+    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
+    unificadoApertura($this->empresa2, $this->admin);
+
+    // Sólo la empresa1 tiene un período de caja abierto, con un cobro y un gasto.
+    $aperturaCaja = AperturaCaja::withoutGlobalScopes()->create([
+        'empresa_id' => $this->empresa1->id, 'user_id' => $this->admin->id,
+    ]);
+    $articulo = Articulo::create(['descripcion' => 'Filtro', 'stock' => 10, 'min_stock' => 1, 'precio' => 100]);
+    $tx = Transaccion::create([
+        'articulo_id' => $articulo->id, 'user_id' => $this->admin->id,
+        'vehiculo_id' => $veh->id, 'tipo' => 'OUT', 'cantidad' => 2,
+    ]);
+    Cobro::create(['inversion_id' => $inv->id, 'transaccion_id' => $tx->id, 'empresa_id' => $this->empresa1->id]);
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 500,
+        'user_id' => $this->admin->id, 'recibio' => 'Galpón',
+        'metodo_pago' => 'efectivo', 'tipo' => 'galpon', 'vehiculo_id' => null,
+    ]);
+
+    $this->action->execute(1000, $this->admin);
+
+    // La caja de la empresa1 se cerró junto con la recaudación.
+    expect(AperturaCaja::withoutGlobalScopes()->where('id', $aperturaCaja->id)->whereNull('cierre_id')->exists())->toBeFalse();
+
+    $cierreCaja = CierreCaja::withoutGlobalScopes()->where('empresa_id', $this->empresa1->id)->first();
+    expect($cierreCaja)->not->toBeNull()
+        // Cobro snapshot 2×100 = 200.
+        ->and((float) CierreDetalle::where('cierre_id', $cierreCaja->id)->sum('total'))->toBe(200.0);
+
+    // Gasto archivado como hijo del cierre de caja.
+    $cierreGasto = CierreGasto::withoutGlobalScopes()->where('cierre_caja_id', $cierreCaja->id)->first();
+    expect($cierreGasto)->not->toBeNull()
+        ->and((float) $cierreGasto->total_general)->toBe(500.0);
+
+    // La empresa2 no tenía caja abierta → no se le creó cierre de caja.
+    expect(CierreCaja::withoutGlobalScopes()->where('empresa_id', $this->empresa2->id)->exists())->toBeFalse();
 });
 
 it('reparte la parte completa cuando no hay deudores', function () {

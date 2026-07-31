@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\UserRole;
 use App\Models\AperturaRecaudacion;
 use App\Models\Articulo;
+use App\Models\CierreCaja;
+use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
 use App\Models\Cobro;
 use App\Models\Empresa;
@@ -16,6 +18,7 @@ use App\Models\Transaccion;
 use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -142,7 +145,7 @@ it('mi cuenta muestra las inversiones con deuda y estado del inversor', function
         );
 });
 
-it('mi cuenta totaliza autos y recaudación del período abierto por inversión', function () {
+it('mi cuenta totaliza autos y la recaudación del último período CERRADO por inversión', function () {
     Setting::set('cotizacion_dolar', '1000');
 
     $socio = moduloInversor('20000009');
@@ -154,7 +157,7 @@ it('mi cuenta totaliza autos y recaudación del período abierto por inversión'
         'user_id' => $this->admin->id,
     ]);
 
-    // Dos autos reales de la inversión con recaudación en el período abierto.
+    // Dos autos con recaudación en el período ABIERTO: NO deben aparecer.
     foreach ([500, 300] as $i => $monto) {
         $veh = Vehiculo::withoutGlobalScopes()->create([
             'inversion_id' => $inv->id,
@@ -180,7 +183,7 @@ it('mi cuenta totaliza autos y recaudación del período abierto por inversión'
         'total' => 999, 'descuento' => 0, 'precio' => 999,
     ]);
 
-    // Recaudación ya cerrada (otro período): no debe sumar al total abierto.
+    // Último período CERRADO: es lo que la vista debe mostrar (700).
     $cierre = CierreRecaudacion::withoutGlobalScopes()->create([
         'empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id,
     ]);
@@ -204,12 +207,12 @@ it('mi cuenta totaliza autos y recaudación del período abierto por inversión'
             ->where('inversiones.0.nombre', 'INV_R')
             // 3 autos reales creados (2 abiertos + 1 cerrado); EXTERNO excluido.
             ->where('inversiones.0.autos', 3)
-            // Sólo período abierto y sin EXTERNO: 500 + 300 = 800.
-            ->where('inversiones.0.recaudado', 800)
+            // Sólo el último período cerrado (700); el abierto (800) no cuenta.
+            ->where('inversiones.0.recaudado', 700)
         );
 });
 
-it('mi cuenta arma los gastos del período: flota de sus inversiones y globales con su parte', function () {
+it('mi cuenta arma los gastos del último cierre: flota de sus inversiones y globales con su parte', function () {
     Setting::set('cotizacion_dolar', '1000');
 
     $socio = moduloInversor('20000010');
@@ -223,12 +226,21 @@ it('mi cuenta arma los gastos del período: flota de sus inversiones y globales 
         'patente' => 'GAS_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
     ]);
 
+    // Cierre de caja + cierre de gastos: los gastos del PERÍODO CERRADO tienen su
+    // cierre_gasto_id. Es lo que la vista de Mi Cuenta debe tomar.
+    $cierreCaja = CierreCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
+    $cierreGasto = CierreGasto::create([
+        'empresa_id' => $this->empresa->id, 'cierre_caja_id' => $cierreCaja->id,
+        'user_id' => $this->admin->id, 'periodo_inicio' => now()->subDay(),
+        'periodo_fin' => now(), 'total_general' => 0,
+    ]);
+
     // Gasto de flota de su inversión: monto completo al total, mitad le toca.
     Gasto::create([
         'fecha' => now()->toDateString(), 'monto' => 400,
         'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
         'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
-        'vehiculo_id' => $veh->id,
+        'vehiculo_id' => $veh->id, 'cierre_gasto_id' => $cierreGasto->id,
         'distribucion' => [$socio->id => 200, $otro->id => 200],
     ]);
 
@@ -237,7 +249,7 @@ it('mi cuenta arma los gastos del período: flota de sus inversiones y globales 
         'fecha' => now()->toDateString(), 'monto' => 1000,
         'user_id' => $this->admin->id, 'recibio' => 'Galpón',
         'metodo_pago' => 'efectivo', 'tipo' => 'galpon',
-        'vehiculo_id' => null,
+        'vehiculo_id' => null, 'cierre_gasto_id' => $cierreGasto->id,
         'distribucion' => [$socio->id => 100, $otro->id => 900],
     ]);
 
@@ -251,8 +263,17 @@ it('mi cuenta arma los gastos del período: flota de sus inversiones y globales 
         'fecha' => now()->toDateString(), 'monto' => 555,
         'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
         'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
-        'vehiculo_id' => $vehAjeno->id,
+        'vehiculo_id' => $vehAjeno->id, 'cierre_gasto_id' => $cierreGasto->id,
         'distribucion' => [$otro->id => 555],
+    ]);
+
+    // Gasto PENDIENTE (período abierto): no debe aparecer.
+    Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 777,
+        'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
+        'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
+        'vehiculo_id' => $veh->id, 'cierre_gasto_id' => null,
+        'distribucion' => [$socio->id => 777],
     ]);
 
     $this->actingAs($socio)
@@ -288,8 +309,12 @@ it('mi cuenta incluye los repuestos de inventario en la flota, con parte igualit
         'patente' => 'REP_1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
     ]);
 
+    // Gasto y cobro se crean DENTRO del período; el cierre de caja se ejecuta
+    // después (fin del período). Así el cobro cae en el rango del último cierre.
+    Carbon::setTestNow('2026-07-01 10:00:00');
+
     // Gasto de flota: su parte viene del reparto congelado.
-    Gasto::create([
+    $gasto = Gasto::create([
         'fecha' => now()->toDateString(), 'monto' => 400,
         'user_id' => $this->admin->id, 'recibio' => 'Proveedor',
         'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo',
@@ -298,7 +323,7 @@ it('mi cuenta incluye los repuestos de inventario en la flota, con parte igualit
     ]);
 
     // Repuesto colocado al auto desde inventario: 2 × 300 = 600, valuado a
-    // precio de venta. Sin cierre de caja previo → cuenta como del período.
+    // precio de venta.
     $articulo = Articulo::create([
         'descripcion' => 'Filtro de aceite', 'codigo' => 'FIL-1',
         'stock' => 10, 'min_stock' => 1, 'costo' => 200, 'precio' => 300,
@@ -312,6 +337,17 @@ it('mi cuenta incluye los repuestos de inventario en la flota, con parte igualit
         'inversion_id' => $inv->id, 'transaccion_id' => $tx->id,
         'empresa_id' => $this->empresa->id,
     ]);
+
+    // Cierre de caja al fin del período: acota gastos (cierre_gasto_id) y cobros.
+    Carbon::setTestNow('2026-07-02 10:00:00');
+    $cierreCaja = CierreCaja::create(['empresa_id' => $this->empresa->id, 'user_id' => $this->admin->id]);
+    $cierreGasto = CierreGasto::create([
+        'empresa_id' => $this->empresa->id, 'cierre_caja_id' => $cierreCaja->id,
+        'user_id' => $this->admin->id, 'periodo_inicio' => '2026-07-01 00:00:00',
+        'periodo_fin' => now(), 'total_general' => 400,
+    ]);
+    $gasto->update(['cierre_gasto_id' => $cierreGasto->id]);
+    Carbon::setTestNow();
 
     $this->actingAs($socio)
         ->get('/mi-cuenta')

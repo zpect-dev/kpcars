@@ -50,13 +50,22 @@ class MiCuentaController extends Controller
             ->selectRaw('inversion_id, COUNT(*) as total')
             ->pluck('total', 'inversion_id');
 
-        // Recaudación del período ABIERTO (cierre_id null) por inversión: suma
-        // el total cobrado de todos los autos de la inversión, no la parte que le
+        // Último cierre de recaudación por empresa: la vista muestra el período
+        // YA CERRADO, no el que está corriendo. (La recaudación se cierra por
+        // empresa; cross-empresa tomamos el último de cada una.)
+        $ultimoCierreRecIds = DB::table('cierres_recaudacion')
+            ->groupBy('empresa_id')
+            ->selectRaw('MAX(id) as ultimo')
+            ->pluck('ultimo')
+            ->all();
+
+        // Recaudación del ÚLTIMO PERÍODO CERRADO por inversión: suma el total
+        // cobrado de todos los autos de la inversión, no la parte que le
         // corresponde al inversor. Excluye el ficticio EXTERNO.
-        $recaudadoPorInversion = DB::table('recaudaciones')
+        $recaudadoPorInversion = $ultimoCierreRecIds === [] ? collect() : DB::table('recaudaciones')
             ->join('vehiculos', 'recaudaciones.vehiculo_id', '=', 'vehiculos.id')
             ->whereIn('vehiculos.inversion_id', $inversionIds)
-            ->whereNull('recaudaciones.cierre_id')
+            ->whereIn('recaudaciones.cierre_id', $ultimoCierreRecIds)
             ->where('vehiculos.patente', '!=', 'EXTERNO')
             ->groupBy('vehiculos.inversion_id')
             ->selectRaw('vehiculos.inversion_id as inversion_id, SUM(recaudaciones.total) as total')
@@ -110,13 +119,40 @@ class MiCuentaController extends Controller
             ];
         })->values();
 
-        // Gastos del período abierto que tocan al inversor: los de flota de sus
-        // inversiones (monto completo, sin dividir) + los globales de
+        // Último cierre de caja por empresa (id + rango de fechas del período):
+        // los gastos y repuestos también se muestran del período YA CERRADO. El
+        // rango [inicio, fin] acota los cobros (repuestos) de ese cierre.
+        $ultimaCajaPorEmpresa = [];
+        DB::table('cierres_caja')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get(['id', 'empresa_id', 'created_at'])
+            ->groupBy('empresa_id')
+            ->each(function ($cajas, $empresaId) use (&$ultimaCajaPorEmpresa) {
+                $ultima = $cajas->first();
+                $previa = $cajas->get(1);
+                $ultimaCajaPorEmpresa[$empresaId] = [
+                    'id' => $ultima->id,
+                    'inicio' => $previa->created_at ?? null, // null = primer cierre
+                    'fin' => $ultima->created_at,
+                ];
+            });
+
+        // CierreGasto del último cierre de caja de cada empresa (los gastos de
+        // ese período tienen su cierre_gasto_id).
+        $ultimaCajaIds = array_column($ultimaCajaPorEmpresa, 'id');
+        $ultimoCierreGastoIds = $ultimaCajaIds === [] ? [] : DB::table('cierres_gastos')
+            ->whereIn('cierre_caja_id', $ultimaCajaIds)
+            ->pluck('id')
+            ->all();
+
+        // Gastos del ÚLTIMO PERÍODO CERRADO que tocan al inversor: los de flota de
+        // sus inversiones (monto completo, sin dividir) + los globales de
         // galpón/taller/oficina (monto completo y la parte que le corresponde
         // según el reparto congelado en `distribucion`). Cross-empresa.
         $gastosPendientes = Gasto::query()
             ->withoutGlobalScope(GastoTenantScope::class)
-            ->pendientes()
+            ->whereIn('cierre_gasto_id', $ultimoCierreGastoIds)
             ->with([
                 'vehiculo' => fn ($q) => $q
                     ->withoutGlobalScope(TenantScope::class)
@@ -157,13 +193,8 @@ class MiCuentaController extends Controller
         // Repuestos colocados desde inventario a los autos de sus inversiones,
         // valuados a precio de venta (precio * cantidad) — el mismo importe que
         // se le cobra a la inversión en el módulo de Cobros. Se toman los del
-        // período abierto: cobros posteriores al último cierre de caja de su
-        // empresa (la caja se cierra por empresa). Cross-empresa, sin scopes.
-        $ultimoCierreCajaPorEmpresa = DB::table('cierres_caja')
-            ->groupBy('empresa_id')
-            ->selectRaw('empresa_id, MAX(created_at) as ultimo')
-            ->pluck('ultimo', 'empresa_id');
-
+        // ÚLTIMO PERÍODO CERRADO: cobros cuya fecha cae en el rango del último
+        // cierre de caja de su empresa. Cross-empresa, sin scopes.
         $repuestoRows = DB::table('cobros')
             ->join('transacciones', 'cobros.transaccion_id', '=', 'transacciones.id')
             ->join('articulos', 'transacciones.articulo_id', '=', 'articulos.id')
@@ -184,10 +215,16 @@ class MiCuentaController extends Controller
                 'articulos.descripcion as articulo',
                 'articulos.precio as precio',
             ])
-            ->filter(function ($r) use ($ultimoCierreCajaPorEmpresa) {
-                $ultimo = $ultimoCierreCajaPorEmpresa[$r->empresa_id] ?? null;
+            ->filter(function ($r) use ($ultimaCajaPorEmpresa) {
+                $caja = $ultimaCajaPorEmpresa[$r->empresa_id] ?? null;
+                if ($caja === null) {
+                    return false; // sin cierre de caja → no hay período cerrado
+                }
 
-                return $ultimo === null || $r->cobro_fecha > $ultimo;
+                $antesDelFin = $r->cobro_fecha <= $caja['fin'];
+                $despuesDelInicio = $caja['inicio'] === null || $r->cobro_fecha > $caja['inicio'];
+
+                return $antesDelFin && $despuesDelInicio;
             })
             ->values();
 

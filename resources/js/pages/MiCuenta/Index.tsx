@@ -395,7 +395,7 @@ export default function MiCuentaIndex({
         {
             key: 'gastos',
             label: 'Tus gastos',
-            detalle: 'Tu parte del período en curso',
+            detalle: 'Tu parte del último cierre',
             monto: formatARS(misGastos),
             icon: Receipt,
         },
@@ -647,7 +647,7 @@ export default function MiCuentaIndex({
                         {/* Total del período (sin dividir) */}
                         <div className="rounded-lg border border-border bg-card px-4 py-3">
                             <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                                Gasto total del período
+                                Gasto total del último cierre
                             </div>
                             <div className="mt-1 text-2xl font-semibold text-foreground tabular-nums">
                                 {formatARS(gastos.total)}
