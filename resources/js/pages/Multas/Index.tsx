@@ -141,7 +141,11 @@ function diasHastaVenc(v: string): number {
  * fecha de vencimiento tampoco aplica.
  */
 function tieneDescuento(m: Multa): boolean {
-    return m.jurisdiccion === 'CABA' && !!m.fecha_vencimiento && HOY <= m.fecha_vencimiento;
+    return (
+        m.jurisdiccion === 'CABA' &&
+        !!m.fecha_vencimiento &&
+        HOY <= m.fecha_vencimiento
+    );
 }
 
 /** Monto vigente hoy: 50% si todavía no venció, total en caso contrario. */
@@ -246,7 +250,11 @@ function Highlight({ text, query }: { text: string; query: string }) {
     );
 }
 
-export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Props) {
+export default function MultasIndex({
+    multas,
+    vehiculos,
+    eliminadas = [],
+}: Props) {
     // Estado inicial tomado de la URL: sobrevive a recargas y permite compartir
     // el link con la misma vista (tab, búsqueda, filtros y orden).
     const [tab, setTab] = useState<Tab>(() => {
@@ -265,13 +273,21 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
     const [cobrando, setCobrando] = useState<Multa | null>(null);
 
     // Filtros
-    const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>(() => {
-        const v = readParams().get('jur');
-        return v === 'CABA' || v === 'GBA' ? v : '';
-    });
-    const [fSistema, setFSistema] = useState<FiltroEstado>(() => normEstado(readParams().get('sis')));
-    const [fChofer, setFChofer] = useState<FiltroEstado>(() => normEstado(readParams().get('cob')));
-    const [fPuntoRojo, setFPuntoRojo] = useState(() => readParams().get('pr') === '1');
+    const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>(
+        () => {
+            const v = readParams().get('jur');
+            return v === 'CABA' || v === 'GBA' ? v : '';
+        },
+    );
+    const [fSistema, setFSistema] = useState<FiltroEstado>(() =>
+        normEstado(readParams().get('sis')),
+    );
+    const [fChofer, setFChofer] = useState<FiltroEstado>(() =>
+        normEstado(readParams().get('cob')),
+    );
+    const [fPuntoRojo, setFPuntoRojo] = useState(
+        () => readParams().get('pr') === '1',
+    );
     const [fVencimiento, setFVencimiento] = useState<
         '' | 'vencida' | 'no-vencida'
     >(() => {
@@ -296,9 +312,23 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
         if (fDesde) p.set('desde', fDesde);
         if (fHasta) p.set('hasta', fHasta);
         const qs = p.toString();
-        const url = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+        const url =
+            window.location.pathname +
+            (qs ? `?${qs}` : '') +
+            window.location.hash;
         window.history.replaceState(window.history.state, '', url);
-    }, [tab, search, orden, fJurisdiccion, fSistema, fChofer, fPuntoRojo, fVencimiento, fDesde, fHasta]);
+    }, [
+        tab,
+        search,
+        orden,
+        fJurisdiccion,
+        fSistema,
+        fChofer,
+        fPuntoRojo,
+        fVencimiento,
+        fDesde,
+        fHasta,
+    ]);
 
     // Periodo activo: se deriva comparando fechas con cada preset
     const fPeriodoActivo = useMemo<FiltroPeriodo>(() => {
@@ -485,10 +515,15 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
             }))
             .sort((a, b) => {
                 if (orden === 'monto') return b.total - a.total || alfa(a, b);
-                if (orden === 'cantidad') return b.multas.length - a.multas.length || alfa(a, b);
+                if (orden === 'cantidad')
+                    return b.multas.length - a.multas.length || alfa(a, b);
                 if (orden === 'alfabetico') return alfa(a, b);
                 // 'pendientes' (default)
-                return b.pendientes - a.pendientes || b.total - a.total || alfa(a, b);
+                return (
+                    b.pendientes - a.pendientes ||
+                    b.total - a.total ||
+                    alfa(a, b)
+                );
             });
     }, [
         multas,
@@ -562,7 +597,11 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                     action: {
                         label: 'Deshacer',
                         onClick: () =>
-                            router.patch(`/multas/${id}/restaurar`, {}, visitaMulta),
+                            router.patch(
+                                `/multas/${id}/restaurar`,
+                                {},
+                                visitaMulta,
+                            ),
                     },
                 });
             },
@@ -574,7 +613,9 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
         grupos.length > 0 && grupos.every((g) => expanded.has(g.key));
 
     function toggleExpandAll() {
-        setExpanded(allExpanded ? new Set() : new Set(grupos.map((g) => g.key)));
+        setExpanded(
+            allExpanded ? new Set() : new Set(grupos.map((g) => g.key)),
+        );
     }
 
     // Contador de multas pendientes por tab (para el badge).
@@ -582,7 +623,9 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
         () => ({
             vehiculo: multas.filter(pendiente).length,
             chofer: multas.filter(pendiente).length,
-            'ex-chofer': multas.filter((m) => m.conductor_inactivo && pendiente(m)).length,
+            'ex-chofer': multas.filter(
+                (m) => m.conductor_inactivo && pendiente(m),
+            ).length,
             ranking: 0,
             reporte: 0,
         }),
@@ -1085,7 +1128,10 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                 </p>
                             </div>
                             {multas.length === 0 ? (
-                                <Button size="sm" onClick={() => setShowModal(true)}>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowModal(true)}
+                                >
                                     <Plus className="h-4 w-4" /> Registrar multa
                                 </Button>
                             ) : (
@@ -1098,7 +1144,8 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                             setSearch('');
                                         }}
                                     >
-                                        <X className="h-4 w-4" /> Limpiar filtros
+                                        <X className="h-4 w-4" /> Limpiar
+                                        filtros
                                     </Button>
                                 )
                             )}
@@ -1110,10 +1157,18 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                 <span className="text-xs text-muted-foreground tabular-nums">
                                     {grupos.length}{' '}
                                     {tab === 'vehiculo'
-                                        ? grupos.length === 1 ? 'vehículo' : 'vehículos'
-                                        : grupos.length === 1 ? 'chofer' : 'choferes'}
+                                        ? grupos.length === 1
+                                            ? 'vehículo'
+                                            : 'vehículos'
+                                        : grupos.length === 1
+                                          ? 'chofer'
+                                          : 'choferes'}
                                     {' · '}
-                                    {grupos.reduce((s, g) => s + g.multas.length, 0)} multas
+                                    {grupos.reduce(
+                                        (s, g) => s + g.multas.length,
+                                        0,
+                                    )}{' '}
+                                    multas
                                 </span>
                                 <div className="flex items-center gap-1.5">
                                     <DropdownMenu>
@@ -1123,15 +1178,24 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                 className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                             >
                                                 <ArrowDownUp className="h-3.5 w-3.5" />
-                                                <span className="hidden sm:inline">{ORDEN_LABEL[orden]}</span>
+                                                <span className="hidden sm:inline">
+                                                    {ORDEN_LABEL[orden]}
+                                                </span>
                                             </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                            {(Object.keys(ORDEN_LABEL) as Orden[]).map((o) => (
+                                            {(
+                                                Object.keys(
+                                                    ORDEN_LABEL,
+                                                ) as Orden[]
+                                            ).map((o) => (
                                                 <DropdownMenuItem
                                                     key={o}
                                                     onClick={() => setOrden(o)}
-                                                    className={cn(orden === o && 'bg-muted font-medium')}
+                                                    className={cn(
+                                                        orden === o &&
+                                                            'bg-muted font-medium',
+                                                    )}
                                                 >
                                                     {ORDEN_LABEL[o]}
                                                 </DropdownMenuItem>
@@ -1149,7 +1213,9 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                             <ChevronsUpDown className="h-3.5 w-3.5" />
                                         )}
                                         <span className="hidden sm:inline">
-                                            {allExpanded ? 'Colapsar todo' : 'Expandir todo'}
+                                            {allExpanded
+                                                ? 'Colapsar todo'
+                                                : 'Expandir todo'}
                                         </span>
                                     </button>
                                 </div>
@@ -1157,7 +1223,8 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                             {grupos.map((g) => {
                                 // Al buscar, los grupos se abren solos para ver las coincidencias.
                                 const isOpen =
-                                    search.trim().length > 0 || expanded.has(g.key);
+                                    search.trim().length > 0 ||
+                                    expanded.has(g.key);
                                 return (
                                     <div
                                         key={g.key}
@@ -1179,12 +1246,18 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                 />
                                                 {tab === 'vehiculo' ? (
                                                     <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold tracking-wide text-foreground uppercase">
-                                                        <Highlight text={g.titulo} query={search} />
+                                                        <Highlight
+                                                            text={g.titulo}
+                                                            query={search}
+                                                        />
                                                     </span>
                                                 ) : (
                                                     <span className="flex min-w-0 shrink items-center gap-1.5">
                                                         <span className="truncate text-sm font-semibold text-foreground">
-                                                            <Highlight text={g.titulo} query={search} />
+                                                            <Highlight
+                                                                text={g.titulo}
+                                                                query={search}
+                                                            />
                                                         </span>
                                                         {g.multas[0]
                                                             ?.conductor_inactivo && (
@@ -1358,37 +1431,63 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                         )
                                                                     }
                                                                     title={
-                                                                        estadoCobro(m) === 'cobrada'
-                                                                            ? (m.cobrada_en ? `Cobrada — pagó ${formatARS(m.monto_cobrado)} el ${formatFecha(m.cobrada_en)}` : 'Cobrada')
-                                                                            : estadoCobro(m) === 'parcial'
-                                                                                ? `Pago parcial: pagó ${formatARS(m.monto_cobrado)}, falta ${formatARS(faltante(m))}`
-                                                                                : 'Registrar cobro al chofer'
+                                                                        estadoCobro(
+                                                                            m,
+                                                                        ) ===
+                                                                        'cobrada'
+                                                                            ? m.cobrada_en
+                                                                                ? `Cobrada — pagó ${formatARS(m.monto_cobrado)} el ${formatFecha(m.cobrada_en)}`
+                                                                                : 'Cobrada'
+                                                                            : estadoCobro(
+                                                                                    m,
+                                                                                ) ===
+                                                                                'parcial'
+                                                                              ? `Pago parcial: pagó ${formatARS(m.monto_cobrado)}, falta ${formatARS(faltante(m))}`
+                                                                              : 'Registrar cobro al chofer'
                                                                     }
                                                                     className={cn(
                                                                         'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
-                                                                        estadoCobro(m) === 'cobrada'
+                                                                        estadoCobro(
+                                                                            m,
+                                                                        ) ===
+                                                                            'cobrada'
                                                                             ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                                                            : estadoCobro(m) === 'parcial'
-                                                                                ? 'border-orange-300 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                                                : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                                                                            : estadoCobro(
+                                                                                    m,
+                                                                                ) ===
+                                                                                'parcial'
+                                                                              ? 'border-orange-300 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                                                                              : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
                                                                     )}
                                                                 >
                                                                     <UserIcon className="h-3 w-3 shrink-0" />
-                                                                    {estadoCobro(m) === 'cobrada'
+                                                                    {estadoCobro(
+                                                                        m,
+                                                                    ) ===
+                                                                    'cobrada'
                                                                         ? 'Cobrada'
-                                                                        : estadoCobro(m) === 'parcial'
-                                                                            ? 'Parcial'
-                                                                            : 'Sin cobrar'}
+                                                                        : estadoCobro(
+                                                                                m,
+                                                                            ) ===
+                                                                            'parcial'
+                                                                          ? 'Parcial'
+                                                                          : 'Sin cobrar'}
                                                                 </button>
                                                             </div>
-                                                            {!sinImporte(m) && estadoCobro(m) !== 'sin' && (
-                                                                <span className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
-                                                                    <UserIcon className="h-2.5 w-2.5 shrink-0" />
-                                                                    {estadoCobro(m) === 'cobrada'
-                                                                        ? `Pagó ${formatARS(m.monto_cobrado)}${m.cobrada_en ? ' el ' + formatFecha(m.cobrada_en) : ''}`
-                                                                        : `Pagó ${formatARS(m.monto_cobrado)} · Falta ${formatARS(faltante(m))}`}
-                                                                </span>
-                                                            )}
+                                                            {!sinImporte(m) &&
+                                                                estadoCobro(
+                                                                    m,
+                                                                ) !== 'sin' && (
+                                                                    <span className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
+                                                                        <UserIcon className="h-2.5 w-2.5 shrink-0" />
+                                                                        {estadoCobro(
+                                                                            m,
+                                                                        ) ===
+                                                                        'cobrada'
+                                                                            ? `Pagó ${formatARS(m.monto_cobrado)}${m.cobrada_en ? ' el ' + formatFecha(m.cobrada_en) : ''}`
+                                                                            : `Pagó ${formatARS(m.monto_cobrado)} · Falta ${formatARS(faltante(m))}`}
+                                                                    </span>
+                                                                )}
                                                         </div>
                                                     );
 
@@ -1477,8 +1576,12 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                                 'vehiculo' && (
                                                                                 <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground uppercase">
                                                                                     <Highlight
-                                                                                        text={m.patente}
-                                                                                        query={search}
+                                                                                        text={
+                                                                                            m.patente
+                                                                                        }
+                                                                                        query={
+                                                                                            search
+                                                                                        }
                                                                                     />
                                                                                 </span>
                                                                             )}
@@ -1493,8 +1596,12 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                                                                 {m.conductor ? (
                                                                                     <Highlight
-                                                                                        text={m.conductor}
-                                                                                        query={search}
+                                                                                        text={
+                                                                                            m.conductor
+                                                                                        }
+                                                                                        query={
+                                                                                            search
+                                                                                        }
                                                                                     />
                                                                                 ) : (
                                                                                     <span className="italic opacity-50">
@@ -1581,8 +1688,12 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                             <span className="truncate">
                                                                                 {m.conductor ? (
                                                                                     <Highlight
-                                                                                        text={m.conductor}
-                                                                                        query={search}
+                                                                                        text={
+                                                                                            m.conductor
+                                                                                        }
+                                                                                        query={
+                                                                                            search
+                                                                                        }
                                                                                     />
                                                                                 ) : (
                                                                                     <span className="italic opacity-50">
@@ -1598,8 +1709,12 @@ export default function MultasIndex({ multas, vehiculos, eliminadas = [] }: Prop
                                                                     ) : (
                                                                         <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
                                                                             <Highlight
-                                                                                text={m.patente}
-                                                                                query={search}
+                                                                                text={
+                                                                                    m.patente
+                                                                                }
+                                                                                query={
+                                                                                    search
+                                                                                }
                                                                             />
                                                                         </span>
                                                                     )}
@@ -1689,7 +1804,9 @@ function PatenteChofer({
                 {patente}
             </span>
             <span className="truncate text-xs text-muted-foreground">
-                {conductor ?? <span className="italic opacity-60">Sin chofer</span>}
+                {conductor ?? (
+                    <span className="italic opacity-60">Sin chofer</span>
+                )}
             </span>
             {inactivo && <InactivoBadge />}
         </div>
@@ -1712,11 +1829,20 @@ function ReporteStat({
 }) {
     return (
         <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-            <span className={cn('flex items-center gap-1.5 text-xs font-medium', color)}>
+            <span
+                className={cn(
+                    'flex items-center gap-1.5 text-xs font-medium',
+                    color,
+                )}
+            >
                 <Icon className="h-3.5 w-3.5" /> {label}
             </span>
-            <span className="text-xl font-bold text-foreground tabular-nums">{value}</span>
-            {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+            <span className="text-xl font-bold text-foreground tabular-nums">
+                {value}
+            </span>
+            {sub && (
+                <span className="text-xs text-muted-foreground">{sub}</span>
+            )}
         </div>
     );
 }
@@ -1739,7 +1865,9 @@ function ReporteSeccion({
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
             <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
                 <Icon className={cn('h-4 w-4', color)} />
-                <span className="text-sm font-medium text-foreground">{title}</span>
+                <span className="text-sm font-medium text-foreground">
+                    {title}
+                </span>
                 <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
                     {count}
                 </span>
@@ -1774,7 +1902,8 @@ function ReporteSemanal({
     }, [offset]);
 
     const rep = useMemo(() => {
-        const en = (d: string | null | undefined) => !!d && d >= desde && d <= hasta;
+        const en = (d: string | null | undefined) =>
+            !!d && d >= desde && d <= hasta;
         const nuevas = multas.filter((m) => en(m.created_at));
         const pagadas = multas.filter((m) => en(m.pagada_en));
         const cobros = multas.flatMap((m) =>
@@ -1865,14 +1994,20 @@ function ReporteSemanal({
                     color="text-primary"
                     label="Nuevas multas"
                     value={String(rep.nuevas.length)}
-                    sub={rep.montoNuevas > 0 ? formatARS(rep.montoNuevas) : 'Sin monto'}
+                    sub={
+                        rep.montoNuevas > 0
+                            ? formatARS(rep.montoNuevas)
+                            : 'Sin monto'
+                    }
                 />
                 <ReporteStat
                     icon={Building2}
                     color="text-emerald-600 dark:text-emerald-400"
                     label="Pagadas al sistema"
                     value={String(rep.pagadas.length)}
-                    sub={rep.montoPagadas > 0 ? formatARS(rep.montoPagadas) : '—'}
+                    sub={
+                        rep.montoPagadas > 0 ? formatARS(rep.montoPagadas) : '—'
+                    }
                 />
                 <ReporteStat
                     icon={UserIcon}
@@ -1891,13 +2026,29 @@ function ReporteSemanal({
             </div>
 
             {/* Nuevas multas */}
-            <ReporteSeccion icon={Plus} color="text-primary" title="Nuevas multas registradas" count={rep.nuevas.length}>
+            <ReporteSeccion
+                icon={Plus}
+                color="text-primary"
+                title="Nuevas multas registradas"
+                count={rep.nuevas.length}
+            >
                 {rep.nuevas.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{formatFecha(m.created_at)}</span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                    <div
+                        key={m.id}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                    >
+                        <PatenteChofer
+                            patente={m.patente}
+                            conductor={m.conductor ?? null}
+                            inactivo={m.conductor_inactivo}
+                        />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
+                            {m.descripcion}
+                        </span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
+                            {formatFecha(m.created_at)}
+                        </span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
                             {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
                         </span>
                     </div>
@@ -1905,13 +2056,29 @@ function ReporteSemanal({
             </ReporteSeccion>
 
             {/* Pagadas al sistema */}
-            <ReporteSeccion icon={Building2} color="text-emerald-500" title="Pagadas al sistema de infracciones" count={rep.pagadas.length}>
+            <ReporteSeccion
+                icon={Building2}
+                color="text-emerald-500"
+                title="Pagadas al sistema de infracciones"
+                count={rep.pagadas.length}
+            >
                 {rep.pagadas.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.pagada_en ? formatFecha(m.pagada_en) : ''}</span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                    <div
+                        key={m.id}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                    >
+                        <PatenteChofer
+                            patente={m.patente}
+                            conductor={m.conductor ?? null}
+                            inactivo={m.conductor_inactivo}
+                        />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
+                            {m.descripcion}
+                        </span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
+                            {m.pagada_en ? formatFecha(m.pagada_en) : ''}
+                        </span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
                             {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
                         </span>
                     </div>
@@ -1919,46 +2086,103 @@ function ReporteSemanal({
             </ReporteSeccion>
 
             {/* Cobros a choferes */}
-            <ReporteSeccion icon={UserIcon} color="text-green-500" title="Cobros a choferes" count={rep.cobros.length}>
+            <ReporteSeccion
+                icon={UserIcon}
+                color="text-green-500"
+                title="Cobros a choferes"
+                count={rep.cobros.length}
+            >
                 {rep.cobros.map(({ multa: m, pago: p }) => (
-                    <div key={p.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
+                    <div
+                        key={p.id}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                    >
+                        <PatenteChofer
+                            patente={m.patente}
+                            conductor={m.conductor ?? null}
+                            inactivo={m.conductor_inactivo}
+                        />
                         <span className="ml-auto flex shrink-0 items-center gap-2">
                             {p.con_deposito && (
-                                <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">Depósito</span>
+                                <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
+                                    Depósito
+                                </span>
                             )}
                             {!m.cobrado && (
-                                <span className="rounded border border-orange-300 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Parcial</span>
+                                <span className="rounded border border-orange-300 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                                    Parcial
+                                </span>
                             )}
-                            <span className="text-xs text-muted-foreground tabular-nums">{formatFecha(p.fecha)}</span>
-                            <span className="w-24 text-right text-sm font-semibold tabular-nums text-green-600 dark:text-green-400">{formatARS(Number(p.monto))}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                                {formatFecha(p.fecha)}
+                            </span>
+                            <span className="w-24 text-right text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                {formatARS(Number(p.monto))}
+                            </span>
                         </span>
                     </div>
                 ))}
             </ReporteSeccion>
 
             {/* Saldadas por completo */}
-            <ReporteSeccion icon={Check} color="text-green-500" title="Saldadas por completo" count={rep.saldadas.length}>
+            <ReporteSeccion
+                icon={Check}
+                color="text-green-500"
+                title="Saldadas por completo"
+                count={rep.saldadas.length}
+            >
                 {rep.saldadas.map((m) => (
-                    <div key={m.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <PatenteChofer patente={m.patente} conductor={m.conductor ?? null} inactivo={m.conductor_inactivo} />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{m.descripcion}</span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">{m.cobrada_en ? formatFecha(m.cobrada_en) : ''}</span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
-                            {sinImporte(m) ? '—' : formatARS(Number(m.monto_cobrado))}
+                    <div
+                        key={m.id}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                    >
+                        <PatenteChofer
+                            patente={m.patente}
+                            conductor={m.conductor ?? null}
+                            inactivo={m.conductor_inactivo}
+                        />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
+                            {m.descripcion}
+                        </span>
+                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
+                            {m.cobrada_en ? formatFecha(m.cobrada_en) : ''}
+                        </span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
+                            {sinImporte(m)
+                                ? '—'
+                                : formatARS(Number(m.monto_cobrado))}
                         </span>
                     </div>
                 ))}
             </ReporteSeccion>
 
             {/* Eliminadas */}
-            <ReporteSeccion icon={Trash2} color="text-red-500" title="Multas eliminadas" count={rep.borradas.length}>
+            <ReporteSeccion
+                icon={Trash2}
+                color="text-red-500"
+                title="Multas eliminadas"
+                count={rep.borradas.length}
+            >
                 {rep.borradas.map((e) => (
-                    <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
-                        <PatenteChofer patente={e.patente} conductor={e.conductor} inactivo={e.conductor_inactivo} />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">{e.descripcion}</span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0" title="Fecha de eliminación">{formatFecha(e.deleted_at)}</span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-muted-foreground line-through">
+                    <div
+                        key={e.id}
+                        className="flex items-center gap-3 px-4 py-2.5"
+                    >
+                        <PatenteChofer
+                            patente={e.patente}
+                            conductor={e.conductor}
+                            inactivo={e.conductor_inactivo}
+                        />
+                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
+                            {e.descripcion}
+                        </span>
+                        <span
+                            className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0"
+                            title="Fecha de eliminación"
+                        >
+                            {formatFecha(e.deleted_at)}
+                        </span>
+                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-muted-foreground tabular-nums line-through">
                             {sinImporte(e) ? '—' : formatARS(Number(e.monto))}
                         </span>
                     </div>
@@ -2072,7 +2296,12 @@ function CobrarMultaForm({
         router.patch(
             `/multas/${multa.id}/cobrado`,
             { reset: true },
-            { preserveScroll: true, preserveState: true, only: ['multas', 'flash'], onSuccess: () => onClose() },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                only: ['multas', 'flash'],
+                onSuccess: () => onClose(),
+            },
         );
     }
 
@@ -2086,7 +2315,8 @@ function CobrarMultaForm({
     }
 
     const montoNum = Number(form.data.monto);
-    const puedeRegistrar = montoNum > 0 && form.data.fecha_cobro !== '' && !form.processing;
+    const puedeRegistrar =
+        montoNum > 0 && form.data.fecha_cobro !== '' && !form.processing;
 
     return (
         <form onSubmit={submit}>
@@ -2112,32 +2342,70 @@ function CobrarMultaForm({
                 {/* Resumen del cobro */}
                 <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
                     <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p>
-                        <p className="text-sm font-bold tabular-nums text-foreground">{formatARS(total)}</p>
+                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                            Total
+                        </p>
+                        <p className="text-sm font-bold text-foreground tabular-nums">
+                            {formatARS(total)}
+                        </p>
                     </div>
                     <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pagado</p>
-                        <p className="text-sm font-bold tabular-nums text-green-600 dark:text-green-400">{formatARS(pagado)}</p>
+                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                            Pagado
+                        </p>
+                        <p className="text-sm font-bold text-green-600 tabular-nums dark:text-green-400">
+                            {formatARS(pagado)}
+                        </p>
                     </div>
                     <div>
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Falta</p>
-                        <p className={cn('text-sm font-bold tabular-nums', falta > 0 ? 'text-foreground' : 'text-muted-foreground')}>{formatARS(falta)}</p>
+                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                            Falta
+                        </p>
+                        <p
+                            className={cn(
+                                'text-sm font-bold tabular-nums',
+                                falta > 0
+                                    ? 'text-foreground'
+                                    : 'text-muted-foreground',
+                            )}
+                        >
+                            {formatARS(falta)}
+                        </p>
                     </div>
                 </div>
 
                 {/* Pagos registrados */}
                 {multa.pagos.length > 0 && (
                     <div className="flex flex-col gap-1.5">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pagos registrados</p>
+                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
+                            Pagos registrados
+                        </p>
                         <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border">
                             {multa.pagos.map((p) => (
-                                <div key={p.id} className="flex items-center gap-2 px-3 py-2">
-                                    <span className="w-20 shrink-0 text-xs tabular-nums text-muted-foreground">{formatFecha(p.fecha)}</span>
-                                    <span className="text-sm font-semibold tabular-nums text-foreground">{formatARS(p.monto)}</span>
+                                <div
+                                    key={p.id}
+                                    className="flex items-center gap-2 px-3 py-2"
+                                >
+                                    <span className="w-20 shrink-0 text-xs text-muted-foreground tabular-nums">
+                                        {formatFecha(p.fecha)}
+                                    </span>
+                                    <span className="text-sm font-semibold text-foreground tabular-nums">
+                                        {formatARS(p.monto)}
+                                    </span>
                                     <span className="flex-1">
-                                        {p.con_deposito && (
-                                            <span className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400" title="Pagado con depósito">
+                                        {p.con_deposito ? (
+                                            <span
+                                                className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
+                                                title="Pagado con depósito"
+                                            >
                                                 Depósito
+                                            </span>
+                                        ) : (
+                                            <span
+                                                className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
+                                                title="Pagado en efectivo"
+                                            >
+                                                Efectivo
                                             </span>
                                         )}
                                     </span>
@@ -2149,10 +2417,13 @@ function CobrarMultaForm({
                                             title="Ver comprobante"
                                             className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                         >
-                                            <FileText className="h-3 w-3" /> Comp.
+                                            <FileText className="h-3 w-3" />{' '}
+                                            Comp.
                                         </a>
                                     ) : (
-                                        <span className="text-[10px] text-muted-foreground/60">sin comprobante</span>
+                                        <span className="text-[10px] text-muted-foreground/60">
+                                            sin comprobante
+                                        </span>
                                     )}
                                     <button
                                         type="button"
@@ -2170,65 +2441,145 @@ function CobrarMultaForm({
 
                 {fully ? (
                     <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
-                        Cobrada por completo{multa.cobrada_en ? ` el ${formatFecha(multa.cobrada_en)}` : ''}.
+                        Cobrada por completo
+                        {multa.cobrada_en
+                            ? ` el ${formatFecha(multa.cobrada_en)}`
+                            : ''}
+                        .
                     </p>
                 ) : (
                     <>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-monto">Monto que pagó</Label>
+                                <Label htmlFor="cobro-monto">
+                                    Monto que pagó
+                                </Label>
                                 <MoneyInput
                                     id="cobro-monto"
-                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
-                                    onValueChange={(n) => form.setData('monto', n == null ? '' : String(n))}
+                                    value={
+                                        form.data.monto === ''
+                                            ? null
+                                            : Number(form.data.monto)
+                                    }
+                                    onValueChange={(n) =>
+                                        form.setData(
+                                            'monto',
+                                            n == null ? '' : String(n),
+                                        )
+                                    }
                                 />
-                                {form.errors.monto && <p className="text-xs text-red-600">{form.errors.monto}</p>}
+                                {form.errors.monto && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.monto}
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-fecha">Fecha del pago</Label>
+                                <Label htmlFor="cobro-fecha">
+                                    Fecha del pago
+                                </Label>
                                 <Input
                                     id="cobro-fecha"
                                     type="date"
                                     value={form.data.fecha_cobro}
                                     max={today}
-                                    onChange={(e) => form.setData('fecha_cobro', e.target.value)}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'fecha_cobro',
+                                            e.target.value,
+                                        )
+                                    }
                                 />
-                                {form.errors.fecha_cobro && <p className="text-xs text-red-600">{form.errors.fecha_cobro}</p>}
+                                {form.errors.fecha_cobro && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.fecha_cobro}
+                                    </p>
+                                )}
                             </div>
                         </div>
 
+                        {/* Método de pago: efectivo (sin comprobante) o depósito. */}
                         <div className="flex flex-col gap-1.5">
-                            <Label>Comprobante <span className="font-normal text-muted-foreground">(opcional)</span></Label>
-                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
-                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span className={cn('min-w-0 flex-1 truncate', form.data.comprobante ? 'text-foreground' : 'text-muted-foreground')}>
-                                    {form.data.comprobante ? form.data.comprobante.name : 'Adjuntar comprobante (PDF o imagen)...'}
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="application/pdf,image/*"
-                                    className="hidden"
-                                    onChange={(e) => {
-                                        handleComprobante(e.target.files?.[0] ?? null);
-                                        e.target.value = '';
+                            <Label>Método de pago</Label>
+                            <div className="inline-flex overflow-hidden rounded-lg border border-border">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        form.setData('con_deposito', false);
+                                        form.setData('comprobante', null);
                                     }}
-                                />
-                            </label>
-                            {form.errors.comprobante && <p className="text-xs text-red-600">{form.errors.comprobante}</p>}
+                                    className={cn(
+                                        'flex-1 px-3 py-2 text-sm font-medium transition-colors',
+                                        !form.data.con_deposito
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
+                                    )}
+                                >
+                                    Efectivo
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        form.setData('con_deposito', true)
+                                    }
+                                    className={cn(
+                                        'flex-1 border-l border-border px-3 py-2 text-sm font-medium transition-colors',
+                                        form.data.con_deposito
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
+                                    )}
+                                >
+                                    Depósito
+                                </button>
+                            </div>
                         </div>
 
-                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
-                            <input
-                                type="checkbox"
-                                checked={form.data.con_deposito}
-                                onChange={(e) => form.setData('con_deposito', e.target.checked)}
-                                className="h-4 w-4 rounded border-input accent-primary"
-                            />
-                            <span className="text-sm text-foreground">Paga con depósito</span>
-                        </label>
+                        {/* El comprobante solo aplica al depósito; en efectivo no se pide. */}
+                        {form.data.con_deposito && (
+                            <div className="flex flex-col gap-1.5">
+                                <Label>
+                                    Comprobante{' '}
+                                    <span className="font-normal text-muted-foreground">
+                                        (opcional)
+                                    </span>
+                                </Label>
+                                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
+                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span
+                                        className={cn(
+                                            'min-w-0 flex-1 truncate',
+                                            form.data.comprobante
+                                                ? 'text-foreground'
+                                                : 'text-muted-foreground',
+                                        )}
+                                    >
+                                        {form.data.comprobante
+                                            ? form.data.comprobante.name
+                                            : 'Adjuntar comprobante (PDF o imagen)...'}
+                                    </span>
+                                    <input
+                                        type="file"
+                                        accept="application/pdf,image/*"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                            handleComprobante(
+                                                e.target.files?.[0] ?? null,
+                                            );
+                                            e.target.value = '';
+                                        }}
+                                    />
+                                </label>
+                                {form.errors.comprobante && (
+                                    <p className="text-xs text-red-600">
+                                        {form.errors.comprobante}
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <p className="-mt-1 text-[11px] text-muted-foreground">
-                            Si el pago no cubre el total, la multa queda como cobro parcial (pendiente).
+                            Si el pago no cubre el total, la multa queda como
+                            cobro parcial (pendiente).
                         </p>
                     </>
                 )}
@@ -2236,7 +2587,12 @@ function CobrarMultaForm({
 
             <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4">
                 {pagado > 0 && (
-                    <Button type="button" variant="ghost" onClick={reiniciar} className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={reiniciar}
+                        className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400"
+                    >
                         Reiniciar cobro
                     </Button>
                 )}
@@ -2245,7 +2601,13 @@ function CobrarMultaForm({
                 </Button>
                 {!fully && (
                     <Button type="submit" disabled={!puedeRegistrar}>
-                        {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Registrar pago</>}
+                        {form.processing ? (
+                            'Guardando...'
+                        ) : (
+                            <>
+                                <Check className="h-4 w-4" /> Registrar pago
+                            </>
+                        )}
                     </Button>
                 )}
             </DialogFooter>
@@ -2417,8 +2779,8 @@ function RegistrarMultaModal({
                             {puntoRojo
                                 ? 'Las multas de punto rojo no tienen importe ni vencimiento.'
                                 : form.data.jurisdiccion === 'GBA'
-                                    ? 'Las multas de GBA (provincia) no tienen descuento.'
-                                    : 'CABA: pagando antes del vencimiento, la multa tiene un 50% de descuento (GBA no tiene descuento).'}
+                                  ? 'Las multas de GBA (provincia) no tienen descuento.'
+                                  : 'CABA: pagando antes del vencimiento, la multa tiene un 50% de descuento (GBA no tiene descuento).'}
                         </p>
 
                         <div className="grid grid-cols-2 gap-3">
@@ -2429,10 +2791,17 @@ function RegistrarMultaModal({
                                     placeholder={
                                         puntoRojo ? 'Sin monto' : '0,00'
                                     }
-                                    value={form.data.monto === '' ? null : Number(form.data.monto)}
+                                    value={
+                                        form.data.monto === ''
+                                            ? null
+                                            : Number(form.data.monto)
+                                    }
                                     disabled={puntoRojo}
                                     onValueChange={(n) =>
-                                        form.setData('monto', n == null ? '' : String(n))
+                                        form.setData(
+                                            'monto',
+                                            n == null ? '' : String(n),
+                                        )
                                     }
                                     className={cn(
                                         puntoRojo &&
@@ -2676,9 +3045,16 @@ function EditarMultaForm({
                             <MoneyInput
                                 id="edit-monto"
                                 placeholder="0,00"
-                                value={form.data.monto === '' ? null : Number(form.data.monto)}
+                                value={
+                                    form.data.monto === ''
+                                        ? null
+                                        : Number(form.data.monto)
+                                }
                                 onValueChange={(n) =>
-                                    form.setData('monto', n == null ? '' : String(n))
+                                    form.setData(
+                                        'monto',
+                                        n == null ? '' : String(n),
+                                    )
                                 }
                             />
                             {form.errors.monto && (

@@ -10,13 +10,13 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\GastoController;
-use App\Http\Controllers\InversionController;
 use App\Http\Controllers\HistorialController;
+use App\Http\Controllers\InversionController;
+use App\Http\Controllers\MiCuentaController;
 use App\Http\Controllers\MultaController;
+use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RecaudacionController;
 use App\Http\Controllers\ResumenController;
-use App\Http\Controllers\MiCuentaController;
-use App\Http\Controllers\PdfController;
 use App\Http\Controllers\RevisionController;
 use App\Http\Controllers\RevisionMecanicaController;
 use App\Http\Controllers\ServiceController;
@@ -194,6 +194,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('cierres-sueldo', [CierreSueldoController::class, 'index'])->name('cierres-sueldo.index');
         Route::get('cierres-sueldo/{cierreSueldo}', [CierreSueldoController::class, 'show'])->name('cierres-sueldo.show');
         Route::patch('cierres-sueldo/{cierreSueldo}/socios/{user}', [CierreSueldoController::class, 'updateSocio'])->name('cierres-sueldo.socios.update');
+        Route::patch('cierres-sueldo/{cierreSueldo}/inversiones/{inversion}/socios/{user}', [CierreSueldoController::class, 'updateComposicion'])->name('cierres-sueldo.composicion.update');
 
         // Anulación de transacciones (auditoría sensible)
         Route::post('transactions/{transaccion}/annul', [TransactionController::class, 'annul'])->name('transactions.annul');

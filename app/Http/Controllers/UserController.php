@@ -11,19 +11,23 @@ use App\Enums\UserRole;
 use App\Models\Asignacion;
 use App\Models\ChoferEvento;
 use App\Models\Empresa;
+use App\Models\Inversion;
+use App\Models\Scopes\TenantScope;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\UserDeposito;
 use App\Models\Vehiculo;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Inertia\Response;
+
 class UserController extends Controller
 {
     /**
@@ -41,9 +45,9 @@ class UserController extends Controller
         foreach (['licencia', 'dni'] as $t) {
             // Frente y dorso son independientes: se puede subir uno hoy y el
             // otro más adelante. 'prohibits' evita mezclar PDF con imágenes.
-            $rules["{$t}_pdf"]    = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
+            $rules["{$t}_pdf"] = ['nullable', 'file', 'mimes:pdf', 'max:10240', "prohibits:{$t}_frente,{$t}_dorso"];
             $rules["{$t}_frente"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
-            $rules["{$t}_dorso"]  = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
+            $rules["{$t}_dorso"] = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'];
         }
 
         return $rules;
@@ -180,7 +184,7 @@ class UserController extends Controller
         if ($isChoferFilter) {
             $baseChofer = User::where('role', 'chofer');
             $choferCounts = [
-                'activos'   => (clone $baseChofer)->where('inactivo', false)->count(),
+                'activos' => (clone $baseChofer)->where('inactivo', false)->count(),
                 'inactivos' => (clone $baseChofer)->where('inactivo', true)->count(),
             ];
         }
@@ -207,7 +211,7 @@ class UserController extends Controller
             // cualquier empresa (bypass TenantScope en la relación). Usamos
             // vehiculoAsignado (vehiculos.user_id) — misma fuente que el dashboard.
             $query->with([
-                'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+                'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
                 'choferEventos' => fn ($q) => $q->orderByDesc('created_at')->orderByDesc('id'),
                 'depositos',
             ]);
@@ -219,7 +223,7 @@ class UserController extends Controller
             $query->with([
                 'empresas:id,nombre',
                 'inversiones' => fn ($q) => $q
-                    ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                    ->withoutGlobalScope(TenantScope::class)
                     ->with('empresa:id,nombre'),
             ]);
         }
@@ -237,9 +241,9 @@ class UserController extends Controller
 
                 $arr['vehiculo'] = $vehiculo ? [
                     'patente' => $vehiculo->patente,
-                    'marca'   => $vehiculo->marca,
-                    'modelo'  => $vehiculo->modelo,
-                    'precio'  => $vehiculo->precio,
+                    'marca' => $vehiculo->marca,
+                    'modelo' => $vehiculo->modelo,
+                    'precio' => $vehiculo->precio,
                 ] : null;
                 $arr['depositos'] = $user->depositos->map(fn (UserDeposito $d) => [
                     'monto' => (float) $d->monto,
@@ -254,8 +258,8 @@ class UserController extends Controller
                 // Fechas de alta/baja desde la auditoría (chofer_eventos), misma
                 // fuente que el reporte. Se toma el último evento de cada tipo.
                 $eventos = $user->choferEventos; // ya ordenados desc por la relación
-                $arr['alta_fecha'] = $eventos->firstWhere('tipo', \App\Enums\ChoferEventoTipo::ALTA)?->created_at?->toISOString();
-                $arr['baja_fecha'] = $eventos->firstWhere('tipo', \App\Enums\ChoferEventoTipo::BAJA)?->created_at?->toISOString();
+                $arr['alta_fecha'] = $eventos->firstWhere('tipo', ChoferEventoTipo::ALTA)?->created_at?->toISOString();
+                $arr['baja_fecha'] = $eventos->firstWhere('tipo', ChoferEventoTipo::BAJA)?->created_at?->toISOString();
 
                 return $arr;
             });
@@ -283,7 +287,7 @@ class UserController extends Controller
         // (sólo admin; cross-empresa, agrupadas por empresa en el frontend).
         $inversionesDisponibles = null;
         if ($isInversorFilter && Gate::allows('manage-inversiones')) {
-            $inversionesDisponibles = \App\Models\Inversion::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+            $inversionesDisponibles = Inversion::withoutGlobalScope(TenantScope::class)
                 ->with('empresa:id,nombre')
                 ->get(['id', 'nombre', 'empresa_id'])
                 ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
@@ -336,7 +340,7 @@ class UserController extends Controller
         DB::transaction(function () use ($user, $items) {
             // Validar el cupo de cada inversión que se agrega (max 6 inversores).
             $actuales = $user->inversiones()
-                ->withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                ->withoutGlobalScope(TenantScope::class)
                 ->pluck('inversiones.id')
                 ->all();
 
@@ -349,18 +353,22 @@ class UserController extends Controller
                     ->lockForUpdate()
                     ->count();
 
-                if ($count >= \App\Models\Inversion::MAX_INVERSORES) {
+                if ($count >= Inversion::MAX_INVERSORES) {
                     $nombre = DB::table('inversiones')->where('id', $inversionId)->value('nombre');
                     throw new \RuntimeException(
-                        "La inversión \"{$nombre}\" ya tiene el máximo de ".\App\Models\Inversion::MAX_INVERSORES.' inversores.'
+                        "La inversión \"{$nombre}\" ya tiene el máximo de ".Inversion::MAX_INVERSORES.' inversores.'
                     );
                 }
             }
 
+            // Desde Personal el deudor se define por el monto (en USD): cargar
+            // deuda > 0 marca deudor. El check para inversiones incompletas sin
+            // monto vive en la composición del cierre.
             $sync = $items->mapWithKeys(fn ($i) => [
                 (int) $i['inversion_id'] => [
                     'es_financiador' => (bool) $i['es_financiador'],
                     'deuda' => round((float) $i['deuda'], 2),
+                    'es_deudor' => round((float) $i['deuda'], 2) > 0,
                 ],
             ])->toArray();
 
@@ -422,7 +430,7 @@ class UserController extends Controller
                 // Desvincular vehículos que estuvieran a su nombre.
                 // Sin el TenantScope: el usuario puede tener vehículos en
                 // otras empresas y todos deben quedar desasignados.
-                Vehiculo::withoutGlobalScope(\App\Models\Scopes\TenantScope::class)
+                Vehiculo::withoutGlobalScope(TenantScope::class)
                     ->where('user_id', $user->id)
                     ->update(['user_id' => null]);
             }
@@ -554,7 +562,7 @@ class UserController extends Controller
 
         // Conserva la hora del evento existente; para uno nuevo usa la hora actual.
         $hora = ($evento->created_at ?? now())->format('H:i:s');
-        $nuevaFecha = \Illuminate\Support\Carbon::parse($fecha)->setTimeFromTimeString($hora);
+        $nuevaFecha = Carbon::parse($fecha)->setTimeFromTimeString($hora);
 
         $evento->created_at = $nuevaFecha;
         $evento->save();
@@ -567,7 +575,7 @@ class UserController extends Controller
         $asignaciones = Asignacion::where('conductor_id', $user->id)
             // Vehículo global: la patente se muestra sin importar la empresa activa
             // (un chofer puede haber tenido autos de distintas empresas).
-            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get()
             ->map(fn ($a) => [
@@ -602,7 +610,7 @@ class UserController extends Controller
         $asignaciones = Asignacion::where('conductor_id', $user->id)
             // Vehículo global (sin TenantScope): la patente se ve aunque el auto
             // sea de otra empresa.
-            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(\App\Models\Scopes\TenantScope::class), 'asignadoPor:id,name'])
+            ->with(['vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class), 'asignadoPor:id,name'])
             ->orderBy('fecha_inicio', 'desc')
             ->get();
 
@@ -632,7 +640,7 @@ class UserController extends Controller
             ->when($status === 'activos', fn ($qq) => $qq->where('inactivo', false))
             ->when($status === 'inactivos', fn ($qq) => $qq->where('inactivo', true))
             ->with([
-                'vehiculoAsignado' => fn ($qq) => $qq->withoutGlobalScope(\App\Models\Scopes\TenantScope::class),
+                'vehiculoAsignado' => fn ($qq) => $qq->withoutGlobalScope(TenantScope::class),
                 'depositos',
             ])
             ->orderBy('name')

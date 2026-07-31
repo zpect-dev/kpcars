@@ -18,6 +18,9 @@ class Inversion extends Model
 {
     public const MAX_INVERSORES = 6;
 
+    /** Autos que tiene una inversión "completa"; con menos está incompleta. */
+    public const AUTOS_COMPLETA = 10;
+
     protected $table = 'inversiones';
 
     /**
@@ -51,7 +54,7 @@ class Inversion extends Model
     public function inversores(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'inversion_user')
-            ->withPivot(['es_financiador', 'deuda'])
+            ->withPivot(['es_financiador', 'deuda', 'es_deudor'])
             ->withTimestamps();
     }
 }

@@ -16,7 +16,6 @@ use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoPago;
-use App\Models\Cobro;
 use App\Models\Empresa;
 use App\Models\Gasto;
 use App\Models\Recaudacion;
@@ -28,6 +27,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 class PdfController extends Controller
@@ -231,7 +232,7 @@ class PdfController extends Controller
      * Genera el PDF de recaudaciones (período actual o cierre) a partir de una
      * colección de recaudaciones, aplicando los filtros de la vista.
      *
-     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
+     * @param  Collection<int, Recaudacion>  $recaudaciones
      */
     private function pdfRecaudaciones($recaudaciones, Request $request, string $encabezado, string $filename): Response
     {
@@ -242,12 +243,12 @@ class PdfController extends Controller
         $filas = $recaudaciones
             ->map(fn (Recaudacion $r) => [
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                'patente'   => $r->vehiculo?->patente ?? 'N/A',
-                'chofer'    => $r->chofer?->name ?? 'N/A',
-                'efectivo'  => (float) $r->efectivo,
-                'transf'    => (float) $r->transferencia,
-                'total'     => (float) $r->total,
-                'estado'    => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+                'patente' => $r->vehiculo?->patente ?? 'N/A',
+                'chofer' => $r->chofer?->name ?? 'N/A',
+                'efectivo' => (float) $r->efectivo,
+                'transf' => (float) $r->transferencia,
+                'total' => (float) $r->total,
+                'estado' => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
             ])
             ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
             ->values();
@@ -268,8 +269,8 @@ class PdfController extends Controller
      * estado pagado/deuda y método efectivo/transferencia/mixto) a la colección de
      * recaudaciones. Replica exactamente el filtrado del frontend.
      *
-     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
-     * @return \Illuminate\Support\Collection<int, Recaudacion>
+     * @param  Collection<int, Recaudacion>  $recaudaciones
+     * @return Collection<int, Recaudacion>
      */
     public static function filtrarRecaudaciones($recaudaciones, Request $request)
     {
@@ -353,12 +354,12 @@ class PdfController extends Controller
         $filas = ($apertura?->recaudaciones ?? collect())
             ->filter(fn (Recaudacion $r) => (float) $r->descuento > 0)
             ->map(fn (Recaudacion $r) => [
-                'inversion'   => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                'patente'     => $r->vehiculo?->patente ?? 'N/A',
-                'chofer'      => $r->chofer?->name ?? 'N/A',
-                'descuento'   => (float) $r->descuento,
+                'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente' => $r->vehiculo?->patente ?? 'N/A',
+                'chofer' => $r->chofer?->name ?? 'N/A',
+                'descuento' => (float) $r->descuento,
                 'descripcion' => $r->descripcion ?? '',
-                'estado'      => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+                'estado' => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
             ])
             ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
             ->groupBy('inversion');
@@ -504,7 +505,7 @@ class PdfController extends Controller
 
         // Recaudado por inversión del período congelado por este cierre.
         $cierreRecIds = $cierreSueldo->cierresRecaudacion->pluck('id')->all();
-        $recaudadoPorInversion = empty($cierreRecIds) ? collect() : \Illuminate\Support\Facades\DB::table('recaudaciones')
+        $recaudadoPorInversion = empty($cierreRecIds) ? collect() : DB::table('recaudaciones')
             ->whereIn('recaudaciones.cierre_id', $cierreRecIds)
             ->join('vehiculos', 'recaudaciones.vehiculo_id', '=', 'vehiculos.id')
             ->join('inversiones', 'vehiculos.inversion_id', '=', 'inversiones.id')
@@ -572,6 +573,7 @@ class PdfController extends Controller
                 'nombre' => $inv->nombre,
                 'es_financiador' => (bool) $inv->pivot->es_financiador,
                 'deuda' => (float) $inv->pivot->deuda,
+                'es_deudor' => (bool) $inv->pivot->es_deudor,
             ]);
 
         $pagosPorCierre = CierreSueldoPago::with([

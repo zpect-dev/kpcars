@@ -86,7 +86,7 @@ class ProcessCierreUnificadoAction
                     );
                 }
 
-                $tieneDeudores = $inv->inversores->contains(fn (User $u) => (float) $u->pivot->deuda > 0);
+                $tieneDeudores = $inv->inversores->contains(fn (User $u) => (bool) $u->pivot->es_deudor);
                 $tieneFinanciadores = $inv->inversores->contains(fn (User $u) => (bool) $u->pivot->es_financiador);
 
                 if ($tieneDeudores && ! $tieneFinanciadores) {
@@ -130,9 +130,10 @@ class ProcessCierreUnificadoAction
                         'empresa_id' => $inv->empresa_id,
                         'saldo' => (float) $u->pivot->deuda,
                         'es_financiador' => (bool) $u->pivot->es_financiador,
+                        'es_deudor' => (bool) $u->pivot->es_deudor,
                     ]);
 
-                    if ((float) $u->pivot->deuda > 0) {
+                    if ((bool) $u->pivot->es_deudor) {
                         $deudorIds[$u->id] = true;
                     }
                 }
@@ -145,6 +146,14 @@ class ProcessCierreUnificadoAction
                     'abona' => true,
                     'abono_monto' => 0,
                 ]);
+            }
+
+            // 4b. Cerrar también la caja (cobros + gastos) de cada empresa junto
+            //     con la recaudación. Tolerante: si una empresa no tiene un período
+            //     de caja abierto, se saltea (no rompe el cierre unificado).
+            $cierreCaja = app(ProcessCierreCajaAction::class);
+            foreach ($empresas as $empresa) {
+                $cierreCaja->cerrarEmpresa($empresa->id, $admin, tolerante: true);
             }
 
             $recalc = app(RecalcularSueldosAction::class);

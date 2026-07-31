@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\RecalcularSueldosAction;
+use App\Enums\UserRole;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoPago;
+use App\Models\CierreSueldoParticipacion;
 use App\Models\CierreSueldoSocio;
 use App\Models\Empresa;
+use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -165,6 +170,8 @@ class CierreSueldoController extends Controller
             ->sortBy(fn ($s) => mb_strtolower($s['user']['name']))
             ->values();
 
+        $composicion = $this->buildComposicion($cierreSueldo, $recaudadoPorInversion);
+
         return Inertia::render('CierresSueldo/Show', [
             'cierre' => [
                 'id' => $cierreSueldo->id,
@@ -176,6 +183,7 @@ class CierreSueldoController extends Controller
             'porSocio' => $porSocio,
             'socios' => $socios,
             'abonos' => $abonos,
+            'composicion' => $composicion,
             'puedeEditar' => Gate::allows('manage-cierres-sueldo'),
             'totales' => [
                 'recaudado' => (float) $empresas->sum('recaudado'),
@@ -210,5 +218,199 @@ class CierreSueldoController extends Controller
         $recalc->execute($cierreSueldo);
 
         return redirect()->back()->with('success', 'Cierre recalculado.');
+    }
+
+    /**
+     * Composición editable del cierre: por empresa → inversión, sus socios (con
+     * saldo y financiador) más los candidatos que se pueden sumar (inversores de
+     * la empresa que aún no participan en esa inversión).
+     *
+     * @param  Collection<int, object>  $recaudadoPorInversion
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildComposicion(CierreSueldo $cierreSueldo, $recaudadoPorInversion): array
+    {
+        $participaciones = $cierreSueldo->participaciones()
+            ->with('user:id,name,dni')
+            ->get();
+
+        $inversionIds = $participaciones->pluck('inversion_id')->unique()->all();
+
+        // Nombre y empresa de cada inversión del cierre (cross-empresa).
+        $inversiones = Inversion::withoutGlobalScope(TenantScope::class)
+            ->whereIn('id', $inversionIds)
+            ->get(['id', 'nombre', 'empresa_id'])
+            ->keyBy('id');
+
+        $recaudadoPorInv = $recaudadoPorInversion->keyBy('inversion_id');
+
+        // Autos reales por inversión (sin el ficticio EXTERNO): definen si la
+        // inversión está completa (>= 10) o incompleta.
+        $autosPorInversion = $inversionIds === [] ? collect() : DB::table('vehiculos')
+            ->whereIn('inversion_id', $inversionIds)
+            ->where('patente', '!=', 'EXTERNO')
+            ->groupBy('inversion_id')
+            ->selectRaw('inversion_id, COUNT(*) as total')
+            ->pluck('total', 'inversion_id');
+
+        // Pool de inversores por empresa (todas las empresas) para los candidatos.
+        $inversoresPorEmpresa = [];
+        User::query()
+            ->where('role', UserRole::INVERSOR)
+            ->where('inactivo', false)
+            ->with('empresas:id')
+            ->get(['id', 'name', 'dni'])
+            ->each(function (User $u) use (&$inversoresPorEmpresa) {
+                foreach ($u->empresas as $e) {
+                    $inversoresPorEmpresa[$e->id][] = $u;
+                }
+            });
+
+        // Todas las empresas, cada una con sus inversiones del cierre (si tiene).
+        return Empresa::orderBy('id')
+            ->get(['id', 'nombre'])
+            ->map(function (Empresa $empresa) use ($participaciones, $inversiones, $recaudadoPorInv, $autosPorInversion, $inversoresPorEmpresa) {
+                $invsEmpresa = $inversiones->where('empresa_id', $empresa->id)
+                    ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE);
+
+                return [
+                    'id' => $empresa->id,
+                    'nombre' => $empresa->nombre,
+                    'inversiones' => $invsEmpresa->map(function (Inversion $inv) use ($participaciones, $recaudadoPorInv, $autosPorInversion, $inversoresPorEmpresa) {
+                        $socios = $participaciones->where('inversion_id', $inv->id)
+                            ->sortBy(fn (CierreSueldoParticipacion $p) => mb_strtolower($p->user?->name ?? ''))
+                            ->values();
+
+                        $sociosIds = $socios->pluck('user_id')->all();
+
+                        $candidatos = collect($inversoresPorEmpresa[$inv->empresa_id] ?? [])
+                            ->reject(fn (User $u) => in_array($u->id, $sociosIds, true))
+                            ->sortBy(fn (User $u) => mb_strtolower($u->name))
+                            ->values()
+                            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'dni' => $u->dni]);
+
+                        $autos = (int) ($autosPorInversion[$inv->id] ?? 0);
+
+                        return [
+                            'id' => $inv->id,
+                            'nombre' => $inv->nombre,
+                            'recaudado' => (float) ($recaudadoPorInv->get($inv->id)?->total ?? 0),
+                            'autos' => $autos,
+                            'completa' => $autos >= Inversion::AUTOS_COMPLETA,
+                            'socios' => $socios->map(fn (CierreSueldoParticipacion $p) => [
+                                'user' => [
+                                    'id' => $p->user->id,
+                                    'name' => $p->user->name,
+                                    'dni' => $p->user->dni,
+                                ],
+                                'saldo' => (float) $p->saldo,
+                                'es_financiador' => (bool) $p->es_financiador,
+                                'es_deudor' => (bool) $p->es_deudor,
+                            ])->values(),
+                            'candidatos' => $candidatos,
+                        ];
+                    })->values(),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Configura a un socio dentro de una inversión del cierre: pertenencia,
+     * deuda y si es financiador. Muta TANTO la foto del cierre (participaciones)
+     * como el registro real (inversion_user), revierte los abonos vigentes para
+     * que la deuda tipeada sea la base, y recalcula el sueldo en vivo.
+     */
+    public function updateComposicion(
+        Request $request,
+        CierreSueldo $cierreSueldo,
+        int $inversion,
+        User $user,
+        RecalcularSueldosAction $recalc,
+    ): RedirectResponse {
+        Gate::authorize('manage-cierres-sueldo');
+
+        $validated = $request->validate([
+            'pertenece' => ['required', 'boolean'],
+            'saldo' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
+            'es_financiador' => ['required', 'boolean'],
+            'es_deudor' => ['required', 'boolean'],
+        ]);
+
+        $inv = Inversion::withoutGlobalScope(TenantScope::class)
+            ->with('inversores:id')
+            ->findOrFail($inversion);
+
+        $saldo = round((float) ($validated['saldo'] ?? 0), 2);
+        // Un financiador nunca es deudor; y cargar un monto implica ser deudor.
+        $esDeudor = ! $validated['es_financiador'] && ($validated['es_deudor'] || $saldo > 0);
+        $yaEsta = $inv->inversores->contains('id', $user->id);
+
+        // Tope de inversores por inversión (sólo al sumar uno nuevo).
+        if ($validated['pertenece'] && ! $yaEsta
+            && $inv->inversores->count() >= Inversion::MAX_INVERSORES) {
+            throw ValidationException::withMessages([
+                'pertenece' => "La inversión \"{$inv->nombre}\" ya tiene el máximo de ".Inversion::MAX_INVERSORES.' inversores.',
+            ]);
+        }
+
+        DB::transaction(function () use ($cierreSueldo, $inv, $user, $validated, $saldo, $esDeudor, $recalc) {
+            // Restaurar la deuda viva a su base antes de tocar montos.
+            $recalc->revertirAbonos($cierreSueldo);
+
+            if ($validated['pertenece']) {
+                $inv->inversores()->syncWithoutDetaching([
+                    $user->id => [
+                        'deuda' => $saldo,
+                        'es_financiador' => $validated['es_financiador'],
+                        'es_deudor' => $esDeudor,
+                    ],
+                ]);
+
+                CierreSueldoParticipacion::updateOrCreate(
+                    [
+                        'cierre_sueldo_id' => $cierreSueldo->id,
+                        'inversion_id' => $inv->id,
+                        'user_id' => $user->id,
+                    ],
+                    [
+                        'empresa_id' => $inv->empresa_id,
+                        'saldo' => $saldo,
+                        'es_financiador' => $validated['es_financiador'],
+                        'es_deudor' => $esDeudor,
+                    ],
+                );
+            } else {
+                $inv->inversores()->detach($user->id);
+
+                CierreSueldoParticipacion::where('cierre_sueldo_id', $cierreSueldo->id)
+                    ->where('inversion_id', $inv->id)
+                    ->where('user_id', $user->id)
+                    ->delete();
+            }
+
+            // La fila de decisión (abona/monto) existe sólo mientras el socio sea
+            // deudor (flag) en alguna inversión del cierre.
+            $sigueDeudor = CierreSueldoParticipacion::where('cierre_sueldo_id', $cierreSueldo->id)
+                ->where('user_id', $user->id)
+                ->where('es_deudor', true)
+                ->exists();
+
+            if ($sigueDeudor) {
+                CierreSueldoSocio::firstOrCreate(
+                    ['cierre_sueldo_id' => $cierreSueldo->id, 'user_id' => $user->id],
+                    ['abona' => true, 'abono_monto' => 0],
+                );
+            } else {
+                CierreSueldoSocio::where('cierre_sueldo_id', $cierreSueldo->id)
+                    ->where('user_id', $user->id)
+                    ->delete();
+            }
+
+            $recalc->execute($cierreSueldo->fresh());
+        });
+
+        return redirect()->back()->with('success', 'Composición actualizada y cierre recalculado.');
     }
 }

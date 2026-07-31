@@ -1,6 +1,18 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
-import { Check, ChevronDown, Crop, Download, Filter, Plus, Search, Camera, UserPlus, UserCog, Trash2 } from 'lucide-react';
+import {
+    Check,
+    ChevronDown,
+    Crop,
+    Download,
+    Filter,
+    Plus,
+    Search,
+    Camera,
+    UserPlus,
+    UserCog,
+    Trash2,
+} from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
@@ -19,8 +31,17 @@ import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
 
 import { index as usersIndex, updateRole, store } from '@/routes/users';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { DocumentSection, DocPreviewDialog, type DocUrls, type DocMode } from '@/components/documentos';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+    DocumentSection,
+    DocPreviewDialog,
+    type DocUrls,
+    type DocMode,
+} from '@/components/documentos';
 import { useImageCropper, type CropInput } from '@/components/image-cropper';
 
 interface Deposito {
@@ -66,7 +87,12 @@ interface User {
         licencia: DocUrls;
         dni: DocUrls;
     };
-    vehiculo?: { patente: string; marca: string; modelo: string; precio?: number } | null;
+    vehiculo?: {
+        patente: string;
+        marca: string;
+        modelo: string;
+        precio?: number;
+    } | null;
     licencia_por_vencer?: boolean;
     sin_licencia?: boolean;
     falta_foto?: boolean;
@@ -192,62 +218,131 @@ function AvatarDropzone({
     );
 }
 
-type FilterAlertValue = 'all' | 'licencia_vencida' | 'licencia_por_vencer' | 'sin_licencia' | 'falta_foto' | 'falta_telefono' | 'falta_correo' | 'falta_direccion' | 'con_direccion' | 'falta_deposito' | 'deposito_bajo' | 'falta_docs' | 'falta_doc_dni' | 'falta_doc_licencia';
+type FilterAlertValue =
+    | 'all'
+    | 'licencia_vencida'
+    | 'licencia_por_vencer'
+    | 'sin_licencia'
+    | 'falta_foto'
+    | 'falta_telefono'
+    | 'falta_correo'
+    | 'falta_direccion'
+    | 'con_direccion'
+    | 'falta_deposito'
+    | 'deposito_bajo'
+    | 'falta_docs'
+    | 'falta_doc_dni'
+    | 'falta_doc_licencia';
 
 const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
-    all:                  'Todos',
-    licencia_vencida:     'Lic. vencida',
-    licencia_por_vencer:  'Lic. por vencer',
-    sin_licencia:         'Sin licencia',
-    falta_foto:           'Sin foto',
-    falta_telefono:       'Sin teléfono',
-    falta_correo:         'Sin correo',
-    falta_direccion:      'Sin dirección',
-    con_direccion:        'Con dirección',
-    falta_deposito:       'Sin depósito',
-    deposito_bajo:        'Depósito bajo',
-    falta_docs:           'Faltan documentos',
-    falta_doc_dni:        'Sin foto DNI',
-    falta_doc_licencia:   'Sin foto licencia',
+    all: 'Todos',
+    licencia_vencida: 'Lic. vencida',
+    licencia_por_vencer: 'Lic. por vencer',
+    sin_licencia: 'Sin licencia',
+    falta_foto: 'Sin foto',
+    falta_telefono: 'Sin teléfono',
+    falta_correo: 'Sin correo',
+    falta_direccion: 'Sin dirección',
+    con_direccion: 'Con dirección',
+    falta_deposito: 'Sin depósito',
+    deposito_bajo: 'Depósito bajo',
+    falta_docs: 'Faltan documentos',
+    falta_doc_dni: 'Sin foto DNI',
+    falta_doc_licencia: 'Sin foto licencia',
 };
 
-const FILTER_SECTIONS: { label: string; items: { val: FilterAlertValue; label: string; desc: string }[] }[] = [
+const FILTER_SECTIONS: {
+    label: string;
+    items: { val: FilterAlertValue; label: string; desc: string }[];
+}[] = [
     {
         label: 'Licencia',
         items: [
-            { val: 'licencia_vencida',     label: 'Vencida',           desc: 'La licencia ya está vencida' },
-            { val: 'licencia_por_vencer',  label: 'Próxima a vencer',  desc: 'Vence en los próximos 30 días' },
-            { val: 'sin_licencia',         label: 'Sin fecha cargada', desc: 'No tiene vencimiento registrado' },
+            {
+                val: 'licencia_vencida',
+                label: 'Vencida',
+                desc: 'La licencia ya está vencida',
+            },
+            {
+                val: 'licencia_por_vencer',
+                label: 'Próxima a vencer',
+                desc: 'Vence en los próximos 30 días',
+            },
+            {
+                val: 'sin_licencia',
+                label: 'Sin fecha cargada',
+                desc: 'No tiene vencimiento registrado',
+            },
         ],
     },
     {
         label: 'Documentos',
         items: [
-            { val: 'falta_docs',         label: 'Faltan documentos',   desc: 'Le falta el DNI, la licencia o la foto de perfil' },
-            { val: 'falta_doc_dni',      label: 'Sin foto de DNI',     desc: 'Le falta frente o dorso del DNI' },
-            { val: 'falta_doc_licencia', label: 'Sin foto de licencia', desc: 'No tiene foto ni PDF de licencia cargado' },
+            {
+                val: 'falta_docs',
+                label: 'Faltan documentos',
+                desc: 'Le falta el DNI, la licencia o la foto de perfil',
+            },
+            {
+                val: 'falta_doc_dni',
+                label: 'Sin foto de DNI',
+                desc: 'Le falta frente o dorso del DNI',
+            },
+            {
+                val: 'falta_doc_licencia',
+                label: 'Sin foto de licencia',
+                desc: 'No tiene foto ni PDF de licencia cargado',
+            },
         ],
     },
     {
         label: 'Contacto',
         items: [
-            { val: 'falta_foto',     label: 'Sin foto de perfil', desc: 'Sin imagen de identificación' },
-            { val: 'falta_telefono', label: 'Sin teléfono',       desc: 'Sin número de contacto' },
-            { val: 'falta_correo',   label: 'Sin correo',         desc: 'Sin dirección de email' },
+            {
+                val: 'falta_foto',
+                label: 'Sin foto de perfil',
+                desc: 'Sin imagen de identificación',
+            },
+            {
+                val: 'falta_telefono',
+                label: 'Sin teléfono',
+                desc: 'Sin número de contacto',
+            },
+            {
+                val: 'falta_correo',
+                label: 'Sin correo',
+                desc: 'Sin dirección de email',
+            },
         ],
     },
     {
         label: 'Domicilio',
         items: [
-            { val: 'falta_direccion', label: 'Sin dirección', desc: 'No tiene domicilio cargado' },
-            { val: 'con_direccion',   label: 'Con dirección', desc: 'Tiene el domicilio cargado' },
+            {
+                val: 'falta_direccion',
+                label: 'Sin dirección',
+                desc: 'No tiene domicilio cargado',
+            },
+            {
+                val: 'con_direccion',
+                label: 'Con dirección',
+                desc: 'Tiene el domicilio cargado',
+            },
         ],
     },
     {
         label: 'Garantía',
         items: [
-            { val: 'falta_deposito', label: 'Sin depósito',  desc: 'Sin garantía registrada' },
-            { val: 'deposito_bajo',  label: 'Depósito bajo', desc: 'Total (ARS + USD convertido) menor a 1.5× el valor del auto' },
+            {
+                val: 'falta_deposito',
+                label: 'Sin depósito',
+                desc: 'Sin garantía registrada',
+            },
+            {
+                val: 'deposito_bajo',
+                label: 'Depósito bajo',
+                desc: 'Total (ARS + USD convertido) menor a 1.5× el valor del auto',
+            },
         ],
     },
 ];
@@ -274,24 +369,41 @@ function FilterPopoverItem({
                 isActive ? 'bg-muted' : 'hover:bg-muted/60',
             )}
         >
-            <div className={cn(
-                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
-                isActive ? 'border-foreground bg-foreground' : 'border-border bg-transparent',
-            )}>
+            <div
+                className={cn(
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+                    isActive
+                        ? 'border-foreground bg-foreground'
+                        : 'border-border bg-transparent',
+                )}
+            >
                 {isActive && <Check className="h-3 w-3 text-background" />}
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-                <span className={cn('text-sm leading-tight', isActive ? 'font-semibold text-foreground' : 'text-foreground')}>
+                <span
+                    className={cn(
+                        'text-sm leading-tight',
+                        isActive
+                            ? 'font-semibold text-foreground'
+                            : 'text-foreground',
+                    )}
+                >
                     {label}
                 </span>
                 {desc && (
-                    <span className="text-xs text-muted-foreground leading-tight mt-0.5">{desc}</span>
+                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">
+                        {desc}
+                    </span>
                 )}
             </div>
-            <span className={cn(
-                'shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums',
-                isActive ? 'bg-background text-foreground' : 'bg-muted text-muted-foreground',
-            )}>
+            <span
+                className={cn(
+                    'shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums',
+                    isActive
+                        ? 'bg-background text-foreground'
+                        : 'bg-muted text-muted-foreground',
+                )}
+            >
                 {count}
             </span>
         </button>
@@ -312,11 +424,16 @@ function DepositosField({
 }) {
     function agregar() {
         const usadas = new Set(depositos.map((d) => d.moneda));
-        const libre = monedas.find((m) => !usadas.has(m.value))?.value ?? monedas[0]?.value ?? 'ARS';
+        const libre =
+            monedas.find((m) => !usadas.has(m.value))?.value ??
+            monedas[0]?.value ??
+            'ARS';
         onChange([...depositos, { monto: 0, moneda: libre }]);
     }
     function actualizar(i: number, patch: Partial<Deposito>) {
-        onChange(depositos.map((d, idx) => (idx === i ? { ...d, ...patch } : d)));
+        onChange(
+            depositos.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
+        );
     }
     function quitar(i: number) {
         onChange(depositos.filter((_, idx) => idx !== i));
@@ -336,23 +453,35 @@ function DepositosField({
             </div>
 
             {depositos.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin depósitos cargados.</p>
+                <p className="text-xs text-muted-foreground">
+                    Sin depósitos cargados.
+                </p>
             ) : (
                 depositos.map((d, i) => (
                     <div key={i} className="flex items-center gap-2">
                         <MoneyInput
                             value={d.monto || null}
-                            onValueChange={(n) => actualizar(i, { monto: n ?? 0 })}
+                            onValueChange={(n) =>
+                                actualizar(i, { monto: n ?? 0 })
+                            }
                             placeholder="0,00"
                             className="flex-1"
                         />
                         <select
                             value={d.moneda}
-                            onChange={(e) => actualizar(i, { moneda: e.target.value })}
+                            onChange={(e) =>
+                                actualizar(i, { moneda: e.target.value })
+                            }
                             className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
                         >
                             {monedas.map((m) => (
-                                <option key={m.value} value={m.value} className="bg-background text-foreground">{m.value}</option>
+                                <option
+                                    key={m.value}
+                                    value={m.value}
+                                    className="bg-background text-foreground"
+                                >
+                                    {m.value}
+                                </option>
                             ))}
                         </select>
                         <button
@@ -404,12 +533,22 @@ function faltaAlgunDocChofer(u: User): boolean {
     return faltaDocDni(u) || faltaDocLicencia(u) || u.falta_foto === true;
 }
 
-export default function UsersIndex({ users, roles, empresas, monedas, choferCounts, cotizacionDolar = 0, inversionesDisponibles = null }: Props) {
+export default function UsersIndex({
+    users,
+    roles,
+    empresas,
+    monedas,
+    choferCounts,
+    cotizacionDolar = 0,
+    inversionesDisponibles = null,
+}: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
     const [inversorConfig, setInversorConfig] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
-    const [openFilterSections, setOpenFilterSections] = useState<Record<string, boolean>>({});
+    const [openFilterSections, setOpenFilterSections] = useState<
+        Record<string, boolean>
+    >({});
     const [previewImage, setPreviewImage] = useState<{
         url: string;
         name: string;
@@ -444,15 +583,21 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             result = result.filter((u) => {
                 if (filterAlert === 'licencia_vencida') {
                     if (!u.fecha_vencimiento_licencia) return false;
-                    const today = new Date(); today.setHours(0, 0, 0, 0);
-                    return parseLicenciaDate(u.fecha_vencimiento_licencia) < today;
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return (
+                        parseLicenciaDate(u.fecha_vencimiento_licencia) < today
+                    );
                 }
-                if (filterAlert === 'licencia_por_vencer') return u.licencia_por_vencer === true;
-                if (filterAlert === 'sin_licencia') return u.sin_licencia === true;
+                if (filterAlert === 'licencia_por_vencer')
+                    return u.licencia_por_vencer === true;
+                if (filterAlert === 'sin_licencia')
+                    return u.sin_licencia === true;
                 if (filterAlert === 'falta_foto') return u.falta_foto === true;
                 if (filterAlert === 'falta_docs') return faltaAlgunDocChofer(u);
                 if (filterAlert === 'falta_doc_dni') return faltaDocDni(u);
-                if (filterAlert === 'falta_doc_licencia') return faltaDocLicencia(u);
+                if (filterAlert === 'falta_doc_licencia')
+                    return faltaDocLicencia(u);
                 if (filterAlert === 'falta_telefono') return !u.telefono;
                 if (filterAlert === 'falta_correo') return !u.correo;
                 if (filterAlert === 'falta_direccion') return sinDireccion(u);
@@ -460,7 +605,10 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 if (filterAlert === 'falta_deposito') return sinDeposito(u);
                 if (filterAlert === 'deposito_bajo') {
                     if (!u.vehiculo?.precio) return false;
-                    return depositoTotalARS(u, cotizacionDolar) < 1.5 * u.vehiculo.precio;
+                    return (
+                        depositoTotalARS(u, cotizacionDolar) <
+                        1.5 * u.vehiculo.precio
+                    );
                 }
                 return true;
             });
@@ -469,14 +617,31 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer') return { licencia_vencida: 0, licencia_por_vencer: 0, sin_licencia: 0, falta_foto: 0, falta_docs: 0, falta_doc_dni: 0, falta_doc_licencia: 0, falta_telefono: 0, falta_correo: 0, falta_direccion: 0, con_direccion: 0, falta_deposito: 0, deposito_bajo: 0 };
-        const today = new Date(); today.setHours(0, 0, 0, 0);
+        if (filterRole !== 'chofer')
+            return {
+                licencia_vencida: 0,
+                licencia_por_vencer: 0,
+                sin_licencia: 0,
+                falta_foto: 0,
+                falta_docs: 0,
+                falta_doc_dni: 0,
+                falta_doc_licencia: 0,
+                falta_telefono: 0,
+                falta_correo: 0,
+                falta_direccion: 0,
+                con_direccion: 0,
+                falta_deposito: 0,
+                deposito_bajo: 0,
+            };
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         return {
             licencia_vencida: users.filter((u) => {
                 if (!u.fecha_vencimiento_licencia) return false;
                 return parseLicenciaDate(u.fecha_vencimiento_licencia) < today;
             }).length,
-            licencia_por_vencer: users.filter((u) => u.licencia_por_vencer).length,
+            licencia_por_vencer: users.filter((u) => u.licencia_por_vencer)
+                .length,
             sin_licencia: users.filter((u) => u.sin_licencia).length,
             falta_foto: users.filter((u) => u.falta_foto).length,
             falta_docs: users.filter((u) => faltaAlgunDocChofer(u)).length,
@@ -489,7 +654,10 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             falta_deposito: users.filter((u) => sinDeposito(u)).length,
             deposito_bajo: users.filter((u) => {
                 if (!u.vehiculo?.precio) return false;
-                return depositoTotalARS(u, cotizacionDolar) < 1.5 * u.vehiculo.precio;
+                return (
+                    depositoTotalARS(u, cotizacionDolar) <
+                    1.5 * u.vehiculo.precio
+                );
             }).length,
         };
     }, [users, filterRole, cotizacionDolar]);
@@ -563,10 +731,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     const [editDniMode, setEditDniMode] = useState<DocMode>('imagenes');
 
     // Cotización global del dólar (ARS por 1 USD) para el filtro de depósito bajo.
-    const cotizacionForm = useForm({ cotizacion_dolar: String(cotizacionDolar) });
+    const cotizacionForm = useForm({
+        cotizacion_dolar: String(cotizacionDolar),
+    });
     function guardarCotizacion(e: React.FormEvent) {
         e.preventDefault();
-        cotizacionForm.patch('/users/cotizacion-dolar', { preserveScroll: true });
+        cotizacionForm.patch('/users/cotizacion-dolar', {
+            preserveScroll: true,
+        });
     }
 
     function openEditModal(user: User) {
@@ -580,7 +752,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 .split(' ')[0];
         }
 
-        const toDateInput = (v?: string | null) => (v ? v.split('T')[0].split(' ')[0] : '');
+        const toDateInput = (v?: string | null) =>
+            v ? v.split('T')[0].split(' ')[0] : '';
 
         editForm.setData({
             _method: 'put',
@@ -595,7 +768,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
             baja_fecha: toDateInput(user.baja_fecha),
             profile_photo: null,
             empresas: (user.empresas ?? []).map((e) => e.id),
-            empresa_restringida_id: user.empresa_restringida_id ? String(user.empresa_restringida_id) : '',
+            empresa_restringida_id: user.empresa_restringida_id
+                ? String(user.empresa_restringida_id)
+                : '',
             depositos: user.depositos ?? [],
             licencia_pdf: null,
             licencia_frente: null,
@@ -694,12 +869,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         return formatted;
     }
 
-
     function formatDeposito(user: User): string | null {
         const ds = user.depositos ?? [];
         if (ds.length === 0) return null;
         return ds
-            .map((d) => `${d.moneda} ${Number(d.monto).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`)
+            .map(
+                (d) =>
+                    `${d.moneda} ${Number(d.monto).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
+            )
             .join(' · ');
     }
 
@@ -707,7 +884,8 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
     // (chofer_eventos) — misma fuente que el reporte y editable desde el modal.
     // Fallback a los campos del usuario por si un chofer no tuviera eventos.
     function estadoFecha(user: User): string | null {
-        if (user.inactivo) return user.baja_fecha ?? user.estado_actualizado_en ?? null;
+        if (user.inactivo)
+            return user.baja_fecha ?? user.estado_actualizado_en ?? null;
         return user.alta_fecha ?? user.created_at ?? null;
     }
 
@@ -716,7 +894,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
         const fecha = new Date(fechaStr);
         if (isNaN(fecha.getTime())) return null;
         return fecha.toLocaleDateString('es-AR', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
         });
     }
 
@@ -728,18 +908,32 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
     function formatLicenciaFecha(fechaStr: string): string {
         return parseLicenciaDate(fechaStr).toLocaleDateString('es-AR', {
-            day: 'numeric', month: 'short', year: 'numeric',
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
         });
     }
 
     function getLicenciaStatus(fechaStr: string | null | undefined) {
         if (!fechaStr) return null;
         const fecha = parseLicenciaDate(fechaStr);
-        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         const diff = Math.floor((fecha.getTime() - today.getTime()) / 86400000);
-        if (diff < 0) return { label: 'Vencida', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' };
-        if (diff <= 30) return { label: 'Por vencer', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
-        return { label: 'Vigente', cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' };
+        if (diff < 0)
+            return {
+                label: 'Vencida',
+                cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+            };
+        if (diff <= 30)
+            return {
+                label: 'Por vencer',
+                cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+            };
+        return {
+            label: 'Vigente',
+            cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+        };
     }
 
     const { auth } = usePage<any>().props;
@@ -782,16 +976,24 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                             <div>
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">Choferes</h1>
+                                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                                        Choferes
+                                    </h1>
                                     <span className="inline-flex items-center rounded-md border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                                         {choferCounts?.activos ?? 0} activos
                                     </span>
                                 </div>
                             </div>
                             {!isInversor && (
-                                <Button size="sm" onClick={openCreateModal} className="shrink-0">
+                                <Button
+                                    size="sm"
+                                    onClick={openCreateModal}
+                                    className="shrink-0"
+                                >
                                     <Plus className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Nuevo chofer</span>
+                                    <span className="hidden sm:inline">
+                                        Nuevo chofer
+                                    </span>
                                 </Button>
                             )}
                         </div>
@@ -799,10 +1001,11 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                         {/* Filter bar */}
                         <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
                             <div className="flex flex-wrap items-end gap-3">
-
                                 {/* Buscar */}
                                 <div className="flex w-full flex-col gap-2 lg:min-w-[240px] lg:flex-1">
-                                    <Label htmlFor="chofer-search">Buscar</Label>
+                                    <Label htmlFor="chofer-search">
+                                        Buscar
+                                    </Label>
                                     <div className="relative">
                                         <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                         <Input
@@ -811,7 +1014,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             placeholder="Buscar por nombre, DNI o patente..."
                                             className="pl-9"
                                             value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            onChange={(e) =>
+                                                setSearchTerm(e.target.value)
+                                            }
                                         />
                                     </div>
                                 </div>
@@ -822,7 +1027,16 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     <div className="flex h-9 gap-1.5">
                                         <button
                                             type="button"
-                                            onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'activos' }, { preserveState: false })}
+                                            onClick={() =>
+                                                router.get(
+                                                    usersIndex.url(),
+                                                    {
+                                                        role: 'chofer',
+                                                        status: 'activos',
+                                                    },
+                                                    { preserveState: false },
+                                                )
+                                            }
                                             className={cn(
                                                 'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                                 filterStatus === 'activos'
@@ -830,12 +1044,23 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
-                                            <span className="font-bold tabular-nums">{choferCounts?.activos ?? 0}</span>
+                                            <span className="font-bold tabular-nums">
+                                                {choferCounts?.activos ?? 0}
+                                            </span>
                                             activos
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => router.get(usersIndex.url(), { role: 'chofer', status: 'inactivos' }, { preserveState: false })}
+                                            onClick={() =>
+                                                router.get(
+                                                    usersIndex.url(),
+                                                    {
+                                                        role: 'chofer',
+                                                        status: 'inactivos',
+                                                    },
+                                                    { preserveState: false },
+                                                )
+                                            }
                                             className={cn(
                                                 'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                                 filterStatus === 'inactivos'
@@ -843,7 +1068,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
-                                            <span className="font-bold tabular-nums">{choferCounts?.inactivos ?? 0}</span>
+                                            <span className="font-bold tabular-nums">
+                                                {choferCounts?.inactivos ?? 0}
+                                            </span>
                                             inactivos
                                         </button>
                                     </div>
@@ -858,10 +1085,14 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-[9px] text-sm font-medium text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
                                     >
                                         <Download className="h-4 w-4 shrink-0" />
-                                        <span className="hidden sm:inline">Exportar PDF</span>
+                                        <span className="hidden sm:inline">
+                                            Exportar PDF
+                                        </span>
                                     </a>
                                     <div className="flex flex-col gap-2">
-                                        <Label className="invisible hidden lg:block">Más</Label>
+                                        <Label className="invisible hidden lg:block">
+                                            Más
+                                        </Label>
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <button
@@ -875,67 +1106,192 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 >
                                                     <Filter className="h-4 w-4 shrink-0" />
                                                     <span className="hidden sm:inline">
-                                                        {filterAlert !== 'all' ? FILTER_SHORT_LABELS[filterAlert] : 'Filtrar'}
+                                                        {filterAlert !== 'all'
+                                                            ? FILTER_SHORT_LABELS[
+                                                                  filterAlert
+                                                              ]
+                                                            : 'Filtrar'}
                                                     </span>
                                                     {filterAlert !== 'all' && (
                                                         <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
                                                     )}
                                                 </button>
                                             </PopoverTrigger>
-                                            <PopoverContent align="end" className="w-72 p-0 shadow-lg">
-                                                <div className="p-1.5 border-b border-border">
+                                            <PopoverContent
+                                                align="end"
+                                                className="w-72 p-0 shadow-lg"
+                                            >
+                                                <div className="border-b border-border p-1.5">
                                                     <FilterPopoverItem
                                                         label="Todos los choferes"
                                                         count={users.length}
-                                                        isActive={filterAlert === 'all'}
-                                                        onClick={() => setFilterAlert('all')}
+                                                        isActive={
+                                                            filterAlert ===
+                                                            'all'
+                                                        }
+                                                        onClick={() =>
+                                                            setFilterAlert(
+                                                                'all',
+                                                            )
+                                                        }
                                                     />
                                                 </div>
-                                                {FILTER_SECTIONS.map((section, i) => {
-                                                    const isOpen = openFilterSections[section.label] ?? false;
-                                                    const hasActive = section.items.some((it) => filterAlert === it.val);
-                                                    const isLast = i === FILTER_SECTIONS.length - 1;
-                                                    return (
-                                                        <div key={section.label} className={!isLast ? 'border-b border-border' : ''}>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setOpenFilterSections((s) => ({ ...s, [section.label]: !s[section.label] }))}
-                                                                className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                                {FILTER_SECTIONS.map(
+                                                    (section, i) => {
+                                                        const isOpen =
+                                                            openFilterSections[
+                                                                section.label
+                                                            ] ?? false;
+                                                        const hasActive =
+                                                            section.items.some(
+                                                                (it) =>
+                                                                    filterAlert ===
+                                                                    it.val,
+                                                            );
+                                                        const isLast =
+                                                            i ===
+                                                            FILTER_SECTIONS.length -
+                                                                1;
+                                                        return (
+                                                            <div
+                                                                key={
+                                                                    section.label
+                                                                }
+                                                                className={
+                                                                    !isLast
+                                                                        ? 'border-b border-border'
+                                                                        : ''
+                                                                }
                                                             >
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-sm font-medium text-foreground">{section.label}</span>
-                                                                    {hasActive && <span className="h-1.5 w-1.5 rounded-full bg-foreground" />}
-                                                                </div>
-                                                                <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', isOpen && 'rotate-180')} />
-                                                            </button>
-                                                            {isOpen && (
-                                                                <div className="px-1.5 pb-1.5">
-                                                                    {section.items.map(({ val, label, desc }) => (
-                                                                        <FilterPopoverItem
-                                                                            key={val}
-                                                                            label={label}
-                                                                            desc={desc}
-                                                                            count={alertCounts[val as keyof typeof alertCounts]}
-                                                                            isActive={filterAlert === val}
-                                                                            onClick={() => setFilterAlert(filterAlert === val ? 'all' : val)}
-                                                                        />
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                                <form onSubmit={guardarCotizacion} className="flex items-end gap-2 border-t border-border p-3">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setOpenFilterSections(
+                                                                            (
+                                                                                s,
+                                                                            ) => ({
+                                                                                ...s,
+                                                                                [section.label]:
+                                                                                    !s[
+                                                                                        section
+                                                                                            .label
+                                                                                    ],
+                                                                            }),
+                                                                        )
+                                                                    }
+                                                                    className="flex w-full items-center justify-between px-3 py-2.5 text-left"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium text-foreground">
+                                                                            {
+                                                                                section.label
+                                                                            }
+                                                                        </span>
+                                                                        {hasActive && (
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                                                                        )}
+                                                                    </div>
+                                                                    <ChevronDown
+                                                                        className={cn(
+                                                                            'h-4 w-4 text-muted-foreground transition-transform',
+                                                                            isOpen &&
+                                                                                'rotate-180',
+                                                                        )}
+                                                                    />
+                                                                </button>
+                                                                {isOpen && (
+                                                                    <div className="px-1.5 pb-1.5">
+                                                                        {section.items.map(
+                                                                            ({
+                                                                                val,
+                                                                                label,
+                                                                                desc,
+                                                                            }) => (
+                                                                                <FilterPopoverItem
+                                                                                    key={
+                                                                                        val
+                                                                                    }
+                                                                                    label={
+                                                                                        label
+                                                                                    }
+                                                                                    desc={
+                                                                                        desc
+                                                                                    }
+                                                                                    count={
+                                                                                        alertCounts[
+                                                                                            val as keyof typeof alertCounts
+                                                                                        ]
+                                                                                    }
+                                                                                    isActive={
+                                                                                        filterAlert ===
+                                                                                        val
+                                                                                    }
+                                                                                    onClick={() =>
+                                                                                        setFilterAlert(
+                                                                                            filterAlert ===
+                                                                                                val
+                                                                                                ? 'all'
+                                                                                                : val,
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    },
+                                                )}
+                                                <form
+                                                    onSubmit={guardarCotizacion}
+                                                    className="flex items-end gap-2 border-t border-border p-3"
+                                                >
                                                     <div className="flex flex-1 flex-col gap-1">
-                                                        <Label htmlFor="cotizacion" className="text-[11px] text-muted-foreground">Cotización dólar (ARS x USD)</Label>
+                                                        <Label
+                                                            htmlFor="cotizacion"
+                                                            className="text-[11px] text-muted-foreground"
+                                                        >
+                                                            Cotización dólar
+                                                            (ARS x USD)
+                                                        </Label>
                                                         <MoneyInput
                                                             id="cotizacion"
-                                                            value={cotizacionForm.data.cotizacion_dolar === '' ? null : Number(cotizacionForm.data.cotizacion_dolar)}
-                                                            onValueChange={(n) => cotizacionForm.setData('cotizacion_dolar', n == null ? '' : String(n))}
+                                                            value={
+                                                                cotizacionForm
+                                                                    .data
+                                                                    .cotizacion_dolar ===
+                                                                ''
+                                                                    ? null
+                                                                    : Number(
+                                                                          cotizacionForm
+                                                                              .data
+                                                                              .cotizacion_dolar,
+                                                                      )
+                                                            }
+                                                            onValueChange={(
+                                                                n,
+                                                            ) =>
+                                                                cotizacionForm.setData(
+                                                                    'cotizacion_dolar',
+                                                                    n == null
+                                                                        ? ''
+                                                                        : String(
+                                                                              n,
+                                                                          ),
+                                                                )
+                                                            }
                                                             className="h-8"
                                                         />
                                                     </div>
-                                                    <Button type="submit" size="sm" disabled={cotizacionForm.processing} className="h-8">
+                                                    <Button
+                                                        type="submit"
+                                                        size="sm"
+                                                        disabled={
+                                                            cotizacionForm.processing
+                                                        }
+                                                        className="h-8"
+                                                    >
                                                         Guardar
                                                     </Button>
                                                 </form>
@@ -943,7 +1299,6 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         </Popover>
                                     </div>
                                 </div>
-
                             </div>
                         </div>
                     </div>
@@ -957,13 +1312,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                     placeholder="Buscar por nombre o DNI..."
                                     className="bg-card pl-9 shadow-sm"
                                     value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    onChange={(e) =>
+                                        setSearchTerm(e.target.value)
+                                    }
                                 />
                             </div>
                         </div>
                         {!isInversor && (
                             <div className="flex w-full sm:w-auto">
-                                <Button className="w-full sm:w-auto" size="default" onClick={openCreateModal}>
+                                <Button
+                                    className="w-full sm:w-auto"
+                                    size="default"
+                                    onClick={openCreateModal}
+                                >
                                     <Plus className="mr-2 h-4 w-4" />
                                     Nuevo Usuario
                                 </Button>
@@ -1012,7 +1373,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             scope="col"
                                             className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
-                                            {filterStatus === 'inactivos' ? 'Baja' : 'Alta'}
+                                            {filterStatus === 'inactivos'
+                                                ? 'Baja'
+                                                : 'Alta'}
                                         </th>
                                     )}
                                     {filterRole === 'chofer' && (
@@ -1027,7 +1390,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         scope="col"
                                         className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        {filterRole === 'chofer' ? 'Vehículo' : 'Rol'}
+                                        {filterRole === 'chofer'
+                                            ? 'Vehículo'
+                                            : 'Rol'}
                                     </th>
                                 </tr>
                             </thead>
@@ -1035,7 +1400,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                 {filteredUsers.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={filterRole === 'chofer' ? 8 : 6}
+                                            colSpan={
+                                                filterRole === 'chofer' ? 8 : 6
+                                            }
                                             className="px-4 py-12 text-center text-muted-foreground sm:px-6"
                                         >
                                             No se encontraron usuarios que
@@ -1083,11 +1450,20 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                         >
                                                             {user.name}
                                                         </span>
-                                                        {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
-                                                            <span className="text-xs text-muted-foreground">
-                                                                Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
-                                                            </span>
-                                                        )}
+                                                        {(user.role ===
+                                                            'administrador' ||
+                                                            user.role ===
+                                                                'administrativo' ||
+                                                            user.role ===
+                                                                'mecanico') &&
+                                                            user.fecha_ingreso && (
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    Ingreso:{' '}
+                                                                    {formatLicenciaFecha(
+                                                                        user.fecha_ingreso,
+                                                                    )}
+                                                                </span>
+                                                            )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -1129,19 +1505,31 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 {user.fecha_vencimiento_licencia ? (
                                                     <div className="flex flex-col gap-1">
                                                         <span className="text-muted-foreground">
-                                                            {formatLicenciaFecha(user.fecha_vencimiento_licencia)}
+                                                            {formatLicenciaFecha(
+                                                                user.fecha_vencimiento_licencia,
+                                                            )}
                                                         </span>
                                                         {(() => {
-                                                            const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
+                                                            const s =
+                                                                getLicenciaStatus(
+                                                                    user.fecha_vencimiento_licencia,
+                                                                );
                                                             return s ? (
-                                                                <span className={cn('inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                                <span
+                                                                    className={cn(
+                                                                        'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                                                                        s.cls,
+                                                                    )}
+                                                                >
                                                                     {s.label}
                                                                 </span>
                                                             ) : null;
                                                         })()}
                                                     </div>
                                                 ) : (
-                                                    <span className="text-muted-foreground/50 italic">N/A</span>
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        N/A
+                                                    </span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 sm:px-6 sm:py-4">
@@ -1149,31 +1537,58 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (isInversor) return;
-                                                        confirmToggleStatus(user);
+                                                        confirmToggleStatus(
+                                                            user,
+                                                        );
                                                     }}
-                                                    disabled={user.id === auth.user.id || isInversor}
+                                                    disabled={
+                                                        user.id ===
+                                                            auth.user.id ||
+                                                        isInversor
+                                                    }
                                                     className={cn(
                                                         'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                         user.inactivo
                                                             ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
                                                             : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-                                                        !isInversor && user.id !== auth.user.id
-                                                            ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
+                                                        !isInversor &&
+                                                            user.id !==
+                                                                auth.user.id
+                                                            ? user.inactivo
+                                                                ? 'cursor-pointer hover:bg-red-100'
+                                                                : 'cursor-pointer hover:bg-green-100'
                                                             : 'cursor-default',
                                                     )}
                                                 >
-                                                    <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
-                                                    {user.inactivo ? 'Inactivo' : 'Activo'}
+                                                    <span
+                                                        className={cn(
+                                                            'h-1.5 w-1.5 rounded-full',
+                                                            user.inactivo
+                                                                ? 'bg-red-500'
+                                                                : 'bg-green-500',
+                                                        )}
+                                                    />
+                                                    {user.inactivo
+                                                        ? 'Inactivo'
+                                                        : 'Activo'}
                                                 </button>
                                             </td>
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-xs sm:px-6 sm:py-4">
-                                                    {formatEstadoFecha(estadoFecha(user)) ? (
+                                                    {formatEstadoFecha(
+                                                        estadoFecha(user),
+                                                    ) ? (
                                                         <span className="text-muted-foreground">
-                                                            {formatEstadoFecha(estadoFecha(user))}
+                                                            {formatEstadoFecha(
+                                                                estadoFecha(
+                                                                    user,
+                                                                ),
+                                                            )}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-muted-foreground/50 italic">—</span>
+                                                        <span className="text-muted-foreground/50 italic">
+                                                            —
+                                                        </span>
                                                     )}
                                                 </td>
                                             )}
@@ -1181,7 +1596,9 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
                                                     {formatDeposito(user) ? (
                                                         <span className="font-medium text-foreground">
-                                                            {formatDeposito(user)}
+                                                            {formatDeposito(
+                                                                user,
+                                                            )}
                                                         </span>
                                                     ) : (
                                                         <span className="text-muted-foreground/50 italic">
@@ -1194,46 +1611,101 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 {filterRole === 'chofer' ? (
                                                     <div className="flex flex-col gap-1">
                                                         {user.vehiculo ? (
-                                                            <span className="text-xs font-bold tracking-widest uppercase text-foreground">{user.vehiculo.patente}</span>
+                                                            <span className="text-xs font-bold tracking-widest text-foreground uppercase">
+                                                                {
+                                                                    user
+                                                                        .vehiculo
+                                                                        .patente
+                                                                }
+                                                            </span>
                                                         ) : (
-                                                            <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
+                                                            <span className="text-xs text-muted-foreground/50 italic">
+                                                                Sin vehículo
+                                                            </span>
                                                         )}
                                                     </div>
                                                 ) : (
                                                     <div className="flex flex-col gap-1.5">
-                                                        {user.id === auth.user.id ? (
+                                                        {user.id ===
+                                                        auth.user.id ? (
                                                             <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                                {roles.find((r) => r.value === user.role)?.label || user.role}{' '}(Tú)
+                                                                {roles.find(
+                                                                    (r) =>
+                                                                        r.value ===
+                                                                        user.role,
+                                                                )?.label ||
+                                                                    user.role}{' '}
+                                                                (Tú)
                                                             </span>
                                                         ) : isInversor ? (
                                                             <span className="inline-flex items-center rounded-md bg-muted px-3 py-1.5 text-sm font-medium text-foreground">
-                                                                {roles.find((r) => r.value === user.role)?.label || user.role}
+                                                                {roles.find(
+                                                                    (r) =>
+                                                                        r.value ===
+                                                                        user.role,
+                                                                )?.label ||
+                                                                    user.role}
                                                             </span>
                                                         ) : (
                                                             <select
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                value={user.role}
-                                                                onChange={(e) => handleRoleChange(user.id, e.target.value)}
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
+                                                                value={
+                                                                    user.role
+                                                                }
+                                                                onChange={(e) =>
+                                                                    handleRoleChange(
+                                                                        user.id,
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
                                                                 className="block w-full max-w-xs rounded-md border-input bg-background px-3 py-1.5 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                                                             >
-                                                                {roles.map((role) => (
-                                                                    <option key={role.value} value={role.value}>{role.label}</option>
-                                                                ))}
+                                                                {roles.map(
+                                                                    (role) => (
+                                                                        <option
+                                                                            key={
+                                                                                role.value
+                                                                            }
+                                                                            value={
+                                                                                role.value
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                role.label
+                                                                            }
+                                                                        </option>
+                                                                    ),
+                                                                )}
                                                             </select>
                                                         )}
-                                                        {user.role === 'inversor' && inversionesDisponibles && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="w-fit"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setInversorConfig(user);
-                                                                }}
-                                                            >
-                                                                Inversiones ({user.inversiones?.length ?? 0})
-                                                            </Button>
-                                                        )}
+                                                        {user.role ===
+                                                            'inversor' &&
+                                                            inversionesDisponibles && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="w-fit"
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) => {
+                                                                        e.stopPropagation();
+                                                                        setInversorConfig(
+                                                                            user,
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Inversiones
+                                                                    (
+                                                                    {user
+                                                                        .inversiones
+                                                                        ?.length ??
+                                                                        0}
+                                                                    )
+                                                                </Button>
+                                                            )}
                                                     </div>
                                                 )}
                                             </td>
@@ -1299,11 +1771,19 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 >
                                                     {user.name}
                                                 </p>
-                                                {(user.role === 'administrador' || user.role === 'administrativo' || user.role === 'mecanico') && user.fecha_ingreso && (
-                                                    <p className="truncate text-xs text-muted-foreground">
-                                                        Ingreso: {formatLicenciaFecha(user.fecha_ingreso)}
-                                                    </p>
-                                                )}
+                                                {(user.role ===
+                                                    'administrador' ||
+                                                    user.role ===
+                                                        'administrativo' ||
+                                                    user.role === 'mecanico') &&
+                                                    user.fecha_ingreso && (
+                                                        <p className="truncate text-xs text-muted-foreground">
+                                                            Ingreso:{' '}
+                                                            {formatLicenciaFecha(
+                                                                user.fecha_ingreso,
+                                                            )}
+                                                        </p>
+                                                    )}
                                                 <p className="truncate text-xs text-muted-foreground">
                                                     {roles.find(
                                                         (r) =>
@@ -1322,19 +1802,34 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                                 if (isInversor) return;
                                                 confirmToggleStatus(user);
                                             }}
-                                            disabled={user.id === auth.user.id || isInversor}
+                                            disabled={
+                                                user.id === auth.user.id ||
+                                                isInversor
+                                            }
                                             className={cn(
                                                 'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                 user.inactivo
                                                     ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
                                                     : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-                                                !isInversor && user.id !== auth.user.id
-                                                    ? user.inactivo ? 'hover:bg-red-100 cursor-pointer' : 'hover:bg-green-100 cursor-pointer'
+                                                !isInversor &&
+                                                    user.id !== auth.user.id
+                                                    ? user.inactivo
+                                                        ? 'cursor-pointer hover:bg-red-100'
+                                                        : 'cursor-pointer hover:bg-green-100'
                                                     : 'cursor-default',
                                             )}
                                         >
-                                            <span className={cn('h-1.5 w-1.5 rounded-full', user.inactivo ? 'bg-red-500' : 'bg-green-500')} />
-                                            {user.inactivo ? 'Inactivo' : 'Activo'}
+                                            <span
+                                                className={cn(
+                                                    'h-1.5 w-1.5 rounded-full',
+                                                    user.inactivo
+                                                        ? 'bg-red-500'
+                                                        : 'bg-green-500',
+                                                )}
+                                            />
+                                            {user.inactivo
+                                                ? 'Inactivo'
+                                                : 'Activo'}
                                         </button>
                                     </div>
 
@@ -1365,19 +1860,21 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         )}
                                     </div>
 
-                                    {user.role === 'inversor' && inversionesDisponibles && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="w-fit"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setInversorConfig(user);
-                                            }}
-                                        >
-                                            Inversiones ({user.inversiones?.length ?? 0})
-                                        </Button>
-                                    )}
+                                    {user.role === 'inversor' &&
+                                        inversionesDisponibles && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="w-fit"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setInversorConfig(user);
+                                                }}
+                                            >
+                                                Inversiones (
+                                                {user.inversiones?.length ?? 0})
+                                            </Button>
+                                        )}
 
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="flex flex-col gap-0.5">
@@ -1395,19 +1892,31 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                             {user.fecha_vencimiento_licencia ? (
                                                 <div className="flex flex-col gap-0.5">
                                                     <span className="text-foreground">
-                                                        {formatLicenciaFecha(user.fecha_vencimiento_licencia)}
+                                                        {formatLicenciaFecha(
+                                                            user.fecha_vencimiento_licencia,
+                                                        )}
                                                     </span>
                                                     {(() => {
-                                                        const s = getLicenciaStatus(user.fecha_vencimiento_licencia);
+                                                        const s =
+                                                            getLicenciaStatus(
+                                                                user.fecha_vencimiento_licencia,
+                                                            );
                                                         return s ? (
-                                                            <span className={cn('inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold', s.cls)}>
+                                                            <span
+                                                                className={cn(
+                                                                    'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                                                                    s.cls,
+                                                                )}
+                                                            >
                                                                 {s.label}
                                                             </span>
                                                         ) : null;
                                                     })()}
                                                 </div>
                                             ) : (
-                                                <span className="text-muted-foreground/50 italic">N/A</span>
+                                                <span className="text-muted-foreground/50 italic">
+                                                    N/A
+                                                </span>
                                             )}
                                         </div>
                                         {filterRole === 'chofer' && (
@@ -1429,14 +1938,23 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                                         {filterRole === 'chofer' && (
                                             <div className="flex flex-col gap-0.5">
                                                 <span className="tracking-wider text-muted-foreground uppercase">
-                                                    {filterStatus === 'inactivos' ? 'Baja' : 'Alta'}
+                                                    {filterStatus ===
+                                                    'inactivos'
+                                                        ? 'Baja'
+                                                        : 'Alta'}
                                                 </span>
-                                                {formatEstadoFecha(estadoFecha(user)) ? (
+                                                {formatEstadoFecha(
+                                                    estadoFecha(user),
+                                                ) ? (
                                                     <span className="text-foreground">
-                                                        {formatEstadoFecha(estadoFecha(user))}
+                                                        {formatEstadoFecha(
+                                                            estadoFecha(user),
+                                                        )}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-muted-foreground/50 italic">—</span>
+                                                    <span className="text-muted-foreground/50 italic">
+                                                        —
+                                                    </span>
                                                 )}
                                             </div>
                                         )}
@@ -1444,11 +1962,17 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
 
                                     {filterRole === 'chofer' && (
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] tracking-wider text-muted-foreground uppercase">Vehículo</span>
+                                            <span className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                Vehículo
+                                            </span>
                                             {user.vehiculo ? (
-                                                <span className="text-sm font-bold tracking-widest uppercase text-foreground">{user.vehiculo.patente}</span>
+                                                <span className="text-sm font-bold tracking-widest text-foreground uppercase">
+                                                    {user.vehiculo.patente}
+                                                </span>
                                             ) : (
-                                                <span className="text-xs text-muted-foreground/50 italic">Sin vehículo</span>
+                                                <span className="text-xs text-muted-foreground/50 italic">
+                                                    Sin vehículo
+                                                </span>
                                             )}
                                         </div>
                                     )}
@@ -1469,202 +1993,449 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <UserPlus className="h-5 w-5 text-violet-500" />
                         </div>
                         <div className="flex-1">
-                            <DialogTitle className="text-base font-semibold">Nuevo usuario</DialogTitle>
+                            <DialogTitle className="text-base font-semibold">
+                                Nuevo usuario
+                            </DialogTitle>
                             <DialogDescription className="text-xs">
-                                La contraseña provisional será la primera letra del nombre + DNI.
+                                La contraseña provisional será la primera letra
+                                del nombre + DNI.
                             </DialogDescription>
                         </div>
                     </div>
 
                     <form onSubmit={handleCreateSubmit}>
-                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
-                        {/* Foto + Nombre */}
-                        <div className="flex items-center gap-4">
-                            <div className="shrink-0">
-                                <AvatarDropzone
-                                    file={createForm.data.profile_photo}
-                                    onDrop={(files) => createForm.setData('profile_photo', files[0])}
-                                />
-                                <InputError message={createForm.errors.profile_photo} />
-                            </div>
-                            <div className="flex flex-1 flex-col gap-1.5">
-                                <Label htmlFor="name">Nombre completo</Label>
-                                <Input
-                                    id="name"
-                                    value={createForm.data.name}
-                                    onChange={(e) => createForm.setData('name', e.target.value)}
-                                    placeholder="Ej. Juan Pérez"
-                                    required
-                                />
-                                <InputError message={createForm.errors.name} />
-                            </div>
-                        </div>
-
-                        {/* DNI + Rol */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="dni">DNI</Label>
-                                <Input
-                                    id="dni"
-                                    value={createForm.data.dni}
-                                    onChange={(e) => createForm.setData('dni', e.target.value)}
-                                    placeholder="Sin puntos"
-                                    required
-                                />
-                                <InputError message={createForm.errors.dni} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="role">Rol</Label>
-                                <select
-                                    id="role"
-                                    value={createForm.data.role}
-                                    onChange={(e) => createForm.setData('role', e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    {roles.map((r) => (
-                                        <option key={r.value} value={r.value} className="bg-background text-foreground">{r.label}</option>
-                                    ))}
-                                </select>
-                                <InputError message={createForm.errors.role} />
-                            </div>
-                        </div>
-
-                        {/* Campos por rol */}
-                        {createForm.data.role === 'inversor' && empresas.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label>Empresas</Label>
-                                <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
-                                    {empresas.map((e) => {
-                                        const checked = createForm.data.empresas.includes(e.id);
-                                        return (
-                                            <label key={e.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-muted/40 transition-colors">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={checked}
-                                                    onChange={() => {
-                                                        const next = checked
-                                                            ? createForm.data.empresas.filter((id) => id !== e.id)
-                                                            : [...createForm.data.empresas, e.id];
-                                                        createForm.setData('empresas', next);
-                                                    }}
-                                                    className="h-4 w-4 rounded border-input"
-                                                />
-                                                <span>{e.nombre}</span>
-                                            </label>
-                                        );
-                                    })}
+                        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
+                            {/* Foto + Nombre */}
+                            <div className="flex items-center gap-4">
+                                <div className="shrink-0">
+                                    <AvatarDropzone
+                                        file={createForm.data.profile_photo}
+                                        onDrop={(files) =>
+                                            createForm.setData(
+                                                'profile_photo',
+                                                files[0],
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={
+                                            createForm.errors.profile_photo
+                                        }
+                                    />
                                 </div>
-                                <InputError message={createForm.errors.empresas as string | undefined} />
+                                <div className="flex flex-1 flex-col gap-1.5">
+                                    <Label htmlFor="name">
+                                        Nombre completo
+                                    </Label>
+                                    <Input
+                                        id="name"
+                                        value={createForm.data.name}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Ej. Juan Pérez"
+                                        required
+                                    />
+                                    <InputError
+                                        message={createForm.errors.name}
+                                    />
+                                </div>
                             </div>
-                        )}
 
-                        {(createForm.data.role === 'administrativo' || createForm.data.role === 'administrador') && empresas.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="create-empresa-restringida">Acceso a empresa</Label>
-                                <select
-                                    id="create-empresa-restringida"
-                                    value={createForm.data.empresa_restringida_id}
-                                    onChange={(e) => createForm.setData('empresa_restringida_id', e.target.value)}
-                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="" className="bg-background text-foreground">Todas las empresas</option>
-                                    {empresas.map((e) => (
-                                        <option key={e.id} value={e.id} className="bg-background text-foreground">Sólo {e.nombre}</option>
-                                    ))}
-                                </select>
-                                <InputError message={createForm.errors.empresa_restringida_id} />
-                            </div>
-                        )}
-
-                        {createForm.data.role === 'chofer' && (
-                            <>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex-1 border-t border-border/60" />
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Contacto y licencia</span>
-                                    <div className="flex-1 border-t border-border/60" />
+                            {/* DNI + Rol */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="dni">DNI</Label>
+                                    <Input
+                                        id="dni"
+                                        value={createForm.data.dni}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'dni',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Sin puntos"
+                                        required
+                                    />
+                                    <InputError
+                                        message={createForm.errors.dni}
+                                    />
                                 </div>
                                 <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="correo">Correo</Label>
-                                    <Input id="correo" type="email" value={createForm.data.correo} onChange={(e) => createForm.setData('correo', e.target.value)} placeholder="usuario@correo.com" />
-                                    <InputError message={createForm.errors.correo} />
+                                    <Label htmlFor="role">Rol</Label>
+                                    <select
+                                        id="role"
+                                        value={createForm.data.role}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'role',
+                                                e.target.value,
+                                            )
+                                        }
+                                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                    >
+                                        {roles.map((r) => (
+                                            <option
+                                                key={r.value}
+                                                value={r.value}
+                                                className="bg-background text-foreground"
+                                            >
+                                                {r.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <InputError
+                                        message={createForm.errors.role}
+                                    />
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label htmlFor="telefono">Teléfono</Label>
-                                        <Input id="telefono" value={createForm.data.telefono} onChange={(e) => createForm.setData('telefono', formatPhone(e.target.value))} placeholder="+54 9 11 1234-5678" />
-                                        <InputError message={createForm.errors.telefono} />
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                        <Label htmlFor="fecha_vencimiento_licencia">Venc. licencia</Label>
-                                        <Input id="fecha_vencimiento_licencia" type="date" value={createForm.data.fecha_vencimiento_licencia} onChange={(e) => createForm.setData('fecha_vencimiento_licencia', e.target.value)} />
-                                        <InputError message={createForm.errors.fecha_vencimiento_licencia} />
-                                    </div>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <Label htmlFor="direccion">Dirección</Label>
-                                    <Input id="direccion" value={createForm.data.direccion} onChange={(e) => createForm.setData('direccion', e.target.value)} placeholder="Calle, número, localidad..." />
-                                    <InputError message={createForm.errors.direccion} />
-                                </div>
-                            </>
-                        )}
-
-                        {(createForm.data.role === 'administrador' || createForm.data.role === 'administrativo' || createForm.data.role === 'mecanico') && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="fecha_ingreso">Fecha de ingreso</Label>
-                                <Input id="fecha_ingreso" type="date" value={createForm.data.fecha_ingreso} onChange={(e) => createForm.setData('fecha_ingreso', e.target.value)} />
-                                <InputError message={createForm.errors.fecha_ingreso} />
                             </div>
-                        )}
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 border-t border-border/60" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Garantía</span>
-                            <div className="flex-1 border-t border-border/60" />
-                        </div>
-                        <DepositosField
-                            depositos={createForm.data.depositos}
-                            monedas={monedas}
-                            onChange={(d) => createForm.setData('depositos', d)}
-                            error={createForm.errors.depositos as string | undefined}
-                        />
+                            {/* Campos por rol */}
+                            {createForm.data.role === 'inversor' &&
+                                empresas.length > 0 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label>Empresas</Label>
+                                        <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
+                                            {empresas.map((e) => {
+                                                const checked =
+                                                    createForm.data.empresas.includes(
+                                                        e.id,
+                                                    );
+                                                return (
+                                                    <label
+                                                        key={e.id}
+                                                        className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => {
+                                                                const next =
+                                                                    checked
+                                                                        ? createForm.data.empresas.filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  e.id,
+                                                                          )
+                                                                        : [
+                                                                              ...createForm
+                                                                                  .data
+                                                                                  .empresas,
+                                                                              e.id,
+                                                                          ];
+                                                                createForm.setData(
+                                                                    'empresas',
+                                                                    next,
+                                                                );
+                                                            }}
+                                                            className="h-4 w-4 rounded border-input"
+                                                        />
+                                                        <span>{e.nombre}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        <InputError
+                                            message={
+                                                createForm.errors.empresas as
+                                                    | string
+                                                    | undefined
+                                            }
+                                        />
+                                    </div>
+                                )}
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 border-t border-border/60" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Documentación</span>
-                            <div className="flex-1 border-t border-border/60" />
-                        </div>
-                        <DocumentSection
-                            title="Licencia"
-                            mode={createLicMode}
-                            onModeChange={(m) => applyDocMode(createForm, 'licencia', setCreateLicMode, m)}
-                            pdfFile={createForm.data.licencia_pdf}
-                            onPdfDrop={(f) => createForm.setData('licencia_pdf', f[0])}
-                            frenteFile={createForm.data.licencia_frente}
-                            onFrenteDrop={(f) => createForm.setData('licencia_frente', f[0])}
-                            dorsoFile={createForm.data.licencia_dorso}
-                            onDorsoDrop={(f) => createForm.setData('licencia_dorso', f[0])}
-                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
-                            error={createForm.errors.licencia_pdf || createForm.errors.licencia_frente || createForm.errors.licencia_dorso}
-                        />
-                        <DocumentSection
-                            title="DNI"
-                            mode={createDniMode}
-                            onModeChange={(m) => applyDocMode(createForm, 'dni', setCreateDniMode, m)}
-                            pdfFile={createForm.data.dni_pdf}
-                            onPdfDrop={(f) => createForm.setData('dni_pdf', f[0])}
-                            frenteFile={createForm.data.dni_frente}
-                            onFrenteDrop={(f) => createForm.setData('dni_frente', f[0])}
-                            dorsoFile={createForm.data.dni_dorso}
-                            onDorsoDrop={(f) => createForm.setData('dni_dorso', f[0])}
-                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
-                            error={createForm.errors.dni_pdf || createForm.errors.dni_frente || createForm.errors.dni_dorso}
-                        />
+                            {(createForm.data.role === 'administrativo' ||
+                                createForm.data.role === 'administrador') &&
+                                empresas.length > 0 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="create-empresa-restringida">
+                                            Acceso a empresa
+                                        </Label>
+                                        <select
+                                            id="create-empresa-restringida"
+                                            value={
+                                                createForm.data
+                                                    .empresa_restringida_id
+                                            }
+                                            onChange={(e) =>
+                                                createForm.setData(
+                                                    'empresa_restringida_id',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                        >
+                                            <option
+                                                value=""
+                                                className="bg-background text-foreground"
+                                            >
+                                                Todas las empresas
+                                            </option>
+                                            {empresas.map((e) => (
+                                                <option
+                                                    key={e.id}
+                                                    value={e.id}
+                                                    className="bg-background text-foreground"
+                                                >
+                                                    Sólo {e.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <InputError
+                                            message={
+                                                createForm.errors
+                                                    .empresa_restringida_id
+                                            }
+                                        />
+                                    </div>
+                                )}
 
+                            {createForm.data.role === 'chofer' && (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 border-t border-border/60" />
+                                        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                            Contacto y licencia
+                                        </span>
+                                        <div className="flex-1 border-t border-border/60" />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="correo">Correo</Label>
+                                        <Input
+                                            id="correo"
+                                            type="email"
+                                            value={createForm.data.correo}
+                                            onChange={(e) =>
+                                                createForm.setData(
+                                                    'correo',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="usuario@correo.com"
+                                        />
+                                        <InputError
+                                            message={createForm.errors.correo}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="telefono">
+                                                Teléfono
+                                            </Label>
+                                            <Input
+                                                id="telefono"
+                                                value={createForm.data.telefono}
+                                                onChange={(e) =>
+                                                    createForm.setData(
+                                                        'telefono',
+                                                        formatPhone(
+                                                            e.target.value,
+                                                        ),
+                                                    )
+                                                }
+                                                placeholder="+54 9 11 1234-5678"
+                                            />
+                                            <InputError
+                                                message={
+                                                    createForm.errors.telefono
+                                                }
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="fecha_vencimiento_licencia">
+                                                Venc. licencia
+                                            </Label>
+                                            <Input
+                                                id="fecha_vencimiento_licencia"
+                                                type="date"
+                                                value={
+                                                    createForm.data
+                                                        .fecha_vencimiento_licencia
+                                                }
+                                                onChange={(e) =>
+                                                    createForm.setData(
+                                                        'fecha_vencimiento_licencia',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    createForm.errors
+                                                        .fecha_vencimiento_licencia
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="direccion">
+                                            Dirección
+                                        </Label>
+                                        <Input
+                                            id="direccion"
+                                            value={createForm.data.direccion}
+                                            onChange={(e) =>
+                                                createForm.setData(
+                                                    'direccion',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="Calle, número, localidad..."
+                                        />
+                                        <InputError
+                                            message={
+                                                createForm.errors.direccion
+                                            }
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {(createForm.data.role === 'administrador' ||
+                                createForm.data.role === 'administrativo' ||
+                                createForm.data.role === 'mecanico') && (
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="fecha_ingreso">
+                                        Fecha de ingreso
+                                    </Label>
+                                    <Input
+                                        id="fecha_ingreso"
+                                        type="date"
+                                        value={createForm.data.fecha_ingreso}
+                                        onChange={(e) =>
+                                            createForm.setData(
+                                                'fecha_ingreso',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={
+                                            createForm.errors.fecha_ingreso
+                                        }
+                                    />
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 border-t border-border/60" />
+                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                    Garantía
+                                </span>
+                                <div className="flex-1 border-t border-border/60" />
+                            </div>
+                            <DepositosField
+                                depositos={createForm.data.depositos}
+                                monedas={monedas}
+                                onChange={(d) =>
+                                    createForm.setData('depositos', d)
+                                }
+                                error={
+                                    createForm.errors.depositos as
+                                        | string
+                                        | undefined
+                                }
+                            />
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 border-t border-border/60" />
+                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                    Documentación
+                                </span>
+                                <div className="flex-1 border-t border-border/60" />
+                            </div>
+                            <DocumentSection
+                                title="Licencia"
+                                mode={createLicMode}
+                                onModeChange={(m) =>
+                                    applyDocMode(
+                                        createForm,
+                                        'licencia',
+                                        setCreateLicMode,
+                                        m,
+                                    )
+                                }
+                                pdfFile={createForm.data.licencia_pdf}
+                                onPdfDrop={(f) =>
+                                    createForm.setData('licencia_pdf', f[0])
+                                }
+                                frenteFile={createForm.data.licencia_frente}
+                                onFrenteDrop={(f) =>
+                                    createForm.setData('licencia_frente', f[0])
+                                }
+                                dorsoFile={createForm.data.licencia_dorso}
+                                onDorsoDrop={(f) =>
+                                    createForm.setData('licencia_dorso', f[0])
+                                }
+                                onPreview={(url, name, type) =>
+                                    setPreviewImage({ url, name, type })
+                                }
+                                error={
+                                    createForm.errors.licencia_pdf ||
+                                    createForm.errors.licencia_frente ||
+                                    createForm.errors.licencia_dorso
+                                }
+                            />
+                            <DocumentSection
+                                title="DNI"
+                                mode={createDniMode}
+                                onModeChange={(m) =>
+                                    applyDocMode(
+                                        createForm,
+                                        'dni',
+                                        setCreateDniMode,
+                                        m,
+                                    )
+                                }
+                                pdfFile={createForm.data.dni_pdf}
+                                onPdfDrop={(f) =>
+                                    createForm.setData('dni_pdf', f[0])
+                                }
+                                frenteFile={createForm.data.dni_frente}
+                                onFrenteDrop={(f) =>
+                                    createForm.setData('dni_frente', f[0])
+                                }
+                                dorsoFile={createForm.data.dni_dorso}
+                                onDorsoDrop={(f) =>
+                                    createForm.setData('dni_dorso', f[0])
+                                }
+                                onPreview={(url, name, type) =>
+                                    setPreviewImage({ url, name, type })
+                                }
+                                error={
+                                    createForm.errors.dni_pdf ||
+                                    createForm.errors.dni_frente ||
+                                    createForm.errors.dni_dorso
+                                }
+                            />
                         </div>
                         <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                            <Button type="button" variant="outline" onClick={closeCreateModal}>Cancelar</Button>
-                            <Button type="submit" disabled={createForm.processing}>
-                                {createForm.processing ? 'Creando...' : <><Check className="h-4 w-4" /> Crear usuario</>}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={closeCreateModal}
+                            >
+                                Cancelar
+                            </Button>
+                            <Button
+                                type="submit"
+                                disabled={createForm.processing}
+                            >
+                                {createForm.processing ? (
+                                    'Creando...'
+                                ) : (
+                                    <>
+                                        <Check className="h-4 w-4" /> Crear
+                                        usuario
+                                    </>
+                                )}
                             </Button>
                         </DialogFooter>
                     </form>
@@ -1681,190 +2452,485 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                             <UserCog className="h-5 w-5 text-violet-500" />
                         </div>
                         <div className="flex-1">
-                            <DialogTitle className="text-base font-semibold">Editar usuario</DialogTitle>
-                            <DialogDescription className="text-xs">{userToEdit?.name}</DialogDescription>
+                            <DialogTitle className="text-base font-semibold">
+                                Editar usuario
+                            </DialogTitle>
+                            <DialogDescription className="text-xs">
+                                {userToEdit?.name}
+                            </DialogDescription>
                         </div>
                     </div>
 
                     <form onSubmit={handleEditSubmit}>
-                    <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
-                        {/* Foto + Nombre */}
-                        <div className="flex items-center gap-4">
-                            <div className="shrink-0">
-                                <AvatarDropzone
-                                    file={editForm.data.profile_photo}
-                                    currentUrl={userToEdit?.profile_photo_url}
-                                    onDrop={(files) => editForm.setData('profile_photo', files[0])}
+                        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
+                            {/* Foto + Nombre */}
+                            <div className="flex items-center gap-4">
+                                <div className="shrink-0">
+                                    <AvatarDropzone
+                                        file={editForm.data.profile_photo}
+                                        currentUrl={
+                                            userToEdit?.profile_photo_url
+                                        }
+                                        onDrop={(files) =>
+                                            editForm.setData(
+                                                'profile_photo',
+                                                files[0],
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={editForm.errors.profile_photo}
+                                    />
+                                </div>
+                                <div className="flex flex-1 flex-col gap-1.5">
+                                    <Label htmlFor="edit-name">
+                                        Nombre completo
+                                    </Label>
+                                    <Input
+                                        id="edit-name"
+                                        value={editForm.data.name}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'name',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Ej. Juan Pérez"
+                                        required
+                                    />
+                                    <InputError
+                                        message={editForm.errors.name}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* DNI */}
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-dni">DNI</Label>
+                                <Input
+                                    id="edit-dni"
+                                    value={editForm.data.dni}
+                                    onChange={(e) =>
+                                        editForm.setData('dni', e.target.value)
+                                    }
+                                    placeholder="Sin puntos"
+                                    required
                                 />
-                                <InputError message={editForm.errors.profile_photo} />
+                                <InputError message={editForm.errors.dni} />
                             </div>
-                            <div className="flex flex-1 flex-col gap-1.5">
-                                <Label htmlFor="edit-name">Nombre completo</Label>
-                                <Input id="edit-name" value={editForm.data.name} onChange={(e) => editForm.setData('name', e.target.value)} placeholder="Ej. Juan Pérez" required />
-                                <InputError message={editForm.errors.name} />
-                            </div>
-                        </div>
 
-                        {/* DNI */}
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="edit-dni">DNI</Label>
-                            <Input id="edit-dni" value={editForm.data.dni} onChange={(e) => editForm.setData('dni', e.target.value)} placeholder="Sin puntos" required />
-                            <InputError message={editForm.errors.dni} />
-                        </div>
-
-                        {/* Campos por rol */}
-                        {userToEdit?.role === 'inversor' && empresas.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label>Empresas</Label>
-                                <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
-                                    {empresas.map((e) => {
-                                        const checked = editForm.data.empresas.includes(e.id);
-                                        return (
-                                            <label key={e.id} className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm hover:bg-muted/40 transition-colors">
-                                                <input type="checkbox" checked={checked} onChange={() => { const next = checked ? editForm.data.empresas.filter((id) => id !== e.id) : [...editForm.data.empresas, e.id]; editForm.setData('empresas', next); }} className="h-4 w-4 rounded border-input" />
-                                                <span>{e.nombre}</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
-                                <InputError message={editForm.errors.empresas as string | undefined} />
-                            </div>
-                        )}
-
-                        {(userToEdit?.role === 'administrativo' || userToEdit?.role === 'administrador') && empresas.length > 0 && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-empresa-restringida">Acceso a empresa</Label>
-                                <select id="edit-empresa-restringida" value={editForm.data.empresa_restringida_id} onChange={(e) => editForm.setData('empresa_restringida_id', e.target.value)} className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none">
-                                    <option value="" className="bg-background text-foreground">Todas las empresas</option>
-                                    {empresas.map((e) => <option key={e.id} value={e.id} className="bg-background text-foreground">Sólo {e.nombre}</option>)}
-                                </select>
-                                <InputError message={editForm.errors.empresa_restringida_id} />
-                            </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 border-t border-border/60" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Contacto y licencia</span>
-                            <div className="flex-1 border-t border-border/60" />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="edit-correo">Correo</Label>
-                            <Input id="edit-correo" type="email" value={editForm.data.correo} onChange={(e) => editForm.setData('correo', e.target.value)} placeholder="usuario@correo.com" />
-                            <InputError message={editForm.errors.correo} />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-telefono">Teléfono</Label>
-                                <Input id="edit-telefono" value={editForm.data.telefono} onChange={(e) => editForm.setData('telefono', formatPhone(e.target.value))} placeholder="+54 9 11 1234-5678" />
-                                <InputError message={editForm.errors.telefono} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-fecha_vencimiento_licencia">Venc. licencia</Label>
-                                <Input id="edit-fecha_vencimiento_licencia" type="date" value={editForm.data.fecha_vencimiento_licencia} onChange={(e) => editForm.setData('fecha_vencimiento_licencia', e.target.value)} />
-                                <InputError message={editForm.errors.fecha_vencimiento_licencia} />
-                            </div>
-                        </div>
-
-                        {userToEdit?.role === 'chofer' && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-direccion">Dirección</Label>
-                                <Input id="edit-direccion" value={editForm.data.direccion} onChange={(e) => editForm.setData('direccion', e.target.value)} placeholder="Calle, número, localidad..." />
-                                <InputError message={editForm.errors.direccion} />
-                            </div>
-                        )}
-
-                        {(userToEdit?.role === 'administrador' || userToEdit?.role === 'administrativo' || userToEdit?.role === 'mecanico') && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="edit-fecha_ingreso">Fecha de ingreso</Label>
-                                <Input id="edit-fecha_ingreso" type="date" value={editForm.data.fecha_ingreso} onChange={(e) => editForm.setData('fecha_ingreso', e.target.value)} />
-                                <InputError message={editForm.errors.fecha_ingreso} />
-                            </div>
-                        )}
-
-                        {userToEdit?.role === 'chofer' && (
-                            <>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex-1 border-t border-border/60" />
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Alta y baja</span>
-                                    <div className="flex-1 border-t border-border/60" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
+                            {/* Campos por rol */}
+                            {userToEdit?.role === 'inversor' &&
+                                empresas.length > 0 && (
                                     <div className="flex flex-col gap-1.5">
-                                        <Label htmlFor="edit-alta_fecha">Fecha de alta</Label>
-                                        <Input id="edit-alta_fecha" type="date" value={editForm.data.alta_fecha} onChange={(e) => editForm.setData('alta_fecha', e.target.value)} />
-                                        <InputError message={editForm.errors.alta_fecha} />
-                                    </div>
-                                    {userToEdit?.inactivo && (
-                                        <div className="flex flex-col gap-1.5">
-                                            <Label htmlFor="edit-baja_fecha">Fecha de baja</Label>
-                                            <Input id="edit-baja_fecha" type="date" value={editForm.data.baja_fecha} onChange={(e) => editForm.setData('baja_fecha', e.target.value)} />
-                                            <InputError message={editForm.errors.baja_fecha} />
+                                        <Label>Empresas</Label>
+                                        <div className="flex flex-col divide-y divide-border rounded-xl border border-input">
+                                            {empresas.map((e) => {
+                                                const checked =
+                                                    editForm.data.empresas.includes(
+                                                        e.id,
+                                                    );
+                                                return (
+                                                    <label
+                                                        key={e.id}
+                                                        className="flex cursor-pointer items-center gap-3 px-3.5 py-2.5 text-sm transition-colors hover:bg-muted/40"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={checked}
+                                                            onChange={() => {
+                                                                const next =
+                                                                    checked
+                                                                        ? editForm.data.empresas.filter(
+                                                                              (
+                                                                                  id,
+                                                                              ) =>
+                                                                                  id !==
+                                                                                  e.id,
+                                                                          )
+                                                                        : [
+                                                                              ...editForm
+                                                                                  .data
+                                                                                  .empresas,
+                                                                              e.id,
+                                                                          ];
+                                                                editForm.setData(
+                                                                    'empresas',
+                                                                    next,
+                                                                );
+                                                            }}
+                                                            className="h-4 w-4 rounded border-input"
+                                                        />
+                                                        <span>{e.nombre}</span>
+                                                    </label>
+                                                );
+                                            })}
                                         </div>
-                                    )}
+                                        <InputError
+                                            message={
+                                                editForm.errors.empresas as
+                                                    | string
+                                                    | undefined
+                                            }
+                                        />
+                                    </div>
+                                )}
+
+                            {(userToEdit?.role === 'administrativo' ||
+                                userToEdit?.role === 'administrador') &&
+                                empresas.length > 0 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="edit-empresa-restringida">
+                                            Acceso a empresa
+                                        </Label>
+                                        <select
+                                            id="edit-empresa-restringida"
+                                            value={
+                                                editForm.data
+                                                    .empresa_restringida_id
+                                            }
+                                            onChange={(e) =>
+                                                editForm.setData(
+                                                    'empresa_restringida_id',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                        >
+                                            <option
+                                                value=""
+                                                className="bg-background text-foreground"
+                                            >
+                                                Todas las empresas
+                                            </option>
+                                            {empresas.map((e) => (
+                                                <option
+                                                    key={e.id}
+                                                    value={e.id}
+                                                    className="bg-background text-foreground"
+                                                >
+                                                    Sólo {e.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <InputError
+                                            message={
+                                                editForm.errors
+                                                    .empresa_restringida_id
+                                            }
+                                        />
+                                    </div>
+                                )}
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 border-t border-border/60" />
+                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                    Contacto y licencia
+                                </span>
+                                <div className="flex-1 border-t border-border/60" />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="edit-correo">Correo</Label>
+                                <Input
+                                    id="edit-correo"
+                                    type="email"
+                                    value={editForm.data.correo}
+                                    onChange={(e) =>
+                                        editForm.setData(
+                                            'correo',
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="usuario@correo.com"
+                                />
+                                <InputError message={editForm.errors.correo} />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="edit-telefono">
+                                        Teléfono
+                                    </Label>
+                                    <Input
+                                        id="edit-telefono"
+                                        value={editForm.data.telefono}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'telefono',
+                                                formatPhone(e.target.value),
+                                            )
+                                        }
+                                        placeholder="+54 9 11 1234-5678"
+                                    />
+                                    <InputError
+                                        message={editForm.errors.telefono}
+                                    />
                                 </div>
-                            </>
-                        )}
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="edit-fecha_vencimiento_licencia">
+                                        Venc. licencia
+                                    </Label>
+                                    <Input
+                                        id="edit-fecha_vencimiento_licencia"
+                                        type="date"
+                                        value={
+                                            editForm.data
+                                                .fecha_vencimiento_licencia
+                                        }
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'fecha_vencimiento_licencia',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={
+                                            editForm.errors
+                                                .fecha_vencimiento_licencia
+                                        }
+                                    />
+                                </div>
+                            </div>
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 border-t border-border/60" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Garantía</span>
-                            <div className="flex-1 border-t border-border/60" />
-                        </div>
+                            {userToEdit?.role === 'chofer' && (
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="edit-direccion">
+                                        Dirección
+                                    </Label>
+                                    <Input
+                                        id="edit-direccion"
+                                        value={editForm.data.direccion}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'direccion',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="Calle, número, localidad..."
+                                    />
+                                    <InputError
+                                        message={editForm.errors.direccion}
+                                    />
+                                </div>
+                            )}
 
-                        <DepositosField
-                            depositos={editForm.data.depositos}
-                            monedas={monedas}
-                            onChange={(d) => editForm.setData('depositos', d)}
-                            error={editForm.errors.depositos as string | undefined}
-                        />
+                            {(userToEdit?.role === 'administrador' ||
+                                userToEdit?.role === 'administrativo' ||
+                                userToEdit?.role === 'mecanico') && (
+                                <div className="flex flex-col gap-1.5">
+                                    <Label htmlFor="edit-fecha_ingreso">
+                                        Fecha de ingreso
+                                    </Label>
+                                    <Input
+                                        id="edit-fecha_ingreso"
+                                        type="date"
+                                        value={editForm.data.fecha_ingreso}
+                                        onChange={(e) =>
+                                            editForm.setData(
+                                                'fecha_ingreso',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <InputError
+                                        message={editForm.errors.fecha_ingreso}
+                                    />
+                                </div>
+                            )}
 
-                        <div className="flex items-center gap-2">
-                            <div className="flex-1 border-t border-border/60" />
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">Documentación</span>
-                            <div className="flex-1 border-t border-border/60" />
-                        </div>
-                        <DocumentSection
-                            title="Licencia"
-                            mode={editLicMode}
-                            onModeChange={(m) => applyDocMode(editForm, 'licencia', setEditLicMode, m)}
-                            pdfFile={editForm.data.licencia_pdf}
-                            onPdfDrop={(f) => editForm.setData('licencia_pdf', f[0])}
-                            frenteFile={editForm.data.licencia_frente}
-                            onFrenteDrop={(f) => editForm.setData('licencia_frente', f[0])}
-                            dorsoFile={editForm.data.licencia_dorso}
-                            onDorsoDrop={(f) => editForm.setData('licencia_dorso', f[0])}
-                            existing={userToEdit?.documentos?.licencia}
-                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
-                            error={editForm.errors.licencia_pdf || editForm.errors.licencia_frente || editForm.errors.licencia_dorso}
-                        />
-                        <DocumentSection
-                            title="DNI"
-                            mode={editDniMode}
-                            onModeChange={(m) => applyDocMode(editForm, 'dni', setEditDniMode, m)}
-                            pdfFile={editForm.data.dni_pdf}
-                            onPdfDrop={(f) => editForm.setData('dni_pdf', f[0])}
-                            frenteFile={editForm.data.dni_frente}
-                            onFrenteDrop={(f) => editForm.setData('dni_frente', f[0])}
-                            dorsoFile={editForm.data.dni_dorso}
-                            onDorsoDrop={(f) => editForm.setData('dni_dorso', f[0])}
-                            existing={userToEdit?.documentos?.dni}
-                            onPreview={(url, name, type) => setPreviewImage({ url, name, type })}
-                            error={editForm.errors.dni_pdf || editForm.errors.dni_frente || editForm.errors.dni_dorso}
-                        />
+                            {userToEdit?.role === 'chofer' && (
+                                <>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 border-t border-border/60" />
+                                        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                            Alta y baja
+                                        </span>
+                                        <div className="flex-1 border-t border-border/60" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1.5">
+                                            <Label htmlFor="edit-alta_fecha">
+                                                Fecha de alta
+                                            </Label>
+                                            <Input
+                                                id="edit-alta_fecha"
+                                                type="date"
+                                                value={editForm.data.alta_fecha}
+                                                onChange={(e) =>
+                                                    editForm.setData(
+                                                        'alta_fecha',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    editForm.errors.alta_fecha
+                                                }
+                                            />
+                                        </div>
+                                        {userToEdit?.inactivo && (
+                                            <div className="flex flex-col gap-1.5">
+                                                <Label htmlFor="edit-baja_fecha">
+                                                    Fecha de baja
+                                                </Label>
+                                                <Input
+                                                    id="edit-baja_fecha"
+                                                    type="date"
+                                                    value={
+                                                        editForm.data.baja_fecha
+                                                    }
+                                                    onChange={(e) =>
+                                                        editForm.setData(
+                                                            'baja_fecha',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                <InputError
+                                                    message={
+                                                        editForm.errors
+                                                            .baja_fecha
+                                                    }
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
 
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 border-t border-border/60" />
+                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                    Garantía
+                                </span>
+                                <div className="flex-1 border-t border-border/60" />
+                            </div>
+
+                            <DepositosField
+                                depositos={editForm.data.depositos}
+                                monedas={monedas}
+                                onChange={(d) =>
+                                    editForm.setData('depositos', d)
+                                }
+                                error={
+                                    editForm.errors.depositos as
+                                        | string
+                                        | undefined
+                                }
+                            />
+
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1 border-t border-border/60" />
+                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                    Documentación
+                                </span>
+                                <div className="flex-1 border-t border-border/60" />
+                            </div>
+                            <DocumentSection
+                                title="Licencia"
+                                mode={editLicMode}
+                                onModeChange={(m) =>
+                                    applyDocMode(
+                                        editForm,
+                                        'licencia',
+                                        setEditLicMode,
+                                        m,
+                                    )
+                                }
+                                pdfFile={editForm.data.licencia_pdf}
+                                onPdfDrop={(f) =>
+                                    editForm.setData('licencia_pdf', f[0])
+                                }
+                                frenteFile={editForm.data.licencia_frente}
+                                onFrenteDrop={(f) =>
+                                    editForm.setData('licencia_frente', f[0])
+                                }
+                                dorsoFile={editForm.data.licencia_dorso}
+                                onDorsoDrop={(f) =>
+                                    editForm.setData('licencia_dorso', f[0])
+                                }
+                                existing={userToEdit?.documentos?.licencia}
+                                onPreview={(url, name, type) =>
+                                    setPreviewImage({ url, name, type })
+                                }
+                                error={
+                                    editForm.errors.licencia_pdf ||
+                                    editForm.errors.licencia_frente ||
+                                    editForm.errors.licencia_dorso
+                                }
+                            />
+                            <DocumentSection
+                                title="DNI"
+                                mode={editDniMode}
+                                onModeChange={(m) =>
+                                    applyDocMode(
+                                        editForm,
+                                        'dni',
+                                        setEditDniMode,
+                                        m,
+                                    )
+                                }
+                                pdfFile={editForm.data.dni_pdf}
+                                onPdfDrop={(f) =>
+                                    editForm.setData('dni_pdf', f[0])
+                                }
+                                frenteFile={editForm.data.dni_frente}
+                                onFrenteDrop={(f) =>
+                                    editForm.setData('dni_frente', f[0])
+                                }
+                                dorsoFile={editForm.data.dni_dorso}
+                                onDorsoDrop={(f) =>
+                                    editForm.setData('dni_dorso', f[0])
+                                }
+                                existing={userToEdit?.documentos?.dni}
+                                onPreview={(url, name, type) =>
+                                    setPreviewImage({ url, name, type })
+                                }
+                                error={
+                                    editForm.errors.dni_pdf ||
+                                    editForm.errors.dni_frente ||
+                                    editForm.errors.dni_dorso
+                                }
+                            />
                         </div>
                         <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">
                             {userToEdit && (
-                                <Button type="button" variant="ghost" size="sm" onClick={() => router.get(`/users/${userToEdit.id}/asignaciones`)}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                        router.get(
+                                            `/users/${userToEdit.id}/asignaciones`,
+                                        )
+                                    }
+                                >
                                     Ver asignaciones
                                 </Button>
                             )}
                             <div className="flex gap-2">
-                                <Button type="button" variant="outline" onClick={closeEditModal}>Cancelar</Button>
-                                <Button type="submit" disabled={editForm.processing}>
-                                    {editForm.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar cambios</>}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={closeEditModal}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={editForm.processing}
+                                >
+                                    {editForm.processing ? (
+                                        'Guardando...'
+                                    ) : (
+                                        <>
+                                            <Check className="h-4 w-4" />{' '}
+                                            Guardar cambios
+                                        </>
+                                    )}
                                 </Button>
                             </div>
                         </DialogFooter>
@@ -1915,7 +2981,10 @@ export default function UsersIndex({ users, roles, empresas, monedas, choferCoun
                 </DialogContent>
             </Dialog>
 
-            <DocPreviewDialog preview={previewImage} onClose={() => setPreviewImage(null)} />
+            <DocPreviewDialog
+                preview={previewImage}
+                onClose={() => setPreviewImage(null)}
+            />
 
             {inversorConfig && inversionesDisponibles && (
                 <InversorInversionesDialog
@@ -2013,7 +3082,9 @@ function InversorInversionesDialog({
                 preserveScroll: true,
                 onSuccess: () => onClose(),
                 onError: (errs) => {
-                    setError(Object.values(errs).join(' ') || 'Error al guardar.');
+                    setError(
+                        Object.values(errs).join(' ') || 'Error al guardar.',
+                    );
                 },
                 onFinish: () => setProcessing(false),
             },
@@ -2039,15 +3110,16 @@ function InversorInversionesDialog({
                     </DialogTitle>
                     <DialogDescription className="text-xs">
                         Marcá a qué inversiones pertenece, si financia y cuánta
-                        deuda tiene en cada una. Los abonos del cierre descuentan
-                        esta deuda automáticamente.
+                        deuda tiene en cada una (en dólares). Los abonos del
+                        cierre descuentan esta deuda en USD, a la tasa del
+                        cierre.
                     </DialogDescription>
                 </div>
 
                 <div className="flex flex-col gap-4 px-5 py-4">
                     {porEmpresa.map(([empresa, items]) => (
                         <div key={empresa}>
-                            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                            <p className="text-[11px] font-semibold tracking-widest text-muted-foreground uppercase">
                                 {empresa}
                             </p>
                             <ul className="mt-1.5 divide-y divide-border rounded-xl border border-border">
@@ -2058,7 +3130,9 @@ function InversorInversionesDialog({
                                             key={r.inversion_id}
                                             className={cn(
                                                 'flex items-center justify-between gap-3 px-3 py-2.5',
-                                                r.asignado ? 'bg-primary/5' : '',
+                                                r.asignado
+                                                    ? 'bg-primary/5'
+                                                    : '',
                                             )}
                                         >
                                             <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
@@ -2066,9 +3140,14 @@ function InversorInversionesDialog({
                                                     type="checkbox"
                                                     checked={r.asignado}
                                                     onChange={(e) =>
-                                                        updateRow(r.inversion_id, {
-                                                            asignado: e.target.checked,
-                                                        })
+                                                        updateRow(
+                                                            r.inversion_id,
+                                                            {
+                                                                asignado:
+                                                                    e.target
+                                                                        .checked,
+                                                            },
+                                                        )
                                                     }
                                                     className="h-4 w-4 rounded border-input"
                                                 />
@@ -2086,11 +3165,18 @@ function InversorInversionesDialog({
                                                 <input
                                                     type="checkbox"
                                                     checked={r.es_financiador}
-                                                    disabled={!r.asignado || esDeudor}
+                                                    disabled={
+                                                        !r.asignado || esDeudor
+                                                    }
                                                     onChange={(e) =>
-                                                        updateRow(r.inversion_id, {
-                                                            es_financiador: e.target.checked,
-                                                        })
+                                                        updateRow(
+                                                            r.inversion_id,
+                                                            {
+                                                                es_financiador:
+                                                                    e.target
+                                                                        .checked,
+                                                            },
+                                                        )
                                                     }
                                                     className="h-4 w-4 rounded border-input"
                                                 />
@@ -2103,18 +3189,36 @@ function InversorInversionesDialog({
                                                     !r.asignado && 'opacity-40',
                                                 )}
                                             >
-                                                <span className="text-xs text-muted-foreground">Deuda</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    Deuda USD
+                                                </span>
                                                 <MoneyInput
-                                                    value={r.deuda === '' ? null : Number(r.deuda)}
-                                                    disabled={!r.asignado || r.es_financiador}
+                                                    value={
+                                                        r.deuda === ''
+                                                            ? null
+                                                            : Number(r.deuda)
+                                                    }
+                                                    disabled={
+                                                        !r.asignado ||
+                                                        r.es_financiador
+                                                    }
                                                     onValueChange={(n) =>
-                                                        updateRow(r.inversion_id, {
-                                                            deuda: n == null ? '' : String(n),
-                                                        })
+                                                        updateRow(
+                                                            r.inversion_id,
+                                                            {
+                                                                deuda:
+                                                                    n == null
+                                                                        ? ''
+                                                                        : String(
+                                                                              n,
+                                                                          ),
+                                                            },
+                                                        )
                                                     }
                                                     className={cn(
                                                         'h-8 w-28 px-2 py-1 text-right text-sm tabular-nums',
-                                                        esDeudor && 'border-red-500/40 text-red-700 dark:text-red-400',
+                                                        esDeudor &&
+                                                            'border-red-500/40 text-red-700 dark:text-red-400',
                                                     )}
                                                 />
                                             </div>
@@ -2133,7 +3237,11 @@ function InversorInversionesDialog({
                 </div>
 
                 <DialogFooter className="gap-2 border-t border-border px-5 py-4 sm:gap-2">
-                    <Button variant="outline" onClick={onClose} disabled={processing}>
+                    <Button
+                        variant="outline"
+                        onClick={onClose}
+                        disabled={processing}
+                    >
                         Cancelar
                     </Button>
                     <Button onClick={handleSave} disabled={processing}>
