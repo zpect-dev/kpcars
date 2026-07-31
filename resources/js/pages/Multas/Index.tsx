@@ -2529,7 +2529,7 @@ function CobrarMultaForm({
                                             : 'bg-transparent text-muted-foreground hover:bg-muted',
                                     )}
                                 >
-                                    Depósito
+                                    Transferencia
                                 </button>
                             </div>
                         </div>
