@@ -859,22 +859,6 @@ export default function ResumenIndex({
                                         />
                                         <SortHeader
                                             label="Gastos"
-                                            col="gastos"
-                                            sortKey={sortVehiculoKey}
-                                            sortDir={sortVehiculoDir}
-                                            onSort={toggleSortVehiculo}
-                                            right
-                                        />
-                                        <SortHeader
-                                            label="Repuestos"
-                                            col="repuestos"
-                                            sortKey={sortVehiculoKey}
-                                            sortDir={sortVehiculoDir}
-                                            onSort={toggleSortVehiculo}
-                                            right
-                                        />
-                                        <SortHeader
-                                            label="Egresos"
                                             col="egresos"
                                             sortKey={sortVehiculoKey}
                                             sortDir={sortVehiculoDir}
@@ -895,7 +879,7 @@ export default function ResumenIndex({
                                     {sortedPorVehiculo.length === 0 && (
                                         <tr>
                                             <td
-                                                colSpan={10}
+                                                colSpan={8}
                                                 className="px-3 py-8 text-center text-sm text-muted-foreground"
                                             >
                                                 Sin resultados para «
@@ -948,12 +932,6 @@ export default function ResumenIndex({
                                             <td className="px-3 py-2 text-right whitespace-nowrap text-foreground tabular-nums">
                                                 {formatARS(f.ingresos)}
                                             </td>
-                                            <td className="px-3 py-2 text-right whitespace-nowrap text-muted-foreground tabular-nums">
-                                                {formatARS(f.gastos)}
-                                            </td>
-                                            <td className="px-3 py-2 text-right whitespace-nowrap text-muted-foreground tabular-nums">
-                                                {formatARS(f.repuestos)}
-                                            </td>
                                             <td className="px-3 py-2 text-right whitespace-nowrap text-foreground tabular-nums">
                                                 {formatARS(f.egresos)}
                                             </td>
@@ -974,9 +952,9 @@ export default function ResumenIndex({
                         </div>
                     )}
                     <p className="text-xs text-muted-foreground">
-                        El egreso de cada vehículo suma sus gastos propios más
-                        los repuestos que se le colocaron desde inventario,
-                        valuados a precio de venta.
+                        La columna Gastos suma los gastos propios de cada
+                        vehículo más los repuestos que se le colocaron desde
+                        inventario, valuados a precio de venta.
                         {!filtroFlota &&
                             ' Los gastos de galpón no se reparten por vehículo: cuentan en los totales y en el desglose por categoría.'}
                     </p>
