@@ -8,6 +8,9 @@
 <body>
     <div class="section-title">
         Resumen financiero — {{ \Carbon\Carbon::parse($filtros['desde'])->format('d/m/Y') }} al {{ \Carbon\Carbon::parse($filtros['hasta'])->format('d/m/Y') }}
+        @if ($resumen['seleccion']['activa'])
+            <span style="font-weight:normal;">(reporte de la selección)</span>
+        @endif
     </div>
 
     <table>
@@ -39,7 +42,7 @@
         <thead>
             <tr>
                 <th style="width:12%">Patente</th>
-                <th style="width:18%">Vehículo</th>
+                <th style="width:18%">Chofer</th>
                 <th style="width:14%">Inversión</th>
                 <th style="width:12%">Empresa</th>
                 <th class="numeric" style="width:11%">Ingresos</th>
@@ -52,7 +55,7 @@
             @forelse ($resumen['por_vehiculo'] as $f)
                 <tr>
                     <td>{{ $f['patente'] }}</td>
-                    <td>{{ trim(($f['marca'] ?? '').' '.($f['modelo'] ?? '')) ?: '—' }}</td>
+                    <td>{{ $f['chofer_nombre'] ?? '—' }}</td>
                     <td>{{ $f['inversion_nombre'] ?? '—' }}</td>
                     <td>{{ $f['empresa_nombre'] ?? '—' }}</td>
                     <td class="numeric">${{ number_format($f['ingresos'], 2, ',', '.') }}</td>
@@ -64,6 +67,17 @@
                 <tr><td colspan="8" class="center">Sin movimientos por vehículo en el rango.</td></tr>
             @endforelse
         </tbody>
+        @if ($resumen['seleccion']['activa'] && $resumen['por_vehiculo']->isNotEmpty())
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="4">TOTAL SELECCIÓN ({{ $resumen['por_vehiculo']->count() }})</td>
+                    <td class="numeric">${{ number_format($resumen['seleccion']['vehiculo']['ingresos'], 2, ',', '.') }}</td>
+                    <td class="numeric">${{ number_format($resumen['seleccion']['vehiculo']['gastos'], 2, ',', '.') }}</td>
+                    <td class="numeric">${{ number_format($resumen['seleccion']['vehiculo']['repuestos'], 2, ',', '.') }}</td>
+                    <td class="numeric">${{ number_format($resumen['seleccion']['vehiculo']['neto'], 2, ',', '.') }}</td>
+                </tr>
+            </tfoot>
+        @endif
     </table>
 
     <p style="font-size:10px; margin:6px 0 0;">
@@ -92,11 +106,19 @@
             @endforelse
         </tbody>
         <tfoot>
-            <tr class="total-row">
-                <td>TOTAL EGRESOS</td>
-                <td class="numeric">${{ number_format($resumen['totales']['egresos'], 2, ',', '.') }}</td>
-                <td></td>
-            </tr>
+            @if ($resumen['seleccion']['activa'] && $resumen['por_tipo']->isNotEmpty())
+                <tr class="total-row">
+                    <td>TOTAL SELECCIÓN ({{ $resumen['por_tipo']->count() }})</td>
+                    <td class="numeric">${{ number_format($resumen['seleccion']['tipo_total'], 2, ',', '.') }}</td>
+                    <td></td>
+                </tr>
+            @else
+                <tr class="total-row">
+                    <td>TOTAL EGRESOS</td>
+                    <td class="numeric">${{ number_format($resumen['totales']['egresos'], 2, ',', '.') }}</td>
+                    <td></td>
+                </tr>
+            @endif
         </tfoot>
     </table>
 

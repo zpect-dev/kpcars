@@ -15,7 +15,6 @@ use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoAbono;
 use App\Models\CierreSueldoPago;
-use App\Models\CierreSueldoParticipacion;
 use App\Models\CierreSueldoSocio;
 use App\Models\Cobro;
 use App\Models\Empresa;
@@ -27,7 +26,6 @@ use App\Models\User;
 use App\Models\Vehiculo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Testing\TestResponse;
 
 uses(RefreshDatabase::class);
 
@@ -246,6 +244,81 @@ it('el cierre unificado también cierra la caja (cobros + gastos) de cada empres
 
     // La empresa2 no tenía caja abierta → no se le creó cierre de caja.
     expect(CierreCaja::withoutGlobalScopes()->where('empresa_id', $this->empresa2->id)->exists())->toBeFalse();
+});
+
+it('el cierre unificado archiva la flota pendiente de una empresa aunque su caja no esté abierta', function () {
+    $invs = unificadoInversores(2);
+    $inv1 = unificadoInversion('INV_1', $this->empresa1, [$invs[0]]);
+    $inv2 = unificadoInversion('INV_2', $this->empresa2, [$invs[1]]);
+
+    $veh2 = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv2->id, 'empresa_id' => $this->empresa2->id,
+        'patente' => 'FLOTA_E2', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+
+    unificadoApertura($this->empresa1, $this->admin, [$inv1->id => 600]);
+    unificadoApertura($this->empresa2, $this->admin, [$inv2->id => 400]);
+
+    // Sólo la empresa1 tiene caja abierta. La empresa2 tiene un gasto de flota
+    // PENDIENTE pero sin apertura de caja abierta (el bug reportado).
+    AperturaCaja::withoutGlobalScopes()->create(['empresa_id' => $this->empresa1->id, 'user_id' => $this->admin->id]);
+
+    $veh1 = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv1->id, 'empresa_id' => $this->empresa1->id,
+        'patente' => 'FLOTA_E1', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+    $gastoE1 = Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 300, 'user_id' => $this->admin->id,
+        'recibio' => 'Prov', 'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo', 'vehiculo_id' => $veh1->id,
+    ]);
+    $gastoE2 = Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 700, 'user_id' => $this->admin->id,
+        'recibio' => 'Prov', 'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo', 'vehiculo_id' => $veh2->id,
+    ]);
+
+    $this->action->execute(1000, $this->admin);
+
+    // La flota de AMBAS empresas quedó archivada, incluida la de empresa2 sin caja.
+    expect($gastoE1->fresh()->cierre_gasto_id)->not->toBeNull()
+        ->and($gastoE2->fresh()->cierre_gasto_id)->not->toBeNull();
+
+    // La empresa2 tiene su cierre de caja con el gasto archivado.
+    $cierreE2 = CierreCaja::withoutGlobalScopes()->where('empresa_id', $this->empresa2->id)->first();
+    expect($cierreE2)->not->toBeNull()
+        ->and((float) CierreGasto::withoutGlobalScopes()->where('cierre_caja_id', $cierreE2->id)->value('total_general'))->toBe(700.0);
+
+    // Ya no quedan gastos pendientes.
+    expect(Gasto::withoutGlobalScopes()->whereNull('cierre_gasto_id')->count())->toBe(0);
+});
+
+it('archiva la flota de OTRA empresa aunque haya una empresa activa distinta en sesión', function () {
+    // Reproduce el escenario real: el admin está parado en empresa1, y hay flota
+    // pendiente en empresa2 con su caja abierta.
+    session(['active_company_id' => $this->empresa1->id]);
+
+    $invs = unificadoInversores(2);
+    $inv1 = unificadoInversion('INV_1', $this->empresa1, [$invs[0]]);
+    $inv2 = unificadoInversion('INV_2', $this->empresa2, [$invs[1]]);
+
+    $veh2 = Vehiculo::withoutGlobalScopes()->create([
+        'inversion_id' => $inv2->id, 'empresa_id' => $this->empresa2->id,
+        'patente' => 'FLOTA_E2', 'marca' => 'Test', 'modelo' => 'Test', 'anio' => '2020',
+    ]);
+
+    unificadoApertura($this->empresa1, $this->admin, [$inv1->id => 600]);
+    unificadoApertura($this->empresa2, $this->admin, [$inv2->id => 400]);
+
+    // Empresa2 con caja abierta y un gasto de flota pendiente.
+    AperturaCaja::withoutGlobalScopes()->create(['empresa_id' => $this->empresa2->id, 'user_id' => $this->admin->id]);
+    $gastoE2 = Gasto::create([
+        'fecha' => now()->toDateString(), 'monto' => 700, 'user_id' => $this->admin->id,
+        'recibio' => 'Prov', 'metodo_pago' => 'efectivo', 'tipo' => 'vehiculo', 'vehiculo_id' => $veh2->id,
+    ]);
+
+    $this->action->execute(1000, $this->admin);
+
+    // Debe quedar archivada aunque la empresa activa sea la 1.
+    expect($gastoE2->fresh()->cierre_gasto_id)->not->toBeNull();
 });
 
 it('reparte la parte completa cuando no hay deudores', function () {
@@ -530,165 +603,6 @@ it('el detalle del cierre muestra el recaudado de AMBAS empresas aunque haya una
         );
 });
 
-// ─── Composición editable del cierre ───────────────────────────────────────
-
-/** Llama al endpoint de composición como lo hace la UI. */
-function composicionPatch(CierreSueldo $cierre, Inversion $inv, User $u, bool $pertenece, float $saldo, bool $esFinanciador, ?bool $esDeudor = null): TestResponse
-{
-    return test()->actingAs(test()->admin)->patch(
-        "/cierres-sueldo/{$cierre->id}/inversiones/{$inv->id}/socios/{$u->id}",
-        [
-            'pertenece' => $pertenece,
-            'saldo' => $saldo,
-            'es_financiador' => $esFinanciador,
-            'es_deudor' => $esDeudor ?? ($saldo > 0),
-        ],
-    );
-}
-
-it('el detalle expone la composición por empresa → inversión con sus socios', function () {
-    [$deudor, $financiador] = unificadoInversores(2);
-    $inv = unificadoInversion('INV_1', $this->empresa1, [$deudor, $financiador], [
-        0 => ['deuda' => 500], 1 => ['es_financiador' => true],
-    ]);
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    $this->actingAs($this->admin)
-        ->get('/cierres-sueldo/'.$cierre->id)
-        ->assertOk()
-        ->assertInertia(fn ($p) => $p
-            ->component('CierresSueldo/Show')
-            ->where('composicion.0.nombre', 'EMP_1')
-            ->where('composicion.0.inversiones.0.nombre', 'INV_1')
-            ->where('composicion.0.inversiones.0.recaudado', 600)
-            ->has('composicion.0.inversiones.0.socios', 2)
-        );
-});
-
-it('editar la deuda de un socio muta el registro real y recalcula el sueldo', function () {
-    [$deudor, $financiador, $normal] = unificadoInversores(3);
-    $inv = unificadoInversion('INV_1', $this->empresa1, [$deudor, $financiador, $normal], [
-        0 => ['deuda' => 500], 1 => ['es_financiador' => true],
-    ]);
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    // Al crear: deudor abona, deuda 500 → 400. Ahora pongo su deuda en 0.
-    composicionPatch($cierre, $inv, $deudor, true, 0, false)->assertRedirect();
-
-    // Ya no es deudor: cobra parte completa y su deuda real queda en 0.
-    $pagoDeudor = CierreSueldoPago::where('cierre_sueldo_id', $cierre->id)->where('user_id', $deudor->id)->first();
-    expect((float) $pagoDeudor->monto)->toBe(200.0)
-        ->and($pagoDeudor->concepto)->toBe(CierreSueldoPago::CONCEPTO_PARTE_COMPLETA)
-        ->and(unificadoDeuda($inv, $deudor))->toBe(0.0);
-
-    // La foto del cierro también se actualizó y ya no hay decisión de deudor.
-    $part = CierreSueldoParticipacion::where('cierre_sueldo_id', $cierre->id)
-        ->where('inversion_id', $inv->id)->where('user_id', $deudor->id)->first();
-    expect((float) $part->saldo)->toBe(0.0)
-        ->and(CierreSueldoSocio::where('cierre_sueldo_id', $cierre->id)->where('user_id', $deudor->id)->exists())->toBeFalse();
-});
-
-it('quitar un socio de la inversión lo desasigna del registro real y reparte entre los que quedan', function () {
-    $invs = unificadoInversores(3);
-    $inv = unificadoInversion('INV_1', $this->empresa1, $invs);
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    // 3 inversores → parte 200. Quito uno.
-    composicionPatch($cierre, $inv, $invs[2], false, 0, false)->assertRedirect();
-
-    expect(DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $invs[2]->id)->exists())->toBeFalse()
-        ->and(CierreSueldoParticipacion::where('cierre_sueldo_id', $cierre->id)->where('inversion_id', $inv->id)->count())->toBe(2);
-
-    // 2 inversores → parte 300 cada uno.
-    $pagos = CierreSueldoPago::where('cierre_sueldo_id', $cierre->id)->get();
-    expect($pagos)->toHaveCount(2);
-    foreach ($pagos as $p) {
-        expect((float) $p->monto)->toBe(300.0);
-    }
-});
-
-it('agregar un socio candidato lo asigna a la inversión real y recalcula', function () {
-    $invs = unificadoInversores(1);
-    $inv = unificadoInversion('INV_1', $this->empresa1, $invs);
-
-    // Candidato: inversor de la empresa que aún no participa.
-    $candidato = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '29999999', 'name' => 'Candidato']);
-    $candidato->empresas()->attach($this->empresa1->id);
-
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    // 1 inversor → parte 600. Sumo al candidato.
-    composicionPatch($cierre, $inv, $candidato, true, 0, false)->assertRedirect();
-
-    expect(DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $candidato->id)->exists())->toBeTrue()
-        ->and(CierreSueldoParticipacion::where('cierre_sueldo_id', $cierre->id)->where('inversion_id', $inv->id)->count())->toBe(2);
-
-    // 2 inversores → parte 300 cada uno.
-    $pagos = CierreSueldoPago::where('cierre_sueldo_id', $cierre->id)->get();
-    expect($pagos)->toHaveCount(2);
-    foreach ($pagos as $p) {
-        expect((float) $p->monto)->toBe(300.0);
-    }
-});
-
-it('marcar a un socio como financiador se refleja en el registro real', function () {
-    [$a, $b] = unificadoInversores(2);
-    $inv = unificadoInversion('INV_1', $this->empresa1, [$a, $b]);
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    composicionPatch($cierre, $inv, $b, true, 0, true)->assertRedirect();
-
-    expect((bool) DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $b->id)->value('es_financiador'))->toBeTrue()
-        ->and((bool) CierreSueldoParticipacion::where('cierre_sueldo_id', $cierre->id)->where('inversion_id', $inv->id)->where('user_id', $b->id)->value('es_financiador'))->toBeTrue();
-});
-
-it('la composición expone si cada inversión está completa (10 autos) y el flag deudor', function () {
-    [$deudor, $financiador] = unificadoInversores(2);
-    $inv = unificadoInversion('INV_1', $this->empresa1, [$deudor, $financiador], [
-        0 => ['es_deudor' => true], 1 => ['es_financiador' => true],
-    ]);
-
-    // 2 autos acá + 1 que crea la apertura para la recaudación = 3 (incompleta).
-    foreach (range(1, 2) as $i) {
-        Vehiculo::withoutGlobalScopes()->create([
-            'inversion_id' => $inv->id, 'empresa_id' => $this->empresa1->id,
-            'patente' => "CAR_{$i}", 'marca' => 'T', 'modelo' => 'T', 'anio' => '2020',
-        ]);
-    }
-
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1, $this->admin);
-
-    $this->actingAs($this->admin)
-        ->get('/cierres-sueldo/'.$cierre->id)
-        ->assertOk()
-        ->assertInertia(fn ($p) => $p
-            ->where('composicion.0.inversiones.0.autos', 3)
-            ->where('composicion.0.inversiones.0.completa', false)
-            // Socios ordenados por nombre: el deudor (2-00) queda primero.
-            ->where('composicion.0.inversiones.0.socios.0.user.id', $deudor->id)
-            ->where('composicion.0.inversiones.0.socios.0.es_deudor', true)
-            ->where('composicion.0.inversiones.0.socios.0.saldo', 0)
-        );
-});
-
 it('un deudor marcado por flag (sin monto) cobra media parte y cede al financiador', function () {
     [$deudor, $financiador, $normal] = unificadoInversores(3);
 
@@ -714,46 +628,6 @@ it('un deudor marcado por flag (sin monto) cobra media parte y cede al financiad
     // Sin monto de deuda, no hay abono que aplicar (la deuda queda en 0).
     expect(unificadoDeuda($inv, $deudor))->toBe(0.0);
 });
-
-it('marcar el check de deudor en la composición lo hace deudor en el registro real', function () {
-    [$a, $financiador] = unificadoInversores(2);
-    $inv = unificadoInversion('INV_1', $this->empresa1, [$a, $financiador], [
-        1 => ['es_financiador' => true],
-    ]);
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1, $this->admin);
-
-    // Marca el check deudor (sin monto) sobre un socio que no lo era.
-    composicionPatch($cierre, $inv, $a, true, 0, false, true)->assertRedirect();
-
-    expect((bool) DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $a->id)->value('es_deudor'))->toBeTrue()
-        ->and((bool) CierreSueldoParticipacion::where('cierre_sueldo_id', $cierre->id)->where('inversion_id', $inv->id)->where('user_id', $a->id)->value('es_deudor'))->toBeTrue();
-
-    // Ahora cobra media parte como deudor.
-    $pago = CierreSueldoPago::where('cierre_sueldo_id', $cierre->id)->where('user_id', $a->id)->first();
-    expect($pago->concepto)->toBe(CierreSueldoPago::CONCEPTO_MEDIA_PARTE_DEUDOR);
-});
-
-it('no permite superar el máximo de inversores al sumar un socio', function () {
-    $invs = unificadoInversores(6);
-    $inv = unificadoInversion('INV_1', $this->empresa1, $invs);
-
-    $candidato = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '29999998', 'name' => 'Extra']);
-    $candidato->empresas()->attach($this->empresa1->id);
-
-    unificadoApertura($this->empresa1, $this->admin, [$inv->id => 600]);
-    unificadoApertura($this->empresa2, $this->admin);
-
-    $cierre = $this->action->execute(1000, $this->admin);
-
-    composicionPatch($cierre, $inv, $candidato, true, 0, false)
-        ->assertSessionHasErrors('pertenece');
-
-    expect(DB::table('inversion_user')->where('inversion_id', $inv->id)->count())->toBe(6);
-});
-
 it('las vistas de cierres de sueldo requieren rol administrador', function () {
     $administrativo = User::factory()->create(['role' => UserRole::ADMINISTRATIVO, 'dni' => '10000002']);
 

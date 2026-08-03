@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\CalcularResumenAction;
 use App\Actions\CreateGastoAction;
 use App\Enums\UserRole;
@@ -351,4 +352,99 @@ it('permite el resumen al administrador y lo niega al administrativo', function 
     ]);
 
     $this->actingAs($administrativo)->get('/resumen')->assertForbidden();
+});
+
+it('AplicarSeleccionResumenAction recorta el resumen a la selección y re-suma sin tocar los totales del período', function () {
+    $vehiculo2 = Vehiculo::factory()->create([
+        'inversion_id' => $this->inversion->id,
+        'empresa_id' => $this->empresa->id,
+        'precio' => 100000,
+    ]);
+
+    cierreConRecaudacion($this->vehiculo, 1000, '2026-07-10 12:00:00');
+    cierreConRecaudacion($vehiculo2, 700, '2026-07-11 12:00:00');
+    gastoBase(['tipo' => 'vehiculo', 'vehiculo_id' => $this->vehiculo->id, 'monto' => 200]);
+    gastoBase(['tipo' => 'galpon', 'monto' => 100, 'fecha' => '2026-07-06']);
+
+    $r = resumen();
+
+    expect($r['por_vehiculo'])->toHaveCount(2)
+        ->and($r['por_tipo'])->toHaveCount(2);
+
+    $seleccionado = app(AplicarSeleccionResumenAction::class)->execute($r, [$vehiculo2->id], ['galpon']);
+
+    expect($seleccionado['seleccion']['activa'])->toBeTrue()
+        ->and($seleccionado['por_vehiculo'])->toHaveCount(1)
+        ->and($seleccionado['por_vehiculo'][0]['vehiculo_id'])->toBe($vehiculo2->id)
+        ->and($seleccionado['seleccion']['vehiculo']['ingresos'])->toBe(700.0)
+        ->and($seleccionado['por_tipo'])->toHaveCount(1)
+        ->and($seleccionado['seleccion']['tipo_total'])->toBe(100.0)
+        ->and($seleccionado['totales']['ingresos'])->toBe(1700.0);
+});
+
+it('sin selección, AplicarSeleccionResumenAction deja el resumen intacto', function () {
+    $r = resumen();
+    $sinSeleccion = app(AplicarSeleccionResumenAction::class)->execute($r, [], []);
+
+    expect($sinSeleccion['seleccion']['activa'])->toBeFalse()
+        ->and($sinSeleccion['por_vehiculo'])->toHaveCount($r['por_vehiculo']->count())
+        ->and($sinSeleccion['por_tipo'])->toHaveCount($r['por_tipo']->count());
+});
+
+it('exporta PDF y Excel del resumen filtrando por la selección tildada en pantalla', function () {
+    $vehiculo2 = Vehiculo::factory()->create([
+        'inversion_id' => $this->inversion->id,
+        'empresa_id' => $this->empresa->id,
+        'precio' => 100000,
+    ]);
+    cierreConRecaudacion($this->vehiculo, 1000, '2026-07-10 12:00:00');
+    cierreConRecaudacion($vehiculo2, 700, '2026-07-11 12:00:00');
+
+    $query = http_build_query([
+        'desde' => '2026-07-01',
+        'hasta' => '2026-07-31',
+        'sel_vehiculo_ids' => [$vehiculo2->id],
+    ]);
+
+    $this->actingAs($this->admin)->get('/pdf/resumen?'.$query)
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+
+    $this->actingAs($this->admin)->get('/excel/resumen?'.$query)
+        ->assertOk();
+});
+
+it('el detalle de un vehículo lista ingresos y egresos con fecha', function () {
+    // Ingreso: recaudación cerrada en el rango.
+    cierreConRecaudacion($this->vehiculo, 1000, '2026-07-10 12:00:00');
+    // Egreso: gasto de flota en el rango.
+    gastoBase([
+        'tipo' => 'vehiculo', 'vehiculo_id' => $this->vehiculo->id,
+        'fecha' => '2026-07-12', 'monto' => 300, 'descripcion' => 'Cambio de aceite',
+    ]);
+    // Egreso: repuesto (2 × 250 = 500) en el rango.
+    repuestoParaVehiculo($this->vehiculo, 250, 2, '2026-07-15 09:00:00');
+    // Fuera del rango: no debe aparecer.
+    cierreConRecaudacion($this->vehiculo, 999, '2026-06-10 12:00:00');
+
+    $this->actingAs($this->admin)
+        ->get("/resumen/vehiculo/{$this->vehiculo->id}?desde=2026-07-01&hasta=2026-07-31")
+        ->assertOk()
+        ->assertInertia(fn (Assert $p) => $p
+            ->component('Resumen/Vehiculo')
+            ->where('vehiculo.patente', $this->vehiculo->patente)
+            // Ingresos: sólo el cierre en rango (1000).
+            ->has('ingresos', 1)
+            ->where('ingresos.0.monto', 1000)
+            ->where('ingresos.0.fecha', '2026-07-10')
+            // Egresos: gasto (300) + repuesto (500), ordenados por fecha.
+            ->has('egresos', 2)
+            ->where('egresos.0.tipo', 'gasto')
+            ->where('egresos.0.monto', 300)
+            ->where('egresos.1.tipo', 'repuesto')
+            ->where('egresos.1.monto', 500)
+            ->where('totales.ingresos', 1000)
+            ->where('totales.egresos', 800)
+            ->where('totales.neto', 200)
+        );
 });

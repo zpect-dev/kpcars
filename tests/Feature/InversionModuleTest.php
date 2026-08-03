@@ -116,6 +116,111 @@ it('configura las inversiones y deuda del inversor desde Personal', function () 
     expect(DB::table('inversion_user')->where('user_id', $socio->id)->count())->toBe(1);
 });
 
+it('marca deudor con el check desde Personal, sin monto (inversión incompleta)', function () {
+    $inv = Inversion::create(['nombre' => 'INV_INC', 'empresa_id' => $this->empresa->id]);
+    $socio = moduloInversor('20000020');
+
+    $this->actingAs($this->admin)
+        ->put("/users/{$socio->id}/inversiones", [
+            'inversiones' => [
+                ['inversion_id' => $inv->id, 'es_financiador' => false, 'deuda' => 0, 'es_deudor' => true],
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $pivot = DB::table('inversion_user')->where('user_id', $socio->id)->where('inversion_id', $inv->id)->first();
+    expect((float) $pivot->deuda)->toBe(0.0)
+        ->and((bool) $pivot->es_deudor)->toBeTrue();
+});
+
+it('un financiador no puede marcarse deudor con el check desde Personal', function () {
+    $inv = Inversion::create(['nombre' => 'INV_F', 'empresa_id' => $this->empresa->id]);
+    $socio = moduloInversor('20000021');
+
+    $this->actingAs($this->admin)
+        ->put("/users/{$socio->id}/inversiones", [
+            'inversiones' => [
+                ['inversion_id' => $inv->id, 'es_financiador' => true, 'deuda' => 0, 'es_deudor' => true],
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    expect(DB::table('inversion_user')->where('user_id', $socio->id)->count())->toBe(0);
+});
+
+it('configura los inversores de UNA inversión (financiador + deudor) y los asigna a la empresa', function () {
+    $inv = Inversion::create(['nombre' => 'INV_C', 'empresa_id' => $this->empresa->id]);
+    $financiador = moduloInversor('20000030');
+    // Inversor que NO pertenece a la empresa todavía.
+    $deudor = User::factory()->create(['role' => UserRole::INVERSOR, 'dni' => '20000031']);
+    expect(DB::table('empresa_user')->where('user_id', $deudor->id)->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)
+        ->put("/inversiones/{$inv->id}/inversores", [
+            'socios' => [
+                ['user_id' => $financiador->id, 'es_financiador' => true, 'deuda' => 0],
+                ['user_id' => $deudor->id, 'es_financiador' => false, 'deuda' => 500],
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    $pFin = DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $financiador->id)->first();
+    expect((bool) $pFin->es_financiador)->toBeTrue()
+        ->and((bool) $pFin->es_deudor)->toBeFalse();
+
+    $pDeu = DB::table('inversion_user')->where('inversion_id', $inv->id)->where('user_id', $deudor->id)->first();
+    expect((float) $pDeu->deuda)->toBe(500.0)
+        ->and((bool) $pDeu->es_deudor)->toBeTrue();
+
+    // El deudor quedó asignado a la empresa de la inversión (efecto global).
+    expect(DB::table('empresa_user')->where('empresa_id', $this->empresa->id)->where('user_id', $deudor->id)->exists())->toBeTrue();
+});
+
+it('quitar un socio del listado de la inversión lo desasigna (sync)', function () {
+    $inv = Inversion::create(['nombre' => 'INV_S', 'empresa_id' => $this->empresa->id]);
+    [$a, $b] = [moduloInversor('20000032'), moduloInversor('20000033')];
+    $inv->inversores()->attach($a->id, ['es_financiador' => false, 'deuda' => 0, 'es_deudor' => false]);
+    $inv->inversores()->attach($b->id, ['es_financiador' => false, 'deuda' => 0, 'es_deudor' => false]);
+
+    // Guardo dejando sólo a $a: $b debe quedar fuera.
+    $this->actingAs($this->admin)
+        ->put("/inversiones/{$inv->id}/inversores", [
+            'socios' => [
+                ['user_id' => $a->id, 'es_financiador' => false, 'deuda' => 0],
+            ],
+        ])
+        ->assertRedirect();
+
+    expect(DB::table('inversion_user')->where('inversion_id', $inv->id)->pluck('user_id')->all())
+        ->toBe([$a->id]);
+});
+
+it('no permite más de MAX_INVERSORES en una inversión', function () {
+    $inv = Inversion::create(['nombre' => 'INV_MAX', 'empresa_id' => $this->empresa->id]);
+    $socios = [];
+    foreach (range(0, 6) as $i) {
+        $socios[] = ['user_id' => moduloInversor('2100000'.$i)->id, 'es_financiador' => false, 'deuda' => 0];
+    }
+
+    $this->actingAs($this->admin)
+        ->put("/inversiones/{$inv->id}/inversores", ['socios' => $socios])
+        ->assertSessionHasErrors('socios');
+
+    expect(DB::table('inversion_user')->where('inversion_id', $inv->id)->count())->toBe(0);
+});
+
+it('el administrativo no puede configurar los inversores de una inversión', function () {
+    $administrativo = User::factory()->create(['role' => UserRole::ADMINISTRATIVO, 'dni' => '10000009']);
+    $inv = Inversion::create(['nombre' => 'INV_ADM', 'empresa_id' => $this->empresa->id]);
+
+    $this->actingAs($administrativo)
+        ->put("/inversiones/{$inv->id}/inversores", ['socios' => []])
+        ->assertForbidden();
+});
+
 it('el administrativo no puede configurar inversiones desde Personal', function () {
     $administrativo = User::factory()->create([
         'role' => UserRole::ADMINISTRATIVO,

@@ -66,11 +66,10 @@ class ProcessCierreCajaAction
             ->lockForUpdate()
             ->first();
 
-        if ($apertura === null) {
-            if ($tolerante) {
-                return null;
-            }
-
+        // En modo manual el período debe estar abierto. En el cierre unificado
+        // (tolerante) seguimos aunque no lo esté: igual barremos los cobros y
+        // gastos que hayan quedado pendientes para esa empresa.
+        if ($apertura === null && ! $tolerante) {
             throw new RuntimeException('No hay un período de caja abierto para cerrar.');
         }
 
@@ -93,22 +92,33 @@ class ProcessCierreCajaAction
             ->get();
 
         // Gastos pendientes de la empresa: sus gastos de vehículo + los globales
-        // (vehiculo_id null). Replica GastoTenantScope para $empresaId concreto.
-        // Los globales los toma la PRIMERA empresa que cierra; las siguientes ya
-        // no los ven (dejan de estar pendientes), así no se cierran dos veces.
+        // (vehiculo_id null). El filtro por empresa se hace con una subconsulta
+        // CRUDA a `vehiculos` (sin TenantScope): un `whereHas` no logra quitar el
+        // scope de Vehiculo y, con otra empresa activa en sesión, dejaba afuera la
+        // flota de las demás empresas. Los globales los toma la PRIMERA empresa que
+        // cierra; las siguientes ya no los ven (dejan de estar pendientes).
         $gastosPendientes = Gasto::query()
             ->withoutGlobalScope(GastoTenantScope::class)
             ->pendientes()
             ->where(fn ($q) => $q
                 ->whereNull('vehiculo_id')
-                ->orWhereHas('vehiculo', fn ($q2) => $q2
-                    ->withoutGlobalScope(TenantScope::class)
+                ->orWhereIn('vehiculo_id', DB::table('vehiculos')
+                    ->select('id')
                     ->where('empresa_id', $empresaId)))
             ->lockForUpdate()
             ->get();
 
-        if ($totalesCobros->isEmpty() && $gastosPendientes->isEmpty() && ! $tolerante) {
-            throw new RuntimeException('No hay cobros ni gastos pendientes para cerrar.');
+        if ($totalesCobros->isEmpty() && $gastosPendientes->isEmpty()) {
+            if (! $tolerante) {
+                throw new RuntimeException('No hay cobros ni gastos pendientes para cerrar.');
+            }
+
+            // Tolerante: si hay un período abierto lo cerramos igual (aunque esté
+            // vacío, para alinearlo con la recaudación); si ni siquiera hay
+            // período abierto y nada pendiente, no hay nada que hacer.
+            if ($apertura === null) {
+                return null;
+            }
         }
 
         $cierre = CierreCaja::create([
@@ -132,18 +142,23 @@ class ProcessCierreCajaAction
                 'empresa_id' => $empresaId,
                 'cierre_caja_id' => $cierre->id,
                 'user_id' => $user->id,
-                'periodo_inicio' => $apertura->created_at,
+                // Sin apertura (barrido tolerante) usamos el último cierre como
+                // inicio del período, o ahora si tampoco hubo cierre previo.
+                'periodo_inicio' => $apertura?->created_at ?? $ultimoCierreFecha ?? now(),
                 'periodo_fin' => now(),
                 'total_general' => $gastosPendientes->sum(fn (Gasto $g) => (float) $g->monto),
             ]);
 
+            // Sin GastoTenantScope: si no, el update quedaría acotado a la empresa
+            // activa de la sesión y no archivaría la flota de las demás empresas.
             Gasto::query()
+                ->withoutGlobalScope(GastoTenantScope::class)
                 ->whereIn('id', $gastosPendientes->pluck('id'))
                 ->update(['cierre_gasto_id' => $cierreGasto->id]);
         }
 
-        // Cerrar la apertura: el período queda congelado hasta una nueva apertura.
-        $apertura->update(['cierre_id' => $cierre->id]);
+        // Cerrar la apertura si la había: el período queda congelado.
+        $apertura?->update(['cierre_id' => $cierre->id]);
 
         return $cierre;
     }

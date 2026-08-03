@@ -173,6 +173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Resumen financiero (ingresos vs egresos). Vista y exportaciones
         // consumen la misma CalcularResumenAction con los mismos filtros.
         Route::get('resumen', [ResumenController::class, 'index'])->name('resumen.index');
+        Route::get('resumen/vehiculo/{vehiculo}', [ResumenController::class, 'vehiculo'])->name('resumen.vehiculo');
         Route::get('pdf/resumen', [PdfController::class, 'resumen'])->name('pdf.resumen');
         Route::get('excel/resumen', [ExcelController::class, 'resumen'])->name('excel.resumen');
 
@@ -187,14 +188,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // desde Personal (users/{user}/inversiones).
         Route::post('inversiones', [InversionController::class, 'store'])->name('inversiones.store');
 
-        // Config de inversiones+deuda por inversor desde Personal (sólo admin)
+        // Config de inversiones+deuda: página con TODAS las inversiones (admin),
+        // acordeón por inversión con sus inversores.
+        Route::get('users/inversiones', [UserController::class, 'editInversiones'])->name('users.inversiones.edit');
+        Route::put('inversiones/{inversion}/inversores', [UserController::class, 'syncInversores'])->name('inversiones.inversores.sync');
         Route::put('users/{user}/inversiones', [UserController::class, 'syncInversiones'])->name('users.inversiones.sync');
 
         // Cierres de sueldo (generados por el cierre unificado de recaudaciones)
         Route::get('cierres-sueldo', [CierreSueldoController::class, 'index'])->name('cierres-sueldo.index');
         Route::get('cierres-sueldo/{cierreSueldo}', [CierreSueldoController::class, 'show'])->name('cierres-sueldo.show');
         Route::patch('cierres-sueldo/{cierreSueldo}/socios/{user}', [CierreSueldoController::class, 'updateSocio'])->name('cierres-sueldo.socios.update');
-        Route::patch('cierres-sueldo/{cierreSueldo}/inversiones/{inversion}/socios/{user}', [CierreSueldoController::class, 'updateComposicion'])->name('cierres-sueldo.composicion.update');
 
         // Anulación de transacciones (auditoría sensible)
         Route::post('transactions/{transaccion}/annul', [TransactionController::class, 'annul'])->name('transactions.annul');

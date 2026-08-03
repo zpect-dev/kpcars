@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
@@ -15,6 +16,8 @@ use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
 use App\Models\Recaudacion;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Spatie\SimpleExcel\SimpleExcelWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -24,12 +27,18 @@ class ExcelController extends Controller
      * Excel del Resumen financiero: mismos filtros y misma Action que la
      * vista (las cifras exportadas nunca divergen de la pantalla).
      */
-    public function resumen(ResumenFiltrosRequest $request, CalcularResumenAction $action): StreamedResponse
-    {
+    public function resumen(
+        ResumenFiltrosRequest $request,
+        CalcularResumenAction $action,
+        AplicarSeleccionResumenAction $seleccionAction,
+    ): StreamedResponse {
         $filtros = $request->filtros();
         $resumen = $action->execute($filtros);
 
-        $filename = 'resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
+        $seleccion = $request->seleccion();
+        $resumen = $seleccionAction->execute($resumen, $seleccion['vehiculo_ids'], $seleccion['tipos']);
+
+        $filename = ($resumen['seleccion']['activa'] ? 'resumen-seleccion-' : 'resumen-').$filtros['desde'].'-al-'.$filtros['hasta'].'.xlsx';
         $writer = SimpleExcelWriter::streamDownload($filename);
         $writer->addHeader(['Sección', 'Detalle', 'Ingresos', 'Gastos', 'Repuestos', 'Egresos', 'Neto']);
 
@@ -58,12 +67,25 @@ class ExcelController extends Controller
         foreach ($resumen['por_vehiculo'] as $f) {
             $writer->addRow([
                 'Vehículo',
-                trim($f['patente'].' '.($f['marca'] ?? '').' '.($f['modelo'] ?? '')).' — '.($f['inversion_nombre'] ?? 'Sin inversión'),
+                $f['patente'].' — '.($f['chofer_nombre'] ?? 'Sin chofer').' — '.($f['inversion_nombre'] ?? 'Sin inversión'),
                 round($f['ingresos'], 2),
                 round($f['gastos'], 2),
                 round($f['repuestos'], 2),
                 round($f['egresos'], 2),
                 round($f['neto'], 2),
+            ]);
+        }
+
+        if ($resumen['seleccion']['activa'] && $seleccion['vehiculo_ids'] !== []) {
+            $sv = $resumen['seleccion']['vehiculo'];
+            $writer->addRow([
+                'TOTAL SELECCIÓN (vehículos)',
+                count($resumen['por_vehiculo']).' vehículo(s) seleccionado(s)',
+                round($sv['ingresos'], 2),
+                round($sv['gastos'], 2),
+                round($sv['repuestos'], 2),
+                round($sv['egresos'], 2),
+                round($sv['neto'], 2),
             ]);
         }
 
@@ -75,6 +97,18 @@ class ExcelController extends Controller
                 '',
                 '',
                 round($t['total'], 2),
+                '',
+            ]);
+        }
+
+        if ($resumen['seleccion']['activa'] && $seleccion['tipos'] !== []) {
+            $writer->addRow([
+                'TOTAL SELECCIÓN (categorías)',
+                count($resumen['por_tipo']).' categoría(s) seleccionada(s)',
+                '',
+                '',
+                '',
+                round($resumen['seleccion']['tipo_total'], 2),
                 '',
             ]);
         }
@@ -228,7 +262,7 @@ class ExcelController extends Controller
     public function miCuenta(Request $request): StreamedResponse
     {
         // Acceso: middleware role:inversor. El Gate valida que tenga inversiones.
-        \Illuminate\Support\Facades\Gate::authorize('view-mi-cuenta');
+        Gate::authorize('view-mi-cuenta');
 
         $user = $request->user();
 
@@ -347,19 +381,19 @@ class ExcelController extends Controller
      * Escribe el Excel de recaudaciones a partir de una colección, aplicando los
      * filtros de la vista (reusa el filtrado de PdfController).
      *
-     * @param  \Illuminate\Support\Collection<int, Recaudacion>  $recaudaciones
+     * @param  Collection<int, Recaudacion>  $recaudaciones
      */
     private function excelRecaudaciones($recaudaciones, Request $request, string $filename): StreamedResponse
     {
         $filas = PdfController::filtrarRecaudaciones($recaudaciones, $request)
             ->map(fn (Recaudacion $r) => [
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                'patente'   => $r->vehiculo?->patente ?? 'N/A',
-                'chofer'    => $r->chofer?->name ?? 'N/A',
-                'efectivo'  => round((float) $r->efectivo, 2),
-                'transf'    => round((float) $r->transferencia, 2),
-                'total'     => round((float) $r->total, 2),
-                'estado'    => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+                'patente' => $r->vehiculo?->patente ?? 'N/A',
+                'chofer' => $r->chofer?->name ?? 'N/A',
+                'efectivo' => round((float) $r->efectivo, 2),
+                'transf' => round((float) $r->transferencia, 2),
+                'total' => round((float) $r->total, 2),
+                'estado' => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
             ])
             ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
             ->values();
@@ -390,12 +424,12 @@ class ExcelController extends Controller
         $filas = ($apertura?->recaudaciones ?? collect())
             ->filter(fn (Recaudacion $r) => (float) $r->descuento > 0)
             ->map(fn (Recaudacion $r) => [
-                'inversion'   => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
-                'patente'     => $r->vehiculo?->patente ?? 'N/A',
-                'chofer'      => $r->chofer?->name ?? 'N/A',
-                'descuento'   => round((float) $r->descuento, 2),
+                'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
+                'patente' => $r->vehiculo?->patente ?? 'N/A',
+                'chofer' => $r->chofer?->name ?? 'N/A',
+                'descuento' => round((float) $r->descuento, 2),
                 'descripcion' => $r->descripcion ?? '',
-                'estado'      => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
+                'estado' => $r->total >= max((float) $r->precio - (float) $r->descuento, 0) ? 'Pagado' : 'Deuda',
             ])
             ->sortBy([['inversion', SORT_NATURAL], ['patente', SORT_NATURAL]])
             ->values();

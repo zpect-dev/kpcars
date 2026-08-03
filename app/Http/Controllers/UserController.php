@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\UserDeposito;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -283,22 +284,6 @@ class UserController extends Controller
             'symbol' => $m->symbol(),
         ]);
 
-        // Inversiones disponibles para configurar inversores desde Personal
-        // (sólo admin; cross-empresa, agrupadas por empresa en el frontend).
-        $inversionesDisponibles = null;
-        if ($isInversorFilter && Gate::allows('manage-inversiones')) {
-            $inversionesDisponibles = Inversion::withoutGlobalScope(TenantScope::class)
-                ->with('empresa:id,nombre')
-                ->get(['id', 'nombre', 'empresa_id'])
-                ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
-                ->values()
-                ->map(fn ($inv) => [
-                    'id' => $inv->id,
-                    'nombre' => $inv->nombre,
-                    'empresa' => $inv->empresa,
-                ]);
-        }
-
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
@@ -307,8 +292,115 @@ class UserController extends Controller
             'monedas' => $monedas,
             'choferCounts' => $choferCounts,
             'cotizacionDolar' => (float) (Setting::get('cotizacion_dolar') ?? 0),
-            'inversionesDisponibles' => $inversionesDisponibles,
+            // La configuración de inversiones ya no vive en un modal acá: cada
+            // inversor tiene su propia página (users/{user}/inversiones).
+            'puedeConfigInversiones' => $isInversorFilter && Gate::allows('manage-inversiones'),
         ]);
+    }
+
+    /**
+     * Página única para configurar la composición de TODAS las inversiones: un
+     * acordeón por inversión y, dentro, sus (hasta MAX_INVERSORES) inversores con
+     * su rol (financiador / deudor) y su deuda en USD. Cross-empresa.
+     */
+    public function editInversiones(): Response
+    {
+        Gate::authorize('manage-inversiones');
+
+        $autosPorInversion = DB::table('vehiculos')
+            ->where('patente', '!=', 'EXTERNO')
+            ->groupBy('inversion_id')
+            ->selectRaw('inversion_id, COUNT(*) as total')
+            ->pluck('total', 'inversion_id');
+
+        $inversiones = Inversion::withoutGlobalScope(TenantScope::class)
+            ->with(['empresa:id,nombre', 'inversores:id,name,dni'])
+            ->get(['id', 'nombre', 'empresa_id'])
+            ->sortBy('nombre', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->map(function (Inversion $inv) use ($autosPorInversion) {
+                $autos = (int) ($autosPorInversion[$inv->id] ?? 0);
+
+                return [
+                    'id' => $inv->id,
+                    'nombre' => $inv->nombre,
+                    'empresa' => $inv->empresa,
+                    'autos' => $autos,
+                    'completa' => $autos >= Inversion::AUTOS_COMPLETA,
+                    'socios' => $inv->inversores
+                        ->sortBy(fn (User $u) => mb_strtolower($u->name))
+                        ->values()
+                        ->map(fn (User $u) => [
+                            'user' => ['id' => $u->id, 'name' => $u->name, 'dni' => $u->dni],
+                            'es_financiador' => (bool) $u->pivot->es_financiador,
+                            'deuda' => (float) $u->pivot->deuda,
+                            'es_deudor' => (bool) $u->pivot->es_deudor,
+                        ]),
+                ];
+            });
+
+        $candidatos = User::query()
+            ->where('role', UserRole::INVERSOR)
+            ->where('inactivo', false)
+            ->orderBy('name')
+            ->get(['id', 'name', 'dni']);
+
+        return Inertia::render('Users/Inversiones', [
+            'inversiones' => $inversiones,
+            'candidatos' => $candidatos,
+            'maxInversores' => Inversion::MAX_INVERSORES,
+            'cotizacionDolar' => (float) (Setting::get('cotizacion_dolar') ?? 0),
+        ]);
+    }
+
+    /**
+     * Guarda la composición de UNA inversión: sus inversores con rol (financiador
+     * o deudor) y deuda en USD. Escribe el registro real (inversion_user) y asigna
+     * los socios a la empresa de la inversión, para que impacte en toda la app.
+     */
+    public function syncInversores(Request $request, int $inversion): RedirectResponse
+    {
+        Gate::authorize('manage-inversiones');
+
+        $inv = Inversion::withoutGlobalScope(TenantScope::class)->findOrFail($inversion);
+
+        $validated = $request->validate([
+            'socios' => ['present', 'array', 'max:'.Inversion::MAX_INVERSORES],
+            'socios.*.user_id' => ['required', 'integer', 'distinct', 'exists:users,id'],
+            'socios.*.es_financiador' => ['required', 'boolean'],
+            'socios.*.es_deudor' => ['nullable', 'boolean'],
+            'socios.*.deuda' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+        ]);
+
+        $items = collect($validated['socios'] ?? []);
+
+        // Deudor = flag explícito (inversión incompleta) o monto > 0.
+        $esDeudor = fn ($i) => (bool) ($i['es_deudor'] ?? false) || (float) $i['deuda'] > 0;
+
+        if ($items->first(fn ($i) => $i['es_financiador'] && $esDeudor($i))) {
+            return back()->with('error', 'Un inversor no puede ser financiador y deudor al mismo tiempo.');
+        }
+
+        DB::transaction(function () use ($inv, $items, $esDeudor) {
+            $sync = $items->mapWithKeys(fn ($i) => [
+                (int) $i['user_id'] => [
+                    'es_financiador' => (bool) $i['es_financiador'],
+                    'deuda' => round((float) $i['deuda'], 2),
+                    'es_deudor' => ! $i['es_financiador'] && $esDeudor($i),
+                ],
+            ])->toArray();
+
+            $inv->inversores()->sync($sync);
+
+            // Global: cada socio queda asignado a la empresa de la inversión.
+            if ($sync !== []) {
+                User::whereIn('id', array_keys($sync))->get()->each(
+                    fn (User $u) => $u->empresas()->syncWithoutDetaching([$inv->empresa_id]),
+                );
+            }
+        });
+
+        return back()->with('success', "Inversores de {$inv->nombre} actualizados.");
     }
 
     /**
@@ -327,17 +419,21 @@ class UserController extends Controller
             'inversiones' => ['present', 'array'],
             'inversiones.*.inversion_id' => ['required', 'integer', 'distinct', 'exists:inversiones,id'],
             'inversiones.*.es_financiador' => ['required', 'boolean'],
+            'inversiones.*.es_deudor' => ['nullable', 'boolean'],
             'inversiones.*.deuda' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
         ]);
 
         $items = collect($validated['inversiones'] ?? []);
 
-        $invalido = $items->first(fn ($i) => $i['es_financiador'] && (float) $i['deuda'] > 0);
+        // Deudor = flag explícito (para inversiones incompletas) o monto > 0.
+        $esDeudor = fn ($i) => (bool) ($i['es_deudor'] ?? false) || (float) $i['deuda'] > 0;
+
+        $invalido = $items->first(fn ($i) => $i['es_financiador'] && $esDeudor($i));
         if ($invalido) {
             return back()->with('error', 'Un inversor no puede ser financiador y deudor al mismo tiempo.');
         }
 
-        DB::transaction(function () use ($user, $items) {
+        DB::transaction(function () use ($user, $items, $esDeudor) {
             // Validar el cupo de cada inversión que se agrega (max 6 inversores).
             $actuales = $user->inversiones()
                 ->withoutGlobalScope(TenantScope::class)
@@ -361,14 +457,14 @@ class UserController extends Controller
                 }
             }
 
-            // Desde Personal el deudor se define por el monto (en USD): cargar
-            // deuda > 0 marca deudor. El check para inversiones incompletas sin
-            // monto vive en la composición del cierre.
+            // Deudor: en inversiones completas se define por el monto (USD > 0);
+            // en incompletas, por el check (sin monto). Un financiador nunca es
+            // deudor.
             $sync = $items->mapWithKeys(fn ($i) => [
                 (int) $i['inversion_id'] => [
                     'es_financiador' => (bool) $i['es_financiador'],
                     'deuda' => round((float) $i['deuda'], 2),
-                    'es_deudor' => round((float) $i['deuda'], 2) > 0,
+                    'es_deudor' => ! $i['es_financiador'] && $esDeudor($i),
                 ],
             ])->toArray();
 

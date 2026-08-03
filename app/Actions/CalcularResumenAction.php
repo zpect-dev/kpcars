@@ -350,9 +350,10 @@ class CalcularResumenAction
                     ->withoutGlobalScope(TenantScope::class)
                     ->select('id', 'nombre'),
                 'empresa:id,nombre',
+                'user:id,name',
             ])
             ->whereIn('id', $ids)
-            ->get(['id', 'patente', 'marca', 'modelo', 'inversion_id', 'empresa_id'])
+            ->get(['id', 'patente', 'marca', 'modelo', 'inversion_id', 'empresa_id', 'user_id'])
             ->map(function (Vehiculo $v) use ($ingresos, $gastos, $repuestos) {
                 $ing = round((float) ($ingresos[$v->id] ?? 0), 2);
                 $gas = round((float) ($gastos[$v->id] ?? 0), 2);
@@ -366,6 +367,7 @@ class CalcularResumenAction
                     'modelo' => $v->modelo,
                     'inversion_nombre' => $v->inversion?->nombre,
                     'empresa_nombre' => $v->empresa?->nombre,
+                    'chofer_nombre' => $v->user?->name,
                     'ingresos' => $ing,
                     'gastos' => $gas,
                     'repuestos' => $rep,

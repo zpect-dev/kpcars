@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\BuildResumenIntegradoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
@@ -83,17 +84,25 @@ class PdfController extends Controller
      * PDF del Resumen financiero: mismos filtros y misma Action que la vista
      * (las cifras exportadas nunca divergen de la pantalla).
      */
-    public function resumen(ResumenFiltrosRequest $request, CalcularResumenAction $action): Response
-    {
+    public function resumen(
+        ResumenFiltrosRequest $request,
+        CalcularResumenAction $action,
+        AplicarSeleccionResumenAction $seleccionAction,
+    ): Response {
         $filtros = $request->filtros();
         $resumen = $action->execute($filtros);
+
+        $seleccion = $request->seleccion();
+        $resumen = $seleccionAction->execute($resumen, $seleccion['vehiculo_ids'], $seleccion['tipos']);
 
         $pdf = Pdf::loadView('pdf.resumen', [
             'filtros' => $filtros,
             'resumen' => $resumen,
         ])->setPaper('a4', 'portrait');
 
-        return $pdf->download('resumen-'.$filtros['desde'].'-al-'.$filtros['hasta'].'.pdf');
+        $nombre = ($resumen['seleccion']['activa'] ? 'resumen-seleccion-' : 'resumen-').$filtros['desde'].'-al-'.$filtros['hasta'].'.pdf';
+
+        return $pdf->download($nombre);
     }
 
     /**

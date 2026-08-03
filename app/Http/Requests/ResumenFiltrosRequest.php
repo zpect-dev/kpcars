@@ -33,6 +33,13 @@ class ResumenFiltrosRequest extends FormRequest
             'vehiculo_ids.*' => ['integer', 'exists:vehiculos,id'],
             'tipo' => ['nullable', Rule::in(array_keys(CalcularResumenAction::TIPO_LABELS))],
             'incluir_abierto' => ['nullable', 'boolean'],
+            // Selección de filas tildadas en pantalla (sólo para exportar "lo
+            // seleccionado"); no afecta el cálculo del resumen, sólo qué filas
+            // se muestran en el PDF/Excel resultante.
+            'sel_vehiculo_ids' => ['nullable', 'array'],
+            'sel_vehiculo_ids.*' => ['integer'],
+            'sel_tipos' => ['nullable', 'array'],
+            'sel_tipos.*' => [Rule::in(array_keys(CalcularResumenAction::TIPO_LABELS))],
         ];
     }
 
@@ -62,6 +69,22 @@ class ResumenFiltrosRequest extends FormRequest
             'vehiculo_ids' => array_map('intval', $validated['vehiculo_ids'] ?? []),
             'tipo' => $validated['tipo'] ?? null,
             'incluir_abierto' => (bool) ($validated['incluir_abierto'] ?? false),
+        ];
+    }
+
+    /**
+     * Selección de filas tildadas en pantalla, para las exportaciones que
+     * quieren traer sólo lo seleccionado (ver AplicarSeleccionResumenAction).
+     *
+     * @return array{vehiculo_ids: array<int, int>, tipos: array<int, string>}
+     */
+    public function seleccion(): array
+    {
+        $validated = $this->validated();
+
+        return [
+            'vehiculo_ids' => array_map('intval', $validated['sel_vehiculo_ids'] ?? []),
+            'tipos' => $validated['sel_tipos'] ?? [],
         ];
     }
 }
