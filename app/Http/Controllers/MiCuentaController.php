@@ -41,11 +41,13 @@ class MiCuentaController extends Controller
 
         $inversionIds = $inversiones->pluck('id');
 
-        // Cantidad de autos por inversión (excluye el ficticio EXTERNO).
+        // Cantidad de autos alquilados (asignados a un conductor) por inversión.
+        // Excluye el ficticio EXTERNO.
         // Bypass de scopes vía Query Builder: la vista es cross-empresa.
         $autosPorInversion = DB::table('vehiculos')
             ->whereIn('inversion_id', $inversionIds)
             ->where('patente', '!=', 'EXTERNO')
+            ->whereNotNull('user_id')
             ->groupBy('inversion_id')
             ->selectRaw('inversion_id, COUNT(*) as total')
             ->pluck('total', 'inversion_id');
