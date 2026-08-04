@@ -159,6 +159,51 @@ const CONCEPTO_LABELS: Record<string, string> = {
     redistribucion_financiador: 'Financiamiento',
 };
 
+/**
+ * Estilo visual de cada concepto de pago: una etiqueta corta y colores para el
+ * badge y su punto, coherentes con el resto de la app (verde = al día, ámbar =
+ * media parte, rojo = sin parte, violeta = financiamiento).
+ */
+const CONCEPTO_STYLES: Record<
+    string,
+    { label: string; badge: string; dot: string }
+> = {
+    parte_completa: {
+        label: 'Parte completa',
+        badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+        dot: 'bg-emerald-500',
+    },
+    media_parte_deudor: {
+        label: 'Media parte',
+        badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+        dot: 'bg-amber-500',
+    },
+    cero_deudor: {
+        label: 'Sin parte',
+        badge: 'bg-red-500/10 text-red-700 dark:text-red-400',
+        dot: 'bg-red-500',
+    },
+    redistribucion_financiador: {
+        label: 'Financiamiento',
+        badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
+        dot: 'bg-violet-500',
+    },
+};
+
+function conceptoStyle(concepto: string): {
+    label: string;
+    badge: string;
+    dot: string;
+} {
+    return (
+        CONCEPTO_STYLES[concepto] ?? {
+            label: CONCEPTO_LABELS[concepto] ?? concepto,
+            badge: 'bg-muted text-muted-foreground',
+            dot: 'bg-muted-foreground/40',
+        }
+    );
+}
+
 /** Celdas de monto: ARS y USD como dos columnas alineadas a la derecha. */
 function MoneyCells({
     ars,
@@ -218,44 +263,87 @@ function MoneyHead({
 /** Tabla de pagos de un cierre de sueldo con subtotal. */
 function TablaSueldo({
     titulo,
+    icon: Icon,
+    accent,
     detalles,
     tasa,
 }: {
     titulo: string;
+    icon: typeof Wallet;
+    accent: string;
     detalles: CierreDetalle[];
     tasa: number | null;
 }) {
     const subtotal = detalles.reduce((s, d) => s + d.monto, 0);
 
     return (
-        <section className="flex flex-col gap-1.5">
-            <h2 className="text-sm font-semibold text-foreground">{titulo}</h2>
-            <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <section className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <span
+                        className={cn(
+                            'flex h-6 w-6 items-center justify-center rounded-md',
+                            accent,
+                        )}
+                    >
+                        <Icon className="h-3.5 w-3.5" />
+                    </span>
+                    {titulo}
+                </h2>
+                <span className="text-xs text-muted-foreground">
+                    {detalles.length}{' '}
+                    {detalles.length === 1 ? 'concepto' : 'conceptos'}
+                </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
                 <table className="w-full text-sm">
                     <MoneyHead firstCol="Inversión" secondCol="Concepto" />
                     <tbody className="divide-y divide-border">
-                        {detalles.map((d, i) => (
-                            <tr key={i}>
-                                <td className="px-3 py-2 text-left font-medium text-foreground">
-                                    {d.inversion ?? '—'}
-                                </td>
-                                <td className="px-3 py-2 text-left text-muted-foreground">
-                                    {CONCEPTO_LABELS[d.concepto] ?? d.concepto}
-                                </td>
-                                <MoneyCells ars={d.monto} tasa={tasa} />
-                            </tr>
-                        ))}
+                        {detalles.map((d, i) => {
+                            const c = conceptoStyle(d.concepto);
+
+                            return (
+                                <tr
+                                    key={i}
+                                    className="transition-colors hover:bg-muted/30"
+                                >
+                                    <td className="px-3 py-2.5 text-left font-medium text-foreground">
+                                        {d.inversion ?? '—'}
+                                    </td>
+                                    <td className="px-3 py-2.5 text-left">
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+                                                c.badge,
+                                            )}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'h-1.5 w-1.5 rounded-full',
+                                                    c.dot,
+                                                )}
+                                            />
+                                            {c.label}
+                                        </span>
+                                    </td>
+                                    <MoneyCells ars={d.monto} tasa={tasa} />
+                                </tr>
+                            );
+                        })}
                     </tbody>
                     {detalles.length > 1 && (
                         <tfoot>
-                            <tr className="border-t border-border font-semibold">
-                                <td className="px-3 py-2 text-left" colSpan={2}>
+                            <tr className="border-t-2 border-primary/30 bg-primary/5 font-semibold">
+                                <td
+                                    className="px-3 py-2.5 text-left"
+                                    colSpan={2}
+                                >
                                     Subtotal
                                 </td>
                                 <MoneyCells
                                     ars={subtotal}
                                     tasa={tasa}
-                                    className="font-semibold"
+                                    className="font-semibold text-primary"
                                 />
                             </tr>
                         </tfoot>
@@ -376,6 +464,13 @@ export default function MiCuentaIndex({
             gastos.globales.mi_parte +
             gastos.flota.reduce((s, f) => s + f.mi_parte, 0),
         [gastos],
+    );
+
+    // Suma de la parte que le corresponde al inversor en TODOS los gastos de
+    // flota (sin los globales), para el total del encabezado de esa sección.
+    const miParteFlota = useMemo(
+        () => gastos.flota.reduce((s, f) => s + f.mi_parte, 0),
+        [gastos.flota],
     );
 
     const tabs: {
@@ -585,6 +680,8 @@ export default function MiCuentaIndex({
                             {detallesFlota.length > 0 && (
                                 <TablaSueldo
                                     titulo="Recaudación"
+                                    icon={Wallet}
+                                    accent="bg-primary/10 text-primary"
                                     detalles={detallesFlota}
                                     tasa={ultimoCierre.tasa}
                                 />
@@ -592,6 +689,8 @@ export default function MiCuentaIndex({
                             {detallesFinancia.length > 0 && (
                                 <TablaSueldo
                                     titulo="Financiamiento"
+                                    icon={Landmark}
+                                    accent="bg-violet-500/10 text-violet-600 dark:text-violet-400"
                                     detalles={detallesFinancia}
                                     tasa={ultimoCierre.tasa}
                                 />
@@ -733,10 +832,27 @@ export default function MiCuentaIndex({
                         </Colapsable>
 
                         {/* Gastos por flota */}
-                        <section className="flex flex-col gap-1.5">
+                        <section className="flex flex-col gap-2">
                             <h2 className="text-sm font-semibold text-foreground">
                                 Gastos por flota
                             </h2>
+
+                            {/* Total de la parte del inversor en toda la flota */}
+                            <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                                <span className="text-sm font-medium text-foreground">
+                                    Tu parte de la flota
+                                </span>
+                                <span className="flex flex-col items-end leading-tight">
+                                    <span className="text-lg font-bold text-primary tabular-nums">
+                                        {formatARS(miParteFlota)}
+                                    </span>
+                                    {tasa ? (
+                                        <span className="text-xs text-muted-foreground tabular-nums">
+                                            {formatUSD(miParteFlota / tasa)}
+                                        </span>
+                                    ) : null}
+                                </span>
+                            </div>
 
                             {grupos.map((grupo) => (
                                 <div
