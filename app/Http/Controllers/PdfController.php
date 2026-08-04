@@ -130,12 +130,24 @@ class PdfController extends Controller
             ? CierreCaja::where('created_at', '<', $cierre->created_at)->latest()->value('created_at')?->toDateTimeString()
             : null;
 
+        // grupo: recorta el export al mismo subconjunto que se está viendo en
+        // la pestaña (Gastos de galpón vs Kevin). Sin valor, exporta ambos.
+        $grupo = $request->query('grupo');
+        $tiposPorGrupo = [
+            'galpon' => ['galpon', 'taller', 'oficina'],
+            'kevin' => ['kevin', 'stock'],
+        ];
+
         // Scopeado por empresa activa vía GastoTenantScope (igual que el panel).
         $gastos = Gasto::query()
             ->when(! $historico, fn ($q) => $q->pendientes())
             ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
             ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
             ->where('gastos.tipo', '!=', 'vehiculo')
+            ->when(
+                isset($tiposPorGrupo[$grupo]),
+                fn ($q) => $q->whereIn('gastos.tipo', $tiposPorGrupo[$grupo])
+            )
             ->latest('fecha')
             ->latest('id')
             ->get();
