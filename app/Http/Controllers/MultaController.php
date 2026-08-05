@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\RegistrarMovimientoDepositoAction;
+use App\Actions\RevertirMovimientoDepositoAction;
+use App\Enums\DepositoMoneda;
+use App\Enums\DepositoMovimientoTipo;
 use App\Models\Asignacion;
 use App\Models\Multa;
 use App\Models\MultaPago;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
+use App\Models\UserDepositoMovimiento;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -245,13 +250,13 @@ class MultaController extends Controller
     {
         $this->authorize('view-multas');
 
-        $tipo  = $request->query('tipo', 'vehiculo');
-        $id    = $request->query('id');
-        $q     = $request->query('q');
+        $tipo = $request->query('tipo', 'vehiculo');
+        $id = $request->query('id');
+        $q = $request->query('q');
         $juris = $request->query('jurisdiccion');
-        $sis   = $request->query('sistema');
-        $chof  = $request->query('chofer');
-        $pr    = $request->query('punto_rojo');
+        $sis = $request->query('sistema');
+        $chof = $request->query('chofer');
+        $pr = $request->query('punto_rojo');
         $inact = $request->query('inactivo');
         $desde = $request->query('desde');
         $hasta = $request->query('hasta');
@@ -270,20 +275,42 @@ class MultaController extends Controller
                 ->orWhereHas('conductor', fn ($q3) => $q3->where('name', 'like', "%{$q}%"))
             );
         }
-        if ($juris) $query->where('jurisdiccion', $juris);
-        if ($sis === 'si') $query->where('pagado', true);
-        if ($sis === 'no') $query->where('pagado', false);
-        if ($chof === 'si') $query->where('cobrado', true);
-        if ($chof === 'no') $query->where('cobrado', false);
-        if ($pr) $query->where('punto_rojo', true);
-        if ($inact) $query->whereHas('conductor', fn ($q2) => $q2->where('inactivo', true));
+        if ($juris) {
+            $query->where('jurisdiccion', $juris);
+        }
+        if ($sis === 'si') {
+            $query->where('pagado', true);
+        }
+        if ($sis === 'no') {
+            $query->where('pagado', false);
+        }
+        if ($chof === 'si') {
+            $query->where('cobrado', true);
+        }
+        if ($chof === 'no') {
+            $query->where('cobrado', false);
+        }
+        if ($pr) {
+            $query->where('punto_rojo', true);
+        }
+        if ($inact) {
+            $query->whereHas('conductor', fn ($q2) => $q2->where('inactivo', true));
+        }
         $venc = $request->query('vencimiento');
-        if ($venc === 'no-vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '>=', today());
-        if ($venc === 'vencida') $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '<', today());
-        if ($desde) $query->whereDate('fecha', '>=', $desde);
-        if ($hasta) $query->whereDate('fecha', '<=', $hasta);
+        if ($venc === 'no-vencida') {
+            $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '>=', today());
+        }
+        if ($venc === 'vencida') {
+            $query->whereNotNull('fecha_vencimiento')->whereDate('fecha_vencimiento', '<', today());
+        }
+        if ($desde) {
+            $query->whereDate('fecha', '>=', $desde);
+        }
+        if ($hasta) {
+            $query->whereDate('fecha', '<=', $hasta);
+        }
 
-        $esGlobal = !$id;
+        $esGlobal = ! $id;
 
         if ($tipo === 'vehiculo' && $id) {
             $query->where('vehiculo_id', $id);
@@ -305,30 +332,30 @@ class MultaController extends Controller
             $cobrado = (float) $m->monto_cobrado;
 
             return [
-                'fecha'            => $m->fecha?->format('d/m/Y'),
-                'fecha_vencimiento'=> $m->fecha_vencimiento?->format('d/m/Y'),
-                'patente'          => $m->vehiculo?->patente ?? 'N/A',
-                'conductor'        => $m->conductor?->name,
-                'descripcion'      => $m->descripcion,
-                'jurisdiccion'     => $m->jurisdiccion,
-                'punto_rojo'       => $m->punto_rojo,
-                'sin_importe'      => $m->sinImporte(),
-                'monto'            => (float) $m->monto,
-                'monto_efectivo'   => $efectivo,
-                'monto_cobrado'    => $cobrado,
-                'adeudado'         => $m->cobrado ? 0.0 : max($efectivo - $cobrado, 0),
-                'pagado'           => $m->pagado,
-                'cobrado'          => $m->cobrado,
+                'fecha' => $m->fecha?->format('d/m/Y'),
+                'fecha_vencimiento' => $m->fecha_vencimiento?->format('d/m/Y'),
+                'patente' => $m->vehiculo?->patente ?? 'N/A',
+                'conductor' => $m->conductor?->name,
+                'descripcion' => $m->descripcion,
+                'jurisdiccion' => $m->jurisdiccion,
+                'punto_rojo' => $m->punto_rojo,
+                'sin_importe' => $m->sinImporte(),
+                'monto' => (float) $m->monto,
+                'monto_efectivo' => $efectivo,
+                'monto_cobrado' => $cobrado,
+                'adeudado' => $m->cobrado ? 0.0 : max($efectivo - $cobrado, 0),
+                'pagado' => $m->pagado,
+                'cobrado' => $m->cobrado,
             ];
         });
 
         // Los puntos rojos sin importe no suman en ningún total (los que
         // conservan monto sí, como cualquier multa).
         $conImporte = $multas->where('sin_importe', false);
-        $totalMonto     = $conImporte->sum('monto_efectivo');
+        $totalMonto = $conImporte->sum('monto_efectivo');
         $pagadoChoferes = $conImporte->sum('monto_cobrado');
-        $sinCobrar      = $conImporte->sum('adeudado');
-        $sinPagar       = $conImporte->where('pagado', false)->sum('monto_efectivo');
+        $sinCobrar = $conImporte->sum('adeudado');
+        $sinPagar = $conImporte->where('pagado', false)->sum('monto_efectivo');
 
         // Export global: agrupar por vehículo o chofer
         $grupos = null;
@@ -337,9 +364,9 @@ class MultaController extends Controller
                 ? $multas->groupBy('conductor')
                 : $multas->groupBy('patente')
             )->map(fn ($ms) => [
-                'label'    => $ms->first()[$tipo === 'chofer' ? 'conductor' : 'patente'] ?? 'Sin chofer',
-                'multas'   => $ms,
-                'total'    => $ms->where('sin_importe', false)->sum('monto_efectivo'),
+                'label' => $ms->first()[$tipo === 'chofer' ? 'conductor' : 'patente'] ?? 'Sin chofer',
+                'multas' => $ms,
+                'total' => $ms->where('sin_importe', false)->sum('monto_efectivo'),
                 'adeudado' => $ms->where('sin_importe', false)->sum('adeudado'),
             ])->sortByDesc('adeudado')->values();
         }
@@ -347,7 +374,7 @@ class MultaController extends Controller
         $pdf = Pdf::loadView('pdf.multas', compact('multas', 'titulo', 'tipo', 'totalMonto', 'pagadoChoferes', 'sinPagar', 'sinCobrar', 'esGlobal', 'grupos'));
         $pdf->setPaper('a4', 'landscape');
 
-        $filename = 'multas-' . str($titulo)->slug() . '-' . now()->format('Ymd') . '.pdf';
+        $filename = 'multas-'.str($titulo)->slug().'-'.now()->format('Ymd').'.pdf';
 
         return $pdf->download($filename);
     }
@@ -380,13 +407,21 @@ class MultaController extends Controller
      * pagos parciales: la multa queda cobrada cuando la suma de los pagos alcanza
      * el total a cobrar. Con ?reset se borran todos los pagos.
      */
-    public function registrarCobro(Request $request, Multa $multa): RedirectResponse
-    {
+    public function registrarCobro(
+        Request $request,
+        Multa $multa,
+        RegistrarMovimientoDepositoAction $registrarDeposito,
+        RevertirMovimientoDepositoAction $revertirDeposito,
+    ): RedirectResponse {
         $this->authorize('manage-multas');
 
         // Reiniciar el cobro (deshacer): borra todos los pagos y sus comprobantes.
         if ($request->boolean('reset')) {
             foreach ($multa->pagos as $pago) {
+                // El descuento que el pago hizo en la cuenta de depósito se
+                // deshace con un contraasiento antes de borrar el pago.
+                $this->revertirDescuentoDeposito($pago, $revertirDeposito);
+
                 if ($pago->comprobante_path) {
                     Storage::disk('public')->delete($pago->comprobante_path);
                 }
@@ -413,7 +448,7 @@ class MultaController extends Controller
             'con_deposito' => ['boolean'],
         ]);
 
-        $multa->pagos()->create([
+        $pago = $multa->pagos()->create([
             'monto' => $validated['monto'],
             'fecha' => $validated['fecha_cobro'],
             'comprobante_path' => $request->hasFile('comprobante')
@@ -422,6 +457,26 @@ class MultaController extends Controller
             'con_deposito' => $validated['con_deposito'] ?? false,
             'registrado_por' => $request->user()->id,
         ]);
+
+        // Pagada con depósito: se descuenta de la cuenta del chofer imputado.
+        // El saldo puede quedar negativo (el descuento refleja un hecho ya
+        // ocurrido); la vista de Personal lo marca en rojo.
+        if ($pago->con_deposito && $multa->conductor_id !== null) {
+            $conductor = User::find($multa->conductor_id);
+
+            if ($conductor !== null) {
+                $registrarDeposito->execute(
+                    user: $conductor,
+                    tipo: DepositoMovimientoTipo::DESCUENTO_MULTA,
+                    moneda: DepositoMoneda::ARS,
+                    monto: (float) $validated['monto'],
+                    fecha: Carbon::parse($validated['fecha_cobro'])->toDateString(),
+                    nota: 'Multa #'.$multa->id.($multa->descripcion ? ' — '.$multa->descripcion : ''),
+                    pago: $pago,
+                    registradoPor: $request->user()->id,
+                );
+            }
+        }
 
         $completo = $this->recomputarCobro($multa);
 
@@ -437,11 +492,14 @@ class MultaController extends Controller
     /**
      * Elimina un pago puntual del chofer y recalcula el estado del cobro.
      */
-    public function eliminarPago(Request $request, Multa $multa, MultaPago $pago): RedirectResponse
+    public function eliminarPago(Request $request, Multa $multa, MultaPago $pago, RevertirMovimientoDepositoAction $revertirDeposito): RedirectResponse
     {
         $this->authorize('manage-multas');
 
         abort_unless($pago->multa_id === $multa->id, 404);
+
+        // Devuelve a la cuenta de depósito lo que este pago había descontado.
+        $this->revertirDescuentoDeposito($pago, $revertirDeposito);
 
         if ($pago->comprobante_path) {
             Storage::disk('public')->delete($pago->comprobante_path);
@@ -451,6 +509,22 @@ class MultaController extends Controller
         $this->recomputarCobro($multa);
 
         return redirect()->back()->with('success', 'Pago eliminado.');
+    }
+
+    /**
+     * Contraasienta el descuento que un pago con depósito generó en la cuenta
+     * del chofer. Si el pago no descontó nada (o ya fue revertido), no hace nada.
+     */
+    private function revertirDescuentoDeposito(MultaPago $pago, RevertirMovimientoDepositoAction $revertir): void
+    {
+        $movimientos = UserDepositoMovimiento::where('multa_pago_id', $pago->id)
+            ->whereNull('revierte_id')
+            ->whereDoesntHave('reversion')
+            ->get();
+
+        foreach ($movimientos as $movimiento) {
+            $revertir->execute($movimiento, 'Pago de multa eliminado (movimiento #'.$movimiento->id.')');
+        }
     }
 
     /**

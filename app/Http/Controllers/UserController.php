@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\RegistrarMovimientoDepositoAction;
 use App\Actions\SaveUserDocumentsAction;
 use App\Enums\ChoferEventoTipo;
 use App\Enums\DepositoMoneda;
+use App\Enums\DepositoMovimientoTipo;
 use App\Enums\UserRole;
 use App\Models\Asignacion;
 use App\Models\ChoferEvento;
@@ -15,7 +17,7 @@ use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
 use App\Models\Setting;
 use App\Models\User;
-use App\Models\UserDeposito;
+use App\Models\UserDepositoMovimiento;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -55,21 +57,76 @@ class UserController extends Controller
     }
 
     /**
-     * Reemplaza los depósitos del usuario por los enviados (uno o varios,
-     * cada uno con su moneda).
+     * Reglas del depósito inicial del alta (uno por moneda). Después del alta la
+     * cuenta se maneja sólo con movimientos (UserDepositoController).
      *
-     * @param  array<int, array{monto: mixed, moneda: string}>  $depositos
+     * @return array<string, array<int, mixed>>
      */
-    private function syncDepositos(User $user, array $depositos): void
+    private function depositoInicialRules(): array
     {
-        $user->depositos()->delete();
+        return [
+            'depositos' => ['nullable', 'array'],
+            'depositos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
+            'depositos.*.moneda' => ['required', Rule::enum(DepositoMoneda::class)],
+            'depositos.*.fecha' => ['nullable', 'date'],
+        ];
+    }
 
+    /**
+     * Registra el depósito inicial del chofer como primer ingreso de la cuenta.
+     * Puede ser parcial: después se agregan más ingresos, nunca se reemplaza.
+     *
+     * @param  array<int, array{monto: mixed, moneda: string, fecha?: string|null}>  $depositos
+     */
+    private function registrarDepositosIniciales(User $user, array $depositos, RegistrarMovimientoDepositoAction $registrar): void
+    {
         foreach ($depositos as $d) {
-            $user->depositos()->create([
-                'monto' => $d['monto'],
-                'moneda' => $d['moneda'],
-            ]);
+            $registrar->execute(
+                user: $user,
+                tipo: DepositoMovimientoTipo::INGRESO,
+                moneda: DepositoMoneda::from($d['moneda']),
+                monto: (float) $d['monto'],
+                fecha: ! empty($d['fecha']) ? Carbon::parse($d['fecha'])->toDateString() : now()->toDateString(),
+                nota: 'Depósito inicial',
+            );
         }
+    }
+
+    /**
+     * Payload de la cuenta de depósito para el frontend: saldo por moneda y el
+     * extracto completo de movimientos.
+     *
+     * @return array{saldos: array<int, array{moneda: string, saldo: float}>, movimientos: array<int, array<string, mixed>>}
+     */
+    private function cuentaDepositoPayload(User $user): array
+    {
+        $revertidos = $user->depositoMovimientos
+            ->pluck('revierte_id')
+            ->filter()
+            ->all();
+
+        return [
+            'saldos' => collect($user->saldosDeposito())
+                ->map(fn (float $saldo, string $moneda) => ['moneda' => $moneda, 'saldo' => $saldo])
+                ->values()
+                ->all(),
+            'movimientos' => $user->depositoMovimientos
+                ->map(fn (UserDepositoMovimiento $m) => [
+                    'id' => $m->id,
+                    'moneda' => $m->moneda->value,
+                    'tipo' => $m->tipo->value,
+                    'tipo_label' => $m->tipo->label(),
+                    'monto' => (float) $m->monto,
+                    'fecha' => $m->fecha?->toDateString(),
+                    'nota' => $m->nota,
+                    'multa_pago_id' => $m->multa_pago_id,
+                    'revierte_id' => $m->revierte_id,
+                    'revertido' => in_array($m->id, $revertidos, true),
+                    'registrado_en' => $m->created_at?->toISOString(),
+                ])
+                ->values()
+                ->all(),
+        ];
     }
 
     /**
@@ -89,7 +146,7 @@ class UserController extends Controller
         return redirect()->back()->with('success', 'Cotización del dólar actualizada.');
     }
 
-    public function store(Request $request, SaveUserDocumentsAction $documentos)
+    public function store(Request $request, SaveUserDocumentsAction $documentos, RegistrarMovimientoDepositoAction $registrarDeposito)
     {
         $this->authorize('create', User::class);
 
@@ -106,9 +163,7 @@ class UserController extends Controller
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
-            'depositos' => ['nullable', 'array'],
-            'depositos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
-            'depositos.*.moneda' => ['required', Rule::enum(DepositoMoneda::class)],
+            ...$this->depositoInicialRules(),
             ...$this->documentRules(),
         ]);
 
@@ -143,7 +198,7 @@ class UserController extends Controller
             'empresa_restringida_id' => $esGestor ? ($validated['empresa_restringida_id'] ?? null) : null,
         ]);
 
-        $this->syncDepositos($user, $validated['depositos'] ?? []);
+        $this->registrarDepositosIniciales($user, $validated['depositos'] ?? [], $registrarDeposito);
 
         // Pivot empresa_user: sólo aplica al rol inversor.
         if ($validated['role'] === UserRole::INVERSOR->value) {
@@ -214,7 +269,7 @@ class UserController extends Controller
             $query->with([
                 'vehiculoAsignado' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
                 'choferEventos' => fn ($q) => $q->orderByDesc('created_at')->orderByDesc('id'),
-                'depositos',
+                'depositoMovimientos',
             ]);
         }
 
@@ -236,7 +291,7 @@ class UserController extends Controller
         if ($isChoferFilter) {
             $today = now()->startOfDay();
             $users = $users->map(function (User $user) use ($today) {
-                $arr = collect($user->toArray())->except(['vehiculo_asignado', 'chofer_eventos'])->all();
+                $arr = collect($user->toArray())->except(['vehiculo_asignado', 'chofer_eventos', 'deposito_movimientos'])->all();
                 $vehiculo = $user->vehiculoAsignado;
                 $vencimientoLicencia = $user->fecha_vencimiento_licencia;
 
@@ -246,10 +301,8 @@ class UserController extends Controller
                     'modelo' => $vehiculo->modelo,
                     'precio' => $vehiculo->precio,
                 ] : null;
-                $arr['depositos'] = $user->depositos->map(fn (UserDeposito $d) => [
-                    'monto' => (float) $d->monto,
-                    'moneda' => $d->moneda->value,
-                ])->values();
+                // Cuenta de depósito: saldo por moneda + extracto de movimientos.
+                $arr['deposito'] = $this->cuentaDepositoPayload($user);
                 $arr['licencia_por_vencer'] = $vencimientoLicencia !== null
                     && $vencimientoLicencia->gte($today)
                     && $vencimientoLicencia->lte($today->copy()->addDays(30));
@@ -284,12 +337,20 @@ class UserController extends Controller
             'symbol' => $m->symbol(),
         ]);
 
+        // Tipos que se pueden cargar a mano en la cuenta de depósito (el
+        // descuento por multa lo genera el sistema al cobrar la multa).
+        $tiposMovimiento = collect(DepositoMovimientoTipo::cases())
+            ->filter(fn (DepositoMovimientoTipo $t) => $t->esManual())
+            ->map(fn (DepositoMovimientoTipo $t) => ['value' => $t->value, 'label' => $t->label()])
+            ->values();
+
         return Inertia::render('Users/Index', [
             'users' => $users,
             'roles' => $roles,
             'filterRoles' => $filterRoles,
             'empresas' => $empresas,
             'monedas' => $monedas,
+            'tiposMovimiento' => $tiposMovimiento,
             'choferCounts' => $choferCounts,
             'cotizacionDolar' => (float) (Setting::get('cotizacion_dolar') ?? 0),
             // La configuración de inversiones ya no vive en un modal acá: cada
@@ -553,9 +614,6 @@ class UserController extends Controller
             'empresas' => ['nullable', 'array'],
             'empresas.*' => ['integer', 'exists:empresas,id'],
             'empresa_restringida_id' => ['nullable', 'integer', 'exists:empresas,id'],
-            'depositos' => ['nullable', 'array'],
-            'depositos.*.monto' => ['required', 'numeric', 'min:0.01', 'max:99999999999.99'],
-            'depositos.*.moneda' => ['required', Rule::enum(DepositoMoneda::class)],
             'alta_fecha' => ['nullable', 'date'],
             'baja_fecha' => ['nullable', 'date'],
             ...$this->documentRules(),
@@ -575,10 +633,6 @@ class UserController extends Controller
         $altaFecha = $validated['alta_fecha'] ?? null;
         $bajaFecha = $validated['baja_fecha'] ?? null;
         unset($validated['alta_fecha'], $validated['baja_fecha']);
-
-        // Los depósitos no son columnas del usuario: se sincronizan aparte.
-        $depositos = $validated['depositos'] ?? [];
-        unset($validated['depositos']);
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo_path) {
@@ -604,7 +658,8 @@ class UserController extends Controller
 
         $user->update($validated);
 
-        $this->syncDepositos($user, $depositos);
+        // La cuenta de depósito no se toca acá: es append-only y se mueve desde
+        // UserDepositoController (ingreso / retiro / ajuste).
 
         // Sincroniza pivot empresa_user para inversor (no aplica a otros roles).
         if ($user->isInversor() && $empresaIds !== null) {
@@ -737,7 +792,7 @@ class UserController extends Controller
             ->when($status === 'inactivos', fn ($qq) => $qq->where('inactivo', true))
             ->with([
                 'vehiculoAsignado' => fn ($qq) => $qq->withoutGlobalScope(TenantScope::class),
-                'depositos',
+                'depositoMovimientos',
             ])
             ->orderBy('name')
             ->get();
@@ -745,9 +800,9 @@ class UserController extends Controller
         $filas = $choferes->map(function (User $u) use ($today, $en30, $cotizacion) {
             $venc = $u->fecha_vencimiento_licencia;
             $veh = $u->vehiculoAsignado;
-            $depTotalArs = $u->depositos->sum(fn (UserDeposito $d) => $d->moneda === DepositoMoneda::USD
-                ? (float) $d->monto * $cotizacion
-                : (float) $d->monto);
+            // Saldo de la cuenta de depósito por moneda y su total en ARS.
+            $saldos = $u->saldosDeposito();
+            $depTotalArs = $u->saldoDepositoARS($cotizacion);
 
             return [
                 'name' => $u->name,
@@ -757,8 +812,10 @@ class UserController extends Controller
                 'direccion' => $u->direccion,
                 'inactivo' => $u->inactivo,
                 'venc_licencia' => $venc?->format('d/m/Y'),
-                'depositos' => $u->depositos->map(fn (UserDeposito $d) => $d->moneda->value.' '
-                    .number_format((float) $d->monto, 0, ',', '.'))->all(),
+                'depositos' => collect($saldos)
+                    ->map(fn (float $saldo, string $moneda) => $moneda.' '.number_format($saldo, 0, ',', '.'))
+                    ->values()
+                    ->all(),
                 'vehiculo' => $veh?->patente,
                 // Flags para replicar los filtros de alerta de la vista.
                 '_licencia_vencida' => $venc !== null && $venc->lt($today),
@@ -775,7 +832,9 @@ class UserController extends Controller
                 '_falta_correo' => empty($u->correo),
                 '_falta_direccion' => trim((string) $u->direccion) === '',
                 '_con_direccion' => trim((string) $u->direccion) !== '',
-                '_sin_deposito' => $u->depositos->isEmpty(),
+                // "Sin depósito" ahora mira el saldo: una cuenta con movimientos
+                // pero consumida por retiros/multas también entra en la alerta.
+                '_sin_deposito' => collect($saldos)->every(fn (float $saldo) => $saldo <= 0),
                 '_deposito_bajo' => $veh !== null && (float) $veh->precio > 0 && $depTotalArs < 1.5 * (float) $veh->precio,
             ];
         });

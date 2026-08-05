@@ -43,10 +43,19 @@ import {
     type DocMode,
 } from '@/components/documentos';
 import { useImageCropper, type CropInput } from '@/components/image-cropper';
+import {
+    DepositoCuentaDialog,
+    formatSaldos,
+    saldoTotalARS,
+    type CuentaDeposito,
+    type TipoMovimientoOption,
+} from '@/components/deposito-cuenta-dialog';
 
-interface Deposito {
+/** Fila del depósito inicial que se carga en el alta del chofer. */
+interface DepositoInicial {
     monto: number;
     moneda: string;
+    fecha: string;
 }
 
 interface InversionAsignada {
@@ -80,7 +89,8 @@ interface User {
     empresa_restringida_id?: number | null;
     empresas?: { id: number; nombre: string }[];
     inversiones?: InversionAsignada[];
-    depositos?: Deposito[];
+    /** Cuenta de depósito (garantía): saldo por moneda + extracto. */
+    deposito?: CuentaDeposito | null;
     documentos?: {
         licencia: DocUrls;
         dni: DocUrls;
@@ -117,6 +127,7 @@ interface Props {
     roles: RoleOption[];
     empresas: Empresa[];
     monedas: MonedaOption[];
+    tiposMovimiento?: TipoMovimientoOption[];
     choferCounts?: { activos: number; inactivos: number } | null;
     cotizacionDolar?: number;
     puedeConfigInversiones?: boolean;
@@ -408,27 +419,33 @@ function FilterPopoverItem({
     );
 }
 
-/** Repetidor de depósitos (monto + moneda) para el alta/edición del chofer. */
+/**
+ * Repetidor del depósito inicial (monto + moneda + fecha) para el alta del
+ * chofer. Después del alta la cuenta se mueve desde el extracto: los ingresos
+ * se suman, nunca reemplazan al anterior.
+ */
 function DepositosField({
     depositos,
     monedas,
     onChange,
     error,
 }: {
-    depositos: Deposito[];
+    depositos: DepositoInicial[];
     monedas: MonedaOption[];
-    onChange: (d: Deposito[]) => void;
+    onChange: (d: DepositoInicial[]) => void;
     error?: string;
 }) {
+    const hoy = new Date().toISOString().slice(0, 10);
+
     function agregar() {
         const usadas = new Set(depositos.map((d) => d.moneda));
         const libre =
             monedas.find((m) => !usadas.has(m.value))?.value ??
             monedas[0]?.value ??
             'ARS';
-        onChange([...depositos, { monto: 0, moneda: libre }]);
+        onChange([...depositos, { monto: 0, moneda: libre, fecha: hoy }]);
     }
-    function actualizar(i: number, patch: Partial<Deposito>) {
+    function actualizar(i: number, patch: Partial<DepositoInicial>) {
         onChange(
             depositos.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
         );
@@ -440,7 +457,7 @@ function DepositosField({
     return (
         <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
-                <Label>Depósitos (garantía)</Label>
+                <Label>Depósito inicial (garantía)</Label>
                 <button
                     type="button"
                     onClick={agregar}
@@ -452,7 +469,8 @@ function DepositosField({
 
             {depositos.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                    Sin depósitos cargados.
+                    Sin depósito cargado. Puede ser parcial: después se agregan
+                    más entregas desde la cuenta.
                 </p>
             ) : (
                 depositos.map((d, i) => (
@@ -464,6 +482,14 @@ function DepositosField({
                             }
                             placeholder="0,00"
                             className="flex-1"
+                        />
+                        <Input
+                            type="date"
+                            value={d.fecha}
+                            onChange={(e) =>
+                                actualizar(i, { fecha: e.target.value })
+                            }
+                            className="w-36"
                         />
                         <select
                             value={d.moneda}
@@ -498,17 +524,17 @@ function DepositosField({
     );
 }
 
-/** Total del depósito del chofer expresado en ARS (USD × cotización). */
+/** Saldo total de la cuenta de depósito expresado en ARS (USD × cotización). */
 function depositoTotalARS(u: User, cotizacion: number): number {
-    return (u.depositos ?? []).reduce(
-        (s, d) => s + (d.moneda === 'USD' ? d.monto * cotizacion : d.monto),
-        0,
-    );
+    return saldoTotalARS(u.deposito, cotizacion);
 }
 
-/** El chofer no tiene ningún depósito cargado. */
+/**
+ * El chofer no tiene depósito respaldando: nunca cargó o el saldo quedó
+ * consumido por retiros y descuentos de multas.
+ */
 function sinDeposito(u: User): boolean {
-    return (u.depositos?.length ?? 0) === 0;
+    return (u.deposito?.saldos ?? []).every((s) => s.saldo <= 0);
 }
 
 /** Al chofer le falta el DNI (frente o dorso sin cargar). */
@@ -536,11 +562,16 @@ export default function UsersIndex({
     roles,
     empresas,
     monedas,
+    tiposMovimiento = [],
     choferCounts,
     cotizacionDolar = 0,
     puedeConfigInversiones = false,
 }: Props) {
     const [userToToggle, setUserToToggle] = useState<User | null>(null);
+    // Chofer cuya cuenta de depósito se está mirando. Se guarda el id (no el
+    // objeto) para que el extracto se refresque solo al registrar movimientos.
+    const [cuentaUserId, setCuentaUserId] = useState<number | null>(null);
+    const cuentaUser = users.find((u) => u.id === cuentaUserId) ?? null;
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
     const [openFilterSections, setOpenFilterSections] = useState<
@@ -690,7 +721,7 @@ export default function UsersIndex({
         profile_photo: null as File | null,
         empresas: [] as number[],
         empresa_restringida_id: '' as string,
-        depositos: [] as Deposito[],
+        depositos: [] as DepositoInicial[],
         licencia_pdf: null as File | null,
         licencia_frente: null as File | null,
         licencia_dorso: null as File | null,
@@ -716,7 +747,6 @@ export default function UsersIndex({
         profile_photo: null as File | null,
         empresas: [] as number[],
         empresa_restringida_id: '' as string,
-        depositos: [] as Deposito[],
         licencia_pdf: null as File | null,
         licencia_frente: null as File | null,
         licencia_dorso: null as File | null,
@@ -768,7 +798,6 @@ export default function UsersIndex({
             empresa_restringida_id: user.empresa_restringida_id
                 ? String(user.empresa_restringida_id)
                 : '',
-            depositos: user.depositos ?? [],
             licencia_pdf: null,
             licencia_frente: null,
             licencia_dorso: null,
@@ -866,15 +895,9 @@ export default function UsersIndex({
         return formatted;
     }
 
+    /** Saldo de la cuenta de depósito por moneda, para la tabla de choferes. */
     function formatDeposito(user: User): string | null {
-        const ds = user.depositos ?? [];
-        if (ds.length === 0) return null;
-        return ds
-            .map(
-                (d) =>
-                    `${d.moneda} ${Number(d.monto).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-            )
-            .join(' · ');
+        return formatSaldos(user.deposito);
     }
 
     // Fecha a mostrar en la columna Alta/Baja, tomada de la auditoría
@@ -1606,17 +1629,32 @@ export default function UsersIndex({
                                             )}
                                             {filterRole === 'chofer' && (
                                                 <td className="px-4 py-3 text-sm sm:px-6 sm:py-4">
-                                                    {formatDeposito(user) ? (
-                                                        <span className="font-medium text-foreground">
-                                                            {formatDeposito(
-                                                                user,
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-muted-foreground/50 italic">
-                                                            —
-                                                        </span>
-                                                    )}
+                                                    {/* Abre el extracto de la
+                                                        cuenta de depósito. */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setCuentaUserId(
+                                                                user.id,
+                                                            )
+                                                        }
+                                                        title="Ver cuenta de depósito"
+                                                        className="rounded-md px-1 py-0.5 transition-colors hover:bg-muted"
+                                                    >
+                                                        {formatDeposito(
+                                                            user,
+                                                        ) ? (
+                                                            <span className="font-medium text-foreground">
+                                                                {formatDeposito(
+                                                                    user,
+                                                                )}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-muted-foreground/50 italic">
+                                                                —
+                                                            </span>
+                                                        )}
+                                                    </button>
                                                 </td>
                                             )}
                                             <td className="px-4 py-3 sm:px-6 sm:py-4">
@@ -1895,15 +1933,25 @@ export default function UsersIndex({
                                                 <span className="tracking-wider text-muted-foreground uppercase">
                                                     Depósito
                                                 </span>
-                                                {formatDeposito(user) ? (
-                                                    <span className="font-medium text-foreground">
-                                                        {formatDeposito(user)}
-                                                    </span>
-                                                ) : (
-                                                    <span className="text-muted-foreground/50 italic">
-                                                        —
-                                                    </span>
-                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setCuentaUserId(user.id)
+                                                    }
+                                                    className="text-left"
+                                                >
+                                                    {formatDeposito(user) ? (
+                                                        <span className="font-medium text-foreground">
+                                                            {formatDeposito(
+                                                                user,
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-muted-foreground/50 italic">
+                                                            —
+                                                        </span>
+                                                    )}
+                                                </button>
                                             </div>
                                         )}
                                         {filterRole === 'chofer' && (
@@ -2780,18 +2828,31 @@ export default function UsersIndex({
                                 <div className="flex-1 border-t border-border/60" />
                             </div>
 
-                            <DepositosField
-                                depositos={editForm.data.depositos}
-                                monedas={monedas}
-                                onChange={(d) =>
-                                    editForm.setData('depositos', d)
-                                }
-                                error={
-                                    editForm.errors.depositos as
-                                        | string
-                                        | undefined
-                                }
-                            />
+                            {/* La cuenta de depósito es append-only: no se edita
+                                acá, se le agregan movimientos en el extracto. */}
+                            {userToEdit && (
+                                <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                                    <div className="flex flex-col">
+                                        <span className="text-xs tracking-wider text-muted-foreground uppercase">
+                                            Saldo de la cuenta
+                                        </span>
+                                        <span className="text-sm font-medium text-foreground">
+                                            {formatDeposito(userToEdit) ??
+                                                'Sin movimientos'}
+                                        </span>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setCuentaUserId(userToEdit.id);
+                                            closeEditModal();
+                                        }}
+                                    >
+                                        Ver cuenta
+                                    </Button>
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
@@ -2955,6 +3016,21 @@ export default function UsersIndex({
             <DocPreviewDialog
                 preview={previewImage}
                 onClose={() => setPreviewImage(null)}
+            />
+
+            {/* Cuenta de depósito del chofer: extracto + alta de movimientos. */}
+            <DepositoCuentaDialog
+                key={cuentaUserId ?? 'sin-cuenta'}
+                user={
+                    cuentaUser
+                        ? { id: cuentaUser.id, name: cuentaUser.name }
+                        : null
+                }
+                cuenta={cuentaUser?.deposito}
+                monedas={monedas}
+                tipos={tiposMovimiento}
+                open={!!cuentaUser}
+                onOpenChange={(open) => !open && setCuentaUserId(null)}
             />
         </>
     );

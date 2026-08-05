@@ -22,6 +22,7 @@ use App\Http\Controllers\RevisionMecanicaController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\UserDepositoController;
 use App\Http\Controllers\VehiculoController;
 use Illuminate\Support\Facades\Route;
 
@@ -115,6 +116,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('users/{user}', [UserController::class, 'update'])->name('users.update');
         Route::patch('users/{user}/role', [UserController::class, 'updateRole'])->name('users.update-role');
         Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status');
+        // Cuenta de depósito del chofer (append-only: alta de movimientos y
+        // contraasientos; nunca edición ni borrado).
+        Route::post('users/{user}/deposito/movimientos', [UserDepositoController::class, 'store'])->name('users.deposito.store');
+        Route::post('users/{user}/deposito/movimientos/{movimiento}/revertir', [UserDepositoController::class, 'revertir'])->name('users.deposito.revertir');
         Route::get('users/{user}/asignaciones', [UserController::class, 'asignaciones'])->name('users.asignaciones');
         Route::get('users/{user}/asignaciones/pdf', [UserController::class, 'asignacionesPdf'])->name('users.asignaciones.pdf');
 

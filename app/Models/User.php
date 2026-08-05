@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\DepositoMoneda;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -179,11 +180,44 @@ class User extends Authenticatable
     }
 
     /**
-     * Depósitos (garantía) del chofer, uno por moneda.
+     * Movimientos de la cuenta de depósito (garantía) del chofer, en orden de
+     * extracto. La cuenta es append-only: el saldo sale de sumarlos.
      */
-    public function depositos(): HasMany
+    public function depositoMovimientos(): HasMany
     {
-        return $this->hasMany(UserDeposito::class);
+        return $this->hasMany(UserDepositoMovimiento::class)->ordenExtracto();
+    }
+
+    /**
+     * Saldo de la cuenta de depósito por moneda: ['ARS' => 150000.0, ...].
+     * Sólo devuelve las monedas que tuvieron algún movimiento.
+     *
+     * @return array<string, float>
+     */
+    public function saldosDeposito(): array
+    {
+        $movimientos = $this->relationLoaded('depositoMovimientos')
+            ? $this->depositoMovimientos
+            : $this->depositoMovimientos()->get(['user_id', 'moneda', 'monto']);
+
+        return $movimientos
+            ->groupBy(fn (UserDepositoMovimiento $m) => $m->moneda->value)
+            ->map(fn ($grupo) => round((float) $grupo->sum(fn (UserDepositoMovimiento $m) => (float) $m->monto), 2))
+            ->all();
+    }
+
+    /**
+     * Saldo total de la cuenta de depósito expresado en ARS (USD × cotización).
+     */
+    public function saldoDepositoARS(float $cotizacionDolar): float
+    {
+        $saldos = $this->saldosDeposito();
+
+        return round(
+            ($saldos[DepositoMoneda::ARS->value] ?? 0.0)
+            + ($saldos[DepositoMoneda::USD->value] ?? 0.0) * $cotizacionDolar,
+            2,
+        );
     }
 
     /**
