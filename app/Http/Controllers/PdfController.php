@@ -393,14 +393,22 @@ class PdfController extends Controller
     {
         // Acceso: middleware role:administrador,administrativo,mecanico.
         // Inventario es global: el historial abarca todas las empresas.
-        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
+        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to', 'estado']);
         $articleId = $filters['article'] ?? null;
+
+        // Mismo criterio que la vista: por defecto entran las anuladas
+        // (devoluciones), marcadas como tales en el listado.
+        $estado = in_array($filters['estado'] ?? null, ['todas', 'activas', 'anuladas'], true)
+            ? $filters['estado']
+            : 'todas';
+        $filters['estado'] = $estado;
 
         $transactions = Transaccion::with([
             'articulo',
             'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
             'user',
         ])
+            ->filterByEstado($estado)
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)

@@ -24,7 +24,8 @@
                 <tr>
                     <td>{{ \Carbon\Carbon::parse($tx->created_at)->format('d/m/Y H:i') }}</td>
                     <td>{{ $tx->articulo?->descripcion ?? 'N/A' }}</td>
-                    <td class="center">{{ $tx->tipo === 'IN' ? 'Ingreso' : 'Egreso' }}</td>
+                    {{-- Las anuladas se listan como devolución: el stock ya volvió al inventario. --}}
+                    <td class="center">{{ $tx->inactiva ? 'Devolución' : ($tx->tipo === 'IN' ? 'Ingreso' : 'Egreso') }}</td>
                     <td class="center">{{ $tx->cantidad }}</td>
                     <td>{{ $tx->vehiculo?->patente ?? '-' }}</td>
                     <td>{{ $tx->descripcion ?? '-' }}</td>

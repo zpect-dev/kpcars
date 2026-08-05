@@ -22,9 +22,17 @@ class TransactionController extends Controller
     {
         $this->authorize('viewAny', Transaccion::class);
 
-        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to']);
+        $filters = $request->only(['article', 'plate', 'applicant', 'from', 'to', 'estado']);
 
         $articleId = $filters['article'] ?? null;
+
+        // El historial muestra por defecto activas + anuladas: las anuladas son
+        // las devoluciones (su stock ya volvió al inventario) y forman parte de
+        // la auditoría. El filtro permite quedarse con unas u otras.
+        $estado = in_array($filters['estado'] ?? null, ['todas', 'activas', 'anuladas'], true)
+            ? $filters['estado']
+            : 'todas';
+        $filters['estado'] = $estado;
 
         // Inventario es global: el historial de transacciones muestra TODAS las
         // operaciones de todas las empresas. Eager-load del vehículo sin
@@ -34,6 +42,7 @@ class TransactionController extends Controller
             'vehiculo' => fn ($q) => $q->withoutGlobalScope(TenantScope::class),
             'user',
         ])
+            ->filterByEstado($estado)
             ->filterByItem($articleId ? (int) $articleId : null)
             ->searchByPlate($filters['plate'] ?? null)
             ->searchByApplicant($filters['applicant'] ?? null)

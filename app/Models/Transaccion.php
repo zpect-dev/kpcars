@@ -128,6 +128,23 @@ class Transaccion extends Model
     }
 
     /**
+     * Filtra el historial por estado de la transacción.
+     *
+     * - `activas`: sólo las vigentes (lo que hace el scope global por defecto).
+     * - `anuladas`: sólo las devoluciones (transacciones anuladas, cuyo stock
+     *   ya volvió al inventario).
+     * - `todas`: unas y otras.
+     */
+    public function scopeFilterByEstado(Builder $query, ?string $estado): Builder
+    {
+        return match ($estado) {
+            'anuladas' => $query->withoutGlobalScope('activa')->where('inactiva', true),
+            'todas' => $query->withoutGlobalScope('activa'),
+            default => $query,
+        };
+    }
+
+    /**
      * Scope a query to filter transactions by creation date.
      */
     /**

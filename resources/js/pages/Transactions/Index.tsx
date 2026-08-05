@@ -37,6 +37,8 @@ interface Transaccion {
     tipo: 'IN' | 'OUT';
     cantidad: number;
     descripcion: string | null;
+    /** Anulada: el stock volvió al inventario. Se muestra como devolución. */
+    inactiva: boolean;
     created_at: string;
     articulo: Articulo;
     vehiculo?: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>;
@@ -64,6 +66,7 @@ interface Props {
         applicant?: string;
         from?: string;
         to?: string;
+        estado?: string;
     };
     items: Pick<Articulo, 'id' | 'descripcion'>[];
     vehiculos: Pick<Vehiculo, 'id' | 'patente' | 'marca' | 'modelo'>[];
@@ -92,14 +95,18 @@ export default function TransactionsIndex({
         if (!selectedTx) return;
 
         setIsProcessing(true);
-        router.post(`/transactions/${selectedTx.id}/annul`, {}, {
-            onSuccess: () => {
-                setAnnulDialog(false);
-                setSelectedTx(null);
+        router.post(
+            `/transactions/${selectedTx.id}/annul`,
+            {},
+            {
+                onSuccess: () => {
+                    setAnnulDialog(false);
+                    setSelectedTx(null);
+                },
+                onFinish: () => setIsProcessing(false),
+                preserveScroll: true,
             },
-            onFinish: () => setIsProcessing(false),
-            preserveScroll: true,
-        });
+        );
     }
     // ─── Filtro: Artículo (select con dropdown) ──────────────────────────────
     const [articleSearch, setArticleSearch] = useState('');
@@ -228,6 +235,9 @@ export default function TransactionsIndex({
     const [fromDate, setFromDate] = useState(filters.from || '');
     const [toDate, setToDate] = useState(filters.to || '');
 
+    // ─── Filtro: Estado (activas / devoluciones) ─────────────────────────────
+    const [estado, setEstado] = useState(filters.estado || 'todas');
+
     // ─── Efecto de búsqueda con debounce ─────────────────────────────────────
     const isMounted = useRef(false);
 
@@ -242,7 +252,8 @@ export default function TransactionsIndex({
             selectedPlate !== (filters.plate || '') ||
             applicantQuery !== (filters.applicant || '') ||
             fromDate !== (filters.from || '') ||
-            toDate !== (filters.to || '');
+            toDate !== (filters.to || '') ||
+            estado !== (filters.estado || 'todas');
 
         if (!hasChanges) return;
 
@@ -253,6 +264,7 @@ export default function TransactionsIndex({
             if (applicantQuery) activeFilters.applicant = applicantQuery;
             if (fromDate) activeFilters.from = fromDate;
             if (toDate) activeFilters.to = toDate;
+            if (estado !== 'todas') activeFilters.estado = estado;
 
             router.get(index.url(), activeFilters, {
                 preserveState: true,
@@ -262,7 +274,15 @@ export default function TransactionsIndex({
         }, 300);
 
         return () => clearTimeout(timeoutId);
-    }, [selectedArticleId, selectedPlate, applicantQuery, fromDate, toDate, filters]);
+    }, [
+        selectedArticleId,
+        selectedPlate,
+        applicantQuery,
+        fromDate,
+        toDate,
+        estado,
+        filters,
+    ]);
 
     function clearFilters() {
         setArticleSearch('');
@@ -272,6 +292,7 @@ export default function TransactionsIndex({
         setApplicantQuery('');
         setFromDate('');
         setToDate('');
+        setEstado('todas');
     }
 
     const hasActiveFilters =
@@ -279,7 +300,8 @@ export default function TransactionsIndex({
         Boolean(selectedPlate) ||
         Boolean(applicantQuery) ||
         Boolean(fromDate) ||
-        Boolean(toDate);
+        Boolean(toDate) ||
+        estado !== 'todas';
 
     return (
         <>
@@ -314,6 +336,8 @@ export default function TransactionsIndex({
                                     params.set('applicant', applicantQuery);
                                 if (fromDate) params.set('from', fromDate);
                                 if (toDate) params.set('to', toDate);
+                                if (estado !== 'todas')
+                                    params.set('estado', estado);
                                 const qs = params.toString();
                                 window.open(
                                     '/pdf/transactions' + (qs ? '?' + qs : ''),
@@ -331,7 +355,7 @@ export default function TransactionsIndex({
 
                 {/* Panel de Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(5,minmax(0,1fr))_auto]">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(6,minmax(0,1fr))_auto]">
                         {/* Filtro Artículo */}
                         <div className="flex flex-col gap-2">
                             <Label htmlFor="article">Artículo</Label>
@@ -511,6 +535,36 @@ export default function TransactionsIndex({
                             />
                         </div>
 
+                        {/* Filtro Estado: las anuladas son las devoluciones. */}
+                        <div className="flex flex-col gap-2">
+                            <Label htmlFor="estado">Estado</Label>
+                            <select
+                                id="estado"
+                                value={estado}
+                                onChange={(e) => setEstado(e.target.value)}
+                                className="flex h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                            >
+                                <option
+                                    value="todas"
+                                    className="bg-background text-foreground"
+                                >
+                                    Todas
+                                </option>
+                                <option
+                                    value="activas"
+                                    className="bg-background text-foreground"
+                                >
+                                    Sin devoluciones
+                                </option>
+                                <option
+                                    value="anuladas"
+                                    className="bg-background text-foreground"
+                                >
+                                    Sólo devoluciones
+                                </option>
+                            </select>
+                        </div>
+
                         <div className="col-span-full flex items-end sm:col-span-2 lg:col-span-1">
                             <button
                                 type="button"
@@ -525,7 +579,9 @@ export default function TransactionsIndex({
                                 )}
                             >
                                 <X className="h-4 w-4" />
-                                <span className="lg:hidden">Limpiar filtros</span>
+                                <span className="lg:hidden">
+                                    Limpiar filtros
+                                </span>
                             </button>
                         </div>
                     </div>
@@ -584,9 +640,7 @@ export default function TransactionsIndex({
                                         <th
                                             scope="col"
                                             className="w-[5%] px-3 py-3 text-center font-medium tracking-wider sm:px-6 sm:py-4"
-                                        >
-                                            
-                                        </th>
+                                        ></th>
                                     )}
                                 </tr>
                             </thead>
@@ -605,7 +659,14 @@ export default function TransactionsIndex({
                                     transactions.data.map((tx) => (
                                         <tr
                                             key={tx.id}
-                                            className="bg-card transition-colors hover:bg-muted/40"
+                                            className={cn(
+                                                'bg-card transition-colors hover:bg-muted/40',
+                                                // Devolución: fila teñida de
+                                                // violeta, el color propio del
+                                                // estado en todo el historial.
+                                                tx.inactiva &&
+                                                    'bg-violet-500/5 text-muted-foreground',
+                                            )}
                                         >
                                             <td
                                                 className="px-3 py-3 text-xs whitespace-nowrap sm:px-6 sm:py-4"
@@ -624,17 +685,45 @@ export default function TransactionsIndex({
                                                     'N/A'
                                                 }
                                             >
-                                                {tx.articulo?.descripcion ||
-                                                    'N/A'}
+                                                <span
+                                                    className={cn(
+                                                        tx.inactiva &&
+                                                            'text-muted-foreground',
+                                                    )}
+                                                >
+                                                    {tx.articulo?.descripcion ||
+                                                        'N/A'}
+                                                </span>
+                                                {tx.inactiva && (
+                                                    <span
+                                                        className="ml-2 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400"
+                                                        title="Transacción anulada: el stock volvió al inventario"
+                                                    >
+                                                        Devolución
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="truncate px-3 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex items-center gap-2">
-                                                    {tx.tipo === 'IN' ? (
+                                                    {/* La devolución usa su
+                                                        propio color: no es un
+                                                        ingreso ni un egreso
+                                                        vigente. */}
+                                                    {tx.inactiva ? (
+                                                        <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                    ) : tx.tipo === 'IN' ? (
                                                         <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
                                                     ) : (
                                                         <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                                                     )}
-                                                    <span className="font-semibold text-foreground">
+                                                    <span
+                                                        className={cn(
+                                                            'font-semibold',
+                                                            tx.inactiva
+                                                                ? 'text-muted-foreground line-through'
+                                                                : 'text-foreground',
+                                                        )}
+                                                    >
                                                         {tx.cantidad}
                                                     </span>
                                                 </div>
@@ -679,16 +768,22 @@ export default function TransactionsIndex({
                                             </td>
                                             {isAdmin && (
                                                 <td className="px-3 py-3 text-center sm:px-6 sm:py-4">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            openAnnulModal(tx)
-                                                        }
-                                                        className="text-muted-foreground transition-colors hover:text-amber-500"
-                                                        title="Anular transacción"
-                                                    >
-                                                        <RotateCcw className="h-4 w-4" />
-                                                    </button>
+                                                    {/* Una devolución ya no se
+                                                        vuelve a anular. */}
+                                                    {!tx.inactiva && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                openAnnulModal(
+                                                                    tx,
+                                                                )
+                                                            }
+                                                            className="text-muted-foreground transition-colors hover:text-amber-500"
+                                                            title="Anular transacción"
+                                                        >
+                                                            <RotateCcw className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </td>
                                             )}
                                         </tr>
@@ -709,19 +804,43 @@ export default function TransactionsIndex({
                             transactions.data.map((tx) => (
                                 <li
                                     key={tx.id}
-                                    className="flex flex-col gap-1.5 p-4"
+                                    className={cn(
+                                        'flex flex-col gap-1.5 p-4',
+                                        tx.inactiva && 'bg-violet-500/5',
+                                    )}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <p className="line-clamp-2 flex-1 text-sm font-semibold text-foreground">
+                                        <p
+                                            className={cn(
+                                                'line-clamp-2 flex-1 text-sm font-semibold',
+                                                tx.inactiva
+                                                    ? 'text-muted-foreground'
+                                                    : 'text-foreground',
+                                            )}
+                                        >
                                             {tx.articulo?.descripcion || 'N/A'}
+                                            {tx.inactiva && (
+                                                <span className="ml-2 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                                                    Devolución
+                                                </span>
+                                            )}
                                         </p>
                                         <div className="flex shrink-0 items-center gap-1.5 text-sm">
-                                            {tx.tipo === 'IN' ? (
+                                            {tx.inactiva ? (
+                                                <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                            ) : tx.tipo === 'IN' ? (
                                                 <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
                                             ) : (
                                                 <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                                             )}
-                                            <span className="font-semibold text-foreground">
+                                            <span
+                                                className={cn(
+                                                    'font-semibold',
+                                                    tx.inactiva
+                                                        ? 'text-muted-foreground line-through'
+                                                        : 'text-foreground',
+                                                )}
+                                            >
                                                 {tx.cantidad}
                                             </span>
                                         </div>
@@ -757,8 +876,8 @@ export default function TransactionsIndex({
                                             {tx.user?.name || 'N/A'}
                                         </span>
                                     </p>
-                                    {isAdmin && (
-                                        <div className="mt-1 flex justify-end pt-2 border-t border-border/50">
+                                    {isAdmin && !tx.inactiva && (
+                                        <div className="mt-1 flex justify-end border-t border-border/50 pt-2">
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -787,28 +906,44 @@ export default function TransactionsIndex({
                                 Confirmar Anulación
                             </DialogTitle>
                             <DialogDescription className="pt-2">
-                                ¿Estás seguro de que deseas anular esta transacción?
-                                Esta acción **revertirá el stock** del artículo (
+                                ¿Estás seguro de que deseas anular esta
+                                transacción? Esta acción **revertirá el stock**
+                                del artículo (
                                 <span className="font-semibold text-foreground">
                                     {selectedTx?.articulo?.descripcion}
                                 </span>
-                                ) y ocultará este registro permanentemente.
+                                ) y el registro quedará en el historial marcado
+                                como devolución.
                             </DialogDescription>
                         </DialogHeader>
 
                         <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Tipo</span>
-                                <span className="font-medium text-foreground">{selectedTx?.tipo === 'IN' ? 'Ingreso' : 'Egreso'}</span>
+                                <span className="text-muted-foreground">
+                                    Tipo
+                                </span>
+                                <span className="font-medium text-foreground">
+                                    {selectedTx?.tipo === 'IN'
+                                        ? 'Ingreso'
+                                        : 'Egreso'}
+                                </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground">Cantidad</span>
-                                <span className="font-medium text-foreground">{selectedTx?.cantidad} unidades</span>
+                                <span className="text-muted-foreground">
+                                    Cantidad
+                                </span>
+                                <span className="font-medium text-foreground">
+                                    {selectedTx?.cantidad} unidades
+                                </span>
                             </div>
                             {selectedTx?.vehiculo && (
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Vehículo</span>
-                                    <span className="font-medium text-foreground">{selectedTx.vehiculo.patente}</span>
+                                    <span className="text-muted-foreground">
+                                        Vehículo
+                                    </span>
+                                    <span className="font-medium text-foreground">
+                                        {selectedTx.vehiculo.patente}
+                                    </span>
                                 </div>
                             )}
                         </div>
