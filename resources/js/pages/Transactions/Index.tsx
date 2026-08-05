@@ -679,29 +679,31 @@ export default function TransactionsIndex({
                                                 ).toLocaleString('es-AR')}
                                             </td>
                                             <td
-                                                className="truncate px-3 py-3 font-medium text-foreground sm:px-6 sm:py-4"
+                                                className="px-3 py-3 font-medium text-foreground sm:px-6 sm:py-4"
                                                 title={
                                                     tx.articulo?.descripcion ||
                                                     'N/A'
                                                 }
                                             >
-                                                <span
-                                                    className={cn(
-                                                        tx.inactiva &&
-                                                            'text-muted-foreground',
-                                                    )}
-                                                >
-                                                    {tx.articulo?.descripcion ||
-                                                        'N/A'}
-                                                </span>
-                                                {tx.inactiva && (
+                                                <div className="flex flex-col items-start gap-1">
                                                     <span
-                                                        className="ml-2 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400"
-                                                        title="Transacción anulada: el stock volvió al inventario"
+                                                        className={cn(
+                                                            'block w-full truncate',
+                                                            tx.inactiva &&
+                                                                'text-muted-foreground',
+                                                        )}
                                                     >
-                                                        Devolución
+                                                        {tx.articulo
+                                                            ?.descripcion ||
+                                                            'N/A'}
                                                     </span>
-                                                )}
+                                                    {tx.inactiva && (
+                                                        <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                                                            Stock devuelto al
+                                                            inventario
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="truncate px-3 py-3 sm:px-6 sm:py-4">
                                                 <div className="flex items-center gap-2">
@@ -810,21 +812,24 @@ export default function TransactionsIndex({
                                     )}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <p
-                                            className={cn(
-                                                'line-clamp-2 flex-1 text-sm font-semibold',
-                                                tx.inactiva
-                                                    ? 'text-muted-foreground'
-                                                    : 'text-foreground',
-                                            )}
-                                        >
-                                            {tx.articulo?.descripcion || 'N/A'}
+                                        <div className="flex flex-1 flex-col items-start gap-1">
+                                            <p
+                                                className={cn(
+                                                    'line-clamp-2 text-sm font-semibold',
+                                                    tx.inactiva
+                                                        ? 'text-muted-foreground'
+                                                        : 'text-foreground',
+                                                )}
+                                            >
+                                                {tx.articulo?.descripcion ||
+                                                    'N/A'}
+                                            </p>
                                             {tx.inactiva && (
-                                                <span className="ml-2 rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
-                                                    Devolución
+                                                <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                                                    Stock devuelto al inventario
                                                 </span>
                                             )}
-                                        </p>
+                                        </div>
                                         <div className="flex shrink-0 items-center gap-1.5 text-sm">
                                             {tx.inactiva ? (
                                                 <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
