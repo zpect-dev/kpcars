@@ -55,7 +55,7 @@ export default function CobrosShow({
 
     return (
         <>
-            <Head title={`Cobros — ${inversion.nombre}`} />
+            <Head title={`Caja — ${inversion.nombre}`} />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
@@ -257,7 +257,7 @@ export default function CobrosShow({
 CobrosShow.layout = {
     breadcrumbs: [
         {
-            title: 'Cobros',
+            title: 'Caja',
             href: index.url(),
         },
         {

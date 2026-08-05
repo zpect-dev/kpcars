@@ -76,7 +76,7 @@ setOpenMobile(false);
     const cajaItems: NavItem[] = [];
 
     if (perms.can_view_cobros) {
-        cajaItems.push({ title: 'Cobros', href: cobrosIndex.url(), icon: Receipt });
+        cajaItems.push({ title: 'Caja', href: cobrosIndex.url(), icon: Receipt });
     }
 
     if (perms.can_view_recaudaciones) {

@@ -5,6 +5,7 @@ import {
     Calendar,
     ChevronDown,
     ChevronRight,
+    CircleDollarSign,
     Car,
     Download,
     FileSpreadsheet,
@@ -129,6 +130,11 @@ export default function CobrosIndex({
     const [tab, setTab] = useState<Tab>('inventario');
 
     const totalACerrar = totalGeneral + totalGastos;
+
+    // Total general (inventario + flota + galpón): vive fuera de ambas pestañas
+    // para no duplicar lo que ya se ve en "Gastos de flota" y "Gastos de galpón".
+    const totalGastosGalpon = gastosResumen.cards.find((c) => c.key === 'galpon')?.total ?? 0;
+    const totalGeneralTodo = totalIntegrado + totalGastosGalpon;
 
     // ─── Apertura / Cierre ────────────────────────────────────────────────
     const [processingAbrir, setProcessingAbrir] = useState(false);
@@ -255,7 +261,7 @@ export default function CobrosIndex({
 
     return (
         <>
-            <Head title={historico ? `Cierre de Caja #${historico.id}` : 'Cobros'} />
+            <Head title={historico ? `Cierre de Caja #${historico.id}` : 'Caja'} />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header + estado del período */}
@@ -288,7 +294,7 @@ export default function CobrosIndex({
                         ) : (
                             <>
                                 <h2 className="text-lg font-semibold text-foreground">
-                                    Cobros
+                                    Caja
                                 </h2>
                                 {abierta && apertura ? (
                                     <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
@@ -309,6 +315,14 @@ export default function CobrosIndex({
 
                     {historico ? (
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTab('kevin')}
+                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <UserCircle2 className="h-3.5 w-3.5" />
+                                Gastos de Kevin
+                            </button>
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={historial.url()}>
                                     <History className="mr-1.5 h-4 w-4" />
@@ -318,6 +332,14 @@ export default function CobrosIndex({
                         </div>
                     ) : (
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTab('kevin')}
+                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            >
+                                <UserCircle2 className="h-3.5 w-3.5" />
+                                Gastos de Kevin
+                            </button>
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={historial.url()}>
                                     <History className="mr-1.5 h-4 w-4" />
@@ -371,18 +393,6 @@ export default function CobrosIndex({
                         <HandCoins className="h-4 w-4" />
                         Gastos de galpón
                     </button>
-                    <button
-                        type="button"
-                        onClick={() => setTab('kevin')}
-                        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                            tab === 'kevin'
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:text-foreground'
-                        }`}
-                    >
-                        <UserCircle2 className="h-4 w-4" />
-                        Kevin
-                    </button>
                 </div>
 
                 {tab === 'inventario' ? (
@@ -391,7 +401,6 @@ export default function CobrosIndex({
                         totalIntegrado={totalIntegrado}
                         totalGeneral={totalGeneral}
                         totalGanancia={totalGanancia}
-                        gastosResumen={gastosResumen}
                         historico={historico}
                     />
                 ) : tab === 'gastos' ? (
@@ -484,6 +493,17 @@ export default function CobrosIndex({
                         </div>
                     </div>
                 )}
+
+                {/* Total general: al pie, fuera de "Gastos de flota" y "Gastos de galpón" para no duplicar sus cifras */}
+                <div className="flex w-fit items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                        <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Total general (inventario + flota + galpón)</p>
+                        <p className="text-xl font-bold text-foreground">{formatARS(totalGeneralTodo)}</p>
+                    </div>
+                </div>
             </div>
 
             {/* ─── Modal Cierre de Caja ──────────────────────────────────────── */}
@@ -711,14 +731,12 @@ function InventarioPanel({
     totalIntegrado,
     totalGeneral,
     totalGanancia,
-    gastosResumen,
     historico = null,
 }: {
     resumenIntegrado: ResumenIntegradoInversion[];
     totalIntegrado: number;
     totalGeneral: number;
     totalGanancia: number;
-    gastosResumen: CobrosGastosResumen;
     historico?: { id: number } | null;
 }) {
     const [expandedIntegrado, setExpandedIntegrado] = useState<Set<number>>(new Set());
@@ -726,8 +744,6 @@ function InventarioPanel({
 
     // totalIntegrado = gastos de inventario (cobros) + gastos de flota, ver BuildResumenIntegradoAction.
     const totalGastosFlota = totalIntegrado - totalGeneral;
-    // Card "Galpón" del resumen de gastos: sólo galpón/taller/oficina (sin Kevin/stock ni flota).
-    const totalGastosGalpon = gastosResumen.cards.find((c) => c.key === 'galpon')?.total ?? 0;
     const totalCosto = totalGeneral - totalGanancia;
 
     // Popover de "Ganancia" en hover, con el mismo patrón que MetodoBreakdownCard.
@@ -769,16 +785,16 @@ function InventarioPanel({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Popover open={showGanancia} onOpenChange={setShowGanancia}>
                     <PopoverTrigger asChild onMouseEnter={openGananciaNow} onMouseLeave={scheduleCloseGanancia}>
-                        <div className="cursor-default rounded-xl border border-border bg-card p-4 shadow-sm">
+                        <div className="cursor-default rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 shadow-sm">
                             <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                                    <Box className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
+                                    <Box className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase underline decoration-dotted underline-offset-2">
                                         Gastos de inventario
                                     </p>
-                                    <p className="text-xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
+                                    <p className="text-2xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
                                 </div>
                             </div>
                         </div>
@@ -803,25 +819,25 @@ function InventarioPanel({
                         </div>
                     </PopoverContent>
                 </Popover>
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                            <Car className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15">
+                            <Car className="h-4 w-4 text-sky-600 dark:text-sky-400" />
                         </div>
                         <div className="min-w-0">
                             <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Gastos de flota</p>
-                            <p className="text-xl font-bold text-foreground">{formatARS(totalGastosFlota)}</p>
+                            <p className="text-2xl font-bold text-foreground">{formatARS(totalGastosFlota)}</p>
                         </div>
                     </div>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 shadow-sm">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                            <Warehouse className="h-4 w-4 text-muted-foreground" />
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15">
+                            <CircleDollarSign className="h-4 w-4 text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Gastos de galpón</p>
-                            <p className="text-xl font-bold text-foreground">{formatARS(totalGastosGalpon)}</p>
+                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Total (inventario + flota)</p>
+                            <p className="text-2xl font-bold text-foreground">{formatARS(totalIntegrado)}</p>
                         </div>
                     </div>
                 </div>
@@ -836,21 +852,17 @@ function InventarioPanel({
                     </Button>
                 ) : (
                     <>
-                        <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/pdf/cobros', '_blank')}>
-                            <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">PDF cobros</span>
-                        </Button>
                         <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/excel/cobros', '_blank')}>
                             <FileSpreadsheet className="h-4 w-4" />
-                            <span className="hidden sm:inline">Excel cobros</span>
+                            <span className="hidden sm:inline">Excel detalle de inventario</span>
                         </Button>
                         <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/pdf/cobros-integrado', '_blank')}>
                             <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">PDF integrado</span>
+                            <span className="hidden sm:inline">PDF por vehículo</span>
                         </Button>
                         <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/excel/cobros-integrado', '_blank')}>
                             <FileSpreadsheet className="h-4 w-4" />
-                            <span className="hidden sm:inline">Excel integrado</span>
+                            <span className="hidden sm:inline">Excel por vehículo</span>
                         </Button>
                     </>
                 )}
@@ -985,10 +997,11 @@ const CATEGORIAS_POR_GRUPO: Record<GastoGrupo, CategoriaGasto[]> = {
     ],
 };
 
-function cardIcon(key: string): React.ReactNode {
-    const cls = 'h-5 w-5 text-muted-foreground';
+function cardIcon(key: string, destacada = false): React.ReactNode {
+    const cls = destacada ? 'h-5 w-5 text-primary' : 'h-5 w-5 text-muted-foreground';
     if (key.startsWith('empresa_')) return <Building2 className={cls} />;
     if (key === 'kevin') return <UserCircle2 className={cls} />;
+    if (key === 'stock') return <Box className={cls} />;
     if (key === 'galpon') return <Warehouse className={cls} />;
     return <HandCoins className={cls} />;
 }
@@ -1040,15 +1053,25 @@ function GastosPanel({
         return map;
     }, [gastosFiltrados, categorias]);
 
-    const cardsFiltradas = useMemo(
-        () => gastosResumen.cards.filter((c) => (grupo === 'galpon' ? c.key.startsWith('empresa_') || c.key === 'galpon' : c.key === 'kevin')),
-        [gastosResumen.cards, grupo],
-    );
+    const cardsFiltradas = useMemo(() => {
+        const filtradas = gastosResumen.cards.filter((c) => (
+            grupo === 'galpon'
+                ? c.key.startsWith('empresa_') || c.key === 'galpon'
+                : c.key === 'kevin' || c.key === 'stock'
+        ));
+        if (grupo !== 'galpon') return filtradas;
+        // "Galpón" primero: es el total que después se reparte entre las empresas.
+        const galpon = filtradas.find((c) => c.key === 'galpon');
+        const empresas = filtradas.filter((c) => c.key !== 'galpon');
+        return galpon ? [galpon, ...empresas] : empresas;
+    }, [gastosResumen.cards, grupo]);
 
-    const allCards = [
-        ...cardsFiltradas,
-        { key: 'general', label: 'Total', total: totalFiltrado },
-    ];
+    // En "Galpón" la card "galpon" YA es el total del grupo, no hace falta una
+    // card "Total" aparte (quedaría duplicada). En "Kevin" sí suma información
+    // nueva, porque Kevin y Stock son montos independientes.
+    const allCards = grupo === 'galpon'
+        ? cardsFiltradas
+        : [...cardsFiltradas, { key: 'general', label: 'Total', total: totalFiltrado }];
 
     // "Últimos gastos": por defecto los últimos 10 de este grupo, con opción de ver todos.
     const listaUltimos = mostrarTodos ? gastosFiltrados : gastosFiltrados.slice(0, 10);
@@ -1091,7 +1114,7 @@ function GastosPanel({
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <p className="text-xs text-muted-foreground">
                     {grupo === 'galpon'
-                        ? 'Gastos de galpón, taller y oficina, repartidos por empresa (la flota se ve en Gastos de flota).'
+                        ? 'Gastos de galpón, taller y oficina (la flota se ve en Gastos de flota). El total de Galpón se reparte automáticamente entre las empresas según sus autos alquilados en el momento del gasto.'
                         : 'Gastos de Kevin y stock, aparte de la flota y el galpón.'}
                     {' '}Solo lectura — el alta se hace en{' '}
                     <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => router.get('/gastos')}>
@@ -1122,13 +1145,23 @@ function GastosPanel({
             >
                 {allCards.map((card) => {
                     const isGeneral = card.key === 'general';
+                    const isGalponTotal = card.key === 'galpon';
+                    const isEmpresa = card.key.startsWith('empresa_');
+                    const pct = isEmpresa && totalFiltrado > 0 ? (Number(card.total) / totalFiltrado) * 100 : null;
                     return (
-                        <div key={card.key} className={`rounded-xl border p-4 shadow-sm ${isGeneral ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'}`}>
+                        <div key={card.key} className={`rounded-xl border p-4 shadow-sm ${isGeneral || isGalponTotal ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'}`}>
                             <div className="flex items-center gap-2.5">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">{cardIcon(card.key)}</div>
-                                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{card.label}</p>
+                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isGeneral || isGalponTotal ? 'bg-primary/15' : 'bg-muted'}`}>{cardIcon(card.key, isGeneral || isGalponTotal)}</div>
+                                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                    {isGalponTotal ? 'Galpón (total del período)' : card.label}
+                                </p>
                             </div>
-                            <p className="mt-2 text-xl font-bold text-foreground">{formatARS(Number(card.total))}</p>
+                            <p className={`mt-2 font-bold text-foreground ${isGeneral || isGalponTotal ? 'text-2xl' : 'text-xl'}`}>{formatARS(Number(card.total))}</p>
+                            {pct !== null && (
+                                <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
+                                    {pct.toLocaleString('es-AR', { maximumFractionDigits: 0 })}% del galpón
+                                </p>
+                            )}
                         </div>
                     );
                 })}
@@ -1251,7 +1284,7 @@ function GastosPanel({
 CobrosIndex.layout = {
     breadcrumbs: [
         {
-            title: 'Cobros',
+            title: 'Caja',
             href: index.url(),
         },
     ],

@@ -191,7 +191,12 @@ class CobroController extends Controller
             [
                 'key' => 'kevin',
                 'label' => 'Kevin',
-                'total' => (float) $gastos->whereIn('tipo', ['kevin', 'stock'])->sum(fn (Gasto $g) => (float) $g->monto),
+                'total' => (float) $gastos->where('tipo', 'kevin')->sum(fn (Gasto $g) => (float) $g->monto),
+            ],
+            [
+                'key' => 'stock',
+                'label' => 'Stock',
+                'total' => (float) $gastos->where('tipo', 'stock')->sum(fn (Gasto $g) => (float) $g->monto),
             ],
             [
                 'key' => 'galpon',

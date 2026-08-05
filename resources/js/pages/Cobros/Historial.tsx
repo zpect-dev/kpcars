@@ -39,7 +39,7 @@ function formatDate(date: string | null): string {
 export default function CobrosHistorial({ cierres }: Props) {
     return (
         <>
-            <Head title="Historial de Cobros" />
+            <Head title="Historial de Caja" />
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 <div>
@@ -48,7 +48,7 @@ export default function CobrosHistorial({ cierres }: Props) {
                         Historial de Cierres
                     </h2>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                        Cada cierre abre una réplica de solo lectura de cómo se veía Cobros en ese período.
+                        Cada cierre abre una réplica de solo lectura de cómo se veía Caja en ese período.
                     </p>
                 </div>
 
@@ -138,7 +138,7 @@ export default function CobrosHistorial({ cierres }: Props) {
 
 CobrosHistorial.layout = {
     breadcrumbs: [
-        { title: 'Cobros', href: index.url() },
+        { title: 'Caja', href: index.url() },
         { title: 'Historial', href: '/cobros/historial' },
     ],
 };
