@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActaController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
@@ -128,6 +129,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('multas/{multa}', [MultaController::class, 'destroy'])->name('multas.destroy');
         Route::patch('multas/{multa}/restaurar', [MultaController::class, 'restaurar'])->name('multas.restaurar');
         Route::get('multas/pdf', [MultaController::class, 'pdf'])->name('multas.pdf');
+
+        // Multas (feed): módulo experimental alimentado por el feed externo.
+        Route::get('actas', [ActaController::class, 'index'])->name('actas.index');
+        Route::post('actas/sincronizar', [ActaController::class, 'sincronizar'])->name('actas.sincronizar');
 
         // Historial de movimientos de personal (altas/bajas de choferes y cambios
         // de vehículo) con stats, filtros y ajuste de fechas inline.

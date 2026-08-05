@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Radar, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -47,6 +47,7 @@ setOpenMobile(false);
 
     if (perms.can_view_multas) {
         flotaItems.push({ title: 'Multas', href: '/multas', icon: Siren });
+        flotaItems.push({ title: 'Multas (feed)', href: '/actas', icon: Radar });
     }
 
     if (perms.can_view_revisiones) {

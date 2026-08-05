@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    /*
+    | Feed externo de multas (resolvetusmultas). Es un documento JSON con
+    | snapshots diarios de la deuda por patente. Módulo experimental: la URL
+    | (con su UUID de búsqueda) puede rotar, por eso vive en env.
+    */
+    'resolvetusmultas' => [
+        'feed_url' => env(
+            'MULTAS_FEED_URL',
+            'https://api.resolvetusmultas.com/searches/201ef8c6-762a-47ee-9b9f-259cf45488af.json',
+        ),
+        // Verificación SSL. En algunos entornos locales de Windows falta el CA
+        // bundle de curl; poné MULTAS_FEED_VERIFY_SSL=false ahí. En prod: true.
+        'verify' => env('MULTAS_FEED_VERIFY_SSL', true),
+    ],
+
 ];
