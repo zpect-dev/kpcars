@@ -22,6 +22,43 @@ use Illuminate\Support\Facades\Storage;
 class Vehiculo extends Model
 {
     use HasFactory;
+
+    /**
+     * The "booted" method of the model.
+     */
+    protected static function booted(): void
+    {
+        // Al eliminar un vehículo, sus transacciones de stock se conservan:
+        // se corta la referencia (vehiculo_id = null) y la patente queda
+        // estampada en la descripción para no perder la trazabilidad.
+        static::deleting(function (Vehiculo $vehiculo): void {
+            $vehiculo->desvincularTransacciones();
+        });
+    }
+
+    /**
+     * Desvincula las transacciones del vehículo dejando la patente en la
+     * descripción. Incluye las anuladas (devoluciones), que el scope global
+     * `activa` de Transaccion oculta por defecto.
+     */
+    protected function desvincularTransacciones(): void
+    {
+        $sufijo = "Vehículo {$this->patente} (eliminado)";
+
+        Transaccion::withoutGlobalScope('activa')
+            ->where('vehiculo_id', $this->id)
+            ->chunkById(200, function ($transacciones) use ($sufijo): void {
+                foreach ($transacciones as $transaccion) {
+                    $actual = trim((string) $transaccion->descripcion);
+
+                    $transaccion->forceFill([
+                        'descripcion' => mb_substr($actual === '' ? $sufijo : "{$actual} · {$sufijo}", 0, 255),
+                        'vehiculo_id' => null,
+                    ])->save();
+                }
+            });
+    }
+
     /**
      * Get the attributes that should be cast.
      *

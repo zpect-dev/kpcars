@@ -243,7 +243,11 @@ class VehiculoController extends Controller
         $this->authorize('delete', $vehiculo);
 
         $patente = $vehiculo->patente;
-        $vehiculo->delete();
+
+        // El hook `deleting` del modelo desvincula las transacciones y les deja
+        // la patente en la descripción; ambas cosas van en la misma transacción
+        // para que el historial nunca quede a medio actualizar.
+        DB::transaction(fn () => $vehiculo->delete());
 
         return redirect()->back()->with('success', "Vehículo {$patente} eliminado correctamente.");
     }
