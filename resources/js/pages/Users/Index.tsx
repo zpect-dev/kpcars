@@ -1,6 +1,9 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
 import { useMemo, useState, useEffect } from 'react';
 import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
     Check,
     ChevronDown,
     Crop,
@@ -419,6 +422,52 @@ function FilterPopoverItem({
     );
 }
 
+type SortField =
+    | 'nombre'
+    | 'dni'
+    | 'licencia'
+    | 'estado'
+    | 'fecha_estado'
+    | 'deposito'
+    | 'vehiculo';
+
+function SortHeader({
+    label,
+    field,
+    sortField,
+    sortDir,
+    onSort,
+}: {
+    label: string;
+    field: SortField;
+    sortField: SortField | null;
+    sortDir: 'asc' | 'desc';
+    onSort: (field: SortField) => void;
+}) {
+    const active = sortField === field;
+    return (
+        <button
+            type="button"
+            onClick={() => onSort(field)}
+            className={cn(
+                'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+                active && 'text-foreground',
+            )}
+        >
+            {label}
+            {active ? (
+                sortDir === 'asc' ? (
+                    <ArrowUp className="h-3.5 w-3.5" />
+                ) : (
+                    <ArrowDown className="h-3.5 w-3.5" />
+                )
+            ) : (
+                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+            )}
+        </button>
+    );
+}
+
 /**
  * Repetidor del depósito inicial (monto + moneda + fecha) para el alta del
  * chofer. Después del alta la cuenta se mueve desde el extracto: los ingresos
@@ -574,6 +623,8 @@ export default function UsersIndex({
     const cuentaUser = users.find((u) => u.id === cuentaUserId) ?? null;
     const [searchTerm, setSearchTerm] = useState('');
     const [filterAlert, setFilterAlert] = useState<FilterAlertValue>('all');
+    const [sortField, setSortField] = useState<SortField | null>(null);
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
     const [openFilterSections, setOpenFilterSections] = useState<
         Record<string, boolean>
     >({});
@@ -643,6 +694,63 @@ export default function UsersIndex({
         }
         return result;
     }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
+
+    function getSortValue(
+        user: User,
+        field: SortField,
+    ): string | number | null {
+        switch (field) {
+            case 'nombre':
+                return user.name?.toLowerCase() ?? '';
+            case 'dni':
+                return user.dni ?? '';
+            case 'licencia':
+                return user.fecha_vencimiento_licencia
+                    ? parseLicenciaDate(
+                          user.fecha_vencimiento_licencia,
+                      ).getTime()
+                    : null;
+            case 'estado':
+                return user.inactivo ? 1 : 0;
+            case 'fecha_estado': {
+                const fecha = estadoFecha(user);
+                if (!fecha) return null;
+                const parsed = new Date(fecha);
+                return isNaN(parsed.getTime()) ? null : parsed.getTime();
+            }
+            case 'deposito':
+                return depositoTotalARS(user, cotizacionDolar);
+            case 'vehiculo':
+                return user.vehiculo?.patente?.toLowerCase() ?? null;
+            default:
+                return null;
+        }
+    }
+
+    const sortedUsers = useMemo(() => {
+        if (!sortField) return filteredUsers;
+        const dir = sortDir === 'asc' ? 1 : -1;
+        return [...filteredUsers].sort((a, b) => {
+            const va = getSortValue(a, sortField);
+            const vb = getSortValue(b, sortField);
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            if (typeof va === 'string' && typeof vb === 'string') {
+                return va.localeCompare(vb, 'es', { numeric: true }) * dir;
+            }
+            return ((va as number) - (vb as number)) * dir;
+        });
+    }, [filteredUsers, sortField, sortDir, cotizacionDolar]);
+
+    function toggleSort(field: SortField) {
+        if (sortField === field) {
+            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            setSortDir('asc');
+        }
+    }
 
     const alertCounts = useMemo(() => {
         if (filterRole !== 'chofer')
@@ -1377,7 +1485,17 @@ export default function UsersIndex({
                                         scope="col"
                                         className="w-[20%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        Nombre
+                                        {filterRole === 'chofer' ? (
+                                            <SortHeader
+                                                label="Nombre"
+                                                field="nombre"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            'Nombre'
+                                        )}
                                     </th>
                                     <th
                                         scope="col"
@@ -1389,28 +1507,67 @@ export default function UsersIndex({
                                         scope="col"
                                         className="w-[15%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        DNI
+                                        {filterRole === 'chofer' ? (
+                                            <SortHeader
+                                                label="DNI"
+                                                field="dni"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            'DNI'
+                                        )}
                                     </th>
                                     <th
                                         scope="col"
                                         className="w-[15%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        Licencia
+                                        {filterRole === 'chofer' ? (
+                                            <SortHeader
+                                                label="Licencia"
+                                                field="licencia"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            'Licencia'
+                                        )}
                                     </th>
                                     <th
                                         scope="col"
                                         className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        Estado
+                                        {filterRole === 'chofer' ? (
+                                            <SortHeader
+                                                label="Estado"
+                                                field="estado"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            'Estado'
+                                        )}
                                     </th>
                                     {filterRole === 'chofer' && (
                                         <th
                                             scope="col"
                                             className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
-                                            {filterStatus === 'inactivos'
-                                                ? 'Baja'
-                                                : 'Alta'}
+                                            <SortHeader
+                                                label={
+                                                    filterStatus ===
+                                                    'inactivos'
+                                                        ? 'Baja'
+                                                        : 'Alta'
+                                                }
+                                                field="fecha_estado"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
                                         </th>
                                     )}
                                     {filterRole === 'chofer' && (
@@ -1418,21 +1575,35 @@ export default function UsersIndex({
                                             scope="col"
                                             className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                         >
-                                            Depósito
+                                            <SortHeader
+                                                label="Depósito"
+                                                field="deposito"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
                                         </th>
                                     )}
                                     <th
                                         scope="col"
                                         className="px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
-                                        {filterRole === 'chofer'
-                                            ? 'Vehículo'
-                                            : 'Rol'}
+                                        {filterRole === 'chofer' ? (
+                                            <SortHeader
+                                                label="Vehículo"
+                                                field="vehiculo"
+                                                sortField={sortField}
+                                                sortDir={sortDir}
+                                                onSort={toggleSort}
+                                            />
+                                        ) : (
+                                            'Rol'
+                                        )}
                                     </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {filteredUsers.length === 0 ? (
+                                {sortedUsers.length === 0 ? (
                                     <tr>
                                         <td
                                             colSpan={
@@ -1445,7 +1616,7 @@ export default function UsersIndex({
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredUsers.map((user) => (
+                                    sortedUsers.map((user) => (
                                         <tr
                                             key={user.id}
                                             onClick={() =>
@@ -1743,13 +1914,13 @@ export default function UsersIndex({
 
                     {/* Mobile cards */}
                     <ul className="divide-y divide-border md:hidden">
-                        {filteredUsers.length === 0 ? (
+                        {sortedUsers.length === 0 ? (
                             <li className="px-4 py-12 text-center text-sm text-muted-foreground">
                                 No se encontraron usuarios que coincidan con la
                                 búsqueda.
                             </li>
                         ) : (
-                            filteredUsers.map((user) => (
+                            sortedUsers.map((user) => (
                                 <li
                                     key={user.id}
                                     role={isInversor ? undefined : 'button'}
