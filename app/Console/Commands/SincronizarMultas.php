@@ -13,7 +13,9 @@ use Illuminate\Console\Command;
  */
 class SincronizarMultas extends Command
 {
-    protected $signature = 'multas:sincronizar {--url= : Sobrescribe la URL del feed}';
+    protected $signature = 'multas:sincronizar
+        {--url= : Sobrescribe la URL del feed}
+        {--origen=manual : Etiqueta de la corrida para la bitácora (manual|schedule)}';
 
     protected $description = 'Sincroniza las multas desde el feed externo (resolvetusmultas)';
 
@@ -22,11 +24,17 @@ class SincronizarMultas extends Command
         $this->info('Sincronizando multas desde el feed…');
 
         try {
-            $r = $action->fetch($this->option('url') ?: null);
+            $r = $action->fetch($this->option('url') ?: null, (string) $this->option('origen'));
         } catch (\Throwable $e) {
             $this->error('Falló la sincronización: '.$e->getMessage());
 
             return self::FAILURE;
+        }
+
+        if ($r['locked'] ?? false) {
+            $this->warn('Ya hay una sincronización en curso; se omite esta corrida.');
+
+            return self::SUCCESS;
         }
 
         if ($r['snapshot'] === null) {

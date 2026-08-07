@@ -133,7 +133,29 @@ it('no duplica al reingerir el mismo snapshot, incluida una multa de CABA sin ac
     $action->execute([$snap]);
 
     expect(Acta::count())->toBe(1)
-        ->and(Acta::first()->estado)->toBe('vigente');
+        ->and(Acta::first()->estado->value)->toBe('vigente');
+});
+
+it('no duplica una multa de CABA cuando cambia el monto (intereses)', function () {
+    mkVehiculo('AA123BB');
+    $action = new SincronizarMultasAction;
+
+    // Misma infracción de CABA, con el monto actualizado entre snapshots. Como
+    // el monto salió del hash de la clave, debe seguir siendo la MISMA acta: ni
+    // "nueva" ni "resuelta" falsa.
+    $action->execute([mkSnapshot('01/08/2026', [
+        mkBusqueda('AA123BB', [mkCaba([cabaItem('Peaje', '100')])]),
+    ])]);
+
+    $r = $action->execute([mkSnapshot('03/08/2026', [
+        mkBusqueda('AA123BB', [mkCaba([cabaItem('Peaje', '150')])]),
+    ])]);
+
+    expect(Acta::count())->toBe(1)
+        ->and($r['nuevas'])->toBe(0)
+        ->and($r['resueltas'])->toBe(0)
+        ->and(Acta::first()->estado->value)->toBe('vigente')
+        ->and((float) Acta::first()->monto)->toBe(150.0);
 });
 
 it('marca resuelta el acta que desaparece si la patente sigue presente', function () {
@@ -152,9 +174,9 @@ it('marca resuelta el acta que desaparece si la patente sigue presente', functio
     ])]);
 
     expect($r['resueltas'])->toBe(1)
-        ->and(Acta::where('acta', 'A2')->first()->estado)->toBe('resuelta')
+        ->and(Acta::where('acta', 'A2')->first()->estado->value)->toBe('resuelta')
         ->and(Acta::where('acta', 'A2')->first()->resuelta_en?->toDateString())->toBe('2026-08-03')
-        ->and(Acta::where('acta', 'A1')->first()->estado)->toBe('vigente');
+        ->and(Acta::where('acta', 'A1')->first()->estado->value)->toBe('vigente');
 });
 
 it('NO resuelve actas si la patente entera desaparece del feed (búsqueda caída)', function () {
@@ -172,7 +194,7 @@ it('NO resuelve actas si la patente entera desaparece del feed (búsqueda caída
     ])]);
 
     expect($r['resueltas'])->toBe(0)
-        ->and(Acta::where('acta', 'A1')->first()->estado)->toBe('vigente');
+        ->and(Acta::where('acta', 'A1')->first()->estado->value)->toBe('vigente');
 });
 
 it('reabre un acta que había desaparecido y vuelve a aparecer', function () {
@@ -183,13 +205,13 @@ it('reabre un acta que había desaparecido y vuelve a aparecer', function () {
 
     // Desaparece (patente presente pero sin detalle) => resuelta.
     $action->execute([mkSnapshot('31/07/2026', [mkBusqueda('AA123BB', [mkBsas([])])])]);
-    expect(Acta::where('acta', 'A1')->first()->estado)->toBe('resuelta');
+    expect(Acta::where('acta', 'A1')->first()->estado->value)->toBe('resuelta');
 
     // Vuelve a aparecer => se reabre.
     $r = $action->execute([mkSnapshot('03/08/2026', [mkBusqueda('AA123BB', [mkBsas([bsasItem('A1')])])])]);
 
     expect($r['reabiertas'])->toBe(1)
-        ->and(Acta::where('acta', 'A1')->first()->estado)->toBe('vigente')
+        ->and(Acta::where('acta', 'A1')->first()->estado->value)->toBe('vigente')
         ->and(Acta::where('acta', 'A1')->first()->resuelta_en)->toBeNull();
 });
 

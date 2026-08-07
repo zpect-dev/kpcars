@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\ActaEstado;
 use App\Models\Acta;
 use App\Models\Asignacion;
+use App\Models\MultaSyncRun;
 use App\Models\Scopes\TenantScope;
 use App\Models\Vehiculo;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Ingesta del feed externo de multas (resolvetusmultas).
@@ -35,22 +39,68 @@ class SincronizarMultasAction
     /**
      * Baja el feed desde la URL configurada y lo procesa.
      *
-     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,snapshot:?string}
+     * Toma un lock para que dos corridas (manual + programada, o dos clicks) no
+     * se pisen, deja registro en `multa_sync_runs` del resultado o del error, y
+     * relanza la excepción para que el llamador la muestre.
+     *
+     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,snapshot:?string,locked:bool}
      */
-    public function fetch(?string $url = null): array
+    public function fetch(?string $url = null, string $origen = 'manual'): array
     {
         $url ??= (string) config('services.resolvetusmultas.feed_url');
 
-        $request = Http::timeout(30)->retry(2, 500);
+        $lock = Cache::lock('multas:sincronizar', 120);
 
-        if (! (bool) config('services.resolvetusmultas.verify', true)) {
-            $request = $request->withoutVerifying();
+        if (! $lock->get()) {
+            return ['procesadas' => 0, 'nuevas' => 0, 'resueltas' => 0, 'reabiertas' => 0, 'snapshot' => null, 'locked' => true];
         }
 
-        $response = $request->get($url);
-        $response->throw();
+        $inicio = hrtime(true);
 
-        return $this->execute((array) $response->json());
+        try {
+            $request = Http::timeout(30)->retry(2, 500);
+
+            if (! (bool) config('services.resolvetusmultas.verify', true)) {
+                $request = $request->withoutVerifying();
+            }
+
+            $response = $request->get($url);
+            $response->throw();
+
+            $r = $this->execute((array) $response->json());
+
+            MultaSyncRun::create([
+                'origen' => $origen,
+                'ok' => true,
+                'snapshot_fecha' => $r['snapshot'],
+                'procesadas' => $r['procesadas'],
+                'nuevas' => $r['nuevas'],
+                'resueltas' => $r['resueltas'],
+                'reabiertas' => $r['reabiertas'],
+                'duracion_ms' => $this->transcurridoMs($inicio),
+            ]);
+
+            return $r + ['locked' => false];
+        } catch (\Throwable $e) {
+            MultaSyncRun::create([
+                'origen' => $origen,
+                'ok' => false,
+                'duracion_ms' => $this->transcurridoMs($inicio),
+                'error' => mb_substr($e->getMessage(), 0, 1000),
+            ]);
+
+            Log::error('Sincronización de multas falló', ['origen' => $origen, 'error' => $e->getMessage()]);
+
+            throw $e;
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /** Milisegundos transcurridos desde un instante de hrtime(true). */
+    private function transcurridoMs(float $inicio): int
+    {
+        return (int) round((hrtime(true) - $inicio) / 1_000_000);
     }
 
     /**
@@ -82,24 +132,42 @@ class SincronizarMultasAction
             ->get(['vehiculo_id', 'conductor_id', 'fecha_inicio', 'fecha_fin'])
             ->groupBy('vehiculo_id');
 
-        $patentesPresentes = [];   // patentes que vinieron en este snapshot
-        $clavesVistas = [];        // claves de infracción vistas en este snapshot
-        $nuevas = 0;
-        $reabiertas = 0;
-        $procesadas = 0;
+        // Patentes que vinieron en este snapshot (primer pase liviano: solo las
+        // patentes, para poder precargar sus actas de una sola query).
+        $patentesPresentes = [];
 
-        DB::transaction(function () use (
-            $snapshot, $snapFecha, $vehiculos, $asignaciones,
-            &$patentesPresentes, &$clavesVistas, &$nuevas, &$reabiertas, &$procesadas,
+        foreach ($snapshot['busquedas'] ?? [] as $busqueda) {
+            $patente = strtoupper(trim((string) ($busqueda['busqueda'] ?? '')));
+
+            if ($patente !== '') {
+                $patentesPresentes[$patente] = true;
+            }
+        }
+
+        // Precarga de las actas ya existentes de esas patentes, indexadas por
+        // clave. Evita un SELECT por infracción (el viejo firstOrNew): ahora es
+        // una sola query y el match se resuelve en memoria.
+        $existentes = Acta::query()
+            ->whereIn('patente', array_keys($patentesPresentes))
+            ->get()
+            ->keyBy('clave');
+
+        // Todo en una transacción: ingesta + marcado de resueltas. Si algo falla,
+        // no queda a medias (nuevas commiteadas sin resolver las que se pagaron).
+        return DB::transaction(function () use (
+            $snapshot, $snapFecha, $vehiculos, $asignaciones, $patentesPresentes, $existentes,
         ) {
+            $clavesVistas = [];   // claves de infracción vistas en este snapshot
+            $nuevas = 0;
+            $reabiertas = 0;
+            $procesadas = 0;
+
             foreach ($snapshot['busquedas'] ?? [] as $busqueda) {
                 $patente = strtoupper(trim((string) ($busqueda['busqueda'] ?? '')));
 
                 if ($patente === '') {
                     continue;
                 }
-
-                $patentesPresentes[$patente] = true;
 
                 foreach ($busqueda['resultados'] ?? [] as $resultado) {
                     $juris = $this->jurisdiccion((string) ($resultado['municipio'] ?? ''));
@@ -118,8 +186,8 @@ class SincronizarMultasAction
                         $clavesVistas[$clave] = true;
                         $procesadas++;
 
-                        $acta = Acta::firstOrNew(['clave' => $clave]);
-                        $eraResuelta = $acta->exists && $acta->estado === 'resuelta';
+                        $acta = $existentes->get($clave) ?? new Acta(['clave' => $clave]);
+                        $eraResuelta = $acta->exists && $acta->estado === ActaEstado::Resuelta;
                         $esNueva = ! $acta->exists;
 
                         $vehiculoId = $vehiculos[$patente] ?? null;
@@ -143,7 +211,7 @@ class SincronizarMultasAction
                             'fecha_infraccion' => $fechaInfraccion,
                             'fecha_emision' => $this->parseFecha($item['fechaEmision'] ?? null),
                             'fecha_vencimiento' => $this->parseFecha($item['fechaVencimiento'] ?? null),
-                            'estado' => 'vigente',
+                            'estado' => ActaEstado::Vigente->value,
                             'resuelta_en' => null,
                             'vista_ultima_en' => $snapFecha,
                             'snapshot_fecha' => $snapFecha,
@@ -159,34 +227,38 @@ class SincronizarMultasAction
                         }
 
                         $acta->save();
+
+                        // Refleja el alta en el mapa para que una clave repetida
+                        // dentro del mismo snapshot no se cuente como nueva otra vez.
+                        $existentes->put($clave, $acta);
                     }
                 }
             }
+
+            // Marcar resueltas: actas vigentes cuya patente SÍ vino en el snapshot
+            // pero cuya clave NO apareció. Si la patente no vino (búsqueda caída),
+            // sus actas quedan intactas para no dar falsos pagos.
+            $resueltas = 0;
+
+            if ($patentesPresentes !== []) {
+                $resueltas = Acta::query()
+                    ->where('estado', ActaEstado::Vigente->value)
+                    ->whereIn('patente', array_keys($patentesPresentes))
+                    ->when($clavesVistas !== [], fn ($q) => $q->whereNotIn('clave', array_keys($clavesVistas)))
+                    ->update([
+                        'estado' => ActaEstado::Resuelta->value,
+                        'resuelta_en' => $snapFecha,
+                    ]);
+            }
+
+            return [
+                'procesadas' => $procesadas,
+                'nuevas' => $nuevas,
+                'resueltas' => $resueltas,
+                'reabiertas' => $reabiertas,
+                'snapshot' => $snapFecha->toDateString(),
+            ];
         });
-
-        // Marcar resueltas: actas vigentes cuya patente SÍ vino en el snapshot
-        // pero cuya clave NO apareció. Si la patente no vino (búsqueda caída), sus
-        // actas quedan intactas para no dar falsos pagos.
-        $resueltas = 0;
-
-        if ($patentesPresentes !== []) {
-            $resueltas = Acta::query()
-                ->where('estado', 'vigente')
-                ->whereIn('patente', array_keys($patentesPresentes))
-                ->when($clavesVistas !== [], fn ($q) => $q->whereNotIn('clave', array_keys($clavesVistas)))
-                ->update([
-                    'estado' => 'resuelta',
-                    'resuelta_en' => $snapFecha,
-                ]);
-        }
-
-        return [
-            'procesadas' => $procesadas,
-            'nuevas' => $nuevas,
-            'resueltas' => $resueltas,
-            'reabiertas' => $reabiertas,
-            'snapshot' => $snapFecha->toDateString(),
-        ];
     }
 
     /**
@@ -223,7 +295,13 @@ class SincronizarMultasAction
 
     /**
      * Clave única de la infracción. BSAS trae acta oficial; CABA no, así que se
-     * fabrica un hash estable con patente + fecha + motivo + monto.
+     * fabrica un hash estable con patente + fecha + motivo.
+     *
+     * El monto queda FUERA del hash a propósito: CABA actualiza el importe
+     * (intereses) sobre la misma infracción, y si el monto entrara al hash, un
+     * cambio de importe rompería la identidad — la infracción se marcaría
+     * "pagada" y reaparecería como "nueva". Con patente+fecha+motivo la
+     * identidad es estable frente a esos reajustes.
      *
      * @param  array<string,mixed>  $item
      */
@@ -235,12 +313,11 @@ class SincronizarMultasAction
             return $acta === '' ? null : 'BSAS:'.$acta;
         }
 
-        // CABA: sin acta. Hash de los campos que identifican la infracción.
+        // CABA: sin acta. Hash de los campos estables que identifican la infracción.
         $partes = [
             $patente,
             trim((string) ($item['fechaInfraccion'] ?? '')),
             trim((string) ($item['motivo'] ?? '')),
-            trim((string) ($item['monto'] ?? '')),
         ];
 
         return 'CABA:'.sha1(implode('|', $partes));

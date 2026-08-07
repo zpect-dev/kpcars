@@ -9,6 +9,6 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Feed externo de multas: se ingiere una vez al día a la mañana.
-Schedule::command('multas:sincronizar')
+Schedule::command('multas:sincronizar --origen=schedule')
     ->dailyAt('06:00')
     ->withoutOverlapping();

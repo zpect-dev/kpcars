@@ -133,6 +133,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Multas (feed): módulo experimental alimentado por el feed externo.
         Route::get('actas', [ActaController::class, 'index'])->name('actas.index');
         Route::post('actas/sincronizar', [ActaController::class, 'sincronizar'])->name('actas.sincronizar');
+        Route::patch('actas/{acta}/cobrado', [ActaController::class, 'registrarCobro'])->name('actas.cobrado');
+        Route::delete('actas/{acta}/pagos/{pago}', [ActaController::class, 'eliminarPago'])->name('actas.pagos.destroy');
 
         // Historial de movimientos de personal (altas/bajas de choferes y cambios
         // de vehículo) con stats, filtros y ajuste de fechas inline.
