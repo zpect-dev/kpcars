@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Receipt, Siren, UserRound, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -38,11 +38,26 @@ setOpenMobile(false);
 
     const perms = auth.permissions ?? {};
 
+    // Choferes son clientes (alquilan la flota), no personal de la empresa:
+    // su listado vive en /users?role=chofer pero se muestra en el grupo Flota.
+    const currentRole = url.includes('/users')
+        ? new URLSearchParams(url.split('?')[1] ?? '').get('role')
+        : null;
+
     // ── Grupo Flota ──────────────────────────────────────────────────────
     const flotaItems: NavItem[] = [];
 
     if (perms.can_view_vehiculos) {
         flotaItems.push({ title: 'Vehículos', href: dashboard.url(), icon: CarFront });
+    }
+
+    if (perms.can_view_personal) {
+        flotaItems.push({
+            title: 'Choferes',
+            href: '/users?role=chofer&status=activos',
+            icon: UserRound,
+            isActive: currentRole === 'chofer',
+        });
     }
 
     if (perms.can_view_multas) {
@@ -99,20 +114,18 @@ setOpenMobile(false);
     const personalItems: NavItem[] = [];
 
     if (perms.can_view_personal) {
-        const currentRole = url.includes('/users')
-            ? new URLSearchParams(url.split('?')[1] ?? '').get('role')
-            : null;
-
         personalItems.push({
             title: 'Personal',
             href: '/users',
             icon: Users,
+            // Choferes ya no cuenta acá (ver grupo Flota): que ese filtro esté
+            // activo no debe encender "Personal" al mismo tiempo.
+            isActive: url.includes('/users') && currentRole !== 'chofer',
             items: [
-                { title: 'Administración',  href: '/users?role=administrador',         isActive: currentRole === 'administrador' },
-                { title: 'Administrativos', href: '/users?role=administrativo',        isActive: currentRole === 'administrativo' },
-                { title: 'Mecánicos',       href: '/users?role=mecanico',              isActive: currentRole === 'mecanico' },
-                { title: 'Choferes',        href: '/users?role=chofer&status=activos', isActive: currentRole === 'chofer' },
-                { title: 'Inversores',      href: '/users?role=inversor',              isActive: currentRole === 'inversor' },
+                { title: 'Administración',  href: '/users?role=administrador',  isActive: currentRole === 'administrador' },
+                { title: 'Administrativos', href: '/users?role=administrativo', isActive: currentRole === 'administrativo' },
+                { title: 'Mecánicos',       href: '/users?role=mecanico',       isActive: currentRole === 'mecanico' },
+                { title: 'Inversores',      href: '/users?role=inversor',       isActive: currentRole === 'inversor' },
             ],
         });
     }

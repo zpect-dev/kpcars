@@ -20,8 +20,9 @@ import {
     UserCircle2,
     Warehouse,
     Wrench,
+    type LucideIcon,
 } from 'lucide-react';
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { forwardRef, Fragment, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -30,7 +31,16 @@ import {
     DialogFooter,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { index, abrir, cierre, cierreDesglose, historial } from '@/routes/cobros';
 import type {
     CajaApertura,
@@ -64,6 +74,44 @@ function formatDate(date: string): string {
         minute: '2-digit',
     });
 }
+
+// Tarjeta de total/desglose compartida por las 3 pestañas (Gastos de flota,
+// Gastos de galpón, Kevin) — misma estructura, tamaño y colores en todas.
+const TotalCard = forwardRef<
+    HTMLDivElement,
+    {
+        icon: LucideIcon;
+        label: string;
+        value: number;
+        sublabel?: string;
+        destacada?: boolean;
+        hint?: boolean;
+        className?: string;
+    } & React.HTMLAttributes<HTMLDivElement>
+>(function TotalCard({ icon: Icon, label, value, sublabel, destacada = false, hint = false, className, ...rest }, ref) {
+    return (
+        <div
+            ref={ref}
+            className={cn(
+                'rounded-xl border p-4 shadow-sm',
+                destacada ? 'border-primary/40 bg-primary/5' : 'border-border bg-card',
+                className,
+            )}
+            {...rest}
+        >
+            <div className="flex items-center gap-2.5">
+                <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', destacada ? 'bg-primary/15' : 'bg-muted')}>
+                    <Icon className={cn('h-4 w-4', destacada ? 'text-primary' : 'text-muted-foreground')} />
+                </div>
+                <p className={cn('text-[11px] font-medium tracking-wide text-muted-foreground uppercase', hint && 'underline decoration-dotted underline-offset-2')}>
+                    {label}
+                </p>
+            </div>
+            <p className={cn('mt-2 font-bold text-foreground', destacada ? 'text-2xl' : 'text-xl')}>{formatARS(value)}</p>
+            {sublabel && <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{sublabel}</p>}
+        </div>
+    );
+});
 
 function formatDateDia(d: string | null): string {
     if (!d) return '—';
@@ -494,15 +542,16 @@ export default function CobrosIndex({
                     </div>
                 )}
 
-                {/* Total general: al pie, fuera de "Gastos de flota" y "Gastos de galpón" para no duplicar sus cifras */}
-                <div className="flex w-fit items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                        <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Total general (inventario + flota + galpón)</p>
-                        <p className="text-xl font-bold text-foreground">{formatARS(totalGeneralTodo)}</p>
-                    </div>
+            </div>
+
+            {/* Total general: flotante y fijo en pantalla (no vive dentro de ninguna pestaña, para no duplicar sus cifras) */}
+            <div className="fixed right-4 bottom-4 z-40 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Total general</p>
+                    <p className="text-xl font-bold text-foreground">{formatARS(totalGeneralTodo)}</p>
                 </div>
             </div>
 
@@ -781,23 +830,14 @@ function InventarioPanel({
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Totales */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Totales: misma grilla que Gastos de galpón / Kevin, para que el tamaño de cada tarjeta coincida */}
+            <div
+                className="grid grid-cols-1 gap-3 sm:[grid-template-columns:repeat(var(--cards),minmax(0,1fr))]"
+                style={{ '--cards': 3 } as React.CSSProperties}
+            >
                 <Popover open={showGanancia} onOpenChange={setShowGanancia}>
                     <PopoverTrigger asChild onMouseEnter={openGananciaNow} onMouseLeave={scheduleCloseGanancia}>
-                        <div className="cursor-default rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15">
-                                    <Box className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase underline decoration-dotted underline-offset-2">
-                                        Gastos de inventario
-                                    </p>
-                                    <p className="text-2xl font-bold text-foreground">{formatARS(totalGeneral)}</p>
-                                </div>
-                            </div>
-                        </div>
+                        <TotalCard icon={Box} label="Gastos de inventario" value={totalGeneral} hint className="cursor-default" />
                     </PopoverTrigger>
                     <PopoverContent
                         align="start"
@@ -819,28 +859,8 @@ function InventarioPanel({
                         </div>
                     </PopoverContent>
                 </Popover>
-                <div className="rounded-xl border border-sky-500/30 bg-sky-500/5 p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/15">
-                            <Car className="h-4 w-4 text-sky-600 dark:text-sky-400" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Gastos de flota</p>
-                            <p className="text-2xl font-bold text-foreground">{formatARS(totalGastosFlota)}</p>
-                        </div>
-                    </div>
-                </div>
-                <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15">
-                            <CircleDollarSign className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="min-w-0">
-                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Total (inventario + flota)</p>
-                            <p className="text-2xl font-bold text-foreground">{formatARS(totalIntegrado)}</p>
-                        </div>
-                    </div>
-                </div>
+                <TotalCard icon={Car} label="Gastos de flota" value={totalGastosFlota} />
+                <TotalCard icon={CircleDollarSign} label="Total (inventario + flota)" value={totalIntegrado} destacada />
             </div>
 
             {/* Exportar */}
@@ -851,20 +871,32 @@ function InventarioPanel({
                         <span className="hidden sm:inline">PDF del cierre</span>
                     </Button>
                 ) : (
-                    <>
-                        <Button variant="outline" size="sm" disabled={totalGeneral === 0} onClick={() => window.open('/excel/cobros', '_blank')}>
-                            <FileSpreadsheet className="h-4 w-4" />
-                            <span className="hidden sm:inline">Excel detalle de inventario</span>
-                        </Button>
-                        <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/pdf/cobros-integrado', '_blank')}>
-                            <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">PDF por vehículo</span>
-                        </Button>
-                        <Button variant="outline" size="sm" disabled={resumenIntegrado.length === 0} onClick={() => window.open('/excel/cobros-integrado', '_blank')}>
-                            <FileSpreadsheet className="h-4 w-4" />
-                            <span className="hidden sm:inline">Excel por vehículo</span>
-                        </Button>
-                    </>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={totalGeneral === 0 && resumenIntegrado.length === 0}>
+                                <Download className="h-4 w-4" />
+                                Exportar
+                                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-72">
+                            <DropdownMenuLabel>Detalle de inventario (línea por línea)</DropdownMenuLabel>
+                            <DropdownMenuItem disabled={totalGeneral === 0} onClick={() => window.open('/excel/cobros', '_blank')}>
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Excel
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Por vehículo (agrupado, con gastos de flota)</DropdownMenuLabel>
+                            <DropdownMenuItem disabled={resumenIntegrado.length === 0} onClick={() => window.open('/pdf/cobros-integrado', '_blank')}>
+                                <Download className="h-4 w-4" />
+                                PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled={resumenIntegrado.length === 0} onClick={() => window.open('/excel/cobros-integrado', '_blank')}>
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Excel
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 )}
             </div>
 
@@ -997,13 +1029,12 @@ const CATEGORIAS_POR_GRUPO: Record<GastoGrupo, CategoriaGasto[]> = {
     ],
 };
 
-function cardIcon(key: string, destacada = false): React.ReactNode {
-    const cls = destacada ? 'h-5 w-5 text-primary' : 'h-5 w-5 text-muted-foreground';
-    if (key.startsWith('empresa_')) return <Building2 className={cls} />;
-    if (key === 'kevin') return <UserCircle2 className={cls} />;
-    if (key === 'stock') return <Box className={cls} />;
-    if (key === 'galpon') return <Warehouse className={cls} />;
-    return <HandCoins className={cls} />;
+function cardIcon(key: string): LucideIcon {
+    if (key.startsWith('empresa_')) return Building2;
+    if (key === 'kevin') return UserCircle2;
+    if (key === 'stock') return Box;
+    if (key === 'galpon') return Warehouse;
+    return HandCoins;
 }
 
 function GastosPanel({
@@ -1060,10 +1091,10 @@ function GastosPanel({
                 : c.key === 'kevin' || c.key === 'stock'
         ));
         if (grupo !== 'galpon') return filtradas;
-        // "Galpón" primero: es el total que después se reparte entre las empresas.
+        // El total ("galpón") va al final, a la derecha — igual que en las otras dos pestañas.
         const galpon = filtradas.find((c) => c.key === 'galpon');
         const empresas = filtradas.filter((c) => c.key !== 'galpon');
-        return galpon ? [galpon, ...empresas] : empresas;
+        return galpon ? [...empresas, galpon] : empresas;
     }, [gastosResumen.cards, grupo]);
 
     // En "Galpón" la card "galpon" YA es el total del grupo, no hace falta una
@@ -1111,36 +1142,9 @@ function GastosPanel({
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <p className="text-xs text-muted-foreground">
-                    {grupo === 'galpon'
-                        ? 'Gastos de galpón, taller y oficina (la flota se ve en Gastos de flota). El total de Galpón se reparte automáticamente entre las empresas según sus autos alquilados en el momento del gasto.'
-                        : 'Gastos de Kevin y stock, aparte de la flota y el galpón.'}
-                    {' '}Solo lectura — el alta se hace en{' '}
-                    <button type="button" className="font-medium text-foreground underline-offset-2 hover:underline" onClick={() => router.get('/gastos')}>
-                        Gastos
-                    </button>
-                    .
-                </p>
-
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    disabled={gastosFiltrados.length === 0}
-                    onClick={() => window.open(
-                        historico ? `/pdf/cobros-gastos/${historico.id}?grupo=${grupo}` : `/pdf/cobros-gastos?grupo=${grupo}`,
-                        '_blank',
-                    )}
-                >
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">PDF gastos</span>
-                </Button>
-            </div>
-
-            {/* Cards de totales (una sola fila en pantallas medianas+) */}
+            {/* Totales: misma tarjeta compartida que Gastos de flota, para que la estructura no cambie entre pestañas */}
             <div
-                className="grid grid-cols-2 gap-3 sm:[grid-template-columns:repeat(var(--cards),minmax(0,1fr))]"
+                className="grid grid-cols-1 gap-3 sm:[grid-template-columns:repeat(var(--cards),minmax(0,1fr))]"
                 style={{ '--cards': allCards.length } as React.CSSProperties}
             >
                 {allCards.map((card) => {
@@ -1149,22 +1153,49 @@ function GastosPanel({
                     const isEmpresa = card.key.startsWith('empresa_');
                     const pct = isEmpresa && totalFiltrado > 0 ? (Number(card.total) / totalFiltrado) * 100 : null;
                     return (
-                        <div key={card.key} className={`rounded-xl border p-4 shadow-sm ${isGeneral || isGalponTotal ? 'border-primary/40 bg-primary/5' : 'border-border bg-card'}`}>
-                            <div className="flex items-center gap-2.5">
-                                <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isGeneral || isGalponTotal ? 'bg-primary/15' : 'bg-muted'}`}>{cardIcon(card.key, isGeneral || isGalponTotal)}</div>
-                                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                                    {isGalponTotal ? 'Galpón (total del período)' : card.label}
-                                </p>
-                            </div>
-                            <p className={`mt-2 font-bold text-foreground ${isGeneral || isGalponTotal ? 'text-2xl' : 'text-xl'}`}>{formatARS(Number(card.total))}</p>
-                            {pct !== null && (
-                                <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-                                    {pct.toLocaleString('es-AR', { maximumFractionDigits: 0 })}% del galpón
-                                </p>
-                            )}
-                        </div>
+                        <TotalCard
+                            key={card.key}
+                            icon={cardIcon(card.key)}
+                            label={isGalponTotal ? 'Galpón (total del período)' : card.label}
+                            value={Number(card.total)}
+                            destacada={isGeneral || isGalponTotal}
+                            sublabel={pct !== null ? `${pct.toLocaleString('es-AR', { maximumFractionDigits: 0 })}% del galpón` : undefined}
+                        />
                     );
                 })}
+            </div>
+
+            {/* Exportar */}
+            <div className="flex items-center justify-end gap-2">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="shrink-0" disabled={gastosFiltrados.length === 0}>
+                            <Download className="h-4 w-4" />
+                            Exportar
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                            onClick={() => window.open(
+                                historico ? `/pdf/cobros-gastos/${historico.id}?grupo=${grupo}` : `/pdf/cobros-gastos?grupo=${grupo}`,
+                                '_blank',
+                            )}
+                        >
+                            <Download className="h-4 w-4" />
+                            PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onClick={() => window.open(
+                                historico ? `/excel/cobros-gastos/${historico.id}?grupo=${grupo}` : `/excel/cobros-gastos?grupo=${grupo}`,
+                                '_blank',
+                            )}
+                        >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Excel
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
 
             {/* Últimos gastos */}

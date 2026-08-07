@@ -9,11 +9,13 @@ use App\Actions\BuildResumenIntegradoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
 use App\Models\AperturaRecaudacion;
+use App\Models\CierreCaja;
 use App\Models\CierreGasto;
 use App\Models\CierreRecaudacion;
 use App\Models\CierreSueldo;
 use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
+use App\Models\Gasto;
 use App\Models\Recaudacion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -112,6 +114,80 @@ class ExcelController extends Controller
                 '',
             ]);
         }
+
+        return $writer->toBrowser();
+    }
+
+    /**
+     * Excel de los gastos (sin flota) del panel de Caja: mismo recorte por
+     * `grupo` (galpón vs Kevin) y misma fuente de datos que el PDF equivalente
+     * (PdfController::cobrosGastos), para que ambos formatos coincidan siempre.
+     */
+    public function cobrosGastos(Request $request, ?CierreCaja $cierre = null): StreamedResponse
+    {
+        $historico = $cierre !== null;
+
+        if ($historico) {
+            $empresaActiva = session('active_company_id');
+            if ($empresaActiva !== null) {
+                abort_unless(
+                    $cierre->detalles()->where('empresa_id', (int) $empresaActiva)->exists(),
+                    403,
+                );
+            }
+        }
+
+        $hasta = $historico ? $cierre->created_at->toDateTimeString() : null;
+        $desde = $historico
+            ? CierreCaja::where('created_at', '<', $cierre->created_at)->latest()->value('created_at')?->toDateTimeString()
+            : null;
+
+        $grupo = $request->query('grupo');
+        $tiposPorGrupo = [
+            'galpon' => ['galpon', 'taller', 'oficina'],
+            'kevin' => ['kevin', 'stock'],
+        ];
+
+        $gastos = Gasto::query()
+            ->when(! $historico, fn ($q) => $q->pendientes())
+            ->when($historico && $desde, fn ($q) => $q->where('gastos.created_at', '>', $desde))
+            ->when($historico, fn ($q) => $q->where('gastos.created_at', '<=', $hasta))
+            ->where('gastos.tipo', '!=', 'vehiculo')
+            ->when(
+                isset($tiposPorGrupo[$grupo]),
+                fn ($q) => $q->whereIn('gastos.tipo', $tiposPorGrupo[$grupo])
+            )
+            ->latest('fecha')
+            ->latest('id')
+            ->get();
+
+        $tipoLabels = [
+            'galpon' => 'Galpón',
+            'taller' => 'Taller',
+            'oficina' => 'Oficina',
+            'kevin' => 'Kevin',
+            'stock' => 'Stock',
+        ];
+
+        $nombreGrupo = ['galpon' => 'galpon', 'kevin' => 'kevin'][$grupo] ?? 'gastos';
+        $filename = $historico
+            ? 'cobros-'.$nombreGrupo.'-cierre-'.$cierre->id.'.xlsx'
+            : 'cobros-'.$nombreGrupo.'-'.now()->format('Y-m-d').'.xlsx';
+
+        $writer = SimpleExcelWriter::streamDownload($filename);
+        $writer->addHeader(['Fecha', 'Descripción', 'Categoría', 'Recibió', 'Monto ARS']);
+
+        foreach ($gastos as $g) {
+            $writer->addRow([
+                $g->fecha?->format('d/m/Y'),
+                trim((string) $g->descripcion) !== '' ? $g->descripcion : 'Sin descripción',
+                $tipoLabels[$g->tipo] ?? ucfirst((string) $g->tipo),
+                $g->recibio,
+                round((float) $g->monto, 2),
+            ]);
+        }
+
+        $writer->addRow(['', '', '', 'TOTAL', round((float) $gastos->sum(fn (Gasto $g) => (float) $g->monto), 2)]);
 
         return $writer->toBrowser();
     }

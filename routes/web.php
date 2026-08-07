@@ -228,6 +228,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Gastos del panel de Cobros (período actual o de un cierre puntual).
         Route::get('pdf/cobros-gastos', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos');
         Route::get('pdf/cobros-gastos/{cierre}', [PdfController::class, 'cobrosGastos'])->name('pdf.cobros-gastos.cierre');
+        Route::get('excel/cobros-gastos', [ExcelController::class, 'cobrosGastos'])->name('excel.cobros-gastos');
+        Route::get('excel/cobros-gastos/{cierre}', [ExcelController::class, 'cobrosGastos'])->name('excel.cobros-gastos.cierre');
         Route::get('pdf/cierres-caja/{cierre}', [PdfController::class, 'cierreCaja'])->name('pdf.cierre-caja');
         Route::get('pdf/cierres-sueldo/{cierreSueldo}', [PdfController::class, 'cierreSueldo'])->name('pdf.cierre-sueldo');
         Route::get('excel/cierres-sueldo/{cierreSueldo}', [ExcelController::class, 'cierreSueldo'])->name('excel.cierre-sueldo');

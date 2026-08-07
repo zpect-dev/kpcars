@@ -83,8 +83,9 @@ function NavGroupSection({ group, isCurrentUrl }: { group: NavGroup; isCurrentUr
             <SidebarMenu>
                 {group.items.map((item) => {
                     const isActive =
-                        isCurrentUrl(item.href) ||
-                        !!item.items?.some((sub) => sub.isActive ?? isCurrentUrl(sub.href));
+                        item.isActive ??
+                        (isCurrentUrl(item.href) ||
+                            !!item.items?.some((sub) => sub.isActive ?? isCurrentUrl(sub.href)));
 
                     return item.items && item.items.length > 0 ? (
                         <CollapsibleNavItem
