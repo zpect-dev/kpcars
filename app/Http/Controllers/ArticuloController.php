@@ -12,6 +12,7 @@ use Exception;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use InvalidArgumentException;
@@ -47,7 +48,8 @@ class ArticuloController extends Controller
 
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
-            'codigo' => ['nullable', 'string', 'max:255'],
+            // El código no se carga en el alta: se autogenera. Se edita después
+            // desde el modal del artículo.
             'repuestos' => ['nullable', 'boolean'],
             'stock' => ['required', 'integer', 'min:0'],
             'min_stock' => ['required', 'integer', 'min:0'],
@@ -66,8 +68,9 @@ class ArticuloController extends Controller
                 if ((int) $articulo->min_stock !== (int) $validated['min_stock']) {
                     $updateData['min_stock'] = $validated['min_stock'];
                 }
-                if (array_key_exists('codigo', $validated) && $validated['codigo'] !== $articulo->codigo) {
-                    $updateData['codigo'] = $validated['codigo'];
+                // Un artículo existente conserva su código: sumar stock no lo cambia.
+                if ($articulo->codigo === null || $articulo->codigo === '') {
+                    $updateData['codigo'] = Articulo::generarCodigo($articulo->descripcion);
                 }
                 if (array_key_exists('repuestos', $validated) && (bool) $validated['repuestos'] !== (bool) $articulo->repuestos) {
                     $updateData['repuestos'] = (bool) $validated['repuestos'];
@@ -87,9 +90,11 @@ class ArticuloController extends Controller
                 $hasCosto = isset($validated['costo']) && $validated['costo'] !== '';
                 $costo = $hasCosto ? (float) $validated['costo'] : null;
 
+                // El código se autogenera (familia + correlativo) salvo que se
+                // haya cargado uno a mano.
                 $articulo = Articulo::create([
                     'descripcion' => $descripcion,
-                    'codigo' => $validated['codigo'] ?? null,
+                    'codigo' => Articulo::generarCodigo($descripcion),
                     'repuestos' => (bool) ($validated['repuestos'] ?? false),
                     'stock' => 0,
                     'min_stock' => $validated['min_stock'],
@@ -199,7 +204,7 @@ class ArticuloController extends Controller
 
         $validated = $request->validate([
             'descripcion' => ['required', 'string', 'max:255'],
-            'codigo'      => ['nullable', 'string', 'max:255'],
+            'codigo'      => ['required', 'string', 'max:32', Rule::unique('articulos', 'codigo')->ignore($articulo->id)],
             'repuestos'   => ['required', 'boolean'],
             'min_stock'   => ['required', 'integer', 'min:0'],
             'costo'       => ['nullable', 'numeric', 'min:0'],
@@ -207,7 +212,7 @@ class ArticuloController extends Controller
 
         $data = [
             'descripcion' => trim($validated['descripcion']),
-            'codigo'      => $validated['codigo'] ?? null,
+            'codigo'      => strtoupper(trim($validated['codigo'])),
             'repuestos'   => (bool) $validated['repuestos'],
             'min_stock'   => (int) $validated['min_stock'],
         ];

@@ -10,6 +10,16 @@ export interface ComboboxOption {
     label: string;
     /** Secondary text shown to the right */
     sub?: string;
+    /** Short code shown as a badge before the label (e.g. "AMO-01") */
+    code?: string;
+}
+
+/**
+ * Normaliza para buscar: minúsculas y sin separadores, de modo que "amo01",
+ * "AMO 01" y "amo-01" encuentren todos a "AMO-01".
+ */
+function normalizar(texto: string): string {
+    return texto.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
 interface ComboboxProps {
@@ -73,12 +83,23 @@ export function Combobox({
     const filtered = useMemo(() => {
         const q = inputText.toLowerCase().trim();
         if (!q) return options.slice(0, maxSuggestions);
+
+        // Cada palabra escrita debe aparecer en el texto de la opción, tal cual
+        // o ignorando separadores (así "amo01" encuentra "AMO-01").
+        const tokens = q.split(/\s+/).filter(Boolean);
+
         return options
-            .filter(
-                (o) =>
-                    o.label.toLowerCase().includes(q) ||
-                    (o.sub && o.sub.toLowerCase().includes(q)),
-            )
+            .filter((o) => {
+                const texto = [o.code, o.label, o.sub]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase();
+                const plano = normalizar(texto);
+
+                return tokens.every(
+                    (t) => texto.includes(t) || plano.includes(normalizar(t)),
+                );
+            })
             .slice(0, maxSuggestions);
     }, [options, inputText, maxSuggestions]);
 
@@ -193,9 +214,25 @@ export function Combobox({
                                         handleSelect(option);
                                     }}
                                 >
-                                    <span className="font-medium">{option.label}</span>
+                                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                                        {option.code && (
+                                            <span
+                                                className={cn(
+                                                    'shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold',
+                                                    highlightedIndex === idx
+                                                        ? 'bg-background/70 text-foreground'
+                                                        : 'bg-muted text-muted-foreground',
+                                                )}
+                                            >
+                                                {option.code}
+                                            </span>
+                                        )}
+                                        <span className="min-w-0 flex-1 truncate font-medium">
+                                            {option.label}
+                                        </span>
+                                    </span>
                                     {option.sub && (
-                                        <span className="ml-4 shrink-0 text-xs text-muted-foreground">
+                                        <span className="ml-3 shrink-0 text-xs text-muted-foreground">
                                             {option.sub}
                                         </span>
                                     )}

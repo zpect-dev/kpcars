@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\GeneradorCodigoArticulo;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -27,6 +28,22 @@ class Articulo extends Model
     ];
 
     /**
+     * Todo artículo nace con un código corto y único: si no se especificó uno,
+     * se autogenera (familia + correlativo). Así ningún alta puede quedar sin
+     * código, venga del panel, de un seeder o de un comando.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Articulo $articulo) {
+            $codigo = strtoupper(trim((string) $articulo->codigo));
+
+            $articulo->codigo = $codigo !== ''
+                ? $codigo
+                : self::generarCodigo((string) $articulo->descripcion);
+        });
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -48,6 +65,19 @@ class Articulo extends Model
     public static function precioDesdeCosto(float $costo): float
     {
         return round($costo * self::MARKUP, 2);
+    }
+
+    /**
+     * Código corto y único para un artículo nuevo: familia + correlativo
+     * (AMO-01, FIL-03). Debe llamarse dentro de una transacción con lock para
+     * que dos altas simultáneas no reciban el mismo.
+     */
+    public static function generarCodigo(string $descripcion): string
+    {
+        return GeneradorCodigoArticulo::corto(
+            $descripcion,
+            fn (string $codigo) => self::where('codigo', $codigo)->exists(),
+        );
     }
 
     /**

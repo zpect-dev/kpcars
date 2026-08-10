@@ -4,6 +4,7 @@ import {
     ArrowDownCircle,
     ArrowUpCircle,
     Check,
+    ClipboardList,
     FileDown,
     History,
     Loader2,
@@ -37,6 +38,7 @@ import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { index, salidaMultiple, store, update, updateCosto } from '@/routes/articulos';
+import { index as conteosIndex } from '@/routes/conteos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
 
@@ -165,7 +167,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         let result = tabItems;
 
         const q = itemSearch.toLowerCase().trim();
-        if (q) result = result.filter((i) => i.descripcion.toLowerCase().includes(q));
+        if (q) {
+            result = result.filter(
+                (i) =>
+                    i.descripcion.toLowerCase().includes(q) ||
+                    (i.codigo ?? '').toLowerCase().includes(q),
+            );
+        }
 
         if (stockFilter === 'sin-stock') result = result.filter((i) => i.stock === 0);
         else if (stockFilter === 'bajo')  result = result.filter((i) => i.stock > 0 && i.stock <= i.min_stock);
@@ -219,6 +227,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             .map((i) => ({
                 value: String(i.id),
                 label: i.descripcion,
+                code: i.codigo ?? undefined,
                 sub: `Stock: ${i.stock}`,
             }));
     }, [items, orderLines, salidaMode]);
@@ -463,7 +472,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             type="text"
-                            placeholder="Buscar artículo..."
+                            placeholder="Buscar por código o nombre..."
                             className="bg-card pl-9 shadow-xs"
                             value={itemSearch}
                             onChange={(e) => setItemSearch(e.target.value)}
@@ -495,6 +504,19 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     Historial
                                 </span>
                             </Button>
+                            {/* Conteo: acceso discreto (sólo icono), admin/administrativo. */}
+                            {auth.permissions?.can_view_conteo && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                        router.get(conteosIndex.url())
+                                    }
+                                    title="Conteo de inventario"
+                                >
+                                    <ClipboardList className="h-4 w-4" />
+                                </Button>
+                            )}
                             {canWrite && (
                                 <>
                                     <Button
@@ -594,7 +616,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 <tr>
                                     <th
                                         scope="col"
-                                        className="w-[34%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                        className="w-[10%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
+                                    >
+                                        Código
+                                    </th>
+                                    <th
+                                        scope="col"
+                                        className="w-[24%] px-4 py-3 font-medium tracking-wider sm:px-6 sm:py-4"
                                     >
                                         Descripción
                                     </th>
@@ -629,7 +657,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 {filteredItems.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={canWrite ? 6 : 5}
+                                            colSpan={canWrite ? 7 : 6}
                                             className="px-6 py-12 text-center text-muted-foreground"
                                         >
                                             No hay artículos registrados o no
@@ -651,15 +679,23 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                         : 'bg-card hover:bg-muted/40',
                                                 )}
                                             >
+                                                <td className="px-4 py-3 sm:px-6 sm:py-4">
+                                                    <span className="font-mono text-xs font-semibold text-foreground">
+                                                        {item.codigo ?? '—'}
+                                                    </span>
+                                                </td>
                                                 <td
                                                     className={cn(
-                                                        'px-4 py-3 font-medium sm:px-6 sm:py-4',
+                                                        'max-w-0 px-4 py-3 font-medium sm:px-6 sm:py-4',
                                                         lowStock
                                                             ? 'text-red-800 dark:text-red-300'
                                                             : 'text-foreground',
                                                     )}
                                                 >
-                                                    <span className="truncate">
+                                                    <span
+                                                        className="block truncate"
+                                                        title={item.descripcion}
+                                                    >
                                                         {item.descripcion}
                                                     </span>
                                                 </td>
@@ -857,6 +893,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         <p className="truncate text-sm font-medium text-foreground">
                                             {item.descripcion}
                                         </p>
+                                        {item.codigo && (
+                                            <span className="mt-0.5 inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground">
+                                                {item.codigo}
+                                            </span>
+                                        )}
                                         <div className="mt-1.5 flex gap-3 text-[11px] text-muted-foreground">
                                             <span>Mín: <span className="font-medium text-foreground">{item.min_stock}</span></span>
                                             <span>Precio: <span className="font-medium text-foreground">{formatARS(Number(item.precio))}</span></span>
@@ -946,8 +987,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                 key={comboKey}
                                 placeholder={
                                     isGalponSalida
-                                        ? 'Buscar artículo...'
-                                        : 'Buscar repuesto...'
+                                        ? 'Código o nombre del artículo...'
+                                        : 'Código o nombre del repuesto...'
                                 }
                                 options={articuloOptions}
                                 value=""
@@ -1878,6 +1919,23 @@ function EditarArticuloModal({
                             disabled={!canWrite}
                         />
                         <InputError message={form.errors.descripcion} />
+                    </div>
+
+                    {/* Código interno: se autogenera al crear, se puede ajustar acá. */}
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="edit-codigo" className="text-sm font-medium">Código</Label>
+                        <Input
+                            id="edit-codigo"
+                            value={form.data.codigo}
+                            onChange={(e) => form.setData('codigo', e.target.value.toUpperCase())}
+                            disabled={!canWrite}
+                            className="font-mono uppercase"
+                            placeholder="AMO-01"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Código corto para anotar en papel y buscar rápido. Tiene que ser único.
+                        </p>
+                        <InputError message={form.errors.codigo} />
                     </div>
 
                     {/* Stock mínimo con stepper */}
