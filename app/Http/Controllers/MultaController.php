@@ -76,7 +76,7 @@ class MultaController extends Controller
                         'fecha' => $p->fecha?->toDateString(),
                         'monto' => (float) $p->monto,
                         'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
-                        'con_deposito' => $p->con_deposito,
+                        'es_transferencia' => $p->es_transferencia,
                     ])->values(),
                 ]),
 
@@ -410,7 +410,6 @@ class MultaController extends Controller
     public function registrarCobro(
         Request $request,
         Multa $multa,
-        RegistrarMovimientoDepositoAction $registrarDeposito,
         RevertirMovimientoDepositoAction $revertirDeposito,
     ): RedirectResponse {
         $this->authorize('manage-multas');
@@ -445,38 +444,20 @@ class MultaController extends Controller
             'monto' => ['required', 'numeric', 'min:0.01'],
             'fecha_cobro' => ['required', 'date'],
             'comprobante' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-            'con_deposito' => ['boolean'],
+            'es_transferencia' => ['boolean'],
         ]);
 
-        $pago = $multa->pagos()->create([
+        $multa->pagos()->create([
             'monto' => $validated['monto'],
             'fecha' => $validated['fecha_cobro'],
             'comprobante_path' => $request->hasFile('comprobante')
                 ? $request->file('comprobante')->store('comprobantes-multas', 'public')
                 : null,
-            'con_deposito' => $validated['con_deposito'] ?? false,
+            // Método de pago: efectivo (false) o transferencia (true). No afecta
+            // la cuenta de depósito (esa funcionalidad se eliminó).
+            'es_transferencia' => $validated['es_transferencia'] ?? false,
             'registrado_por' => $request->user()->id,
         ]);
-
-        // Pagada con depósito: se descuenta de la cuenta del chofer imputado.
-        // El saldo puede quedar negativo (el descuento refleja un hecho ya
-        // ocurrido); la vista de Personal lo marca en rojo.
-        if ($pago->con_deposito && $multa->conductor_id !== null) {
-            $conductor = User::find($multa->conductor_id);
-
-            if ($conductor !== null) {
-                $registrarDeposito->execute(
-                    user: $conductor,
-                    tipo: DepositoMovimientoTipo::DESCUENTO_MULTA,
-                    moneda: DepositoMoneda::ARS,
-                    monto: (float) $validated['monto'],
-                    fecha: Carbon::parse($validated['fecha_cobro'])->toDateString(),
-                    nota: 'Multa #'.$multa->id.($multa->descripcion ? ' — '.$multa->descripcion : ''),
-                    pago: $pago,
-                    registradoPor: $request->user()->id,
-                );
-            }
-        }
 
         $completo = $this->recomputarCobro($multa);
 

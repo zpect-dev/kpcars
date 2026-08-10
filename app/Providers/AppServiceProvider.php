@@ -65,6 +65,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('view-inventario', fn (User $user) => $user->isAdminOrAdministrativo() || $user->isMechanic());
         Gate::define('manage-inventario', fn (User $user) => $user->isAdminOrAdministrativo() || $user->isMechanic());
         Gate::define('manage-precios', fn (User $user) => $user->isAdmin());
+        // Conteo/ajuste de stock: acción de control, sin mecánico.
+        Gate::define('view-conteo', fn (User $user) => $user->isAdminOrAdministrativo());
 
         // Turnos: global; chofer accede sólo vía API (no aplicable a este Gate web).
         Gate::define('view-turnos', fn (User $user) => $user->isAdminOrAdministrativo() || $user->isMechanic());

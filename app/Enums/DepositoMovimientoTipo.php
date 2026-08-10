@@ -18,7 +18,11 @@ enum DepositoMovimientoTipo: string
     /** Devolución al chofer (baja, rescisión, retiro parcial). Resta al saldo. */
     case RETIRO = 'retiro';
 
-    /** Multa cobrada con depósito (`multa_pagos.con_deposito`). Resta al saldo. */
+    /**
+     * LEGACY: multa cobrada con depósito. La función se eliminó (el cobro ya no
+     * descuenta la garantía). El tipo se conserva por los movimientos históricos
+     * y sus contraasientos (ver comando `multas:revertir-depositos`). Resta al saldo.
+     */
     case DESCUENTO_MULTA = 'descuento_multa';
 
     /** Corrección manual o contraasiento. Puede sumar o restar; exige nota. */

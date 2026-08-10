@@ -81,7 +81,7 @@ interface Pago {
     fecha: string;
     monto: number;
     comprobante_url: string | null;
-    con_deposito: boolean;
+    es_transferencia: boolean;
 }
 
 interface MultaEliminada {
@@ -2103,9 +2103,9 @@ function ReporteSemanal({
                             inactivo={m.conductor_inactivo}
                         />
                         <span className="ml-auto flex shrink-0 items-center gap-2">
-                            {p.con_deposito && (
+                            {p.es_transferencia && (
                                 <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                                    Depósito
+                                    Transferencia
                                 </span>
                             )}
                             {!m.cobrado && (
@@ -2261,7 +2261,7 @@ function CobrarMultaForm({
         monto: fully ? '' : String(falta.toFixed(2)),
         fecha_cobro: today,
         comprobante: null as File | null,
-        con_deposito: false,
+        es_transferencia: false,
     });
 
     const { cropImage, cropperElement } = useImageCropper();
@@ -2393,12 +2393,12 @@ function CobrarMultaForm({
                                         {formatARS(p.monto)}
                                     </span>
                                     <span className="flex-1">
-                                        {p.con_deposito ? (
+                                        {p.es_transferencia ? (
                                             <span
                                                 className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
-                                                title="Pagado con depósito"
+                                                title="Pagado por transferencia"
                                             >
-                                                Depósito
+                                                Transferencia
                                             </span>
                                         ) : (
                                             <span
@@ -2498,19 +2498,19 @@ function CobrarMultaForm({
                             </div>
                         </div>
 
-                        {/* Método de pago: efectivo (sin comprobante) o depósito. */}
+                        {/* Método de pago: efectivo (sin comprobante) o transferencia. */}
                         <div className="flex flex-col gap-1.5">
                             <Label>Método de pago</Label>
                             <div className="inline-flex overflow-hidden rounded-lg border border-border">
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        form.setData('con_deposito', false);
+                                        form.setData('es_transferencia', false);
                                         form.setData('comprobante', null);
                                     }}
                                     className={cn(
                                         'flex-1 px-3 py-2 text-sm font-medium transition-colors',
-                                        !form.data.con_deposito
+                                        !form.data.es_transferencia
                                             ? 'bg-primary text-primary-foreground'
                                             : 'bg-transparent text-muted-foreground hover:bg-muted',
                                     )}
@@ -2520,11 +2520,11 @@ function CobrarMultaForm({
                                 <button
                                     type="button"
                                     onClick={() =>
-                                        form.setData('con_deposito', true)
+                                        form.setData('es_transferencia', true)
                                     }
                                     className={cn(
                                         'flex-1 border-l border-border px-3 py-2 text-sm font-medium transition-colors',
-                                        form.data.con_deposito
+                                        form.data.es_transferencia
                                             ? 'bg-primary text-primary-foreground'
                                             : 'bg-transparent text-muted-foreground hover:bg-muted',
                                     )}
@@ -2534,8 +2534,8 @@ function CobrarMultaForm({
                             </div>
                         </div>
 
-                        {/* El comprobante solo aplica al depósito; en efectivo no se pide. */}
-                        {form.data.con_deposito && (
+                        {/* El comprobante solo aplica a la transferencia; en efectivo no se pide. */}
+                        {form.data.es_transferencia && (
                             <div className="flex flex-col gap-1.5">
                                 <Label>
                                     Comprobante{' '}

@@ -7,6 +7,7 @@ use App\Http\Controllers\AsignacionController;
 use App\Http\Controllers\CierreGastoController;
 use App\Http\Controllers\CierreSueldoController;
 use App\Http\Controllers\CobroController;
+use App\Http\Controllers\ConteoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmpresaController;
 use App\Http\Controllers\ExcelController;
@@ -86,6 +87,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // ─────────────────────────────────────────────────────────────────────
     Route::middleware('role:administrador,administrativo')->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+        // Conteo físico de inventario (detección de diferencias + ajuste trazable).
+        Route::get('conteos', [ConteoController::class, 'index'])->name('conteos.index');
+        Route::post('conteos/preview', [ConteoController::class, 'preview'])->name('conteos.preview');
+        Route::post('conteos', [ConteoController::class, 'store'])->name('conteos.store');
+        Route::get('conteos/movimientos/{articulo}', [ConteoController::class, 'movimientos'])->name('conteos.movimientos');
 
         // Vehículos
         Route::post('vehiculos', [VehiculoController::class, 'store'])->name('vehiculos.store');

@@ -11,6 +11,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Transaccion extends Model
 {
+    /**
+     * Tipos de movimiento de stock:
+     *  - IN: ingreso al depósito.
+     *  - OUT: egreso (despacho a un vehículo o consumo).
+     *  - AJUSTE: corrección por conteo físico (cantidad con signo; sin vehículo).
+     */
+    public const TIPOS = ['IN', 'OUT', 'AJUSTE'];
+
     protected $table = 'transacciones';
 
     protected $fillable = [

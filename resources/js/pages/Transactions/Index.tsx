@@ -10,6 +10,7 @@ import {
     RotateCcw,
     AlertTriangle,
     Loader2,
+    Scale,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -34,7 +35,7 @@ interface Transaccion {
     vehiculo_id: number | null;
     user_id: number;
     solicitante: string | null;
-    tipo: 'IN' | 'OUT';
+    tipo: 'IN' | 'OUT' | 'AJUSTE';
     cantidad: number;
     descripcion: string | null;
     /** Anulada: el stock volvió al inventario. Se muestra como devolución. */
@@ -715,6 +716,8 @@ export default function TransactionsIndex({
                                                         <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                                                     ) : tx.tipo === 'IN' ? (
                                                         <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                                    ) : tx.tipo === 'AJUSTE' ? (
+                                                        <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                                     ) : (
                                                         <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                                                     )}
@@ -726,7 +729,9 @@ export default function TransactionsIndex({
                                                                 : 'text-foreground',
                                                         )}
                                                     >
-                                                        {tx.cantidad}
+                                                        {tx.tipo === 'AJUSTE' && tx.cantidad > 0
+                                                            ? `+${tx.cantidad}`
+                                                            : tx.cantidad}
                                                     </span>
                                                 </div>
                                             </td>
@@ -771,8 +776,10 @@ export default function TransactionsIndex({
                                             {isAdmin && (
                                                 <td className="px-3 py-3 text-center sm:px-6 sm:py-4">
                                                     {/* Una devolución ya no se
-                                                        vuelve a anular. */}
-                                                    {!tx.inactiva && (
+                                                        vuelve a anular. Un ajuste
+                                                        de conteo tampoco: se
+                                                        corrige con otro conteo. */}
+                                                    {!tx.inactiva && tx.tipo !== 'AJUSTE' && (
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -835,6 +842,8 @@ export default function TransactionsIndex({
                                                 <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                                             ) : tx.tipo === 'IN' ? (
                                                 <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                            ) : tx.tipo === 'AJUSTE' ? (
+                                                <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                             ) : (
                                                 <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
                                             )}
@@ -846,7 +855,9 @@ export default function TransactionsIndex({
                                                         : 'text-foreground',
                                                 )}
                                             >
-                                                {tx.cantidad}
+                                                {tx.tipo === 'AJUSTE' && tx.cantidad > 0
+                                                    ? `+${tx.cantidad}`
+                                                    : tx.cantidad}
                                             </span>
                                         </div>
                                     </div>
@@ -930,7 +941,9 @@ export default function TransactionsIndex({
                                 <span className="font-medium text-foreground">
                                     {selectedTx?.tipo === 'IN'
                                         ? 'Ingreso'
-                                        : 'Egreso'}
+                                        : selectedTx?.tipo === 'AJUSTE'
+                                          ? 'Ajuste'
+                                          : 'Egreso'}
                                 </span>
                             </div>
                             <div className="flex justify-between">

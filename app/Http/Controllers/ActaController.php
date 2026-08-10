@@ -100,7 +100,7 @@ class ActaController extends Controller
                     'fecha' => $p->fecha?->toDateString(),
                     'monto' => (float) $p->monto,
                     'comprobante_url' => $p->comprobante_path ? Storage::disk('public')->url($p->comprobante_path) : null,
-                    'con_deposito' => $p->con_deposito,
+                    'es_transferencia' => $p->es_transferencia,
                 ])->values(),
             ]);
 
@@ -180,7 +180,7 @@ class ActaController extends Controller
             'monto' => ['required', 'numeric', 'min:0.01'],
             'fecha_cobro' => ['required', 'date'],
             'comprobante' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-            'con_deposito' => ['boolean'],
+            'es_transferencia' => ['boolean'],
         ]);
 
         $acta->pagos()->create([
@@ -189,7 +189,7 @@ class ActaController extends Controller
             'comprobante_path' => $request->hasFile('comprobante')
                 ? $request->file('comprobante')->store('comprobantes-actas', 'public')
                 : null,
-            'con_deposito' => $validated['con_deposito'] ?? false,
+            'es_transferencia' => $validated['es_transferencia'] ?? false,
             'registrado_por' => $request->user()->id,
         ]);
 
