@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Pago del chofer para un acta del feed (parcial o total), con su comprobante.
  * Análogo a MultaPago.
  */
-#[Fillable(['acta_id', 'monto', 'fecha', 'comprobante_path', 'con_deposito', 'registrado_por'])]
+#[Fillable(['acta_id', 'monto', 'fecha', 'comprobante_path', 'es_transferencia', 'registrado_por'])]
 class ActaPago extends Model
 {
     protected $table = 'acta_pagos';
@@ -20,7 +20,7 @@ class ActaPago extends Model
     protected $casts = [
         'monto' => 'decimal:2',
         'fecha' => 'date',
-        'con_deposito' => 'boolean',
+        'es_transferencia' => 'boolean',
     ];
 
     public function acta(): BelongsTo

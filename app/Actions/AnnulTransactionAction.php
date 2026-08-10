@@ -22,6 +22,12 @@ class AnnulTransactionAction
                 return;
             }
 
+            // Un ajuste de conteo no se anula: se corrige con un nuevo conteo.
+            // (Anularlo revertiría el stock a un "esperado" que ya sabemos falso.)
+            if ($transaction->tipo === 'AJUSTE') {
+                throw new Exception('Un ajuste de conteo no puede anularse. Corregilo con un nuevo conteo.');
+            }
+
             $articulo = \App\Models\Articulo::whereKey($transaction->articulo_id)
                 ->lockForUpdate()
                 ->first();

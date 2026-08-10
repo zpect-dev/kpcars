@@ -39,6 +39,7 @@ export type Permissions = Partial<{
     can_view_inventario: boolean;
     can_manage_inventario: boolean;
     can_manage_precios: boolean;
+    can_view_conteo: boolean;
     can_view_turnos: boolean;
     can_manage_turnos: boolean;
     can_view_revisiones: boolean;

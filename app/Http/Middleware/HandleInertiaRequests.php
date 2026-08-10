@@ -17,7 +17,7 @@ class HandleInertiaRequests extends Middleware
     private const EXPOSED_GATES = [
         'switch-empresa',
         'view-vehiculos', 'manage-vehiculos',
-        'view-inventario', 'manage-inventario', 'manage-precios',
+        'view-inventario', 'manage-inventario', 'manage-precios', 'view-conteo',
         'view-turnos', 'manage-turnos',
         'view-revisiones', 'manage-revisiones',
         'view-revision-mecanica',

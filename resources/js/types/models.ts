@@ -54,6 +54,49 @@ export interface Articulo {
     updated_at?: string;
 }
 
+// ─── Conteo de Inventario ──────────────────────────────────────────────────
+
+export type MotivoAjuste =
+    | 'perdida_no_explicada'
+    | 'rotura'
+    | 'error_carga'
+    | 'devolucion'
+    | 'otro';
+
+/** Fila del historial de conteos (resumen por sesión). */
+export interface ConteoHistorial {
+    id: number;
+    zona: 'repuestos' | 'galpon';
+    user: { id: number; name: string } | null;
+    lineas_count: number;
+    ajustes_count: number;
+    created_at: string;
+}
+
+/** Línea calculada en el paso de preview (esperado vs físico). */
+export interface ConteoPreviewLinea {
+    articulo_id: number;
+    descripcion: string;
+    esperado: number;
+    fisico: number;
+    diferencia: number;
+}
+
+/** Movimiento reciente de un artículo, para el panel de investigación. */
+export interface ConteoMovimiento {
+    id: number;
+    tipo: 'IN' | 'OUT' | 'AJUSTE';
+    cantidad: number;
+    vehiculo_id: number | null;
+    user_id: number | null;
+    solicitante: string | null;
+    descripcion: string | null;
+    inactiva: boolean;
+    created_at: string;
+    vehiculo?: { id: number; patente: string; marca: string; modelo: string } | null;
+    user?: { id: number; name: string } | null;
+}
+
 export interface ServiceType {
     id: number;
     name: string;

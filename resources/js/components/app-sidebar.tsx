@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, Coins, Gauge, HandCoins, History, Lock, Package, Radar, Receipt, Siren, UserRound, Users, Wallet, Wrench } from 'lucide-react';
+import { CalendarClock, CarFront, ChartColumn, ClipboardCheck, ClipboardList, Coins, Gauge, HandCoins, History, Lock, Package, Radar, Receipt, Siren, UserRound, Users, Wallet, Wrench } from 'lucide-react';
 import { useEffect } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -19,6 +19,7 @@ import {
 import { dashboard } from '@/routes';
 import { index as articulosIndex } from '@/routes/articulos';
 import { index as cobrosIndex } from '@/routes/cobros';
+import { index as conteosIndex } from '@/routes/conteos';
 import { index as gastosIndex } from '@/routes/gastos';
 import type { Auth, NavItem } from '@/types';
 
@@ -86,6 +87,10 @@ setOpenMobile(false);
 
     if (perms.can_view_inventario) {
         tallerItems.push({ title: 'Inventario', href: articulosIndex.url(), icon: Package });
+    }
+
+    if (perms.can_view_conteo) {
+        tallerItems.push({ title: 'Conteo', href: conteosIndex.url(), icon: ClipboardList });
     }
 
     // ── Grupo Caja ───────────────────────────────────────────────────────

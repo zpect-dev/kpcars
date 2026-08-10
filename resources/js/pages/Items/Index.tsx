@@ -894,7 +894,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     }
                 }}
             >
-                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
+                <DialogContent className="max-h-[90dvh] w-[92vw] max-w-[92vw] gap-0 overflow-x-hidden overflow-y-auto p-0 sm:w-full sm:max-w-lg">
                     {/* Header */}
                     <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
@@ -1226,8 +1226,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </div>
                         )}
 
-                        <DialogFooter className="flex-row flex-wrap items-center gap-2 border-t border-border pt-4">
-                            <div className="mr-auto flex items-center gap-2">
+                        <DialogFooter className="flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:flex-wrap sm:items-center">
+                            <div className="flex items-center gap-2 sm:mr-auto">
                                 {salidaValida ? (
                                     <span className="relative flex h-2.5 w-2.5">
                                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
@@ -1245,12 +1245,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                                 onClick={closeSalidaModal}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 type="submit"
+                                className="w-full sm:w-auto"
                                 disabled={
                                     salidaForm.processing || !salidaValida
                                 }
@@ -1278,7 +1280,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     }
                 }}
             >
-                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                <DialogContent className="max-h-[90dvh] w-[92vw] max-w-[92vw] gap-0 overflow-x-hidden overflow-y-auto p-0 sm:w-full sm:max-w-md">
                     {/* Header */}
                     <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
@@ -1711,9 +1713,9 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             </>
                         )}
 
-                        <DialogFooter className="flex-row flex-wrap items-center gap-2 border-t border-border pt-4">
+                        <DialogFooter className="flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:flex-wrap sm:items-center">
                             {isRestock && Number(createForm.data.stock) > 0 && (
-                                <div className="mr-auto flex items-center gap-2 text-sm font-medium text-emerald-500">
+                                <div className="flex items-center gap-2 text-sm font-medium text-emerald-500 sm:mr-auto">
                                     <span className="relative flex h-2.5 w-2.5">
                                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
                                         <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
@@ -1724,12 +1726,14 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <Button
                                 type="button"
                                 variant="outline"
+                                className="w-full sm:w-auto"
                                 onClick={closeCreateModal}
                             >
                                 Cancelar
                             </Button>
                             <Button
                                 type="submit"
+                                className="w-full sm:w-auto"
                                 disabled={
                                     createForm.processing ||
                                     !createForm.data.descripcion.trim() ||
