@@ -7,6 +7,7 @@ import {
     History,
     Search,
     Trash2,
+    UserRound,
     Wrench,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -61,30 +62,35 @@ interface Props {
 
 const ESTADO_CONFIG: Record<
     Estado,
-    { label: string; badge: string; border: string; icon: typeof CheckCircle2 }
+    {
+        label: string;
+        accent: string;
+        iconWrap: string;
+        icon: typeof CheckCircle2;
+    }
 > = {
     vencido: {
         label: 'Service vencido',
-        badge: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-        border: 'border-red-500/50 hover:border-red-500/80 dark:border-red-900/50',
+        accent: 'border-l-red-500 dark:border-l-red-600',
+        iconWrap: 'bg-red-500/15 text-red-600 dark:text-red-400',
         icon: AlertTriangle,
     },
     al_dia: {
         label: 'Al día',
-        badge: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-        border: 'border-green-500/50 hover:border-green-500/80 dark:border-green-900/50',
+        accent: 'border-l-green-500 dark:border-l-green-600',
+        iconWrap: 'bg-green-500/15 text-green-600 dark:text-green-400',
         icon: CheckCircle2,
     },
     sin_service: {
         label: 'Sin service',
-        badge: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
-        border: 'border-amber-500/50 hover:border-amber-500/80 dark:border-amber-900/50',
+        accent: 'border-l-amber-500 dark:border-l-amber-600',
+        iconWrap: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
         icon: Wrench,
     },
     sin_km: {
         label: 'Sin datos',
-        badge: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-        border: 'border-border',
+        accent: 'border-l-border',
+        iconWrap: 'bg-muted text-muted-foreground',
         icon: HelpCircle,
     },
 };
@@ -107,6 +113,14 @@ const FILTROS: { val: Estado | 'all'; label: string }[] = [
     { val: 'sin_km', label: 'Sin datos' },
 ];
 
+/** Orden de urgencia: vencido primero, sin datos al final. */
+const ESTADO_PRIORIDAD: Record<Estado, number> = {
+    vencido: 0,
+    sin_service: 1,
+    al_dia: 2,
+    sin_km: 3,
+};
+
 export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
     const { auth } = usePage<any>().props;
     const canManage = auth.permissions?.can_manage_service ?? false;
@@ -115,8 +129,6 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
     const [filterEstado, setFilterEstado] = useState<Estado | 'all'>('all');
     const [selected, setSelected] = useState<ServiceRow | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [kmRow, setKmRow] = useState<ServiceRow | null>(null);
-    const [kmDialogOpen, setKmDialogOpen] = useState(false);
 
     const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -130,23 +142,15 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
         fecha: today,
     });
 
-    function openKmDialog(row: ServiceRow) {
-        setKmRow(row);
-        kmForm.reset();
-        kmForm.clearErrors();
-        kmForm.setData({
-            kilometraje: row.km_actual != null ? String(row.km_actual) : '',
-            fecha: today,
-        });
-        setKmDialogOpen(true);
-    }
-
     function handleKmSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!kmRow) return;
-        kmForm.post(`/services/${kmRow.id}/kilometraje`, {
+
+        if (!selected) {
+            return;
+        }
+
+        kmForm.post(`/services/${selected.id}/kilometraje`, {
             preserveScroll: true,
-            onSuccess: () => setKmDialogOpen(false),
         });
     }
 
@@ -155,6 +159,12 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
         form.reset();
         form.clearErrors();
         form.setData({
+            kilometraje: row.km_actual != null ? String(row.km_actual) : '',
+            fecha: today,
+        });
+        kmForm.reset();
+        kmForm.clearErrors();
+        kmForm.setData({
             kilometraje: row.km_actual != null ? String(row.km_actual) : '',
             fecha: today,
         });
@@ -177,7 +187,7 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase().trim();
-        return vehiculos.filter((v) => {
+        const result = vehiculos.filter((v) => {
             const matchSearch =
                 !q ||
                 v.patente.toLowerCase().includes(q) ||
@@ -186,14 +196,41 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                 (v.conductor?.toLowerCase().includes(q) ?? false);
             const matchEstado =
                 filterEstado === 'all' || v.estado === filterEstado;
+
             return matchSearch && matchEstado;
+        });
+
+        // Más urgente primero: vencidos por mayor excedido, al día por menor restante.
+        return [...result].sort((a, b) => {
+            const prioridad =
+                ESTADO_PRIORIDAD[a.estado] - ESTADO_PRIORIDAD[b.estado];
+
+            if (prioridad !== 0) {
+                return prioridad;
+            }
+
+            if (a.estado === 'vencido') {
+                return (b.km_recorridos ?? 0) - (a.km_recorridos ?? 0);
+            }
+
+            if (a.estado === 'al_dia') {
+                return (a.km_restantes ?? 0) - (b.km_restantes ?? 0);
+            }
+
+            return a.patente.localeCompare(b.patente, 'es', {
+                numeric: true,
+            });
         });
     }, [vehiculos, search, filterEstado]);
 
     const counts = useMemo(
         () => ({
+            all: vehiculos.length,
             vencido: vehiculos.filter((v) => v.estado === 'vencido').length,
             al_dia: vehiculos.filter((v) => v.estado === 'al_dia').length,
+            sin_service: vehiculos.filter((v) => v.estado === 'sin_service')
+                .length,
+            sin_km: vehiculos.filter((v) => v.estado === 'sin_km').length,
         }),
         [vehiculos],
     );
@@ -204,22 +241,10 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                            Service
-                        </h1>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                        <span className="inline-flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                            {counts.vencido} vencidos
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-md bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                            {counts.al_dia} al día
-                        </span>
-                    </div>
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">
+                        Service
+                    </h1>
                 </div>
 
                 {/* Filtros */}
@@ -255,6 +280,9 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                                 : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                         )}
                                     >
+                                        <span className="font-bold tabular-nums">
+                                            {counts[val]}
+                                        </span>
                                         {label}
                                     </button>
                                 ))}
@@ -306,49 +334,55 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                         }
                                     }}
                                     className={cn(
-                                        'flex cursor-pointer items-center gap-4 rounded-xl border bg-card p-3.5 shadow-sm transition-all duration-200 outline-none hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.99]',
-                                        cfg.border,
+                                        'flex cursor-pointer items-center gap-3 rounded-xl border border-l-4 border-border bg-card p-3.5 shadow-sm transition-all duration-200 outline-none hover:shadow-md focus-visible:ring-2 focus-visible:ring-primary active:scale-[0.99]',
+                                        cfg.accent,
                                     )}
                                 >
-                                    {/* Identidad */}
-                                    <div className="flex min-w-0 flex-1 flex-col">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="font-mono text-base leading-none font-bold text-foreground">
-                                                {row.patente}
-                                            </h3>
-                                            <span
-                                                className={cn(
-                                                    'inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium',
-                                                    cfg.badge,
-                                                )}
-                                            >
-                                                <Icon className="h-3 w-3" />
-                                                {cfg.label}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 truncate text-xs text-muted-foreground">
-                                            {row.marca} {row.modelo}
-                                            {row.conductor
-                                                ? ` · ${row.conductor}`
-                                                : ''}
-                                        </p>
+                                    {/* Avatar de estado */}
+                                    <div
+                                        className={cn(
+                                            'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                                            cfg.iconWrap,
+                                        )}
+                                        title={cfg.label}
+                                    >
+                                        <Icon className="h-5 w-5" />
                                     </div>
 
-                                    {/* Métricas */}
+                                    {/* Identidad */}
+                                    <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                        <h3 className="font-mono text-base leading-none font-bold text-foreground">
+                                            {row.patente}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 text-xs">
+                                            <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            {row.conductor ? (
+                                                <span className="truncate text-muted-foreground">
+                                                    {row.conductor}
+                                                </span>
+                                            ) : (
+                                                <span className="truncate text-muted-foreground/50 italic">
+                                                    Sin conductor asignado
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Km actual/último service + urgencia (el resto del detalle queda en el modal) */}
                                     <div className="flex shrink-0 items-center gap-4 text-right text-xs">
                                         <div className="flex flex-col">
                                             <span className="text-[11px] text-muted-foreground">
                                                 Km actual
                                             </span>
-                                            <span className="font-medium text-foreground">
+                                            <span className="text-sm font-bold text-foreground">
                                                 {fmtKm(row.km_actual)}
                                             </span>
                                         </div>
                                         <div className="hidden flex-col sm:flex">
                                             <span className="text-[11px] text-muted-foreground">
-                                                Últ. service
+                                                Último service
                                             </span>
-                                            <span className="font-medium text-foreground">
+                                            <span className="text-sm font-medium text-muted-foreground">
                                                 {fmtKm(
                                                     row.ultimo_service
                                                         ?.kilometraje,
@@ -371,20 +405,6 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                             </div>
                                         )}
                                     </div>
-
-                                    {canManage && (
-                                        <button
-                                            type="button"
-                                            title="Cargar kilometraje"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                openKmDialog(row);
-                                            }}
-                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        >
-                                            <Gauge className="h-4 w-4" />
-                                        </button>
-                                    )}
                                 </div>
                             );
                         })}
@@ -416,34 +436,43 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                     </DialogHeader>
 
                     <div className="flex max-h-[60vh] flex-col gap-5 overflow-y-auto px-5 py-5">
-                        {/* Resumen */}
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                            <div className="rounded-lg border border-border bg-muted/30 px-2 py-2">
+                        {/* Kilometraje: km actual como dato principal, el resto como contexto */}
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-1.5 text-sm font-medium">
+                                <Gauge className="h-4 w-4 text-muted-foreground" />
+                                Kilometraje
+                            </div>
+                            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-center">
                                 <p className="text-[11px] text-muted-foreground">
                                     Km actual
                                 </p>
-                                <p className="text-sm font-semibold">
+                                <p className="text-xl font-bold text-foreground">
                                     {fmtKm(selected?.km_actual)}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-border bg-muted/30 px-2 py-2">
-                                <p className="text-[11px] text-muted-foreground">
-                                    Último service
-                                </p>
-                                <p className="text-sm font-semibold">
-                                    {fmtKm(
-                                        selected?.ultimo_service?.kilometraje,
+                            {selected?.ultimo_service && (
+                                <div className="rounded-lg border border-border bg-muted/20 px-3 py-2 text-center text-xs text-muted-foreground">
+                                    Último service a los{' '}
+                                    <span className="font-medium text-foreground">
+                                        {fmtKm(
+                                            selected.ultimo_service
+                                                .kilometraje,
+                                        )}
+                                    </span>
+                                    {selected.km_recorridos != null && (
+                                        <>
+                                            {' '}
+                                            ·{' '}
+                                            <span className="font-medium text-foreground">
+                                                {fmtKm(
+                                                    selected.km_recorridos,
+                                                )}
+                                            </span>{' '}
+                                            recorridos desde entonces
+                                        </>
                                     )}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border border-border bg-muted/30 px-2 py-2">
-                                <p className="text-[11px] text-muted-foreground">
-                                    Recorridos
-                                </p>
-                                <p className="text-sm font-semibold">
-                                    {fmtKm(selected?.km_recorridos)}
-                                </p>
-                            </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Km hasta el próximo service */}
@@ -485,6 +514,81 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                 );
                             })()}
 
+                        {/* Actualizar kilometraje: solo la lectura del odómetro, no crea historial */}
+                        {canManage && (
+                            <form
+                                onSubmit={handleKmSubmit}
+                                className="flex flex-col gap-3 rounded-lg border border-dashed border-border p-3"
+                            >
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        Actualizar kilometraje
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Solo guarda la lectura del odómetro.
+                                        No queda en el historial de services.
+                                    </p>
+                                </div>
+                                <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-3">
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="km_lectura">
+                                            Kilometraje
+                                        </Label>
+                                        <Input
+                                            id="km_lectura"
+                                            type="number"
+                                            min={0}
+                                            placeholder="Ej. 65000"
+                                            value={kmForm.data.kilometraje}
+                                            onChange={(e) =>
+                                                kmForm.setData(
+                                                    'kilometraje',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        <InputError
+                                            message={
+                                                kmForm.errors.kilometraje
+                                            }
+                                        />
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <Label htmlFor="km_fecha">
+                                            Fecha
+                                        </Label>
+                                        <Input
+                                            id="km_fecha"
+                                            type="date"
+                                            value={kmForm.data.fecha}
+                                            onChange={(e) =>
+                                                kmForm.setData(
+                                                    'fecha',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                        <InputError
+                                            message={kmForm.errors.fecha}
+                                        />
+                                    </div>
+                                    <Button
+                                        type="submit"
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={
+                                            kmForm.processing ||
+                                            kmForm.data.kilometraje === ''
+                                        }
+                                    >
+                                        {kmForm.processing
+                                            ? 'Guardando...'
+                                            : 'Guardar km'}
+                                    </Button>
+                                </div>
+                            </form>
+                        )}
+
                         {/* Registrar service */}
                         {canManage && (
                             <form
@@ -492,9 +596,15 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                                 onSubmit={handleSubmit}
                                 className="flex flex-col gap-3 rounded-lg border border-border p-3"
                             >
-                                <p className="text-sm font-medium">
-                                    Registrar nuevo service
-                                </p>
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        Registrar nuevo service
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Crea un registro en el historial y
+                                        recalcula el próximo vencimiento.
+                                    </p>
+                                </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="flex flex-col gap-1.5">
                                         <Label htmlFor="km_service">
@@ -603,54 +713,6 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
                             </Button>
                         </DialogFooter>
                     )}
-                </DialogContent>
-            </Dialog>
-
-            {/* Carga rápida de kilometraje */}
-            <Dialog open={kmDialogOpen} onOpenChange={(o) => !o && setKmDialogOpen(false)}>
-                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
-                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15">
-                            <Gauge className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <div className="flex-1">
-                            <DialogTitle className="text-base font-semibold">Cargar kilometraje — {kmRow?.patente}</DialogTitle>
-                            <DialogDescription className="text-xs">Se usará como km actual si es la lectura más reciente por fecha.</DialogDescription>
-                        </div>
-                    </div>
-                    <form id="km-form" onSubmit={handleKmSubmit} className="grid gap-4 px-5 py-5">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="km_lectura">Kilometraje</Label>
-                                <Input
-                                    id="km_lectura"
-                                    type="number"
-                                    min={0}
-                                    placeholder="Ej. 65000"
-                                    value={kmForm.data.kilometraje}
-                                    onChange={(e) => kmForm.setData('kilometraje', e.target.value)}
-                                    autoFocus
-                                />
-                                <InputError message={kmForm.errors.kilometraje} />
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="km_fecha">Fecha</Label>
-                                <Input
-                                    id="km_fecha"
-                                    type="date"
-                                    value={kmForm.data.fecha}
-                                    onChange={(e) => kmForm.setData('fecha', e.target.value)}
-                                />
-                                <InputError message={kmForm.errors.fecha} />
-                            </div>
-                        </div>
-                    </form>
-                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                        <Button type="button" variant="outline" onClick={() => setKmDialogOpen(false)}>Cancelar</Button>
-                        <Button type="submit" form="km-form" disabled={kmForm.processing || kmForm.data.kilometraje === ''}>
-                            {kmForm.processing ? 'Guardando...' : 'Guardar km'}
-                        </Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

@@ -5,7 +5,6 @@ import {
     ArrowUpCircle,
     Check,
     ClipboardList,
-    FileDown,
     History,
     Loader2,
     Minus,
@@ -22,6 +21,7 @@ import {
     X,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { ExportDropdown } from '@/components/export-dropdown';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
@@ -36,6 +36,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
+import { exportToExcel, exportToPdf } from '@/lib/export';
 import { cn } from '@/lib/utils';
 import { index, salidaMultiple, store, update, updateCosto } from '@/routes/articulos';
 import { index as conteosIndex } from '@/routes/conteos';
@@ -186,6 +187,33 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
         return result;
     }, [tabItems, itemSearch, stockFilter]);
+
+    // ─── Exportar (PDF/Excel se generan en el navegador con lo ya filtrado) ───
+    function buildExportRows(): { headers: string[]; rows: (string | number)[][] } {
+        const headers = ['Descripción', 'Código', 'Categoría', 'Stock', 'Stock mínimo', 'Costo', 'Precio'];
+        const rows = filteredItems.map((i) => [
+            i.descripcion,
+            i.codigo ?? '',
+            i.repuestos ? 'Repuesto' : 'Galpón',
+            i.stock,
+            i.min_stock,
+            i.costo ?? 0,
+            i.precio,
+        ]);
+        return { headers, rows };
+    }
+
+    function exportItemsPdf() {
+        const { headers, rows } = buildExportRows();
+        const fecha = new Date().toISOString().slice(0, 10);
+        exportToPdf(`stock-${activeTab}-${fecha}.pdf`, 'Inventario', headers, rows);
+    }
+
+    function exportItemsExcel() {
+        const { headers, rows } = buildExportRows();
+        const fecha = new Date().toISOString().slice(0, 10);
+        exportToExcel(`stock-${activeTab}-${fecha}.xlsx`, headers, rows);
+    }
 
     // ─── Modal Egreso (OUT múltiple) ─────────────────────────────────────────
     const [showSalidaModal, setShowSalidaModal] = useState(false);
@@ -480,18 +508,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                     </div>
                     {!isMechanic && (
                         <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                    window.open('/pdf/stock', '_blank')
-                                }
-                            >
-                                <FileDown className="h-4 w-4" />
-                                <span className="hidden sm:inline">
-                                    Exportar PDF
-                                </span>
-                            </Button>
+                            <ExportDropdown
+                                onExportPdf={exportItemsPdf}
+                                onExportExcel={exportItemsExcel}
+                                disabled={filteredItems.length === 0}
+                            />
                             <Button
                                 variant="outline"
                                 size="sm"

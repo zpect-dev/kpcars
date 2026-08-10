@@ -4,7 +4,6 @@ import {
     Car,
     ChevronDown,
     ChevronRight,
-    Download,
     HandCoins,
     History,
     Plus,
@@ -15,6 +14,7 @@ import {
     UserCircle2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ExportDropdown } from '@/components/export-dropdown';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import {
@@ -35,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { exportToExcel, exportToPdf } from '@/lib/export';
 import { index, store, destroy } from '@/routes/gastos';
 
 type MetodoPago = 'efectivo' | 'transferencia';
@@ -220,6 +221,30 @@ export default function GastosIndex({
     const [descripcion, setDescripcion] = useState('');
     const [comboValue, setComboValue] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // ─── Exportar (PDF/Excel se generan en el navegador, mismos gastos pendientes que se ven en pantalla) ───
+    function buildGastosExportRows(): { headers: string[]; rows: (string | number)[][] } {
+        const headers = ['Fecha', 'Descripción', 'Categoría', 'Patente', 'Monto', 'Recibió'];
+        const rows = gastos.map((g) => [
+            formatDate(g.fecha),
+            g.descripcion?.trim() || 'Sin descripción',
+            TIPO_LABEL[g.tipo],
+            g.vehiculo?.patente ?? '—',
+            g.monto,
+            g.recibio,
+        ]);
+        return { headers, rows };
+    }
+
+    function exportGastosPdf() {
+        const { headers, rows } = buildGastosExportRows();
+        exportToPdf(`gastos-${today}.pdf`, 'Gastos', headers, rows);
+    }
+
+    function exportGastosExcel() {
+        const { headers, rows } = buildGastosExportRows();
+        exportToExcel(`gastos-${today}.xlsx`, headers, rows);
+    }
 
     // Group gastos by category
     const gastosByCat = useMemo(() => {
@@ -501,15 +526,11 @@ export default function GastosIndex({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <a
-                            href="/pdf/gastos"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">Exportar PDF</span>
-                        </a>
+                        <ExportDropdown
+                            onExportPdf={exportGastosPdf}
+                            onExportExcel={exportGastosExcel}
+                            disabled={gastos.length === 0}
+                        />
                         {canManage && (
                             <Button
                                 size="sm"
