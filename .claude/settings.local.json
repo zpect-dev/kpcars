@@ -12,7 +12,10 @@
       "Bash(php -l app/Http/Requests/ResumenFiltrosRequest.php)",
       "Bash(php -m)",
       "Bash(php --ini)",
-      "Bash(php -v)"
+      "Bash(php -v)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173/@vite/client)",
+      "Bash(npx eslint *)"
     ]
   }
 }
