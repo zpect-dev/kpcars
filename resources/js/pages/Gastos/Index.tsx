@@ -1,5 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import {
+    ArrowDownLeft,
+    ArrowUpRight,
     Building2,
     Car,
     ChevronDown,
@@ -8,12 +10,14 @@ import {
     History,
     Plus,
     Trash2,
+    Undo2,
+    Wallet,
     Warehouse,
     Wrench,
     Box,
     UserCircle2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ExportDropdown } from '@/components/export-dropdown';
 import { Button } from '@/components/ui/button';
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
@@ -28,6 +32,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -36,6 +41,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { exportToExcel, exportToPdf } from '@/lib/export';
+import { store as cajaChicaStore, revertir as cajaChicaRevertir } from '@/routes/caja-chica';
 import { index, store, destroy } from '@/routes/gastos';
 
 type MetodoPago = 'efectivo' | 'transferencia';
@@ -95,11 +101,39 @@ interface CardData {
     total: number;
 }
 
+/** Tipos de movimiento de caja chica que se cargan a mano desde la UI. */
+type CajaTipoManual = 'ingreso' | 'retiro' | 'ajuste';
+
+interface CajaMovimiento {
+    id: number;
+    tipo: CajaTipoManual | 'gasto';
+    tipo_label: string;
+    /** Firmado: positivo suma al saldo, negativo lo resta. */
+    monto: number;
+    fecha: string;
+    nota: string | null;
+    gasto_id: number | null;
+    es_contraasiento: boolean;
+    revertido: boolean;
+    registrado_por: string | null;
+}
+
+interface CajaChica {
+    /** La caja vive mientras haya alguna empresa con período de caja abierto. */
+    periodo_abierto: boolean;
+    saldo: number;
+    ingresos: number;
+    /** En positivo: plata que salió de la caja. */
+    egresos: number;
+    movimientos: CajaMovimiento[];
+}
+
 interface Props {
     gastos: Gasto[];
     ultimosGlobales: Gasto[];
     cards: CardData[];
     patentes: PatenteOption[];
+    cajaChica: CajaChica;
     canManage: boolean;
 }
 
@@ -175,11 +209,18 @@ function formatDateDia(d: string): string {
     return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${fecha}`;
 }
 
+const CAJA_TIPOS: { value: CajaTipoManual; label: string; hint: string }[] = [
+    { value: 'ingreso', label: 'Ingreso', hint: 'Carga de plata a la caja (fondo inicial o reposición).' },
+    { value: 'retiro', label: 'Retiro', hint: 'Sale plata de la caja sin ser un gasto (devolución, traspaso).' },
+    { value: 'ajuste', label: 'Ajuste', hint: 'Corrección manual. El signo del monto define si suma o resta.' },
+];
+
 export default function GastosIndex({
     gastos,
     ultimosGlobales,
     cards,
     patentes,
+    cajaChica,
     canManage,
 }: Props) {
     const { auth } = usePage<any>().props;
@@ -221,6 +262,83 @@ export default function GastosIndex({
     const [descripcion, setDescripcion] = useState('');
     const [comboValue, setComboValue] = useState('');
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // ─── Caja chica ─────────────────────────────────────────────────────────
+    // Popover en hover con el mismo patrón que la card "Gastos de inventario"
+    // de Cobros: un pequeño retardo al salir para poder entrar al contenido.
+    const [showCajaPopover, setShowCajaPopover] = useState(false);
+    const closeCajaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelCloseCaja = () => {
+        if (closeCajaTimer.current) {
+            clearTimeout(closeCajaTimer.current);
+            closeCajaTimer.current = null;
+        }
+    };
+    const openCajaNow = () => {
+        cancelCloseCaja();
+        setShowCajaPopover(true);
+    };
+    const scheduleCloseCaja = () => {
+        cancelCloseCaja();
+        closeCajaTimer.current = setTimeout(() => setShowCajaPopover(false), 90);
+    };
+
+    const [showCajaModal, setShowCajaModal] = useState(false);
+    const [showCajaHistorial, setShowCajaHistorial] = useState(false);
+    const [cajaSubmitting, setCajaSubmitting] = useState(false);
+    const [cajaTipo, setCajaTipo] = useState<CajaTipoManual>('ingreso');
+    const [cajaFecha, setCajaFecha] = useState(today);
+    const [cajaMonto, setCajaMonto] = useState('');
+    const [cajaNota, setCajaNota] = useState('');
+    const [cajaErrors, setCajaErrors] = useState<Record<string, string>>({});
+
+    function resetCajaForm() {
+        setCajaTipo('ingreso');
+        setCajaFecha(today);
+        setCajaMonto('');
+        setCajaNota('');
+        setCajaErrors({});
+    }
+
+    function handleCajaSubmit() {
+        const newErrors: Record<string, string> = {};
+        if (!cajaFecha) newErrors.fecha = 'Requerido';
+        // El ajuste admite monto negativo; el resto sólo importes positivos.
+        if (!cajaMonto || Number(cajaMonto) === 0) newErrors.monto = 'Monto inválido';
+        else if (cajaTipo !== 'ajuste' && Number(cajaMonto) < 0)
+            newErrors.monto = 'Usá un ajuste para cargar un monto negativo';
+        if (cajaTipo === 'ajuste' && !cajaNota.trim())
+            newErrors.nota = 'Indicá el motivo del ajuste';
+
+        if (Object.keys(newErrors).length > 0) {
+            setCajaErrors(newErrors);
+            return;
+        }
+
+        setCajaSubmitting(true);
+        router.post(
+            cajaChicaStore.url(),
+            {
+                tipo: cajaTipo,
+                monto: Number(cajaMonto),
+                fecha: cajaFecha,
+                nota: cajaNota.trim() || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setShowCajaModal(false);
+                    resetCajaForm();
+                },
+                onError: (errs) => setCajaErrors(errs as Record<string, string>),
+                onFinish: () => setCajaSubmitting(false),
+            },
+        );
+    }
+
+    function handleCajaRevertir(id: number) {
+        router.post(cajaChicaRevertir.url(id), {}, { preserveScroll: true });
+    }
 
     // ─── Exportar (PDF/Excel se generan en el navegador, mismos gastos pendientes que se ven en pantalla) ───
     function buildGastosExportRows(): { headers: string[]; rows: (string | number)[][] } {
@@ -526,6 +644,110 @@ export default function GastosIndex({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Caja chica: chip discreto, el detalle vive en el popover al pasar el mouse */}
+                        <Popover open={showCajaPopover} onOpenChange={setShowCajaPopover}>
+                            <PopoverTrigger asChild onMouseEnter={openCajaNow} onMouseLeave={scheduleCloseCaja}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowCajaPopover(false);
+                                        setShowCajaHistorial(true);
+                                    }}
+                                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 shadow-sm transition-colors hover:bg-muted/40"
+                                >
+                                    <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase underline decoration-dotted underline-offset-2">
+                                        Caja chica
+                                    </span>
+                                    <span
+                                        className={`text-sm font-bold tabular-nums ${
+                                            cajaChica.saldo < 0 ? 'text-destructive' : 'text-foreground'
+                                        }`}
+                                    >
+                                        {formatARS(Number(cajaChica.saldo))}
+                                    </span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                align="end"
+                                sideOffset={6}
+                                className="w-64 p-1"
+                                onMouseEnter={openCajaNow}
+                                onMouseLeave={scheduleCloseCaja}
+                            >
+                                <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                                    {cajaChica.periodo_abierto
+                                        ? 'Caja chica del período'
+                                        : 'Sin período de caja abierto'}
+                                </p>
+
+                                {cajaChica.periodo_abierto ? (
+                                    <>
+                                        <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+                                            <ArrowDownLeft className="h-4 w-4 shrink-0 text-emerald-500" />
+                                            <span className="flex-1 text-left text-foreground">Cargado</span>
+                                            <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                                                {formatARS(Number(cajaChica.ingresos))}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
+                                            <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span className="flex-1 text-left text-foreground">Salidas</span>
+                                            <span className="font-semibold text-foreground tabular-nums">
+                                                {formatARS(Number(cajaChica.egresos))}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1 flex items-center gap-2 border-t border-border px-2 pt-2 pb-1.5 text-sm">
+                                            <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                            <span className="flex-1 text-left text-foreground">Saldo</span>
+                                            <span
+                                                className={`font-semibold tabular-nums ${
+                                                    cajaChica.saldo < 0 ? 'text-destructive' : 'text-foreground'
+                                                }`}
+                                            >
+                                                {formatARS(Number(cajaChica.saldo))}
+                                            </span>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <p className="px-2 pb-2 text-xs text-muted-foreground">
+                                        La caja se abre junto con el período de caja, desde Cobros.
+                                    </p>
+                                )}
+
+                                <div className="flex items-center gap-1 border-t border-border pt-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 flex-1 justify-start px-2 text-xs"
+                                        onClick={() => {
+                                            setShowCajaPopover(false);
+                                            setShowCajaHistorial(true);
+                                        }}
+                                    >
+                                        <History className="mr-1.5 h-3.5 w-3.5" />
+                                        Historial
+                                    </Button>
+                                    {canManage && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-8 flex-1 justify-start px-2 text-xs"
+                                            disabled={!cajaChica.periodo_abierto}
+                                            onClick={() => {
+                                                setShowCajaPopover(false);
+                                                resetCajaForm();
+                                                setShowCajaModal(true);
+                                            }}
+                                        >
+                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                            Cargar
+                                        </Button>
+                                    )}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+
                         <ExportDropdown
                             onExportPdf={exportGastosPdf}
                             onExportExcel={exportGastosExcel}
@@ -951,6 +1173,200 @@ export default function GastosIndex({
                 </DialogContent>
             </Dialog>
 
+            {/* ─── Cargar / ajustar caja chica ───────────────────────────── */}
+            <Dialog
+                open={showCajaModal}
+                onOpenChange={(open) => {
+                    setShowCajaModal(open);
+                    if (!open) resetCajaForm();
+                }}
+            >
+                <DialogContent
+                    className="gap-0 overflow-hidden p-0 sm:max-w-md"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+                            <Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Movimiento de caja chica</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                El saldo se recalcula sumando los movimientos: nada se edita ni se borra.
+                            </DialogDescription>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-4 px-5 py-5">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="cc-tipo">Tipo</Label>
+                            <Select
+                                value={cajaTipo}
+                                onValueChange={(v) => setCajaTipo(v as CajaTipoManual)}
+                            >
+                                <SelectTrigger id="cc-tipo">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CAJA_TIPOS.map((t) => (
+                                        <SelectItem key={t.value} value={t.value}>
+                                            {t.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                {CAJA_TIPOS.find((t) => t.value === cajaTipo)?.hint}
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cc-fecha">Fecha</Label>
+                                <Input
+                                    id="cc-fecha"
+                                    type="date"
+                                    value={cajaFecha}
+                                    onChange={(e) => setCajaFecha(e.target.value)}
+                                />
+                                {cajaErrors.fecha && (
+                                    <p className="text-xs text-destructive">{cajaErrors.fecha}</p>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="cc-monto">Monto</Label>
+                                <MoneyInput
+                                    id="cc-monto"
+                                    value={cajaMonto === '' ? null : Number(cajaMonto)}
+                                    onValueChange={(n) => setCajaMonto(n == null ? '' : String(n))}
+                                    placeholder="0,00"
+                                />
+                                {cajaErrors.monto && (
+                                    <p className="text-xs text-destructive">{cajaErrors.monto}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="cc-nota">
+                                Nota {cajaTipo === 'ajuste' ? '' : '(opcional)'}
+                            </Label>
+                            <Input
+                                id="cc-nota"
+                                value={cajaNota}
+                                onChange={(e) => setCajaNota(e.target.value)}
+                                placeholder="Detalle del movimiento..."
+                            />
+                            {cajaErrors.nota && (
+                                <p className="text-xs text-destructive">{cajaErrors.nota}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button type="button" variant="outline" onClick={() => setShowCajaModal(false)} disabled={cajaSubmitting}>
+                            Cancelar
+                        </Button>
+                        <Button type="button" onClick={handleCajaSubmit} disabled={cajaSubmitting}>
+                            {cajaSubmitting ? 'Guardando...' : 'Registrar movimiento'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ─── Historial de caja chica ───────────────────────────────── */}
+            <Dialog open={showCajaHistorial} onOpenChange={setShowCajaHistorial}>
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
+                    <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+                            <History className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div className="flex-1">
+                            <DialogTitle className="text-base font-semibold">Historial de caja chica</DialogTitle>
+                            <DialogDescription className="text-xs">
+                                Movimientos del período abierto. Saldo {formatARS(Number(cajaChica.saldo))}; un descuento de gasto se deshace eliminando el gasto.
+                            </DialogDescription>
+                        </div>
+                    </div>
+
+                    <div className="max-h-[60vh] overflow-y-auto">
+                        {cajaChica.movimientos.length === 0 ? (
+                            <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                Todavía no hay movimientos en la caja.
+                            </p>
+                        ) : (
+                            <table className="w-full text-left text-sm">
+                                <thead className="sticky top-0 bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                    <tr>
+                                        <th className="px-3 py-2 font-medium">Fecha</th>
+                                        <th className="px-3 py-2 font-medium">Tipo</th>
+                                        <th className="px-3 py-2 font-medium">Detalle</th>
+                                        <th className="px-3 py-2 font-medium">Registró</th>
+                                        <th className="px-3 py-2 text-right font-medium">Monto</th>
+                                        {canManage && <th className="w-10 px-3 py-2"></th>}
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {cajaChica.movimientos.map((m) => (
+                                        <tr key={m.id} className="hover:bg-muted/20">
+                                            <td className="px-3 py-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                {formatDate(m.fecha)}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-foreground">
+                                                {m.tipo_label}
+                                            </td>
+                                            <td className="px-3 py-2 text-foreground">
+                                                {m.nota ?? '—'}
+                                                {m.revertido && (
+                                                    <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                                        (revertido)
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                                                {m.registrado_por ?? '—'}
+                                            </td>
+                                            <td
+                                                className={`px-3 py-2 text-right font-bold whitespace-nowrap ${
+                                                    m.monto < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                                                }`}
+                                            >
+                                                {formatARS(Number(m.monto))}
+                                            </td>
+                                            {canManage && (
+                                                <td className="px-2 py-2 text-right">
+                                                    {/* Sólo movimientos manuales vivos: el descuento de un
+                                                        gasto se deshace borrando el gasto. */}
+                                                    {m.gasto_id === null &&
+                                                        !m.es_contraasiento &&
+                                                        !m.revertido && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => handleCajaRevertir(m.id)}
+                                                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                                                aria-label="Revertir movimiento"
+                                                            >
+                                                                <Undo2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
+                        <Button variant="outline" onClick={() => setShowCajaHistorial(false)}>
+                            Cerrar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* ─── Confirmar eliminación ─────────────────────────────────── */}
             <Dialog
                 open={confirmDeleteId !== null}
@@ -966,7 +1382,7 @@ export default function GastosIndex({
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Eliminar gasto</DialogTitle>
                             <DialogDescription className="text-xs">
-                                Esta acción no se puede deshacer y también eliminará la distribución asignada a los inversores.
+                                Esta acción no se puede deshacer: también elimina la distribución asignada a los inversores y devuelve el monto a la caja chica.
                             </DialogDescription>
                         </div>
                     </div>

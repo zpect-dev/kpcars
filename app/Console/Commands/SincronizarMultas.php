@@ -44,8 +44,15 @@ class SincronizarMultas extends Command
         }
 
         $this->info(sprintf(
-            'Snapshot %s → %d procesadas · %d nuevas · %d resueltas · %d reabiertas',
+            'Snapshot %s: %d procesadas · %d nuevas · %d resueltas · %d reabiertas',
             $r['snapshot'], $r['procesadas'], $r['nuevas'], $r['resueltas'], $r['reabiertas'],
+        ));
+
+        $this->info(sprintf(
+            'Reporte: +$%s en altas · -$%s pagadas al organismo · deuda vigente $%s',
+            number_format($r['monto_nuevas'], 2, ',', '.'),
+            number_format($r['monto_resueltas'], 2, ',', '.'),
+            number_format($r['deuda_vigente'], 2, ',', '.'),
         ));
 
         return self::SUCCESS;

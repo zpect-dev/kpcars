@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Models\AperturaCaja;
+use App\Models\PeriodoCajaChica;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 class AbrirCajaAction
@@ -24,9 +26,17 @@ class AbrirCajaAction
             throw new RuntimeException('Ya hay un período de caja abierto.');
         }
 
-        return AperturaCaja::create([
-            'empresa_id' => session('active_company_id'),
-            'user_id' => $user->id,
-        ]);
+        return DB::transaction(function () use ($user) {
+            $apertura = AperturaCaja::create([
+                'empresa_id' => session('active_company_id'),
+                'user_id' => $user->id,
+            ]);
+
+            // La caja chica es una sola para todas las empresas: la abre la
+            // primera apertura de la ronda y las siguientes la reusan.
+            PeriodoCajaChica::actualOAbrir($user->id);
+
+            return $apertura;
+        });
     }
 }

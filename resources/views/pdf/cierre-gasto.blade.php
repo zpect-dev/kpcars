@@ -80,5 +80,50 @@
             </tr>
         </tbody>
     </table>
+
+    @if($cajaChica)
+        <div class="section-title">Caja chica del período</div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:15%">Fecha</th>
+                    <th style="width:15%">Tipo</th>
+                    <th style="width:40%">Detalle</th>
+                    <th style="width:15%">Registró</th>
+                    <th class="numeric" style="width:15%">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($cajaMovimientos as $m)
+                    <tr>
+                        <td>{{ $m->fecha?->format('d/m/Y') ?? '—' }}</td>
+                        <td>{{ $m->tipo->label() }}</td>
+                        <td>{{ $m->nota ?? '—' }}</td>
+                        <td>{{ $m->registradoPor?->name ?? '—' }}</td>
+                        <td class="numeric">${{ number_format((float) $m->monto, 0, ',', '.') }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="center">Sin movimientos de caja chica.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+
+        <table>
+            <tbody>
+                <tr>
+                    <td style="width:70%">Cargado a la caja</td>
+                    <td class="numeric" style="width:30%">${{ number_format($cajaTotales['ingresos'], 0, ',', '.') }}</td>
+                </tr>
+                <tr>
+                    <td>Salidas de la caja</td>
+                    <td class="numeric">${{ number_format($cajaTotales['egresos'], 0, ',', '.') }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td>SALDO FINAL DE CAJA CHICA</td>
+                    <td class="numeric">${{ number_format($cajaTotales['saldo'], 0, ',', '.') }}</td>
+                </tr>
+            </tbody>
+        </table>
+    @endif
 </body>
 </html>

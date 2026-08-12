@@ -11,8 +11,13 @@ use App\Models\ActaPago;
 use App\Models\Multa;
 use App\Models\MultaSyncRun;
 use App\Models\Scopes\TenantScope;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -32,7 +37,10 @@ class ActaController extends Controller
      */
     private const DIAS_RESUELTAS = 90;
 
-    public function index(): Response
+    /** Cuántas corridas de sincronización se listan como reportes en la vista. */
+    private const REPORTES_LIMITE = 20;
+
+    public function index(Request $request): Response
     {
         Gate::authorize('view-multas');
 
@@ -118,7 +126,41 @@ class ActaController extends Controller
             'ultimoSnapshot' => Acta::max('snapshot_fecha'),
             'diasResueltas' => self::DIAS_RESUELTAS,
             'ultimaSync' => $this->ultimaSync(),
+
+            // Reportes: una fila por corrida de sincronización, con lo que movió.
+            'reportes' => fn () => $this->reportes(),
+
+            // Detalle de un reporte puntual. Es un prop parcial: el frontend lo
+            // pide (`only: ['reporteDetalle']`) recién al desplegar una fila, así
+            // no viaja el detalle de las 20 corridas en cada carga.
+            // Con un id que ya no existe (link viejo) simplemente no hay detalle:
+            // la vista muestra la lista sin desplegar nada.
+            'reporteDetalle' => function () use ($request): ?array {
+                $run = $request->filled('reporte')
+                    ? MultaSyncRun::find((int) $request->query('reporte'))
+                    : null;
+
+                return $run !== null ? $this->detalleReporte($run) : null;
+            },
         ]);
+    }
+
+    /**
+     * PDF del reporte de una corrida: altas, pagadas al organismo, cobros del
+     * período y desglose por chofer y por vehículo.
+     */
+    public function reportePdf(MultaSyncRun $run): HttpResponse
+    {
+        Gate::authorize('view-multas');
+
+        $reporte = $this->detalleReporte($run);
+
+        $pdf = Pdf::loadView('pdf.actas-reporte', ['r' => $reporte]);
+        $pdf->setPaper('a4', 'landscape');
+
+        $fecha = $run->created_at?->format('Ymd-Hi') ?? 'sin-fecha';
+
+        return $pdf->download("reporte-multas-{$fecha}.pdf");
     }
 
     /**
@@ -143,8 +185,12 @@ class ActaController extends Controller
         }
 
         return back()->with('success', sprintf(
-            'Sincronizado (%s): %d nuevas, %d resueltas.',
-            $r['snapshot'], $r['nuevas'], $r['resueltas'],
+            'Sincronizado (%s): %d nuevas por $%s, %d pagadas al organismo. Deuda vigente $%s.',
+            $r['snapshot'],
+            $r['nuevas'],
+            number_format($r['monto_nuevas'], 2, ',', '.'),
+            $r['resueltas'],
+            number_format($r['deuda_vigente'], 2, ',', '.'),
         ));
     }
 
@@ -240,6 +286,246 @@ class ActaController extends Controller
         ]);
 
         return $completo;
+    }
+
+    /**
+     * Reportes: una fila por corrida de sincronización, con lo que movió.
+     *
+     * A cada corrida se le imputan además los cobros a choferes registrados
+     * DESDE esa corrida y hasta la siguiente, así los pagos del día caen en el
+     * reporte más reciente en lugar de quedar fuera de todos.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function reportes(): array
+    {
+        $runs = MultaSyncRun::query()->latest('id')->limit(self::REPORTES_LIMITE)->get()->values();
+
+        if ($runs->isEmpty()) {
+            return [];
+        }
+
+        // Los cobros de todo el rango en una sola query; se reparten por ventana
+        // en memoria (una query por corrida serían 20).
+        $pagos = ActaPago::query()
+            ->where('created_at', '>=', $runs->last()->created_at)
+            ->get(['id', 'monto', 'created_at']);
+
+        return $runs->map(function (MultaSyncRun $run, int $i) use ($runs, $pagos) {
+            // La corrida siguiente (más nueva) cierra la ventana; la última
+            // abierta llega hasta ahora.
+            $cobros = $this->pagosDeLaVentana($pagos, $run->created_at, $runs->get($i - 1)?->created_at);
+
+            return [
+                'id' => $run->id,
+                'cuando' => $run->created_at?->toIso8601String(),
+                'origen' => $run->origen,
+                'ok' => $run->ok,
+                'error' => $run->error,
+                'snapshot' => $run->snapshot_fecha?->toDateString(),
+                'nuevas' => $run->nuevas,
+                'monto_nuevas' => (float) $run->monto_nuevas,
+                'resueltas' => $run->resueltas,
+                'monto_resueltas' => (float) $run->monto_resueltas,
+                'reabiertas' => $run->reabiertas,
+                'deuda_vigente' => (float) $run->deuda_vigente,
+                'pagos' => $cobros->count(),
+                'cobrado' => round((float) $cobros->sum('monto'), 2),
+                // Corrida que no movió nada: la vista la muestra apagada.
+                'sin_movimiento' => $run->ok && ! $run->tieneReporte() && $cobros->isEmpty(),
+            ];
+        })->all();
+    }
+
+    /**
+     * Detalle de un reporte: qué actas entraron, cuáles se pagaron en el
+     * organismo, qué cobró la empresa en el período y el desglose por chofer y
+     * por vehículo.
+     *
+     * @return array<string,mixed>
+     */
+    private function detalleReporte(MultaSyncRun $run): array
+    {
+        // Fin de la ventana de cobros: el arranque de la corrida siguiente.
+        $hasta = MultaSyncRun::query()->where('id', '>', $run->id)->orderBy('id')->value('created_at');
+        $desde = $run->created_at;
+
+        $nuevas = Acta::query()
+            ->with('conductor:id,name')
+            ->where('sync_run_id', $run->id)
+            ->orderBy('patente')
+            ->get();
+
+        $resueltas = Acta::query()
+            ->with('conductor:id,name')
+            ->where('resuelta_run_id', $run->id)
+            ->orderBy('patente')
+            ->get();
+
+        $pagos = ActaPago::query()
+            ->with(['acta:id,patente,conductor_id,monto,monto_cobrado,cobrado', 'acta.conductor:id,name'])
+            ->when($desde !== null, fn ($q) => $q->where('created_at', '>=', $desde))
+            ->when($hasta !== null, fn ($q) => $q->where('created_at', '<', $hasta))
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->get();
+
+        // Deuda actual de cada unidad, para cerrar el desglose con el saldo.
+        $vigentes = Acta::query()->vigente()->get(['id', 'conductor_id', 'patente', 'monto', 'monto_cobrado', 'cobrado']);
+
+        $cobrado = round((float) $pagos->sum('monto'), 2);
+
+        return [
+            'run' => [
+                'id' => $run->id,
+                'cuando' => $run->created_at?->toIso8601String(),
+                'origen' => $run->origen,
+                'ok' => $run->ok,
+                'error' => $run->error,
+                'snapshot' => $run->snapshot_fecha?->toDateString(),
+            ],
+            'periodo' => [
+                'desde' => $desde?->toIso8601String(),
+                'hasta' => $hasta?->toIso8601String(),
+            ],
+            'totales' => [
+                'nuevas' => $run->nuevas,
+                'monto_nuevas' => (float) $run->monto_nuevas,
+                'resueltas' => $run->resueltas,
+                'monto_resueltas' => (float) $run->monto_resueltas,
+                'reabiertas' => $run->reabiertas,
+                'deuda_vigente' => (float) $run->deuda_vigente,
+                'pagos' => $pagos->count(),
+                'cobrado' => $cobrado,
+            ],
+            'nuevas' => $nuevas->map(fn (Acta $a) => $this->filaActa($a))->all(),
+            'resueltas' => $resueltas->map(fn (Acta $a) => $this->filaActa($a))->all(),
+            'cobros' => $pagos->map(fn (ActaPago $p) => [
+                'id' => $p->id,
+                'fecha' => $p->fecha?->toDateString(),
+                'registrado_en' => $p->created_at?->toIso8601String(),
+                'monto' => (float) $p->monto,
+                'es_transferencia' => $p->es_transferencia,
+                'patente' => $p->acta?->patente,
+                'conductor' => $p->acta?->conductor?->name,
+            ])->all(),
+            'por_chofer' => $this->desglose($nuevas, $pagos, $vigentes, 'chofer'),
+            'por_vehiculo' => $this->desglose($nuevas, $pagos, $vigentes, 'vehiculo'),
+        ];
+    }
+
+    /**
+     * Desglose del movimiento por chofer o por vehículo: altas de la corrida,
+     * cobros del período y lo que la unidad todavía adeuda hoy.
+     *
+     * Solo aparecen las unidades con movimiento en el reporte; el saldo se
+     * agrega a esas filas (si no, la tabla sería la flota entera).
+     *
+     * @param  EloquentCollection<int,Acta>  $nuevas
+     * @param  EloquentCollection<int,ActaPago>  $pagos
+     * @param  EloquentCollection<int,Acta>  $vigentes
+     * @return array<int,array<string,mixed>>
+     */
+    private function desglose(
+        EloquentCollection $nuevas,
+        EloquentCollection $pagos,
+        EloquentCollection $vigentes,
+        string $dimension,
+    ): array {
+        $filas = [];
+
+        $tocar = function (string $label) use (&$filas): string {
+            $filas[$label] ??= [
+                'label' => $label,
+                'nuevas' => 0,
+                'monto_nuevas' => 0.0,
+                'pagos' => 0,
+                'cobrado' => 0.0,
+                'adeuda' => 0.0,
+            ];
+
+            return $label;
+        };
+
+        foreach ($nuevas as $acta) {
+            $k = $tocar($this->etiqueta($acta, $dimension));
+            $filas[$k]['nuevas']++;
+            $filas[$k]['monto_nuevas'] += (float) ($acta->monto ?? 0);
+        }
+
+        foreach ($pagos as $pago) {
+            $acta = $pago->acta;
+
+            if ($acta === null) {
+                continue;
+            }
+
+            $k = $tocar($this->etiqueta($acta, $dimension));
+            $filas[$k]['pagos']++;
+            $filas[$k]['cobrado'] += (float) $pago->monto;
+        }
+
+        foreach ($vigentes as $acta) {
+            $label = $this->etiqueta($acta, $dimension);
+
+            if (isset($filas[$label])) {
+                $filas[$label]['adeuda'] += $acta->montoAdeudado();
+            }
+        }
+
+        $filas = array_map(fn (array $f) => [
+            ...$f,
+            'monto_nuevas' => round($f['monto_nuevas'], 2),
+            'cobrado' => round($f['cobrado'], 2),
+            'adeuda' => round($f['adeuda'], 2),
+        ], $filas);
+
+        usort($filas, fn (array $a, array $b) => [$b['monto_nuevas'], $b['cobrado']] <=> [$a['monto_nuevas'], $a['cobrado']]);
+
+        return array_values($filas);
+    }
+
+    /** Nombre de la unidad del desglose para un acta. */
+    private function etiqueta(Acta $acta, string $dimension): string
+    {
+        return $dimension === 'chofer'
+            ? ($acta->conductor?->name ?? 'Sin chofer')
+            : $acta->patente;
+    }
+
+    /**
+     * Pagos registrados entre dos corridas: desde `$desde` (inclusive) hasta
+     * `$hasta` (exclusivo); sin `$hasta`, la ventana sigue abierta.
+     *
+     * @param  Collection<int,ActaPago>  $pagos
+     * @return Collection<int,ActaPago>
+     */
+    private function pagosDeLaVentana(Collection $pagos, ?CarbonInterface $desde, ?CarbonInterface $hasta): Collection
+    {
+        return $pagos->filter(fn (ActaPago $p) => $p->created_at !== null
+            && ($desde === null || $p->created_at->greaterThanOrEqualTo($desde))
+            && ($hasta === null || $p->created_at->lessThan($hasta)));
+    }
+
+    /**
+     * Fila de un acta en el detalle del reporte.
+     *
+     * @return array<string,mixed>
+     */
+    private function filaActa(Acta $acta): array
+    {
+        return [
+            'id' => $acta->id,
+            'patente' => $acta->patente,
+            'conductor' => $acta->conductor?->name,
+            'jurisdiccion' => $acta->jurisdiccion,
+            'acta' => $acta->acta,
+            'motivo' => $acta->motivo,
+            'monto' => $acta->monto !== null ? (float) $acta->monto : null,
+            'fecha_infraccion' => $acta->fecha_infraccion?->toDateString(),
+            'fecha_vencimiento' => $acta->fecha_vencimiento?->toDateString(),
+            'adeudado' => $acta->montoAdeudado(),
+        ];
     }
 
     /** Clave de deduplicación contra las multas manuales. */

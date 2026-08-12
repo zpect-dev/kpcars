@@ -21,10 +21,31 @@ interface PorVehiculo {
     total: number;
 }
 
+interface CajaMovimiento {
+    id: number;
+    tipo_label: string;
+    /** Firmado: positivo suma al saldo, negativo lo resta. */
+    monto: number;
+    fecha: string;
+    nota: string | null;
+    registrado_por: string | null;
+}
+
+interface CajaChica {
+    ingresos: number;
+    /** En positivo: plata que salió de la caja. */
+    egresos: number;
+    saldo: number;
+    cerrado_at: string | null;
+    movimientos: CajaMovimiento[];
+}
+
 interface Props {
     cierre: Cierre;
     porTipo: PorTipo[];
     porVehiculo: PorVehiculo[];
+    /** Null cuando este cierre no es el que cerró la caja chica. */
+    cajaChica: CajaChica | null;
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -48,7 +69,7 @@ function formatARS(n: number): string {
     return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 }
 
-export default function CierresGastoShow({ cierre, porTipo, porVehiculo }: Props) {
+export default function CierresGastoShow({ cierre, porTipo, porVehiculo, cajaChica }: Props) {
     return (
         <>
             <Head title={`Cierre de Gastos #${cierre.id}`} />
@@ -134,6 +155,64 @@ export default function CierresGastoShow({ cierre, porTipo, porVehiculo }: Props
                         )}
                     </div>
                 </div>
+
+                {/* Caja chica del período (sólo en el cierre que la cerró) */}
+                {cajaChica && (
+                    <div className="overflow-hidden rounded-xl border border-border bg-card">
+                        <div className="flex items-center justify-between border-b border-border bg-muted/40 px-4 py-2.5">
+                            <span className="text-sm font-semibold text-foreground">Caja chica del período</span>
+                            <span className="text-xs text-muted-foreground">
+                                Cargado {formatARS(cajaChica.ingresos)} · Salidas {formatARS(cajaChica.egresos)}
+                            </span>
+                        </div>
+
+                        <div className="border-b border-border px-4 py-3">
+                            <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">Saldo final</p>
+                            <p className={`text-xl font-bold ${cajaChica.saldo < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                                {formatARS(cajaChica.saldo)}
+                            </p>
+                        </div>
+
+                        {cajaChica.movimientos.length === 0 ? (
+                            <p className="px-4 py-6 text-center text-sm text-muted-foreground">Sin movimientos de caja chica.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-muted/20 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 font-medium">Fecha</th>
+                                            <th className="px-4 py-2 font-medium">Tipo</th>
+                                            <th className="px-4 py-2 font-medium">Detalle</th>
+                                            <th className="px-4 py-2 font-medium">Registró</th>
+                                            <th className="px-4 py-2 text-right font-medium">Monto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {cajaChica.movimientos.map((m) => (
+                                            <tr key={m.id} className="hover:bg-muted/20">
+                                                <td className="px-4 py-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                    {formatFecha(m.fecha)}
+                                                </td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-foreground">{m.tipo_label}</td>
+                                                <td className="px-4 py-2 text-foreground">{m.nota ?? '—'}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-muted-foreground">
+                                                    {m.registrado_por ?? '—'}
+                                                </td>
+                                                <td
+                                                    className={`px-4 py-2 text-right font-medium whitespace-nowrap ${
+                                                        m.monto < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                                                    }`}
+                                                >
+                                                    {formatARS(m.monto)}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     );

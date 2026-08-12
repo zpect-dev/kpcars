@@ -53,4 +53,14 @@ class CierreCaja extends Model
     {
         return $this->hasOne(CierreGasto::class, 'cierre_caja_id');
     }
+
+    /**
+     * Período de caja chica que este cierre congeló. La caja chica es única para
+     * todas las empresas, así que sólo lo tiene el cierre de la última empresa
+     * de la vuelta (la que dejó sin aperturas abiertas al sistema).
+     */
+    public function periodoCajaChica(): HasOne
+    {
+        return $this->hasOne(PeriodoCajaChica::class, 'cierre_caja_id');
+    }
 }

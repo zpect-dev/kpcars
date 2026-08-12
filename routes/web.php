@@ -4,6 +4,7 @@ use App\Http\Controllers\ActaController;
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ArticuloController;
 use App\Http\Controllers\AsignacionController;
+use App\Http\Controllers\CajaChicaController;
 use App\Http\Controllers\CierreGastoController;
 use App\Http\Controllers\CierreSueldoController;
 use App\Http\Controllers\CobroController;
@@ -145,6 +146,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // Multas (feed): módulo experimental alimentado por el feed externo.
         Route::get('actas', [ActaController::class, 'index'])->name('actas.index');
         Route::post('actas/sincronizar', [ActaController::class, 'sincronizar'])->name('actas.sincronizar');
+        Route::get('actas/reportes/{run}/pdf', [ActaController::class, 'reportePdf'])->name('actas.reporte.pdf');
         Route::patch('actas/{acta}/cobrado', [ActaController::class, 'registrarCobro'])->name('actas.cobrado');
         Route::delete('actas/{acta}/pagos/{pago}', [ActaController::class, 'eliminarPago'])->name('actas.pagos.destroy');
 
@@ -188,6 +190,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('gastos', [GastoController::class, 'store'])->name('gastos.store');
         Route::delete('gastos/{gasto}', [GastoController::class, 'destroy'])->name('gastos.destroy');
         Route::get('pdf/gastos', [PdfController::class, 'gastos'])->name('pdf.gastos');
+
+        // Caja chica: fondo único global del que salen los gastos. Libro
+        // append-only, se lee desde el panel de Gastos.
+        Route::post('caja-chica/movimientos', [CajaChicaController::class, 'store'])->name('caja-chica.store');
+        Route::post('caja-chica/movimientos/{movimiento}/revertir', [CajaChicaController::class, 'revertir'])->name('caja-chica.revertir');
 
         // Resumen financiero (ingresos vs egresos). Vista y exportaciones
         // consumen la misma CalcularResumenAction con los mismos filtros.

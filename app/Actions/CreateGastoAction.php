@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\CajaChicaMovimientoTipo;
 use App\Models\Gasto;
 use App\Models\Inversion;
 use App\Models\Scopes\TenantScope;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class CreateGastoAction
 {
+    public function __construct(
+        protected RegistrarMovimientoCajaChicaAction $registrarCajaChica,
+    ) {}
+
     /**
      * Crea un gasto y calcula su distribución entre los inversores.
      *
@@ -51,9 +56,48 @@ class CreateGastoAction
             $gasto->save();
 
             $this->replicarDistribuciones($gasto);
+            $this->descontarDeCajaChica($gasto, $monto);
 
             return $gasto->load('vehiculo:id,patente,marca,modelo');
         });
+    }
+
+    /**
+     * Todo gasto sale de la caja chica (efectivo y transferencia por igual), así
+     * que deja su movimiento negativo en el libro. La caja puede quedar en
+     * negativo: el gasto ya ocurrió, el rojo avisa que hay que reponer el fondo.
+     */
+    protected function descontarDeCajaChica(Gasto $gasto, float $monto): void
+    {
+        $this->registrarCajaChica->execute(
+            tipo: CajaChicaMovimientoTipo::GASTO,
+            monto: $monto,
+            fecha: $gasto->fecha->toDateString(),
+            nota: $this->notaCajaChica($gasto),
+            gasto: $gasto,
+            registradoPor: $gasto->user_id,
+        );
+    }
+
+    /** Etiqueta del movimiento en el extracto de caja: categoría + detalle. */
+    protected function notaCajaChica(Gasto $gasto): string
+    {
+        // El vehículo puede ser de otra empresa que la activa: sin TenantScope.
+        $patente = $gasto->vehiculo_id !== null
+            ? Vehiculo::withoutGlobalScope(TenantScope::class)->find($gasto->vehiculo_id)?->patente
+            : null;
+
+        $etiqueta = $gasto->tipo === 'vehiculo'
+            ? 'Vehículo '.($patente ?? '—')
+            : ucfirst($gasto->tipo);
+
+        $descripcion = trim((string) $gasto->descripcion);
+
+        return mb_substr(
+            $descripcion !== '' ? $etiqueta.' — '.$descripcion : $etiqueta,
+            0,
+            255,
+        );
     }
 
     /**

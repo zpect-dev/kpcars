@@ -23,7 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'vehiculo_id', 'conductor_id', 'patente', 'jurisdiccion', 'clave', 'acta', 'motivo', 'monto',
     'fecha_infraccion', 'fecha_emision', 'fecha_vencimiento',
     'estado', 'vista_primera_en', 'vista_ultima_en', 'resuelta_en', 'snapshot_fecha', 'raw',
-    'cobrado', 'cobrada_en', 'monto_cobrado',
+    'cobrado', 'cobrada_en', 'monto_cobrado', 'sync_run_id', 'resuelta_run_id',
 ])]
 class Acta extends Model
 {
@@ -58,6 +58,12 @@ class Acta extends Model
     public function pagos(): HasMany
     {
         return $this->hasMany(ActaPago::class)->orderByDesc('fecha')->orderByDesc('id');
+    }
+
+    /** Corrida de sincronización que dio de alta el acta. */
+    public function syncRun(): BelongsTo
+    {
+        return $this->belongsTo(MultaSyncRun::class, 'sync_run_id');
     }
 
     /**

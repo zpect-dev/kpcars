@@ -60,6 +60,19 @@ class CierreGasto extends Model
     }
 
     /**
+     * Período de caja chica congelado junto con este cierre.
+     *
+     * La caja chica es única para todas las empresas y la cierra el cierre de la
+     * última empresa de la vuelta, así que sólo el cierre de gastos hijo de ESE
+     * cierre de caja la trae; los de las demás empresas devuelven null (y los
+     * cierres legacy, anteriores a la caja chica, también).
+     */
+    public function cajaChica(): ?PeriodoCajaChica
+    {
+        return $this->cierreCaja?->periodoCajaChica;
+    }
+
+    /**
      * Desglose del cierre derivado de sus gastos (sin tablas auxiliares):
      *  - porTipo: subtotal por categoría (excluye 'vehiculo'), ordenado por tipo.
      *  - porVehiculo: subtotal por patente para los gastos de tipo 'vehiculo'.

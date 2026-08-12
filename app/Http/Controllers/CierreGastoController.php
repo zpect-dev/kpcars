@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\CajaChicaMovimiento;
 use App\Models\CierreGasto;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -43,6 +44,40 @@ class CierreGastoController extends Controller
             ],
             'porTipo' => $porTipo,
             'porVehiculo' => $porVehiculo,
+            'cajaChica' => $this->cajaChica($cierreGasto),
         ]);
+    }
+
+    /**
+     * Caja chica del período congelado por este cierre. Null cuando el cierre no
+     * es el que cerró la caja (ver {@see CierreGasto::cajaChica()}).
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function cajaChica(CierreGasto $cierreGasto): ?array
+    {
+        $periodo = $cierreGasto->cajaChica();
+
+        if ($periodo === null) {
+            return null;
+        }
+
+        $movimientos = $periodo->movimientos()
+            ->with('registradoPor:id,name')
+            ->ordenExtracto()
+            ->get();
+
+        return [
+            ...$periodo->totales(),
+            'cerrado_at' => $periodo->cerrado_at?->toIso8601String(),
+            'movimientos' => $movimientos->map(fn (CajaChicaMovimiento $m) => [
+                'id' => $m->id,
+                'tipo_label' => $m->tipo->label(),
+                'monto' => (float) $m->monto,
+                'fecha' => $m->fecha?->format('Y-m-d'),
+                'nota' => $m->nota,
+                'registrado_por' => $m->registradoPor?->name,
+            ])->values(),
+        ];
     }
 }

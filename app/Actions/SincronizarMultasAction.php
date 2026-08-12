@@ -43,7 +43,11 @@ class SincronizarMultasAction
      * se pisen, deja registro en `multa_sync_runs` del resultado o del error, y
      * relanza la excepción para que el llamador la muestre.
      *
-     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,snapshot:?string,locked:bool}
+     * La fila de la corrida se crea ANTES de procesar (en estado no-ok) porque
+     * cada acta guarda de qué corrida vino: recién con el id a mano se puede
+     * sellar el alta. Al terminar se completa con los totales del reporte.
+     *
+     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,monto_nuevas:float,monto_resueltas:float,deuda_vigente:float,snapshot:?string,locked:bool,run_id:?int}
      */
     public function fetch(?string $url = null, string $origen = 'manual'): array
     {
@@ -52,10 +56,16 @@ class SincronizarMultasAction
         $lock = Cache::lock('multas:sincronizar', 120);
 
         if (! $lock->get()) {
-            return ['procesadas' => 0, 'nuevas' => 0, 'resueltas' => 0, 'reabiertas' => 0, 'snapshot' => null, 'locked' => true];
+            return [
+                'procesadas' => 0, 'nuevas' => 0, 'resueltas' => 0, 'reabiertas' => 0,
+                'monto_nuevas' => 0.0, 'monto_resueltas' => 0.0, 'deuda_vigente' => 0.0,
+                'snapshot' => null, 'locked' => true, 'run_id' => null,
+            ];
         }
 
         $inicio = hrtime(true);
+
+        $run = MultaSyncRun::create(['origen' => $origen, 'ok' => false]);
 
         try {
             $request = Http::timeout(30)->retry(2, 500);
@@ -67,23 +77,24 @@ class SincronizarMultasAction
             $response = $request->get($url);
             $response->throw();
 
-            $r = $this->execute((array) $response->json());
+            $r = $this->execute((array) $response->json(), $run->id);
 
-            MultaSyncRun::create([
-                'origen' => $origen,
+            $run->update([
                 'ok' => true,
                 'snapshot_fecha' => $r['snapshot'],
                 'procesadas' => $r['procesadas'],
                 'nuevas' => $r['nuevas'],
                 'resueltas' => $r['resueltas'],
                 'reabiertas' => $r['reabiertas'],
+                'monto_nuevas' => $r['monto_nuevas'],
+                'monto_resueltas' => $r['monto_resueltas'],
+                'deuda_vigente' => $r['deuda_vigente'],
                 'duracion_ms' => $this->transcurridoMs($inicio),
             ]);
 
-            return $r + ['locked' => false];
+            return $r + ['locked' => false, 'run_id' => $run->id];
         } catch (\Throwable $e) {
-            MultaSyncRun::create([
-                'origen' => $origen,
+            $run->update([
                 'ok' => false,
                 'duracion_ms' => $this->transcurridoMs($inicio),
                 'error' => mb_substr($e->getMessage(), 0, 1000),
@@ -108,14 +119,19 @@ class SincronizarMultasAction
      * poder testear sin red).
      *
      * @param  array<int,array<string,mixed>>  $snapshots
-     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,snapshot:?string}
+     * @param  int|null  $runId  Corrida a la que se imputan las altas y las resoluciones.
+     * @return array{procesadas:int,nuevas:int,resueltas:int,reabiertas:int,monto_nuevas:float,monto_resueltas:float,deuda_vigente:float,snapshot:?string}
      */
-    public function execute(array $snapshots): array
+    public function execute(array $snapshots, ?int $runId = null): array
     {
         $snapshot = $this->snapshotMasReciente($snapshots);
 
         if ($snapshot === null) {
-            return ['procesadas' => 0, 'nuevas' => 0, 'resueltas' => 0, 'reabiertas' => 0, 'snapshot' => null];
+            return [
+                'procesadas' => 0, 'nuevas' => 0, 'resueltas' => 0, 'reabiertas' => 0,
+                'monto_nuevas' => 0.0, 'monto_resueltas' => 0.0,
+                'deuda_vigente' => $this->deudaVigente(), 'snapshot' => null,
+            ];
         }
 
         $snapFecha = $this->parseFecha($snapshot['fecha'] ?? null) ?? Carbon::today();
@@ -155,12 +171,13 @@ class SincronizarMultasAction
         // Todo en una transacción: ingesta + marcado de resueltas. Si algo falla,
         // no queda a medias (nuevas commiteadas sin resolver las que se pagaron).
         return DB::transaction(function () use (
-            $snapshot, $snapFecha, $vehiculos, $asignaciones, $patentesPresentes, $existentes,
+            $snapshot, $snapFecha, $vehiculos, $asignaciones, $patentesPresentes, $existentes, $runId,
         ) {
             $clavesVistas = [];   // claves de infracción vistas en este snapshot
             $nuevas = 0;
             $reabiertas = 0;
             $procesadas = 0;
+            $montoNuevas = 0.0;   // plata que suman las altas de esta corrida
 
             foreach ($snapshot['busquedas'] ?? [] as $busqueda) {
                 $patente = strtoupper(trim((string) ($busqueda['busqueda'] ?? '')));
@@ -213,6 +230,9 @@ class SincronizarMultasAction
                             'fecha_vencimiento' => $this->parseFecha($item['fechaVencimiento'] ?? null),
                             'estado' => ActaEstado::Vigente->value,
                             'resuelta_en' => null,
+                            // Se reabre: deja de pertenecer al reporte que la dio
+                            // por pagada.
+                            'resuelta_run_id' => null,
                             'vista_ultima_en' => $snapFecha,
                             'snapshot_fecha' => $snapFecha,
                             'raw' => $item,
@@ -220,7 +240,10 @@ class SincronizarMultasAction
 
                         if ($esNueva) {
                             $acta->vista_primera_en = $snapFecha;
+                            // Corrida del alta: no cambia si después se reabre.
+                            $acta->sync_run_id = $runId;
                             $nuevas++;
+                            $montoNuevas += (float) ($acta->monto ?? 0);
                         } elseif ($eraResuelta) {
                             // La infracción había desaparecido y volvió: se reabre.
                             $reabiertas++;
@@ -239,16 +262,23 @@ class SincronizarMultasAction
             // pero cuya clave NO apareció. Si la patente no vino (búsqueda caída),
             // sus actas quedan intactas para no dar falsos pagos.
             $resueltas = 0;
+            $montoResueltas = 0.0;
 
             if ($patentesPresentes !== []) {
-                $resueltas = Acta::query()
+                $porResolver = fn () => Acta::query()
                     ->where('estado', ActaEstado::Vigente->value)
                     ->whereIn('patente', array_keys($patentesPresentes))
-                    ->when($clavesVistas !== [], fn ($q) => $q->whereNotIn('clave', array_keys($clavesVistas)))
-                    ->update([
-                        'estado' => ActaEstado::Resuelta->value,
-                        'resuelta_en' => $snapFecha,
-                    ]);
+                    ->when($clavesVistas !== [], fn ($q) => $q->whereNotIn('clave', array_keys($clavesVistas)));
+
+                // El monto se suma ANTES del update: después ya no se distinguen
+                // de las resueltas de corridas anteriores.
+                $montoResueltas = (float) $porResolver()->sum('monto');
+
+                $resueltas = $porResolver()->update([
+                    'estado' => ActaEstado::Resuelta->value,
+                    'resuelta_en' => $snapFecha,
+                    'resuelta_run_id' => $runId,
+                ]);
             }
 
             return [
@@ -256,9 +286,18 @@ class SincronizarMultasAction
                 'nuevas' => $nuevas,
                 'resueltas' => $resueltas,
                 'reabiertas' => $reabiertas,
+                'monto_nuevas' => round($montoNuevas, 2),
+                'monto_resueltas' => round($montoResueltas, 2),
+                'deuda_vigente' => $this->deudaVigente(),
                 'snapshot' => $snapFecha->toDateString(),
             ];
         });
+    }
+
+    /** Deuda total de las actas vigentes (mismo total que muestra la vista). */
+    private function deudaVigente(): float
+    {
+        return round((float) Acta::query()->where('estado', ActaEstado::Vigente->value)->sum('monto'), 2);
     }
 
     /**

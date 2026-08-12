@@ -192,7 +192,13 @@ class PdfController extends Controller
 
         $cierre = $cierreGasto;
 
-        $pdf = Pdf::loadView('pdf.cierre-gasto', compact('cierre', 'porTipo', 'porVehiculo'))
+        // Caja chica del período que este cierre congeló (null si no es el que
+        // la cerró, o si el cierre es anterior a la caja chica).
+        $cajaChica = $cierreGasto->cajaChica();
+        $cajaMovimientos = $cajaChica?->movimientos()->with('registradoPor:id,name')->ordenExtracto()->get();
+        $cajaTotales = $cajaChica?->totales();
+
+        $pdf = Pdf::loadView('pdf.cierre-gasto', compact('cierre', 'porTipo', 'porVehiculo', 'cajaChica', 'cajaMovimientos', 'cajaTotales'))
             ->setPaper('a4', 'portrait');
 
         return $pdf->download('cierre-gastos-'.$cierre->id.'-'.$cierre->periodo_fin->format('Y-m-d').'.pdf');

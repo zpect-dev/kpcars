@@ -6,8 +6,10 @@ namespace App\Http\Controllers;
 
 use App\Actions\CreateGastoAction;
 use App\Models\AperturaCaja;
+use App\Models\CajaChicaMovimiento;
 use App\Models\Empresa;
 use App\Models\Gasto;
+use App\Models\PeriodoCajaChica;
 use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
@@ -21,6 +23,9 @@ use Inertia\Response;
 
 class GastoController extends Controller
 {
+    /** Movimientos de caja chica que se mandan a la vista como extracto. */
+    private const CAJA_CHICA_EXTRACTO = 50;
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Gasto::class);
@@ -151,8 +156,60 @@ class GastoController extends Controller
             'ultimosGlobales' => $ultimosGlobales,
             'cards' => $cards,
             'patentes' => $patentes,
+            'cajaChica' => $this->cajaChica(),
             'canManage' => $request->user()->isAdmin(),
         ]);
+    }
+
+    /**
+     * Caja chica del período abierto: fondo único y global (no depende de la
+     * empresa activa) que vive mientras haya alguna empresa con período de caja
+     * abierto. El saldo es la suma del libro del período y el extracto son sus
+     * últimos movimientos, con el gasto que originó cada descuento automático.
+     *
+     * Sin período abierto no hay caja: saldo cero y extracto vacío (el período
+     * anterior quedó congelado en su cierre de gastos).
+     *
+     * @return array{periodo_abierto: bool, saldo: float, ingresos: float, egresos: float, movimientos: \Illuminate\Support\Collection<int, array<string, mixed>>}
+     */
+    protected function cajaChica(): array
+    {
+        $periodo = PeriodoCajaChica::actual();
+
+        if ($periodo === null) {
+            return [
+                'periodo_abierto' => false,
+                'saldo' => 0.0,
+                'ingresos' => 0.0,
+                'egresos' => 0.0,
+                'movimientos' => collect(),
+            ];
+        }
+
+        $movimientos = $periodo->movimientos()
+            ->with(['registradoPor:id,name', 'reversion:id,revierte_id'])
+            ->orderByDesc('fecha')
+            ->orderByDesc('id')
+            ->limit(self::CAJA_CHICA_EXTRACTO)
+            ->get();
+
+        return [
+            'periodo_abierto' => true,
+            ...$periodo->totales(),
+            'movimientos' => $movimientos->map(fn (CajaChicaMovimiento $m) => [
+                'id' => $m->id,
+                'tipo' => $m->tipo->value,
+                'tipo_label' => $m->tipo->label(),
+                'monto' => (float) $m->monto,
+                'fecha' => $m->fecha?->format('Y-m-d'),
+                'nota' => $m->nota,
+                'gasto_id' => $m->gasto_id,
+                // Un contraasiento no se revierte, y uno ya revertido tampoco.
+                'es_contraasiento' => $m->revierte_id !== null,
+                'revertido' => $m->reversion !== null,
+                'registrado_por' => $m->registradoPor?->name,
+            ])->values(),
+        ];
     }
 
     public function store(Request $request, CreateGastoAction $action): RedirectResponse

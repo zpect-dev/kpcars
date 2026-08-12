@@ -10,6 +10,7 @@ use App\Models\CierreDetalle;
 use App\Models\CierreGasto;
 use App\Models\Cobro;
 use App\Models\Gasto;
+use App\Models\PeriodoCajaChica;
 use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
@@ -160,6 +161,36 @@ class ProcessCierreCajaAction
         // Cerrar la apertura si la había: el período queda congelado.
         $apertura?->update(['cierre_id' => $cierre->id]);
 
+        $this->cerrarCajaChicaSiCorresponde($cierre, $user);
+
         return $cierre;
+    }
+
+    /**
+     * La caja chica es única para todas las empresas, así que vive mientras
+     * quede alguna empresa con período de caja abierto. La cierra el cierre de
+     * la última: en el cierre unificado, el de la última empresa de la vuelta.
+     *
+     * El período cerrado queda congelado y el siguiente arranca en cero: el
+     * saldo no se arrastra.
+     */
+    protected function cerrarCajaChicaSiCorresponde(CierreCaja $cierre, User $user): void
+    {
+        $quedanAbiertas = AperturaCaja::withoutGlobalScope(TenantScope::class)
+            ->whereNull('cierre_id')
+            ->exists();
+
+        if ($quedanAbiertas) {
+            return;
+        }
+
+        PeriodoCajaChica::abierto()
+            ->lockForUpdate()
+            ->get()
+            ->each(fn (PeriodoCajaChica $periodo) => $periodo->update([
+                'cerrado_at' => now(),
+                'cerrado_por' => $user->id,
+                'cierre_caja_id' => $cierre->id,
+            ]));
     }
 }
