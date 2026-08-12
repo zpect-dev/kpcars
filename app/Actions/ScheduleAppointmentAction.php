@@ -20,10 +20,18 @@ class ScheduleAppointmentAction
      * - Turnos "normal": máximo MAX_NORMAL_SLOTS por día. Si el día está
      *   lleno se lanza una RuntimeException (no se desplaza).
      * - Turnos "emergencia": cupos ilimitados, se insertan directamente.
-     * - Domingos y miércoles bloqueados para ambos tipos.
+     * - Domingos bloqueados para todos.
+     * - Miércoles bloqueados salvo que quien agenda sea administrativo o
+     *   administrador ($allowWednesday): el taller no toma turnos ese día, pero
+     *   la administración sí puede meter uno a mano.
      *
      * Todo el proceso corre dentro de una transacción con bloqueo pesimista
      * (lockForUpdate) para evitar sobreasignación concurrente.
+     *
+     * @param  bool  $allowWednesday  Levanta el bloqueo del miércoles. Sólo lo
+     *                                pasa en true el alta web de administrativo
+     *                                o administrador; la app del chofer y la API
+     *                                externa siguen sin poder.
      *
      * @throws RuntimeException Si no hay cupos o la fecha es domingo o miércoles.
      */
@@ -33,15 +41,16 @@ class ScheduleAppointmentAction
         ?int $conductorId,
         Carbon $preferredDate,
         string $type = 'normal',
+        bool $allowWednesday = false,
     ): Appointment {
-        return DB::transaction(function () use ($service, $plate, $conductorId, $preferredDate, $type) {
+        return DB::transaction(function () use ($service, $plate, $conductorId, $preferredDate, $type, $allowWednesday) {
             $requestedDate = $preferredDate->copy()->startOfDay();
 
             if ($requestedDate->isSunday()) {
                 throw new RuntimeException('El taller no atiende los días domingo. Por favor seleccione otro día.');
             }
 
-            if ($requestedDate->isWednesday()) {
+            if ($requestedDate->isWednesday() && ! $allowWednesday) {
                 throw new RuntimeException('No se asignan turnos los días miércoles. Por favor seleccione otro día.');
             }
 

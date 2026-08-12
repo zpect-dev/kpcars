@@ -17,6 +17,11 @@ interface AppointmentCalendarProps {
     viewMode?: 'month' | 'week';
     /** Muestra la leyenda de cupos. Off para filtros ajenos a turnos (ej. Historial). */
     showLegend?: boolean;
+    /**
+     * Habilita los miércoles, que por defecto están bloqueados. Sólo lo activa
+     * el alta de turnos de administrativo/administrador.
+     */
+    allowWednesday?: boolean;
 }
 
 export function AppointmentCalendar({
@@ -33,6 +38,7 @@ export function AppointmentCalendar({
     isFilterMode = false,
     viewMode = 'month',
     showLegend = true,
+    allowWednesday = false,
 }: AppointmentCalendarProps) {
     // Current month/year being viewed
     const [viewDate, setViewDate] = useState(() => {
@@ -178,7 +184,8 @@ export function AppointmentCalendar({
                         
                         // State checks
                         const isPast = minDateObj ? date < minDateObj : false;
-                        const isWednesday = date.getDay() === 3;
+                        // Miércoles cerrado, salvo que quien agenda tenga permiso.
+                        const isWednesday = date.getDay() === 3 && !allowWednesday;
                         const slotsUsed = dailySlots ? (dailySlots[dateStr] ?? 0) : 0;
                         const isFull = maxSlots !== undefined ? slotsUsed >= maxSlots : false;
 

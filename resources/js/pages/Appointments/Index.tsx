@@ -81,6 +81,8 @@ interface Props {
     dailySlots: Record<string, number>;
     remainingToday: number;
     maxSlots: number;
+    /** Administrativo y administrador pueden agendar los miércoles. */
+    canScheduleWednesday: boolean;
 }
 
 // Icono + color por estado. Cada estado tiene su propio color de acento e ícono
@@ -166,6 +168,7 @@ export default function AppointmentsIndex({
     dailySlots,
     remainingToday,
     maxSlots,
+    canScheduleWednesday,
 }: Props) {
     const today = useRef(new Date().toISOString().slice(0, 10)).current;
 
@@ -460,6 +463,7 @@ export default function AppointmentsIndex({
                                                     dailySlots={dailySlots}
                                                     maxSlots={form.data.type === 'emergencia' ? 9999 : maxSlots}
                                                     viewMode="week"
+                                                    allowWednesday={canScheduleWednesday}
                                                 />
                                                 <InputError message={form.errors.preferred_date} />
                                             </div>

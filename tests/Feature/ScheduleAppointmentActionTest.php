@@ -108,6 +108,43 @@ it('rechaza miércoles para ambos tipos de turno', function (string $type) {
 })->throws(RuntimeException::class, 'No se asignan turnos los días miércoles.')
     ->with(['normal', 'emergencia']);
 
+it('permite miércoles cuando quien agenda tiene permiso', function (string $type) {
+    $miercoles = Carbon::parse('2026-04-22'); // Miércoles
+
+    $appointment = $this->action->execute(
+        'Servicio',
+        'WED002',
+        null,
+        $miercoles,
+        $type,
+        allowWednesday: true,
+    );
+
+    expect($appointment->scheduled_date->toDateString())->toBe('2026-04-22');
+})->with(['normal', 'emergencia']);
+
+it('el miércoles habilitado sigue respetando el cupo de turnos normales', function () {
+    $miercoles = Carbon::parse('2026-04-22');
+
+    for ($i = 0; $i < 4; $i++) {
+        Appointment::create([
+            'service' => 'Normal '.$i,
+            'license_plate' => 'WED10'.$i,
+            'scheduled_date' => $miercoles->toDateString(),
+            'type' => 'normal',
+            'status' => 'agendado',
+        ]);
+    }
+
+    $this->action->execute('Servicio', 'WED999', null, $miercoles, 'normal', allowWednesday: true);
+})->throws(RuntimeException::class, 'No hay cupos normales disponibles');
+
+it('el domingo sigue bloqueado aunque el miércoles esté habilitado', function () {
+    $domingo = Carbon::parse('2026-04-19');
+
+    $this->action->execute('Servicio', 'SUN002', null, $domingo, 'normal', allowWednesday: true);
+})->throws(RuntimeException::class, 'El taller no atiende los días domingo.');
+
 it('los turnos de emergencia no afectan el conteo de cupos normales', function () {
     $date = Carbon::parse('2026-04-21');
 

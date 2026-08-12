@@ -82,6 +82,9 @@ class AppointmentController extends Controller
             'dailySlots' => $dailySlots,
             'remainingToday' => $remainingToday,
             'maxSlots' => 4,
+            // El miércoles el taller no toma turnos, pero administrativo y
+            // administrador sí pueden agendar uno a mano.
+            'canScheduleWednesday' => $request->user()->isAdminOrAdministrativo(),
         ]);
     }
 
@@ -109,6 +112,8 @@ class AppointmentController extends Controller
                 (int) $validated['conductor_id'],
                 $preferred,
                 $validated['type'],
+                // Administrativo y administrador pueden agendar los miércoles.
+                allowWednesday: $request->user()->isAdminOrAdministrativo(),
             );
         } catch (RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
