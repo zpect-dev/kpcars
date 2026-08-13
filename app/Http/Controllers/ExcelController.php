@@ -422,7 +422,7 @@ class ExcelController extends Controller
             ->with([
                 'recaudaciones.vehiculo:id,patente,inversion_id',
                 'recaudaciones.vehiculo.inversion:id,nombre',
-                'recaudaciones.chofer:id,name',
+                'recaudaciones.chofer:id,name,dni',
             ])
             ->latest()
             ->first();
@@ -443,7 +443,7 @@ class ExcelController extends Controller
         $cierreRecaudacion->load([
             'recaudaciones.vehiculo:id,patente,inversion_id',
             'recaudaciones.vehiculo.inversion:id,nombre',
-            'recaudaciones.chofer:id,name',
+            'recaudaciones.chofer:id,name,dni',
         ]);
 
         return $this->excelRecaudaciones(
@@ -466,6 +466,7 @@ class ExcelController extends Controller
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                 'patente' => $r->vehiculo?->patente ?? 'N/A',
                 'chofer' => $r->chofer?->name ?? 'N/A',
+                'chofer_dni' => $r->chofer?->dni ?? '',
                 'efectivo' => round((float) $r->efectivo, 2),
                 'transf' => round((float) $r->transferencia, 2),
                 'total' => round((float) $r->total, 2),
@@ -475,13 +476,13 @@ class ExcelController extends Controller
             ->values();
 
         $writer = SimpleExcelWriter::streamDownload($filename);
-        $writer->addHeader(['Inversión', 'Patente', 'Chofer', 'Efectivo', 'Transferencia', 'Total', 'Estado']);
+        $writer->addHeader(['Inversión', 'Patente', 'Chofer', 'DNI', 'Efectivo', 'Transferencia', 'Total', 'Estado']);
 
         foreach ($filas as $f) {
-            $writer->addRow([$f['inversion'], $f['patente'], $f['chofer'], $f['efectivo'], $f['transf'], $f['total'], $f['estado']]);
+            $writer->addRow([$f['inversion'], $f['patente'], $f['chofer'], $f['chofer_dni'], $f['efectivo'], $f['transf'], $f['total'], $f['estado']]);
         }
 
-        $writer->addRow(['', '', 'TOTAL', $filas->sum('efectivo'), $filas->sum('transf'), $filas->sum('total'), '']);
+        $writer->addRow(['', '', '', 'TOTAL', $filas->sum('efectivo'), $filas->sum('transf'), $filas->sum('total'), '']);
 
         return $writer->toBrowser();
     }

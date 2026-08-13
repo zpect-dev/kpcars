@@ -25,12 +25,13 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width:14%">Patente</th>
-                        <th style="width:30%">Chofer</th>
-                        <th class="numeric" style="width:16%">Efectivo</th>
-                        <th class="numeric" style="width:16%">Transf.</th>
-                        <th class="numeric" style="width:16%">Total</th>
-                        <th style="width:8%">Estado</th>
+                        <th style="width:12%">Patente</th>
+                        <th style="width:24%">Chofer</th>
+                        <th style="width:12%">DNI</th>
+                        <th class="numeric" style="width:15%">Efectivo</th>
+                        <th class="numeric" style="width:15%">Transf.</th>
+                        <th class="numeric" style="width:15%">Total</th>
+                        <th style="width:7%">Estado</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -43,6 +44,7 @@
                         <tr>
                             <td>{{ $f['patente'] }}</td>
                             <td>{{ $f['chofer'] }}</td>
+                            <td>{{ $f['chofer_dni'] }}</td>
                             <td class="numeric">${{ number_format($f['efectivo'], 0, ',', '.') }}</td>
                             <td class="numeric">${{ number_format($f['transf'], 0, ',', '.') }}</td>
                             <td class="numeric">${{ number_format($f['total'], 0, ',', '.') }}</td>
@@ -50,7 +52,7 @@
                         </tr>
                     @endforeach
                     <tr class="total-row">
-                        <td colspan="2">Subtotal {{ strtolower($nombre) }}</td>
+                        <td colspan="3">Subtotal {{ strtolower($nombre) }}</td>
                         <td class="numeric">${{ number_format($subEfectivo, 0, ',', '.') }}</td>
                         <td class="numeric">${{ number_format($subTransf, 0, ',', '.') }}</td>
                         <td class="numeric">${{ number_format($subTotal, 0, ',', '.') }}</td>
@@ -63,11 +65,11 @@
         <table style="margin-top:14px">
             <tbody>
                 <tr class="total-row">
-                    <td colspan="2" style="width:44%">TOTAL GENERAL</td>
-                    <td class="numeric" style="width:16%">${{ number_format($totalEfectivo, 0, ',', '.') }}</td>
-                    <td class="numeric" style="width:16%">${{ number_format($totalTransferencia, 0, ',', '.') }}</td>
-                    <td class="numeric" style="width:16%">${{ number_format($totalGeneral, 0, ',', '.') }}</td>
-                    <td style="width:8%"></td>
+                    <td colspan="3" style="width:48%">TOTAL GENERAL</td>
+                    <td class="numeric" style="width:15%">${{ number_format($totalEfectivo, 0, ',', '.') }}</td>
+                    <td class="numeric" style="width:15%">${{ number_format($totalTransferencia, 0, ',', '.') }}</td>
+                    <td class="numeric" style="width:15%">${{ number_format($totalGeneral, 0, ',', '.') }}</td>
+                    <td style="width:7%"></td>
                 </tr>
             </tbody>
         </table>

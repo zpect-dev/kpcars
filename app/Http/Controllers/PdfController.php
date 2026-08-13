@@ -213,7 +213,7 @@ class PdfController extends Controller
             ->with([
                 'recaudaciones.vehiculo:id,patente,inversion_id',
                 'recaudaciones.vehiculo.inversion:id,nombre',
-                'recaudaciones.chofer:id,name',
+                'recaudaciones.chofer:id,name,dni',
             ])
             ->latest()
             ->first();
@@ -235,7 +235,7 @@ class PdfController extends Controller
         $cierreRecaudacion->load([
             'recaudaciones.vehiculo:id,patente,inversion_id',
             'recaudaciones.vehiculo.inversion:id,nombre',
-            'recaudaciones.chofer:id,name',
+            'recaudaciones.chofer:id,name,dni',
         ]);
 
         return $this->pdfRecaudaciones(
@@ -263,6 +263,7 @@ class PdfController extends Controller
                 'inversion' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                 'patente' => $r->vehiculo?->patente ?? 'N/A',
                 'chofer' => $r->chofer?->name ?? 'N/A',
+                'chofer_dni' => $r->chofer?->dni ?? '—',
                 'efectivo' => (float) $r->efectivo,
                 'transf' => (float) $r->transferencia,
                 'total' => (float) $r->total,

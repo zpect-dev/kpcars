@@ -1,5 +1,5 @@
 import { useForm } from '@inertiajs/react';
-import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, Phone, Mail, Wallet, X, type LucideIcon } from 'lucide-react';
+import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, IdCard, Phone, Mail, Wallet, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -826,6 +826,17 @@ function RecaudacionCard({
                                 </div>
                             </div>
                             <div className="flex flex-col gap-0 p-1">
+                                {fila.chofer_dni ? (
+                                    <div className="flex items-center gap-3 px-3 py-2 text-sm">
+                                        <IdCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <span className="tabular-nums text-foreground">{fila.chofer_dni}</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                        <IdCard className="h-4 w-4 shrink-0" />
+                                        <span className="italic">Sin DNI</span>
+                                    </div>
+                                )}
                                 {fila.chofer_telefono ? (
                                     <a href={`tel:${fila.chofer_telefono}`} className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-muted">
                                         <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -962,6 +973,17 @@ function RecaudacionRow({
                             </div>
                         </div>
                         <div className="flex flex-col gap-0 p-1">
+                            {fila.chofer_dni ? (
+                                <div className="flex items-center gap-3 px-3 py-2 text-sm">
+                                    <IdCard className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="tabular-nums text-foreground">{fila.chofer_dni}</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground/50">
+                                    <IdCard className="h-4 w-4 shrink-0" />
+                                    <span className="italic">Sin DNI</span>
+                                </div>
+                            )}
                             {fila.chofer_telefono ? (
                                 <a
                                     href={`tel:${fila.chofer_telefono}`}

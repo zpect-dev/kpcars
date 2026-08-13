@@ -40,7 +40,7 @@ class RecaudacionController extends Controller
             $apertura->load([
                 'recaudaciones.vehiculo:id,patente,inversion_id',
                 'recaudaciones.vehiculo.inversion:id,nombre',
-                'recaudaciones.chofer:id,name,correo,telefono',
+                'recaudaciones.chofer:id,name,dni,correo,telefono',
             ]);
 
             $filas = $apertura->recaudaciones
@@ -55,6 +55,7 @@ class RecaudacionController extends Controller
                         'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                         'patente' => $r->vehiculo?->patente ?? 'N/A',
                         'chofer' => $r->chofer?->name ?? 'N/A',
+                        'chofer_dni' => $r->chofer?->dni,
                         'chofer_telefono' => $r->chofer?->telefono,
                         'chofer_correo' => $r->chofer?->correo,
                         'precio' => $precio,
@@ -265,7 +266,7 @@ class RecaudacionController extends Controller
             'user:id,name',
             'recaudaciones.vehiculo:id,patente,inversion_id',
             'recaudaciones.vehiculo.inversion:id,nombre',
-            'recaudaciones.chofer:id,name',
+            'recaudaciones.chofer:id,name,dni,correo,telefono',
         ]);
 
         $filas = $cierreRecaudacion->recaudaciones
@@ -281,6 +282,9 @@ class RecaudacionController extends Controller
                     'inversion_nombre' => $r->vehiculo?->inversion?->nombre ?? 'Sin inversión',
                     'patente' => $r->vehiculo?->patente ?? 'N/A',
                     'chofer' => $r->chofer?->name ?? 'N/A',
+                    'chofer_dni' => $r->chofer?->dni,
+                    'chofer_telefono' => $r->chofer?->telefono,
+                    'chofer_correo' => $r->chofer?->correo,
                     'precio' => $precio,
                     'efectivo' => (float) $r->efectivo,
                     'transferencia' => (float) $r->transferencia,
