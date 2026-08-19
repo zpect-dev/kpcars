@@ -31,7 +31,7 @@ class RecaudacionController extends Controller
         // Apertura abierta de la empresa activa (TenantScope la scopea).
         $apertura = AperturaRecaudacion::abierta()
             ->with('user:id,name')
-            ->latest()
+            ->latest('id')
             ->first();
 
         $filas = collect();
@@ -323,8 +323,14 @@ class RecaudacionController extends Controller
         $this->authorize('manage-recaudaciones');
 
         // La fila ya existe congelada desde la apertura; si no hay período abierto
-        // o el vehículo no entró en la foto, no se puede cargar.
-        $recaudacion = Recaudacion::abiertas()
+        // o el vehículo no entró en la foto, no se puede cargar. Se escribe en la
+        // fila de la MISMA apertura que muestra el listado (la última abierta):
+        // si quedó alguna apertura vieja sin cerrar, sin este filtro se guardaba
+        // en la fila invisible y la tabla parecía no registrar nada.
+        $apertura = AperturaRecaudacion::abierta()->latest('id')->first();
+
+        $recaudacion = $apertura === null ? null : Recaudacion::abiertas()
+            ->where('apertura_id', $apertura->id)
             ->where('vehiculo_id', $vehiculo->id)
             ->first();
 
