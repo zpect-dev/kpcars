@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\BuildResumenIntegradoAction;
+use App\Actions\BuildServiceListadoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
 use App\Models\AperturaRecaudacion;
@@ -21,6 +22,7 @@ use App\Models\Gasto;
 use App\Models\Recaudacion;
 use App\Models\Scopes\GastoTenantScope;
 use App\Models\Scopes\TenantScope;
+use App\Models\Service;
 use App\Models\Transaccion;
 use App\Models\Vehiculo;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -479,6 +481,27 @@ class PdfController extends Controller
             ->setPaper('a4', 'landscape');
 
         return $pdf->download('turnos-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * PDF del panel de Service: cada patente con su kilometraje actual y su
+     * último service. Respeta los filtros de búsqueda y estado de la vista.
+     */
+    public function services(Request $request, BuildServiceListadoAction $action): Response
+    {
+        // Acceso: middleware role:administrador,administrativo,mecanico.
+        $filtros = [
+            'q' => $request->query('q'),
+            'estado' => $request->query('estado'),
+        ];
+
+        $vehiculos = $action->execute($filtros);
+        $intervaloKm = Service::INTERVALO_KM;
+
+        $pdf = Pdf::loadView('pdf.services', compact('vehiculos', 'filtros', 'intervaloKm'))
+            ->setPaper('a4', 'landscape');
+
+        return $pdf->download('service-'.now()->format('Y-m-d').'.pdf');
     }
 
     /**

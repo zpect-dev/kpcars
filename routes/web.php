@@ -80,6 +80,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // PDFs de inventario/turnos
         Route::get('pdf/stock', [PdfController::class, 'stock'])->name('pdf.stock');
         Route::get('pdf/appointments', [PdfController::class, 'appointments'])->name('pdf.appointments');
+
+        // Exportaciones del panel de Service (kilometraje y último service)
+        Route::get('pdf/services', [PdfController::class, 'services'])->name('pdf.services');
+        Route::get('excel/services', [ExcelController::class, 'services'])->name('excel.services');
     });
 
     // ─────────────────────────────────────────────────────────────────────

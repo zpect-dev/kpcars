@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\AplicarSeleccionResumenAction;
 use App\Actions\BuildResumenIntegradoAction;
+use App\Actions\BuildServiceListadoAction;
 use App\Actions\CalcularResumenAction;
 use App\Http\Requests\ResumenFiltrosRequest;
 use App\Models\AperturaRecaudacion;
@@ -17,6 +18,7 @@ use App\Models\CierreSueldoPago;
 use App\Models\Cobro;
 use App\Models\Gasto;
 use App\Models\Recaudacion;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -25,6 +27,14 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExcelController extends Controller
 {
+    /** Etiquetas legibles del estado de service (mismas que la pantalla). */
+    private const ESTADO_SERVICE_LABEL = [
+        'vencido' => 'Service vencido',
+        'al_dia' => 'Al día',
+        'sin_service' => 'Sin service',
+        'sin_km' => 'Sin datos',
+    ];
+
     /**
      * Excel del Resumen financiero: mismos filtros y misma Action que la
      * vista (las cifras exportadas nunca divergen de la pantalla).
@@ -520,6 +530,46 @@ class ExcelController extends Controller
         }
 
         $writer->addRow(['', '', 'TOTAL', $filas->sum('descuento'), '', '']);
+
+        return $writer->toBrowser();
+    }
+
+    /**
+     * Excel del panel de Service: cada patente con su kilometraje actual y su
+     * último service. Misma Action que la pantalla, mismos filtros.
+     */
+    public function services(Request $request, BuildServiceListadoAction $action): StreamedResponse
+    {
+        // Acceso: middleware role:administrador,administrativo,mecanico.
+        $vehiculos = $action->execute([
+            'q' => $request->query('q'),
+            'estado' => $request->query('estado'),
+        ]);
+
+        $writer = SimpleExcelWriter::streamDownload('service-'.now()->format('Y-m-d').'.xlsx');
+        $writer->addHeader([
+            'Patente', 'Marca', 'Modelo', 'Año', 'Empresa', 'Conductor',
+            'Km actual', 'Último service (km)', 'Último service (fecha)', 'Realizado por',
+            'Km recorridos', 'Km restantes', 'Estado',
+        ]);
+
+        foreach ($vehiculos as $v) {
+            $writer->addRow([
+                $v['patente'],
+                $v['marca'],
+                $v['modelo'],
+                $v['anio'],
+                $v['empresa'] ?? '',
+                $v['conductor'] ?? 'Sin conductor',
+                $v['km_actual'] ?? '',
+                $v['ultimo_service']['kilometraje'] ?? '',
+                isset($v['ultimo_service']) ? Carbon::parse($v['ultimo_service']['fecha'])->format('d/m/Y') : '',
+                $v['ultimo_service']['realizado_por'] ?? '',
+                $v['km_recorridos'] ?? '',
+                $v['km_restantes'] ?? '',
+                self::ESTADO_SERVICE_LABEL[$v['estado']] ?? $v['estado'],
+            ]);
+        }
 
         return $writer->toBrowser();
     }
