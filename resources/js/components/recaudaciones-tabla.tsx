@@ -1,6 +1,7 @@
 import { useForm } from '@inertiajs/react';
 import { ArrowLeftRight, Banknote, Check, Search, TrendingUp, Users, AlertCircle, ChevronUp, ChevronDown, ChevronsUpDown, IdCard, Phone, Mail, Wallet, X, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -387,7 +388,13 @@ function useRecaudacionForm(fila: RecaudacionFila, endpoint: (fila: RecaudacionF
     const deuda         = Math.max(precioEfectivo - total, 0);
 
     function save() {
-        if (excede) return;
+        // Sin aviso el usuario no entiende por qué el guardado no hace nada.
+        if (excede) {
+            toast.error(`${fila.patente}: el total supera el precio menos el descuento (${formatARS(precioEfectivo)}).`);
+
+            return;
+        }
+
         form.transform((data) => ({
             efectivo:      parseFloat(data.efectivo)      || 0,
             transferencia: parseFloat(data.transferencia) || 0,

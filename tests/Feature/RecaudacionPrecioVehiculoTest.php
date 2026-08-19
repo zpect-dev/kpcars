@@ -112,6 +112,24 @@ it('sincroniza el precio de las filas abiertas al listar recaudaciones', functio
     expect((float) Recaudacion::first()->precio)->toBe(150000.0);
 });
 
+it('guarda en la fila de la apertura que muestra el listado, no en una apertura vieja sin cerrar', function () {
+    $vieja = precioApertura(100000);
+    $nueva = precioApertura(100000);
+
+    $this->patch("/recaudaciones/{$this->vehiculo->id}", [
+        'efectivo' => 50000,
+        'transferencia' => 0,
+        'descuento' => 0,
+        'descripcion' => '',
+    ])->assertSessionHasNoErrors();
+
+    $filaVieja = Recaudacion::where('apertura_id', $vieja->id)->first();
+    $filaNueva = Recaudacion::where('apertura_id', $nueva->id)->first();
+
+    expect((float) $filaNueva->total)->toBe(50000.0)
+        ->and((float) $filaVieja->total)->toBe(0.0);
+});
+
 it('no toca el precio congelado de las recaudaciones ya cerradas', function () {
     $apertura = precioApertura(100000);
 
