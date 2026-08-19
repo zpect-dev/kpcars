@@ -2,6 +2,9 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     CheckCircle2,
+    ChevronDown,
+    Download,
+    FileSpreadsheet,
     Gauge,
     HelpCircle,
     History,
@@ -21,6 +24,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -223,6 +232,23 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
         });
     }, [vehiculos, search, filterEstado]);
 
+    /** Los exportes salen con los mismos filtros que se ven en pantalla. */
+    function exportQuery(): string {
+        const params = new URLSearchParams();
+
+        if (search.trim()) {
+            params.set('q', search.trim());
+        }
+
+        if (filterEstado !== 'all') {
+            params.set('estado', filterEstado);
+        }
+
+        const qs = params.toString();
+
+        return qs ? `?${qs}` : '';
+    }
+
     const counts = useMemo(
         () => ({
             all: vehiculos.length,
@@ -241,10 +267,48 @@ export default function ServiceIndex({ vehiculos, intervaloKm }: Props) {
 
             <div className="flex h-full flex-1 flex-col gap-4 p-4">
                 {/* Header */}
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                     <h1 className="text-lg font-semibold text-foreground sm:text-xl">
                         Service
                     </h1>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={filtered.length === 0}
+                            >
+                                <Download className="mr-1.5 h-4 w-4" />
+                                Exportar
+                                <ChevronDown className="ml-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    window.open(
+                                        '/pdf/services' + exportQuery(),
+                                        '_blank',
+                                    )
+                                }
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                PDF (según filtros)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onClick={() =>
+                                    window.open(
+                                        '/excel/services' + exportQuery(),
+                                        '_blank',
+                                    )
+                                }
+                            >
+                                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                                Excel (según filtros)
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
 
                 {/* Filtros */}

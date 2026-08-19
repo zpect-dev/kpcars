@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\BuildServiceListadoAction;
 use App\Models\KilometrajeLectura;
-use App\Models\Revision;
 use App\Models\Scopes\TenantScope;
 use App\Models\Service;
 use App\Models\Vehiculo;
@@ -20,94 +20,13 @@ class ServiceController extends Controller
      * Panel de service: lista global de vehículos con el km de su último
      * service comparado contra el km más reciente de las revisiones.
      */
-    public function index(Request $request): Response
+    public function index(Request $request, BuildServiceListadoAction $action): Response
     {
         $this->authorize('view-service');
 
-        // Service es global: todos los carros de todas las empresas.
-        // Se excluye el vehículo sintético "EXTERNO" (no es un carro real).
-        $vehiculos = Vehiculo::withoutGlobalScope(TenantScope::class)
-            ->with(['user:id,name', 'inversion:id,nombre', 'empresa:id,nombre', 'services.realizadoPor:id,name'])
-            ->where('patente', '!=', 'EXTERNO')
-            ->orderBy('patente')
-            ->get();
-
-        $vehiculoIds = $vehiculos->pluck('id');
-
-        // Km más reciente de las revisiones por vehículo (cerrada o no).
-        $ultimaRevision = Revision::select('vehiculo_id', 'kilometraje', 'created_at')
-            ->whereIn('vehiculo_id', $vehiculoIds)
-            ->orderByDesc('created_at')
-            ->get()
-            ->groupBy('vehiculo_id');
-
-        // Última lectura de kilometraje cargada manualmente por vehículo.
-        $ultimaLectura = KilometrajeLectura::select('vehiculo_id', 'kilometraje', 'fecha')
-            ->whereIn('vehiculo_id', $vehiculoIds)
-            ->orderByDesc('fecha')
-            ->orderByDesc('id')
-            ->get()
-            ->groupBy('vehiculo_id');
-
-        $payload = $vehiculos->map(function (Vehiculo $vehiculo) use ($ultimaRevision, $ultimaLectura): array {
-            // Km actual = la lectura más reciente por fecha entre la última
-            // revisión y la última carga manual. En empate de fecha, el mayor km.
-            $candidatos = [];
-            if ($rev = $ultimaRevision->get($vehiculo->id)?->first()) {
-                $candidatos[] = ['fecha' => $rev->created_at->toDateString(), 'km' => (int) $rev->kilometraje];
-            }
-            if ($lec = $ultimaLectura->get($vehiculo->id)?->first()) {
-                $candidatos[] = ['fecha' => $lec->fecha->toDateString(), 'km' => (int) $lec->kilometraje];
-            }
-
-            usort($candidatos, fn ($a, $b) => $a['fecha'] <=> $b['fecha'] ?: $a['km'] <=> $b['km']);
-            $kmActual = $candidatos ? end($candidatos)['km'] : null;
-
-            $ultimoService = $vehiculo->services->first(); // ya ordenado desc por la relación
-
-            $kmRecorridos = null;
-            $kmRestantes = null;
-            $estado = 'sin_km';
-
-            if ($kmActual === null) {
-                $estado = 'sin_km';
-            } elseif ($ultimoService === null) {
-                $estado = 'sin_service';
-            } else {
-                $kmRecorridos = max(0, $kmActual - $ultimoService->kilometraje);
-                $kmRestantes = max(0, Service::INTERVALO_KM - $kmRecorridos);
-                $estado = $kmRecorridos >= Service::INTERVALO_KM ? 'vencido' : 'al_dia';
-            }
-
-            return [
-                'id' => $vehiculo->id,
-                'patente' => $vehiculo->patente,
-                'marca' => $vehiculo->marca,
-                'modelo' => $vehiculo->modelo,
-                'anio' => $vehiculo->anio,
-                'empresa' => $vehiculo->empresa?->nombre,
-                'inversion' => $vehiculo->inversion?->nombre,
-                'conductor' => $vehiculo->user?->name,
-                'km_actual' => $kmActual,
-                'ultimo_service' => $ultimoService ? [
-                    'kilometraje' => $ultimoService->kilometraje,
-                    'fecha' => $ultimoService->fecha->toDateString(),
-                    'realizado_por' => $ultimoService->realizadoPor?->name,
-                ] : null,
-                'km_recorridos' => $kmRecorridos,
-                'km_restantes' => $kmRestantes,
-                'estado' => $estado,
-                'historial' => $vehiculo->services->map(fn (Service $s) => [
-                    'id' => $s->id,
-                    'kilometraje' => $s->kilometraje,
-                    'fecha' => $s->fecha->toDateString(),
-                    'realizado_por' => $s->realizadoPor?->name,
-                ])->values(),
-            ];
-        });
-
+        // Sin filtros: la pantalla busca y filtra del lado del cliente.
         return Inertia::render('Service/Index', [
-            'vehiculos' => $payload,
+            'vehiculos' => $action->execute(),
             'intervaloKm' => Service::INTERVALO_KM,
         ]);
     }
