@@ -37,6 +37,11 @@ class RecaudacionController extends Controller
         $filas = collect();
 
         if ($apertura !== null) {
+            // Mientras el período está abierto el precio de referencia es el
+            // actual del vehículo: se sincroniza la fila antes de mostrarla para
+            // que tabla, exportaciones y validaciones usen el mismo importe.
+            $this->sincronizarPreciosAbiertos($apertura->id);
+
             $apertura->load([
                 'recaudaciones.vehiculo:id,patente,inversion_id',
                 'recaudaciones.vehiculo.inversion:id,nombre',
@@ -336,14 +341,19 @@ class RecaudacionController extends Controller
         $descuento = (float) $validated['descuento'];
         $total = $efectivo + $transferencia;
 
-        // Se usa el precio congelado en la fila, no el actual del vehículo.
-        $this->assertNoSupera($total, (float) $recaudacion->precio, $descuento);
+        // El tope es el precio actual del vehículo (columna `precio` de
+        // `vehiculos`), no el congelado al abrir el período. Se persiste en la
+        // fila para que el historial quede con el precio realmente aplicado.
+        $precio = (float) $vehiculo->precio;
+
+        $this->assertNoSupera($total, $precio, $descuento);
 
         $recaudacion->update([
             'efectivo' => $efectivo,
             'transferencia' => $transferencia,
             'total' => $total,
             'descuento' => $descuento,
+            'precio' => $precio,
             'descripcion' => $validated['descripcion'] ?? null,
         ]);
 
@@ -365,13 +375,21 @@ class RecaudacionController extends Controller
         $descuento = (float) $validated['descuento'];
         $total = $efectivo + $transferencia;
 
-        $this->assertNoSupera($total, (float) $recaudacion->precio, $descuento);
+        // Período abierto: tope = precio actual del vehículo, y se persiste.
+        // Cierre ya hecho: se respeta el precio congelado del registro.
+        $abierta = $recaudacion->cierre_id === null;
+        $precio = $abierta
+            ? (float) ($recaudacion->vehiculo?->precio ?? $recaudacion->precio)
+            : (float) $recaudacion->precio;
+
+        $this->assertNoSupera($total, $precio, $descuento);
 
         $recaudacion->update([
             'efectivo' => $efectivo,
             'transferencia' => $transferencia,
             'total' => $total,
             'descuento' => $descuento,
+            'precio' => $precio,
             'descripcion' => $validated['descripcion'] ?? null,
         ]);
 
@@ -412,6 +430,32 @@ class RecaudacionController extends Controller
             'descuento' => ['required', 'numeric', 'min:0'],
             'descripcion' => ['nullable', 'string', 'max:1000'],
         ]);
+    }
+
+    /**
+     * Alinea el precio de las filas del período abierto con el precio actual
+     * de cada vehículo (`vehiculos.precio`). El snapshot recién queda congelado
+     * cuando el período se cierra.
+     */
+    private function sincronizarPreciosAbiertos(int $aperturaId): void
+    {
+        $precios = Vehiculo::query()
+            ->whereIn('id', DB::table('recaudaciones')
+                ->where('apertura_id', $aperturaId)
+                ->whereNull('cierre_id')
+                ->select('vehiculo_id'))
+            ->pluck('precio', 'id');
+
+        // Un UPDATE por precio distinto: agrupa los vehículos que comparten
+        // importe para no escribir fila por fila.
+        foreach ($precios->groupBy(fn ($precio) => (string) $precio, true) as $precio => $ids) {
+            DB::table('recaudaciones')
+                ->where('apertura_id', $aperturaId)
+                ->whereNull('cierre_id')
+                ->whereIn('vehiculo_id', $ids->keys())
+                ->where('precio', '!=', (float) $precio)
+                ->update(['precio' => (float) $precio]);
+        }
     }
 
     /**
