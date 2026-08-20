@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, Car, Receipt } from 'lucide-react';
 import { useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { Button } from '@/components/ui/button';
 import { index } from '@/routes/cobros';
 import type { CobroDesglose, CobroTransaccion, Inversion } from '@/types';
@@ -33,11 +34,13 @@ export default function CobrosShow({
     function toggleVehicle(vehiculoId: number) {
         setExpandedVehicles((prev) => {
             const next = new Set(prev);
+
             if (next.has(vehiculoId)) {
                 next.delete(vehiculoId);
             } else {
                 next.add(vehiculoId);
             }
+
             return next;
         });
     }
@@ -46,8 +49,13 @@ export default function CobrosShow({
     const transactionsByVehicle = transacciones.reduce(
         (acc, t) => {
             const key = t.patente;
-            if (!acc[key]) acc[key] = [];
+
+            if (!acc[key]) {
+acc[key] = [];
+}
+
             acc[key].push(t);
+
             return acc;
         },
         {} as Record<string, CobroTransaccion[]>,
@@ -57,7 +65,7 @@ export default function CobrosShow({
         <>
             <Head title={`Caja — ${inversion.nombre}`} />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex items-center gap-3">
@@ -249,7 +257,7 @@ export default function CobrosShow({
                         })}
                     </div>
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }

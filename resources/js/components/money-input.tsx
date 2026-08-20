@@ -15,8 +15,13 @@ import { Input } from '@/components/ui/input';
 /** "1.234,5" → 1234.5 (null si está vacío o no es un número). */
 export function parseMoney(display: string): number | null {
     const clean = display.replace(/\./g, '').replace(',', '.');
-    if (clean === '') return null;
+
+    if (clean === '') {
+return null;
+}
+
     const n = Number(clean);
+
     return Number.isFinite(n) ? n : null;
 }
 
@@ -77,12 +82,14 @@ export function MoneyInput({
         // Sanitizar: sólo dígitos y UNA coma decimal.
         let sane = raw.replace(/[^\d,]/g, '');
         const primeraComa = sane.indexOf(',');
+
         if (primeraComa !== -1) {
             sane = sane.slice(0, primeraComa + 1) + sane.slice(primeraComa + 1).replace(/,/g, '');
         }
 
         let [entero, decimal] = sane.split(',');
         entero = entero.replace(/^0+(?=\d)/, '');
+
         if (decimal !== undefined) {
             decimal = decimal.slice(0, decimals);
         }
@@ -96,13 +103,22 @@ export function MoneyInput({
         // Reponer el caret detrás de la misma cantidad de dígitos.
         requestAnimationFrame(() => {
             const el = inputRef.current;
-            if (!el) return;
+
+            if (!el) {
+return;
+}
+
             let pos = 0;
             let vistos = 0;
+
             while (pos < formatted.length && vistos < relevantesAntesDelCaret) {
-                if (/[\d,]/.test(formatted[pos])) vistos++;
+                if (/[\d,]/.test(formatted[pos])) {
+vistos++;
+}
+
                 pos++;
             }
+
             el.setSelectionRange(pos, pos);
         });
     }

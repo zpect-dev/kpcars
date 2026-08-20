@@ -1,5 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import {
     SidebarGroup,
     SidebarGroupLabel,
@@ -13,12 +19,6 @@ import {
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import type { NavItem } from '@/types';
 
-import { ChevronRight } from 'lucide-react';
-import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 function CollapsibleNavItem({
     item,
@@ -31,9 +31,18 @@ function CollapsibleNavItem({
 }) {
     const [open, setOpen] = useState(isActive);
 
-    useEffect(() => {
-        if (isActive) setOpen(true);
-    }, [isActive]);
+    // El grupo se despliega solo cuando pasa a estar activo, pero después el
+    // usuario puede volver a plegarlo. Se ajusta durante el render, no con un
+    // efecto, para no encadenar un segundo commit en cada navegación.
+    const [activoPrevio, setActivoPrevio] = useState(isActive);
+
+    if (isActive !== activoPrevio) {
+        setActivoPrevio(isActive);
+
+        if (isActive) {
+            setOpen(true);
+        }
+    }
 
     return (
         <Collapsible

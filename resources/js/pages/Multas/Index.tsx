@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowDownUp,
@@ -6,107 +6,68 @@ import {
     CalendarDays,
     CalendarRange,
     Car,
-    Check,
     ChevronDown,
-    ChevronLeft,
-    ChevronRight,
     ChevronsDownUp,
     ChevronsUpDown,
     Download,
-    FileText,
     FileX,
     Medal,
     Pencil,
     Plus,
-    Search,
     Siren,
-    Trash2,
     User as UserIcon,
     UserX,
-    X,
-    type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { EmptyState } from '@/components/app/empty-state';
+import { SearchInput } from '@/components/app/filter-bar';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
+import { Chip, Highlight, InactivoBadge } from '@/components/multas/atomos';
+import { CobrarMultaModal } from '@/components/multas/cobrar-modal';
+import { EditarMultaModal } from '@/components/multas/editar-modal';
+import {
+    diasHastaVenc,
+    estadoCobro,
+    faltante,
+    formatFecha,
+    HOY,
+    HOY_PLUS_7,
+    montoEfectivo,
+    normEstado,
+    ORDEN_LABEL,
+    pendiente,
+    periodoRango,
+    readParams,
+    sinImporte,
+    TABS,
+    tieneDescuento,
+} from '@/components/multas/logica';
+import { MultaPdf } from '@/components/multas/multa-pdf';
+import { RegistrarMultaModal } from '@/components/multas/registrar-modal';
+import { ReporteSemanal } from '@/components/multas/reporte-semanal';
+import type {
+    FiltroEstado,
+    FiltroJurisdiccion,
+    FiltroPeriodo,
+    Grupo,
+    Multa,
+    MultaEliminada,
+    Orden,
+    Tab,
+    VehiculoOpt,
+} from '@/components/multas/tipos';
 import { formatARS } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/money-input';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { useImageCropper } from '@/components/image-cropper';
-
-interface Multa {
-    id: number;
-    vehiculo_id: number;
-    patente: string;
-    marca?: string | null;
-    modelo?: string | null;
-    conductor_id: number | null;
-    conductor?: string | null;
-    conductor_inactivo: boolean;
-    fecha: string;
-    fecha_vencimiento: string | null;
-    monto: number;
-    descripcion: string;
-    punto_rojo: boolean;
-    jurisdiccion: 'CABA' | 'GBA' | null;
-    pdf_url: string | null;
-    pagado: boolean;
-    pagada_en: string | null;
-    cobrado: boolean;
-    cobrada_en: string | null;
-    monto_cobrado: number;
-    created_at: string;
-    pagos: Pago[];
-}
-
-interface Pago {
-    id: number;
-    fecha: string;
-    monto: number;
-    comprobante_url: string | null;
-    es_transferencia: boolean;
-}
-
-interface MultaEliminada {
-    id: number;
-    patente: string;
-    conductor: string | null;
-    conductor_inactivo: boolean;
-    monto: number;
-    punto_rojo: boolean;
-    fecha: string;
-    descripcion: string;
-    deleted_at: string;
-}
-
-/** Una multa está pendiente mientras no esté pagada al sistema de infracciones o no esté cobrada al chofer. */
-function pendiente(m: Multa): boolean {
-    return !m.pagado || !m.cobrado;
-}
-
-interface VehiculoOpt {
-    id: number;
-    patente: string;
-    marca: string;
-    modelo: string;
-}
 
 interface Props {
     multas: Multa[];
@@ -114,141 +75,6 @@ interface Props {
     eliminadas: MultaEliminada[];
 }
 
-type Tab = 'vehiculo' | 'chofer' | 'ex-chofer' | 'ranking' | 'reporte';
-
-function formatFecha(d: string): string {
-    const [y, m, day] = d.slice(0, 10).split('-');
-    return `${day}/${m}/${y}`;
-}
-
-const HOY = new Date().toISOString().slice(0, 10);
-const _d3 = new Date();
-_d3.setDate(_d3.getDate() + 3);
-const HOY_PLUS_3 = _d3.toISOString().slice(0, 10);
-const _d7 = new Date();
-_d7.setDate(_d7.getDate() + 7);
-const HOY_PLUS_7 = _d7.toISOString().slice(0, 10);
-
-function diasHastaVenc(v: string): number {
-    return Math.round(
-        (new Date(v).getTime() - new Date(HOY).getTime()) / 86_400_000,
-    );
-}
-
-/**
- * Solo las multas de CABA tienen 50% de descuento si se pagan antes (o el mismo
- * día) del vencimiento. Las de GBA (provincia) nunca tienen descuento, y sin
- * fecha de vencimiento tampoco aplica.
- */
-function tieneDescuento(m: Multa): boolean {
-    return (
-        m.jurisdiccion === 'CABA' &&
-        !!m.fecha_vencimiento &&
-        HOY <= m.fecha_vencimiento
-    );
-}
-
-/** Monto vigente hoy: 50% si todavía no venció, total en caso contrario. */
-function montoEfectivo(m: Multa): number {
-    return tieneDescuento(m) ? m.monto * 0.5 : m.monto;
-}
-
-/**
- * Punto rojo "de seguimiento" sin importe (monto 0): no tiene precio, se muestra
- * como "—" y queda fuera de todos los cálculos financieros. Un punto rojo con
- * monto cargado (monto > 0) cuenta como una multa normal a todos los efectos;
- * solo lleva además la marca roja.
- */
-function sinImporte(m: { punto_rojo: boolean; monto: number }): boolean {
-    return m.punto_rojo && m.monto <= 0;
-}
-
-/** Lo que falta cobrarle al chofer hoy (0 si ya está cobrada del todo o no tiene importe). */
-function faltante(m: Multa): number {
-    if (m.cobrado || sinImporte(m)) return 0;
-    return Math.max(montoEfectivo(m) - m.monto_cobrado, 0);
-}
-
-/** Estado del cobro al chofer: sin cobrar / parcial / cobrada. */
-function estadoCobro(m: Multa): 'sin' | 'parcial' | 'cobrada' {
-    if (m.cobrado) return 'cobrada';
-    if (m.monto_cobrado > 0) return 'parcial';
-    return 'sin';
-}
-
-interface Grupo {
-    key: string;
-    id: number | null;
-    titulo: string;
-    sub: string;
-    multas: Multa[];
-    pendientes: number;
-    total: number;
-}
-
-type FiltroEstado = '' | 'si' | 'no';
-type FiltroJurisdiccion = '' | 'CABA' | 'GBA';
-type FiltroPeriodo = '' | 'mes' | 'mes-ant' | '3m' | 'año';
-
-function periodoRango(p: FiltroPeriodo): { desde: string; hasta: string } {
-    const now = new Date();
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    if (p === 'mes')
-        return {
-            desde: iso(new Date(now.getFullYear(), now.getMonth(), 1)),
-            hasta: iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
-        };
-    if (p === 'mes-ant')
-        return {
-            desde: iso(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-            hasta: iso(new Date(now.getFullYear(), now.getMonth(), 0)),
-        };
-    if (p === '3m') {
-        const d = new Date(now);
-        d.setMonth(d.getMonth() - 3);
-        return { desde: iso(d), hasta: iso(now) };
-    }
-    if (p === 'año')
-        return { desde: `${now.getFullYear()}-01-01`, hasta: iso(now) };
-    return { desde: '', hasta: '' };
-}
-
-type Orden = 'pendientes' | 'monto' | 'cantidad' | 'alfabetico';
-
-const ORDEN_LABEL: Record<Orden, string> = {
-    pendientes: 'Pendientes primero',
-    monto: 'Mayor monto',
-    cantidad: 'Más multas',
-    alfabetico: 'Alfabético',
-};
-
-const TABS: Tab[] = ['vehiculo', 'chofer', 'ex-chofer', 'ranking', 'reporte'];
-
-function readParams(): URLSearchParams {
-    if (typeof window === 'undefined') return new URLSearchParams();
-    return new URLSearchParams(window.location.search);
-}
-
-function normEstado(v: string | null): FiltroEstado {
-    return v === 'si' || v === 'no' ? v : '';
-}
-
-/** Resalta las coincidencias de `query` dentro de `text` (búsqueda en vivo). */
-function Highlight({ text, query }: { text: string; query: string }) {
-    const q = query.trim();
-    if (!q) return <>{text}</>;
-    const idx = text.toLowerCase().indexOf(q.toLowerCase());
-    if (idx === -1) return <>{text}</>;
-    return (
-        <>
-            {text.slice(0, idx)}
-            <mark className="rounded-[3px] bg-amber-200 px-0.5 text-inherit dark:bg-amber-400/30">
-                {text.slice(idx, idx + q.length)}
-            </mark>
-            {text.slice(idx + q.length)}
-        </>
-    );
-}
 
 export default function MultasIndex({
     multas,
@@ -259,11 +85,13 @@ export default function MultasIndex({
     // el link con la misma vista (tab, búsqueda, filtros y orden).
     const [tab, setTab] = useState<Tab>(() => {
         const t = readParams().get('tab') as Tab;
+
         return TABS.includes(t) ? t : 'vehiculo';
     });
     const [search, setSearch] = useState(() => readParams().get('q') ?? '');
     const [orden, setOrden] = useState<Orden>(() => {
         const o = readParams().get('orden') as Orden;
+
         return o in ORDEN_LABEL ? o : 'pendientes';
     });
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -276,6 +104,7 @@ export default function MultasIndex({
     const [fJurisdiccion, setFJurisdiccion] = useState<FiltroJurisdiccion>(
         () => {
             const v = readParams().get('jur');
+
             return v === 'CABA' || v === 'GBA' ? v : '';
         },
     );
@@ -292,6 +121,7 @@ export default function MultasIndex({
         '' | 'vencida' | 'no-vencida'
     >(() => {
         const v = readParams().get('venc');
+
         return v === 'vencida' || v === 'no-vencida' ? v : '';
     });
     const [fDesde, setFDesde] = useState(() => readParams().get('desde') ?? '');
@@ -299,18 +129,52 @@ export default function MultasIndex({
 
     // Reflejar tab + búsqueda + filtros + orden en la URL (sin recargar).
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined') {
+return;
+}
+
         const p = new URLSearchParams();
-        if (tab !== 'vehiculo') p.set('tab', tab);
-        if (search.trim()) p.set('q', search);
-        if (orden !== 'pendientes') p.set('orden', orden);
-        if (fJurisdiccion) p.set('jur', fJurisdiccion);
-        if (fSistema) p.set('sis', fSistema);
-        if (fChofer) p.set('cob', fChofer);
-        if (fPuntoRojo) p.set('pr', '1');
-        if (fVencimiento) p.set('venc', fVencimiento);
-        if (fDesde) p.set('desde', fDesde);
-        if (fHasta) p.set('hasta', fHasta);
+
+        if (tab !== 'vehiculo') {
+p.set('tab', tab);
+}
+
+        if (search.trim()) {
+p.set('q', search);
+}
+
+        if (orden !== 'pendientes') {
+p.set('orden', orden);
+}
+
+        if (fJurisdiccion) {
+p.set('jur', fJurisdiccion);
+}
+
+        if (fSistema) {
+p.set('sis', fSistema);
+}
+
+        if (fChofer) {
+p.set('cob', fChofer);
+}
+
+        if (fPuntoRojo) {
+p.set('pr', '1');
+}
+
+        if (fVencimiento) {
+p.set('venc', fVencimiento);
+}
+
+        if (fDesde) {
+p.set('desde', fDesde);
+}
+
+        if (fHasta) {
+p.set('hasta', fHasta);
+}
+
         const qs = p.toString();
         const url =
             window.location.pathname +
@@ -334,8 +198,12 @@ export default function MultasIndex({
     const fPeriodoActivo = useMemo<FiltroPeriodo>(() => {
         for (const p of ['mes', 'mes-ant', '3m', 'año'] as FiltroPeriodo[]) {
             const r = periodoRango(p);
-            if (r.desde === fDesde && r.hasta === fHasta) return p;
+
+            if (r.desde === fDesde && r.hasta === fHasta) {
+return p;
+}
         }
+
         return '';
     }, [fDesde, fHasta]);
 
@@ -368,15 +236,43 @@ export default function MultasIndex({
 
     function buildPdfUrl() {
         const p = new URLSearchParams({ tipo: tipoPdf });
-        if (search) p.set('q', search);
-        if (fJurisdiccion) p.set('jurisdiccion', fJurisdiccion);
-        if (fSistema) p.set('sistema', fSistema);
-        if (fChofer) p.set('chofer', fChofer);
-        if (fPuntoRojo) p.set('punto_rojo', '1');
-        if (fVencimiento) p.set('vencimiento', fVencimiento);
-        if (tab === 'ex-chofer') p.set('inactivo', '1');
-        if (fDesde) p.set('desde', fDesde);
-        if (fHasta) p.set('hasta', fHasta);
+
+        if (search) {
+p.set('q', search);
+}
+
+        if (fJurisdiccion) {
+p.set('jurisdiccion', fJurisdiccion);
+}
+
+        if (fSistema) {
+p.set('sistema', fSistema);
+}
+
+        if (fChofer) {
+p.set('chofer', fChofer);
+}
+
+        if (fPuntoRojo) {
+p.set('punto_rojo', '1');
+}
+
+        if (fVencimiento) {
+p.set('vencimiento', fVencimiento);
+}
+
+        if (tab === 'ex-chofer') {
+p.set('inactivo', '1');
+}
+
+        if (fDesde) {
+p.set('desde', fDesde);
+}
+
+        if (fHasta) {
+p.set('hasta', fHasta);
+}
+
         return `/multas/pdf?${p.toString()}`;
     }
 
@@ -392,6 +288,7 @@ export default function MultasIndex({
                 m.fecha_vencimiento >= HOY &&
                 m.fecha_vencimiento <= HOY_PLUS_7,
         );
+
         return {
             total: multas.length,
             deudaSistema: conMonto
@@ -420,11 +317,16 @@ export default function MultasIndex({
                 adeudado: number;
             }
         >();
+
         for (const m of multas) {
-            if (sinImporte(m)) continue;
+            if (sinImporte(m)) {
+continue;
+}
+
             const key = m.conductor_id ? `c${m.conductor_id}` : 'sin';
-            if (!map.has(key))
-                map.set(key, {
+
+            if (!map.has(key)) {
+map.set(key, {
                     id: m.conductor_id ?? 0,
                     nombre: m.conductor ?? 'Sin chofer',
                     cnt: 0,
@@ -432,6 +334,8 @@ export default function MultasIndex({
                     pagado: 0,
                     adeudado: 0,
                 });
+}
+
             const e = map.get(key)!;
             e.cnt++;
             // Total efectivo (con descuento de hoy; si ya está cobrada, lo pagado).
@@ -440,6 +344,7 @@ export default function MultasIndex({
             e.pagado += m.monto_cobrado;
             e.adeudado += faltante(m);
         }
+
         return Array.from(map.values()).sort(
             (a, b) => b.adeudado - a.adeudado || b.total - a.total,
         );
@@ -453,33 +358,68 @@ export default function MultasIndex({
                 q &&
                 !m.patente.toLowerCase().includes(q) &&
                 !(m.conductor ?? '').toLowerCase().includes(q)
-            )
-                return false;
-            if (fJurisdiccion && m.jurisdiccion !== fJurisdiccion) return false;
-            if (fSistema === 'si' && !m.pagado) return false;
-            if (fSistema === 'no' && m.pagado) return false;
-            if (fChofer === 'si' && !m.cobrado) return false;
-            if (fChofer === 'no' && m.cobrado) return false;
-            if (fPuntoRojo && !m.punto_rojo) return false;
+            ) {
+return false;
+}
+
+            if (fJurisdiccion && m.jurisdiccion !== fJurisdiccion) {
+return false;
+}
+
+            if (fSistema === 'si' && !m.pagado) {
+return false;
+}
+
+            if (fSistema === 'no' && m.pagado) {
+return false;
+}
+
+            if (fChofer === 'si' && !m.cobrado) {
+return false;
+}
+
+            if (fChofer === 'no' && m.cobrado) {
+return false;
+}
+
+            if (fPuntoRojo && !m.punto_rojo) {
+return false;
+}
+
             if (
                 fVencimiento === 'no-vencida' &&
                 !(m.fecha_vencimiento && m.fecha_vencimiento >= HOY)
-            )
-                return false;
+            ) {
+return false;
+}
+
             if (
                 fVencimiento === 'vencida' &&
                 !(m.fecha_vencimiento && m.fecha_vencimiento < HOY)
-            )
-                return false;
-            if (tab === 'ex-chofer' && !m.conductor_inactivo) return false;
-            if (fDesde && m.fecha < fDesde) return false;
-            if (fHasta && m.fecha > fHasta) return false;
+            ) {
+return false;
+}
+
+            if (tab === 'ex-chofer' && !m.conductor_inactivo) {
+return false;
+}
+
+            if (fDesde && m.fecha < fDesde) {
+return false;
+}
+
+            if (fHasta && m.fecha > fHasta) {
+return false;
+}
+
             return true;
         });
 
         const map = new Map<string, Grupo>();
+
         for (const m of visibles) {
             let key: string, id: number | null, titulo: string, sub: string;
+
             if (tab === 'vehiculo') {
                 key = String(m.vehiculo_id);
                 id = m.vehiculo_id;
@@ -491,8 +431,9 @@ export default function MultasIndex({
                 titulo = m.conductor ?? 'Sin chofer';
                 sub = '';
             }
-            if (!map.has(key))
-                map.set(key, {
+
+            if (!map.has(key)) {
+map.set(key, {
                     key,
                     id: id ?? 0,
                     titulo,
@@ -501,6 +442,8 @@ export default function MultasIndex({
                     pendientes: 0,
                     total: 0,
                 });
+}
+
             map.get(key)!.multas.push(m);
         }
 
@@ -514,10 +457,18 @@ export default function MultasIndex({
                 total: g.multas.reduce((s, m) => s + montoEfectivo(m), 0),
             }))
             .sort((a, b) => {
-                if (orden === 'monto') return b.total - a.total || alfa(a, b);
-                if (orden === 'cantidad')
-                    return b.multas.length - a.multas.length || alfa(a, b);
-                if (orden === 'alfabetico') return alfa(a, b);
+                if (orden === 'monto') {
+return b.total - a.total || alfa(a, b);
+}
+
+                if (orden === 'cantidad') {
+return b.multas.length - a.multas.length || alfa(a, b);
+}
+
+                if (orden === 'alfabetico') {
+return alfa(a, b);
+}
+
                 // 'pendientes' (default)
                 return (
                     b.pendientes - a.pendientes ||
@@ -542,8 +493,13 @@ export default function MultasIndex({
     function toggleExpand(key: string) {
         setExpanded((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
+
+            if (next.has(key)) {
+next.delete(key);
+} else {
+next.add(key);
+}
+
             return next;
         });
     }
@@ -582,8 +538,10 @@ export default function MultasIndex({
                 m.cobrado ? { reset: true } : { fecha_cobro: HOY },
                 visitaFila(m.id),
             );
+
             return;
         }
+
         // Con importe: el modal registra el pago (total o parcial) o reinicia.
         setCobrando(m);
     }
@@ -636,47 +594,43 @@ export default function MultasIndex({
         <>
             <Head title="Multas" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div>
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                            Multas
-                        </h1>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            La multa se imputa al chofer que tenía el vehículo
-                            en la fecha de la infracción.
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <a
-                            href={buildPdfUrl()}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <Download className="h-4 w-4" />
-                            <span className="hidden sm:inline">
-                                Exportar PDF
-                            </span>
-                        </a>
-                        <Button
-                            size="sm"
-                            onClick={() => setShowModal(true)}
-                            className="shrink-0"
-                        >
-                            <Plus className="h-4 w-4" />
-                            <span className="hidden sm:inline">
-                                Registrar multa
-                            </span>
-                        </Button>
-                    </div>
-                </div>
+            <PageContainer>
+                <PageHeader
+                    title="Multas"
+                    count={{
+                        value: multas.length,
+                        singular: 'multa',
+                        plural: 'multas',
+                    }}
+                    description="La multa se imputa al chofer que tenía el vehículo en la fecha de la infracción."
+                    actions={
+                        <>
+                            <Button variant="outline" size="sm" asChild>
+                                <a
+                                    href={buildPdfUrl()}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    <Download className="size-4" />
+                                    <span className="hidden sm:inline">
+                                        Exportar PDF
+                                    </span>
+                                </a>
+                            </Button>
+                            <Button size="sm" onClick={() => setShowModal(true)}>
+                                <Plus className="size-4" />
+                                <span className="hidden sm:inline">
+                                    Registrar multa
+                                </span>
+                            </Button>
+                        </>
+                    }
+                />
 
                 {/* Mini dashboard */}
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <div className="flex flex-col gap-1 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400">
+                    <div className="flex flex-col gap-1 rounded-xl border border-destructive/20 bg-destructive-soft/40 px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-destructive">
                             <Building2 className="h-3.5 w-3.5" /> Deuda al
                             sistema
                         </span>
@@ -688,8 +642,8 @@ export default function MultasIndex({
                             {stats.cntSinPagar !== 1 ? 's' : ''} sin pagar
                         </span>
                     </div>
-                    <div className="flex flex-col gap-1 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 shadow-sm">
-                        <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+                    <div className="flex flex-col gap-1 rounded-xl border border-warning/20 bg-warning-soft/40 px-4 py-3 shadow-sm">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-warning-soft-foreground">
                             <UserIcon className="h-3.5 w-3.5" /> Por cobrar a
                             choferes
                         </span>
@@ -729,10 +683,10 @@ export default function MultasIndex({
 
                 {/* Alerta de vencimientos próximos */}
                 {stats.proximasVencer.length > 0 && (
-                    <div className="flex items-start gap-3 rounded-xl border border-orange-400/30 bg-orange-500/5 px-4 py-3">
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />
+                    <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft/40 px-4 py-3">
+                        <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
                         <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                            <p className="text-sm font-semibold text-warning-soft-foreground">
                                 {stats.proximasVencer.length} multa
                                 {stats.proximasVencer.length !== 1
                                     ? 's'
@@ -750,6 +704,7 @@ export default function MultasIndex({
                                         const dias = diasHastaVenc(
                                             m.fecha_vencimiento!,
                                         );
+
                                         return `${m.patente} (${dias === 0 ? 'hoy' : `${dias}d`})`;
                                     })
                                     .join(' · ')}
@@ -787,6 +742,7 @@ export default function MultasIndex({
                     ).map(({ val, label, icon: Icon }) => {
                         const activo = tab === val;
                         const pend = tabPendientes[val];
+
                         return (
                             <button
                                 key={val}
@@ -804,10 +760,10 @@ export default function MultasIndex({
                                 {pend > 0 && (
                                     <span
                                         className={cn(
-                                            'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-md px-1 text-[10px] font-bold tabular-nums',
+                                            'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums',
                                             activo
                                                 ? 'bg-primary/20 text-primary'
-                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+                                                : 'bg-warning-soft text-warning-soft-foreground',
                                         )}
                                         title={`${pend} multa${pend !== 1 ? 's' : ''} pendiente${pend !== 1 ? 's' : ''}`}
                                     >
@@ -836,25 +792,25 @@ export default function MultasIndex({
                             <div>
                                 {/* Header desktop */}
                                 <div className="hidden items-center gap-4 border-b border-border px-4 py-2 sm:flex">
-                                    <span className="w-6 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-6 shrink-0 text-xs font-medium text-muted-foreground">
                                         #
                                     </span>
-                                    <span className="flex-1 text-[11px] font-medium text-muted-foreground">
+                                    <span className="flex-1 text-xs font-medium text-muted-foreground">
                                         Conductor
                                     </span>
-                                    <span className="w-16 shrink-0 text-center text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-16 shrink-0 text-center text-xs font-medium text-muted-foreground">
                                         Multas
                                     </span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-28 shrink-0 text-right text-xs font-medium text-muted-foreground">
                                         Total
                                     </span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-28 shrink-0 text-right text-xs font-medium text-muted-foreground">
                                         Pagado
                                     </span>
-                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-28 shrink-0 text-right text-xs font-medium text-muted-foreground">
                                         Adeuda
                                     </span>
-                                    <span className="w-24 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                    <span className="w-24 shrink-0 text-xs font-medium text-muted-foreground">
                                         % pagado
                                     </span>
                                 </div>
@@ -865,6 +821,7 @@ export default function MultasIndex({
                                                   (r.pagado / r.total) * 100,
                                               )
                                             : 0;
+
                                     return (
                                         <div
                                             key={r.id}
@@ -879,11 +836,11 @@ export default function MultasIndex({
                                                 className={cn(
                                                     'w-6 shrink-0 text-xs font-bold tabular-nums',
                                                     i === 0
-                                                        ? 'text-yellow-500'
+                                                        ? 'text-warning'
                                                         : i === 1
-                                                          ? 'text-zinc-400'
+                                                          ? 'text-muted-foreground'
                                                           : i === 2
-                                                            ? 'text-amber-700'
+                                                            ? 'text-warning-soft-foreground'
                                                             : 'text-muted-foreground/50',
                                                 )}
                                             >
@@ -898,14 +855,14 @@ export default function MultasIndex({
                                             <span className="w-28 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                                                 {formatARS(r.total)}
                                             </span>
-                                            <span className="w-28 shrink-0 text-right text-xs font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                            <span className="w-28 shrink-0 text-right text-xs font-semibold text-success tabular-nums">
                                                 {formatARS(r.pagado)}
                                             </span>
                                             <span
                                                 className={cn(
                                                     'w-28 shrink-0 text-right text-xs font-semibold tabular-nums',
                                                     r.adeudado > 0
-                                                        ? 'text-red-500'
+                                                        ? 'text-destructive'
                                                         : 'text-muted-foreground',
                                                 )}
                                             >
@@ -915,13 +872,13 @@ export default function MultasIndex({
                                                 <div className="flex items-center gap-1.5">
                                                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                         <div
-                                                            className="h-full rounded-full bg-green-500 transition-all"
+                                                            className="h-full rounded-full bg-success transition-all"
                                                             style={{
                                                                 width: `${pct}%`,
                                                             }}
                                                         />
                                                     </div>
-                                                    <span className="w-7 shrink-0 text-right text-[11px] text-muted-foreground tabular-nums">
+                                                    <span className="w-7 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
                                                         {pct}%
                                                     </span>
                                                 </div>
@@ -939,16 +896,12 @@ export default function MultasIndex({
                     <div className="sticky top-0 z-20 rounded-xl border border-border bg-card shadow-sm">
                         {/* Buscador */}
                         <div className="flex items-center gap-2 px-3 py-3">
-                            <div className="relative flex-1">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Buscar patente o chofer..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-9"
-                                />
-                            </div>
+                            <SearchInput
+                                className="flex-1"
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Buscar patente o chofer..."
+                            />
                             {(filtrosActivos > 0 || search) && (
                                 <button
                                     type="button"
@@ -956,7 +909,7 @@ export default function MultasIndex({
                                         limpiarFiltros();
                                         setSearch('');
                                     }}
-                                    className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                                 >
                                     Limpiar
                                 </button>
@@ -1026,7 +979,7 @@ export default function MultasIndex({
                                 activo={fPuntoRojo}
                                 onClick={() => setFPuntoRojo((v) => !v)}
                             >
-                                <span className="h-2 w-2 rounded-full bg-red-500" />{' '}
+                                <span aria-hidden="true" className="size-2 rounded-full bg-destructive" />{' '}
                                 Punto rojo
                             </Chip>
                             <Chip
@@ -1053,7 +1006,7 @@ export default function MultasIndex({
 
                         {/* Fila 3: período */}
                         <div className="flex flex-wrap items-center gap-2 border-t border-border bg-muted/20 px-3 py-2.5">
-                            <span className="flex items-center gap-1.5 text-[11px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+                            <span className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
                                 <CalendarDays className="h-3.5 w-3.5" /> Período
                             </span>
                             <div className="h-4 w-px bg-border" />
@@ -1107,48 +1060,39 @@ export default function MultasIndex({
                 {/* Lista agrupada */}
                 {esTabGrupo &&
                     (grupos.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card px-6 py-14 text-center shadow-sm">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted">
-                                {multas.length === 0 ? (
-                                    <Siren className="h-6 w-6 text-muted-foreground" />
-                                ) : (
-                                    <Search className="h-6 w-6 text-muted-foreground" />
-                                )}
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-foreground">
-                                    {multas.length === 0
+                        <div className="rounded-xl border border-border bg-card shadow-sm">
+                            <EmptyState
+                                variant={
+                                    multas.length === 0 ? 'empty' : 'filtered'
+                                }
+                                icon={multas.length === 0 ? Siren : undefined}
+                                title={
+                                    multas.length === 0
                                         ? 'Todavía no hay multas registradas'
-                                        : 'No hay multas que coincidan'}
-                                </p>
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {multas.length === 0
+                                        : 'No hay multas que coincidan'
+                                }
+                                description={
+                                    multas.length === 0
                                         ? 'Registrá la primera multa para empezar a hacer seguimiento.'
-                                        : 'Probá ajustar la búsqueda o limpiar los filtros.'}
-                                </p>
-                            </div>
-                            {multas.length === 0 ? (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setShowModal(true)}
-                                >
-                                    <Plus className="h-4 w-4" /> Registrar multa
-                                </Button>
-                            ) : (
-                                (filtrosActivos > 0 || search) && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            limpiarFiltros();
-                                            setSearch('');
-                                        }}
-                                    >
-                                        <X className="h-4 w-4" /> Limpiar
-                                        filtros
-                                    </Button>
-                                )
-                            )}
+                                        : 'Probá ajustar la búsqueda o limpiar los filtros.'
+                                }
+                                action={
+                                    multas.length === 0
+                                        ? {
+                                              label: 'Registrar multa',
+                                              onClick: () => setShowModal(true),
+                                          }
+                                        : filtrosActivos > 0 || search
+                                          ? {
+                                                label: 'Limpiar filtros',
+                                                onClick: () => {
+                                                    limpiarFiltros();
+                                                    setSearch('');
+                                                },
+                                            }
+                                          : undefined
+                                }
+                            />
                         </div>
                     ) : (
                         <div className="flex flex-col gap-2 pb-4">
@@ -1205,6 +1149,7 @@ export default function MultasIndex({
                                     <button
                                         type="button"
                                         onClick={toggleExpandAll}
+                                        aria-label={allExpanded ? 'Colapsar todo' : 'Expandir todo'}
                                         className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         {allExpanded ? (
@@ -1225,6 +1170,7 @@ export default function MultasIndex({
                                 const isOpen =
                                     search.trim().length > 0 ||
                                     expanded.has(g.key);
+
                                 return (
                                     <div
                                         key={g.key}
@@ -1275,14 +1221,14 @@ export default function MultasIndex({
                                                         : ''}
                                                 </span>
                                                 {g.pendientes > 0 ? (
-                                                    <span className="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    <span className="shrink-0 rounded-md bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-soft-foreground">
                                                         {g.pendientes} pendiente
                                                         {g.pendientes !== 1
                                                             ? 's'
                                                             : ''}
                                                     </span>
                                                 ) : (
-                                                    <span className="shrink-0 rounded-md bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                                    <span className="shrink-0 rounded-md bg-success-soft px-2 py-0.5 text-xs font-semibold text-success-soft-foreground">
                                                         Al día
                                                     </span>
                                                 )}
@@ -1307,27 +1253,27 @@ export default function MultasIndex({
                                             <div className="border-t border-border">
                                                 {/* Header — solo desktop */}
                                                 <div className="hidden items-center gap-4 border-b border-border bg-muted/30 px-4 py-2 sm:flex">
-                                                    <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-[80px] shrink-0 text-xs font-medium text-muted-foreground">
                                                         Fecha inf.
                                                     </span>
-                                                    <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-[80px] shrink-0 text-xs font-medium text-muted-foreground">
                                                         Vencimiento
                                                     </span>
-                                                    <span className="w-[72px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-[72px] shrink-0 text-xs font-medium text-muted-foreground">
                                                         Jurisd.
                                                     </span>
-                                                    <span className="w-32 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-32 shrink-0 text-xs font-medium text-muted-foreground">
                                                         {tab === 'vehiculo'
                                                             ? 'Conductor'
                                                             : 'Patente'}
                                                     </span>
-                                                    <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="min-w-0 flex-1 text-xs font-medium text-muted-foreground">
                                                         Descripción
                                                     </span>
-                                                    <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-28 shrink-0 text-right text-xs font-medium text-muted-foreground">
                                                         Monto
                                                     </span>
-                                                    <span className="w-[196px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                    <span className="w-[196px] shrink-0 text-xs font-medium text-muted-foreground">
                                                         Estado
                                                     </span>
                                                     <span className="w-[60px] shrink-0" />
@@ -1378,7 +1324,7 @@ export default function MultasIndex({
                                                                 </span>
                                                                 {conDesc &&
                                                                     !m.cobrado && (
-                                                                        <span className="text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                                                        <span className="text-sm font-semibold text-success tabular-nums">
                                                                             {formatARS(
                                                                                 montoEfectivo(
                                                                                     m,
@@ -1412,9 +1358,9 @@ export default function MultasIndex({
                                                                             : 'Marcar como pagada en el sistema de infracciones'
                                                                     }
                                                                     className={cn(
-                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold transition-colors',
                                                                         m.pagado
-                                                                            ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                            ? 'border-success/30 bg-success-soft text-success-soft-foreground hover:bg-success/20'
                                                                             : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                                                     )}
                                                                 >
@@ -1446,18 +1392,18 @@ export default function MultasIndex({
                                                                               : 'Registrar cobro al chofer'
                                                                     }
                                                                     className={cn(
-                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold transition-colors',
+                                                                        'flex flex-1 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold transition-colors',
                                                                         estadoCobro(
                                                                             m,
                                                                         ) ===
                                                                             'cobrada'
-                                                                            ? 'border-green-300 bg-green-100 text-green-700 dark:border-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                                            ? 'border-success/30 bg-success-soft text-success-soft-foreground hover:bg-success/20'
                                                                             : estadoCobro(
                                                                                     m,
                                                                                 ) ===
                                                                                 'parcial'
-                                                                              ? 'border-orange-300 bg-orange-100 text-orange-700 hover:bg-orange-200 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                                              : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                                                                              ? 'border-warning/30 bg-warning-soft text-warning-soft-foreground hover:bg-warning/20'
+                                                                              : 'border-warning/30 bg-transparent text-warning-soft-foreground hover:bg-warning-soft',
                                                                     )}
                                                                 >
                                                                     <UserIcon className="h-3 w-3 shrink-0" />
@@ -1478,7 +1424,7 @@ export default function MultasIndex({
                                                                 estadoCobro(
                                                                     m,
                                                                 ) !== 'sin' && (
-                                                                    <span className="flex items-center justify-center gap-1 text-center text-[10px] text-muted-foreground">
+                                                                    <span className="flex items-center justify-center gap-1 text-center text-xs text-muted-foreground">
                                                                         <UserIcon className="h-2.5 w-2.5 shrink-0" />
                                                                         {estadoCobro(
                                                                             m,
@@ -1523,12 +1469,12 @@ export default function MultasIndex({
                                                                         <div className="flex flex-wrap items-center gap-1.5">
                                                                             {m.punto_rojo && (
                                                                                 <span
-                                                                                    className="h-2 w-2 rounded-full bg-red-500"
+                                                                                    aria-hidden="true" className="size-2 rounded-full bg-destructive"
                                                                                     title="Punto rojo"
                                                                                 />
                                                                             )}
                                                                             {m.jurisdiccion && (
-                                                                                <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                                <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                                                     {
                                                                                         m.jurisdiccion
                                                                                     }
@@ -1536,7 +1482,7 @@ export default function MultasIndex({
                                                                             )}
                                                                             {!m.pdf_url && (
                                                                                 <span
-                                                                                    className="inline-flex items-center gap-1 rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400"
+                                                                                    className="inline-flex items-center gap-1 rounded border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-xs font-semibold text-warning-soft-foreground"
                                                                                     title="Sin PDF"
                                                                                 >
                                                                                     <FileX className="h-2.5 w-2.5" />{' '}
@@ -1556,9 +1502,9 @@ export default function MultasIndex({
                                                                                         vencida
                                                                                             ? 'text-muted-foreground/40 line-through'
                                                                                             : vencUrgente
-                                                                                              ? 'font-semibold text-red-500'
+                                                                                              ? 'font-semibold text-destructive'
                                                                                               : vencProximo
-                                                                                                ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                                                                ? 'font-semibold text-warning-soft-foreground'
                                                                                                 : 'text-muted-foreground/70',
                                                                                     )}
                                                                                 >
@@ -1574,7 +1520,7 @@ export default function MultasIndex({
                                                                             )}
                                                                             {tab !==
                                                                                 'vehiculo' && (
-                                                                                <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground uppercase">
+                                                                                <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground uppercase">
                                                                                     <Highlight
                                                                                         text={
                                                                                             m.patente
@@ -1644,9 +1590,9 @@ export default function MultasIndex({
                                                                             : vencida
                                                                               ? 'text-muted-foreground/40 line-through'
                                                                               : vencUrgente
-                                                                                ? 'font-semibold text-red-500'
+                                                                                ? 'font-semibold text-destructive'
                                                                                 : vencProximo
-                                                                                  ? 'font-semibold text-amber-500 dark:text-amber-400'
+                                                                                  ? 'font-semibold text-warning-soft-foreground'
                                                                                   : 'text-muted-foreground',
                                                                     )}
                                                                 >
@@ -1658,7 +1604,7 @@ export default function MultasIndex({
                                                                     {vencUrgente &&
                                                                         dias !==
                                                                             null && (
-                                                                            <span className="ml-1 text-[10px] opacity-80">
+                                                                            <span className="ml-1 text-xs opacity-80">
                                                                                 {dias ===
                                                                                 0
                                                                                     ? 'hoy'
@@ -1669,12 +1615,12 @@ export default function MultasIndex({
                                                                 <div className="flex w-[72px] shrink-0 items-center gap-1.5">
                                                                     {m.punto_rojo && (
                                                                         <span
-                                                                            className="h-2 w-2 shrink-0 rounded-full bg-red-500"
+                                                                            aria-hidden="true" className="size-2 shrink-0 rounded-full bg-destructive"
                                                                             title="Punto rojo"
                                                                         />
                                                                     )}
                                                                     {m.jurisdiccion && (
-                                                                        <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
+                                                                        <span className="rounded border border-border bg-muted/50 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                                                             {
                                                                                 m.jurisdiccion
                                                                             }
@@ -1707,7 +1653,7 @@ export default function MultasIndex({
                                                                             )}
                                                                         </span>
                                                                     ) : (
-                                                                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
+                                                                        <span className="rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground uppercase">
                                                                             <Highlight
                                                                                 text={
                                                                                     m.patente
@@ -1754,7 +1700,7 @@ export default function MultasIndex({
                             })}
                         </div>
                     ))}
-            </div>
+            </PageContainer>
 
             <RegistrarMultaModal
                 open={showModal}
@@ -1773,1490 +1719,6 @@ export default function MultasIndex({
                 onClose={() => setCobrando(null)}
             />
         </>
-    );
-}
-
-/** Lunes de la semana de la fecha dada (semana lun–dom). */
-function lunesDe(d: Date): Date {
-    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const dow = (x.getDay() + 6) % 7; // 0 = lunes
-    x.setDate(x.getDate() - dow);
-    return x;
-}
-
-function isoDate(d: Date): string {
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-/** Celda compacta patente + chofer, reutilizada en las tablas del reporte. */
-function PatenteChofer({
-    patente,
-    conductor,
-    inactivo,
-}: {
-    patente: string;
-    conductor: string | null;
-    inactivo?: boolean;
-}) {
-    return (
-        <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 rounded border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-foreground uppercase">
-                {patente}
-            </span>
-            <span className="truncate text-xs text-muted-foreground">
-                {conductor ?? (
-                    <span className="italic opacity-60">Sin chofer</span>
-                )}
-            </span>
-            {inactivo && <InactivoBadge />}
-        </div>
-    );
-}
-
-/** Tarjeta métrica del resumen del reporte. */
-function ReporteStat({
-    icon: Icon,
-    color,
-    label,
-    value,
-    sub,
-}: {
-    icon: LucideIcon;
-    color: string;
-    label: string;
-    value: string;
-    sub?: string;
-}) {
-    return (
-        <div className="flex flex-col gap-1 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-            <span
-                className={cn(
-                    'flex items-center gap-1.5 text-xs font-medium',
-                    color,
-                )}
-            >
-                <Icon className="h-3.5 w-3.5" /> {label}
-            </span>
-            <span className="text-xl font-bold text-foreground tabular-nums">
-                {value}
-            </span>
-            {sub && (
-                <span className="text-xs text-muted-foreground">{sub}</span>
-            )}
-        </div>
-    );
-}
-
-/** Sección con encabezado + contador; muestra vacío si no hay filas. */
-function ReporteSeccion({
-    icon: Icon,
-    color,
-    title,
-    count,
-    children,
-}: {
-    icon: LucideIcon;
-    color: string;
-    title: string;
-    count: number;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-            <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5">
-                <Icon className={cn('h-4 w-4', color)} />
-                <span className="text-sm font-medium text-foreground">
-                    {title}
-                </span>
-                <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
-                    {count}
-                </span>
-            </div>
-            {count === 0 ? (
-                <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                    Sin novedades esta semana.
-                </p>
-            ) : (
-                <div className="divide-y divide-border">{children}</div>
-            )}
-        </div>
-    );
-}
-
-/** Reporte semanal de actividad de multas (tab "Reporte"). */
-function ReporteSemanal({
-    multas,
-    eliminadas,
-}: {
-    multas: Multa[];
-    eliminadas: MultaEliminada[];
-}) {
-    const [offset, setOffset] = useState(0); // 0 = semana en curso
-
-    const { desde, hasta } = useMemo(() => {
-        const inicio = lunesDe(new Date());
-        inicio.setDate(inicio.getDate() + offset * 7);
-        const fin = new Date(inicio);
-        fin.setDate(fin.getDate() + 6);
-        return { desde: isoDate(inicio), hasta: isoDate(fin) };
-    }, [offset]);
-
-    const rep = useMemo(() => {
-        const en = (d: string | null | undefined) =>
-            !!d && d >= desde && d <= hasta;
-        const nuevas = multas.filter((m) => en(m.created_at));
-        const pagadas = multas.filter((m) => en(m.pagada_en));
-        const cobros = multas.flatMap((m) =>
-            m.pagos
-                .filter((p) => en(p.fecha))
-                .map((p) => ({ multa: m, pago: p })),
-        );
-        const saldadas = multas.filter((m) => m.cobrado && en(m.cobrada_en));
-        const borradas = eliminadas.filter((e) => en(e.deleted_at));
-        return {
-            nuevas,
-            pagadas,
-            cobros,
-            saldadas,
-            borradas,
-            montoNuevas: nuevas.reduce((s, m) => s + montoEfectivo(m), 0),
-            montoPagadas: pagadas.reduce((s, m) => s + montoEfectivo(m), 0),
-            montoCobrado: cobros.reduce((s, c) => s + Number(c.pago.monto), 0),
-        };
-    }, [multas, eliminadas, desde, hasta]);
-
-    const esActual = offset === 0;
-
-    return (
-        <div className="flex flex-col gap-4 pb-4">
-            {/* Navegador de semana */}
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 shadow-sm">
-                <button
-                    type="button"
-                    onClick={() => setOffset((o) => o - 1)}
-                    title="Semana anterior"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <ChevronLeft className="h-4 w-4" />
-                </button>
-                <div className="flex items-center gap-2 px-1">
-                    <CalendarRange className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-semibold text-foreground tabular-nums">
-                        {formatFecha(desde)} – {formatFecha(hasta)}
-                    </span>
-                    {esActual && (
-                        <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            Esta semana
-                        </span>
-                    )}
-                </div>
-                <button
-                    type="button"
-                    onClick={() => setOffset((o) => o + 1)}
-                    disabled={esActual}
-                    title="Semana siguiente"
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    <ChevronRight className="h-4 w-4" />
-                </button>
-                <div className="ml-auto flex items-center gap-1.5">
-                    <button
-                        type="button"
-                        onClick={() => setOffset(-1)}
-                        className={cn(
-                            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                            offset === -1
-                                ? 'border-primary/30 bg-primary/10 text-primary'
-                                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-                        )}
-                    >
-                        Semana pasada
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setOffset(0)}
-                        className={cn(
-                            'rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                            esActual
-                                ? 'border-primary/30 bg-primary/10 text-primary'
-                                : 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-                        )}
-                    >
-                        Esta semana
-                    </button>
-                </div>
-            </div>
-
-            {/* Resumen */}
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <ReporteStat
-                    icon={Plus}
-                    color="text-primary"
-                    label="Nuevas multas"
-                    value={String(rep.nuevas.length)}
-                    sub={
-                        rep.montoNuevas > 0
-                            ? formatARS(rep.montoNuevas)
-                            : 'Sin monto'
-                    }
-                />
-                <ReporteStat
-                    icon={Building2}
-                    color="text-emerald-600 dark:text-emerald-400"
-                    label="Pagadas al sistema"
-                    value={String(rep.pagadas.length)}
-                    sub={
-                        rep.montoPagadas > 0 ? formatARS(rep.montoPagadas) : '—'
-                    }
-                />
-                <ReporteStat
-                    icon={UserIcon}
-                    color="text-green-600 dark:text-green-400"
-                    label="Cobrado a choferes"
-                    value={formatARS(rep.montoCobrado)}
-                    sub={`${rep.cobros.length} pago${rep.cobros.length !== 1 ? 's' : ''} · ${rep.saldadas.length} saldada${rep.saldadas.length !== 1 ? 's' : ''}`}
-                />
-                <ReporteStat
-                    icon={Trash2}
-                    color="text-red-600 dark:text-red-400"
-                    label="Eliminadas"
-                    value={String(rep.borradas.length)}
-                    sub={rep.borradas.length > 0 ? 'ver detalle' : 'Ninguna'}
-                />
-            </div>
-
-            {/* Nuevas multas */}
-            <ReporteSeccion
-                icon={Plus}
-                color="text-primary"
-                title="Nuevas multas registradas"
-                count={rep.nuevas.length}
-            >
-                {rep.nuevas.map((m) => (
-                    <div
-                        key={m.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                    >
-                        <PatenteChofer
-                            patente={m.patente}
-                            conductor={m.conductor ?? null}
-                            inactivo={m.conductor_inactivo}
-                        />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
-                            {m.descripcion}
-                        </span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
-                            {formatFecha(m.created_at)}
-                        </span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
-                            {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
-                        </span>
-                    </div>
-                ))}
-            </ReporteSeccion>
-
-            {/* Pagadas al sistema */}
-            <ReporteSeccion
-                icon={Building2}
-                color="text-emerald-500"
-                title="Pagadas al sistema de infracciones"
-                count={rep.pagadas.length}
-            >
-                {rep.pagadas.map((m) => (
-                    <div
-                        key={m.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                    >
-                        <PatenteChofer
-                            patente={m.patente}
-                            conductor={m.conductor ?? null}
-                            inactivo={m.conductor_inactivo}
-                        />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
-                            {m.descripcion}
-                        </span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
-                            {m.pagada_en ? formatFecha(m.pagada_en) : ''}
-                        </span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
-                            {sinImporte(m) ? '—' : formatARS(montoEfectivo(m))}
-                        </span>
-                    </div>
-                ))}
-            </ReporteSeccion>
-
-            {/* Cobros a choferes */}
-            <ReporteSeccion
-                icon={UserIcon}
-                color="text-green-500"
-                title="Cobros a choferes"
-                count={rep.cobros.length}
-            >
-                {rep.cobros.map(({ multa: m, pago: p }) => (
-                    <div
-                        key={p.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                    >
-                        <PatenteChofer
-                            patente={m.patente}
-                            conductor={m.conductor ?? null}
-                            inactivo={m.conductor_inactivo}
-                        />
-                        <span className="ml-auto flex shrink-0 items-center gap-2">
-                            {p.es_transferencia && (
-                                <span className="rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400">
-                                    Transferencia
-                                </span>
-                            )}
-                            {!m.cobrado && (
-                                <span className="rounded border border-orange-300 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                                    Parcial
-                                </span>
-                            )}
-                            <span className="text-xs text-muted-foreground tabular-nums">
-                                {formatFecha(p.fecha)}
-                            </span>
-                            <span className="w-24 text-right text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
-                                {formatARS(Number(p.monto))}
-                            </span>
-                        </span>
-                    </div>
-                ))}
-            </ReporteSeccion>
-
-            {/* Saldadas por completo */}
-            <ReporteSeccion
-                icon={Check}
-                color="text-green-500"
-                title="Saldadas por completo"
-                count={rep.saldadas.length}
-            >
-                {rep.saldadas.map((m) => (
-                    <div
-                        key={m.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                    >
-                        <PatenteChofer
-                            patente={m.patente}
-                            conductor={m.conductor ?? null}
-                            inactivo={m.conductor_inactivo}
-                        />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
-                            {m.descripcion}
-                        </span>
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0">
-                            {m.cobrada_en ? formatFecha(m.cobrada_en) : ''}
-                        </span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-foreground tabular-nums">
-                            {sinImporte(m)
-                                ? '—'
-                                : formatARS(Number(m.monto_cobrado))}
-                        </span>
-                    </div>
-                ))}
-            </ReporteSeccion>
-
-            {/* Eliminadas */}
-            <ReporteSeccion
-                icon={Trash2}
-                color="text-red-500"
-                title="Multas eliminadas"
-                count={rep.borradas.length}
-            >
-                {rep.borradas.map((e) => (
-                    <div
-                        key={e.id}
-                        className="flex items-center gap-3 px-4 py-2.5"
-                    >
-                        <PatenteChofer
-                            patente={e.patente}
-                            conductor={e.conductor}
-                            inactivo={e.conductor_inactivo}
-                        />
-                        <span className="hidden min-w-0 flex-1 truncate text-xs text-muted-foreground sm:block">
-                            {e.descripcion}
-                        </span>
-                        <span
-                            className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums sm:ml-0"
-                            title="Fecha de eliminación"
-                        >
-                            {formatFecha(e.deleted_at)}
-                        </span>
-                        <span className="w-24 shrink-0 text-right text-sm font-semibold text-muted-foreground tabular-nums line-through">
-                            {sinImporte(e) ? '—' : formatARS(Number(e.monto))}
-                        </span>
-                    </div>
-                ))}
-            </ReporteSeccion>
-        </div>
-    );
-}
-
-function MultaPdf({ pdfUrl }: { pdfUrl: string | null }) {
-    if (!pdfUrl) {
-        return (
-            <span
-                title="Sin PDF"
-                className="flex h-7 w-7 items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            >
-                <FileX className="h-3.5 w-3.5" />
-            </span>
-        );
-    }
-    return (
-        <a
-            href={pdfUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Ver PDF"
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-            <FileText className="h-3.5 w-3.5" />
-        </a>
-    );
-}
-
-/** Al marcar una multa como cobrada, pide la fecha en que pagó el chofer. */
-function CobrarMultaModal({
-    multa,
-    onClose,
-}: {
-    multa: Multa | null;
-    onClose: () => void;
-}) {
-    return (
-        <Dialog
-            open={!!multa}
-            onOpenChange={(o) => {
-                if (!o) onClose();
-            }}
-        >
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
-                {multa && (
-                    <CobrarMultaForm
-                        key={multa.id}
-                        multa={multa}
-                        onClose={onClose}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function CobrarMultaForm({
-    multa,
-    onClose,
-}: {
-    multa: Multa;
-    onClose: () => void;
-}) {
-    const today = new Date().toISOString().slice(0, 10);
-    const total = montoEfectivo(multa);
-    const pagado = multa.monto_cobrado;
-    const falta = Math.max(total - pagado, 0);
-    const fully = multa.cobrado;
-
-    const form = useForm({
-        monto: fully ? '' : String(falta.toFixed(2)),
-        fecha_cobro: today,
-        comprobante: null as File | null,
-        es_transferencia: false,
-    });
-
-    const { cropImage, cropperElement } = useImageCropper();
-
-    async function handleComprobante(f: File | null) {
-        // Solo las imágenes pasan por el editor de recorte; los PDF van directo.
-        if (f && f.type.startsWith('image/')) {
-            try {
-                form.setData('comprobante', await cropImage(f));
-            } catch {
-                // recorte cancelado
-            }
-            return;
-        }
-        form.setData('comprobante', f);
-    }
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        // Comprobante por multipart; la ruta es PATCH, hay que falsear el método.
-        form.transform((data) => ({ ...data, _method: 'patch' }));
-        form.post(`/multas/${multa.id}/cobrado`, {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['multas', 'flash'],
-            forceFormData: true,
-            onSuccess: () => onClose(),
-        });
-    }
-
-    function reiniciar() {
-        router.patch(
-            `/multas/${multa.id}/cobrado`,
-            { reset: true },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['multas', 'flash'],
-                onSuccess: () => onClose(),
-            },
-        );
-    }
-
-    function eliminarPago(pagoId: number) {
-        router.delete(`/multas/${multa.id}/pagos/${pagoId}`, {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['multas', 'flash'],
-            onSuccess: () => onClose(),
-        });
-    }
-
-    const montoNum = Number(form.data.monto);
-    const puedeRegistrar =
-        montoNum > 0 && form.data.fecha_cobro !== '' && !form.processing;
-
-    return (
-        <form onSubmit={submit}>
-            {cropperElement}
-            <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
-                    <UserIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="flex-1">
-                    <DialogTitle className="text-base font-semibold">
-                        Cobro al chofer
-                    </DialogTitle>
-                    <DialogDescription className="text-xs">
-                        <span className="font-mono font-semibold uppercase">
-                            {multa.patente}
-                        </span>
-                        {multa.conductor ? ` · ${multa.conductor}` : ''}
-                    </DialogDescription>
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-4 px-5 py-5">
-                {/* Resumen del cobro */}
-                <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Total
-                        </p>
-                        <p className="text-sm font-bold text-foreground tabular-nums">
-                            {formatARS(total)}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Pagado
-                        </p>
-                        <p className="text-sm font-bold text-green-600 tabular-nums dark:text-green-400">
-                            {formatARS(pagado)}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Falta
-                        </p>
-                        <p
-                            className={cn(
-                                'text-sm font-bold tabular-nums',
-                                falta > 0
-                                    ? 'text-foreground'
-                                    : 'text-muted-foreground',
-                            )}
-                        >
-                            {formatARS(falta)}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Pagos registrados */}
-                {multa.pagos.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                            Pagos registrados
-                        </p>
-                        <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border">
-                            {multa.pagos.map((p) => (
-                                <div
-                                    key={p.id}
-                                    className="flex items-center gap-2 px-3 py-2"
-                                >
-                                    <span className="w-20 shrink-0 text-xs text-muted-foreground tabular-nums">
-                                        {formatFecha(p.fecha)}
-                                    </span>
-                                    <span className="text-sm font-semibold text-foreground tabular-nums">
-                                        {formatARS(p.monto)}
-                                    </span>
-                                    <span className="flex-1">
-                                        {p.es_transferencia ? (
-                                            <span
-                                                className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
-                                                title="Pagado por transferencia"
-                                            >
-                                                Transferencia
-                                            </span>
-                                        ) : (
-                                            <span
-                                                className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
-                                                title="Pagado en efectivo"
-                                            >
-                                                Efectivo
-                                            </span>
-                                        )}
-                                    </span>
-                                    {p.comprobante_url ? (
-                                        <a
-                                            href={p.comprobante_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title="Ver comprobante"
-                                            className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        >
-                                            <FileText className="h-3 w-3" />{' '}
-                                            Comp.
-                                        </a>
-                                    ) : (
-                                        <span className="text-[10px] text-muted-foreground/60">
-                                            sin comprobante
-                                        </span>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => eliminarPago(p.id)}
-                                        title="Eliminar pago"
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {fully ? (
-                    <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
-                        Cobrada por completo
-                        {multa.cobrada_en
-                            ? ` el ${formatFecha(multa.cobrada_en)}`
-                            : ''}
-                        .
-                    </p>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-monto">
-                                    Monto que pagó
-                                </Label>
-                                <MoneyInput
-                                    id="cobro-monto"
-                                    value={
-                                        form.data.monto === ''
-                                            ? null
-                                            : Number(form.data.monto)
-                                    }
-                                    onValueChange={(n) =>
-                                        form.setData(
-                                            'monto',
-                                            n == null ? '' : String(n),
-                                        )
-                                    }
-                                />
-                                {form.errors.monto && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.monto}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-fecha">
-                                    Fecha del pago
-                                </Label>
-                                <Input
-                                    id="cobro-fecha"
-                                    type="date"
-                                    value={form.data.fecha_cobro}
-                                    max={today}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'fecha_cobro',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                {form.errors.fecha_cobro && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.fecha_cobro}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Método de pago: efectivo (sin comprobante) o transferencia. */}
-                        <div className="flex flex-col gap-1.5">
-                            <Label>Método de pago</Label>
-                            <div className="inline-flex overflow-hidden rounded-lg border border-border">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        form.setData('es_transferencia', false);
-                                        form.setData('comprobante', null);
-                                    }}
-                                    className={cn(
-                                        'flex-1 px-3 py-2 text-sm font-medium transition-colors',
-                                        !form.data.es_transferencia
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
-                                    )}
-                                >
-                                    Efectivo
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        form.setData('es_transferencia', true)
-                                    }
-                                    className={cn(
-                                        'flex-1 border-l border-border px-3 py-2 text-sm font-medium transition-colors',
-                                        form.data.es_transferencia
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
-                                    )}
-                                >
-                                    Transferencia
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* El comprobante solo aplica a la transferencia; en efectivo no se pide. */}
-                        {form.data.es_transferencia && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label>
-                                    Comprobante{' '}
-                                    <span className="font-normal text-muted-foreground">
-                                        (opcional)
-                                    </span>
-                                </Label>
-                                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span
-                                        className={cn(
-                                            'min-w-0 flex-1 truncate',
-                                            form.data.comprobante
-                                                ? 'text-foreground'
-                                                : 'text-muted-foreground',
-                                        )}
-                                    >
-                                        {form.data.comprobante
-                                            ? form.data.comprobante.name
-                                            : 'Adjuntar comprobante (PDF o imagen)...'}
-                                    </span>
-                                    <input
-                                        type="file"
-                                        accept="application/pdf,image/*"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            handleComprobante(
-                                                e.target.files?.[0] ?? null,
-                                            );
-                                            e.target.value = '';
-                                        }}
-                                    />
-                                </label>
-                                {form.errors.comprobante && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.comprobante}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        <p className="-mt-1 text-[11px] text-muted-foreground">
-                            Si el pago no cubre el total, la multa queda como
-                            cobro parcial (pendiente).
-                        </p>
-                    </>
-                )}
-            </div>
-
-            <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4">
-                {pagado > 0 && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={reiniciar}
-                        className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400"
-                    >
-                        Reiniciar cobro
-                    </Button>
-                )}
-                <Button type="button" variant="outline" onClick={onClose}>
-                    <X className="h-4 w-4" /> Cerrar
-                </Button>
-                {!fully && (
-                    <Button type="submit" disabled={!puedeRegistrar}>
-                        {form.processing ? (
-                            'Guardando...'
-                        ) : (
-                            <>
-                                <Check className="h-4 w-4" /> Registrar pago
-                            </>
-                        )}
-                    </Button>
-                )}
-            </DialogFooter>
-        </form>
-    );
-}
-
-function RegistrarMultaModal({
-    open,
-    onClose,
-    vehiculos,
-}: {
-    open: boolean;
-    onClose: () => void;
-    vehiculos: VehiculoOpt[];
-}) {
-    const today = new Date().toISOString().slice(0, 10);
-    const form = useForm({
-        vehiculo_id: '' as string,
-        fecha: today,
-        fecha_vencimiento: '' as string,
-        monto: '' as string,
-        descripcion: '' as string,
-        punto_rojo: false,
-        jurisdiccion: '' as '' | 'CABA' | 'GBA',
-        pdf: null as File | null,
-    });
-
-    const opciones: ComboboxOption[] = useMemo(
-        () =>
-            vehiculos.map((v) => ({
-                value: String(v.id),
-                label: v.patente,
-                sub: `${v.marca} ${v.modelo}`,
-            })),
-        [vehiculos],
-    );
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/multas', {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['multas', 'flash'],
-            onSuccess: () => {
-                form.reset();
-                form.setData('fecha', today);
-                onClose();
-            },
-        });
-    }
-
-    const puntoRojo = form.data.punto_rojo;
-    const canSubmit =
-        form.data.vehiculo_id !== '' &&
-        form.data.fecha !== '' &&
-        form.data.descripcion.trim() !== '' &&
-        form.data.jurisdiccion !== '' &&
-        (puntoRojo ||
-            (form.data.fecha_vencimiento !== '' && form.data.monto !== ''));
-
-    function setPuntoRojo(checked: boolean) {
-        form.setData((prev) => ({
-            ...prev,
-            punto_rojo: checked,
-            // Punto rojo no tiene importe ni vencimiento/descuento.
-            monto: checked ? '' : prev.monto,
-            fecha_vencimiento: checked ? '' : prev.fecha_vencimiento,
-        }));
-    }
-
-    return (
-        <Dialog
-            open={open}
-            onOpenChange={(o) => {
-                if (!o) {
-                    form.clearErrors();
-                    onClose();
-                }
-            }}
-        >
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
-                        <Siren className="h-5 w-5 text-red-500" />
-                    </div>
-                    <div className="flex-1">
-                        <DialogTitle className="text-base font-semibold">
-                            Registrar multa
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            El chofer se determina automáticamente según la
-                            fecha.
-                        </DialogDescription>
-                    </div>
-                </div>
-
-                <form onSubmit={submit}>
-                    <div className="flex flex-col gap-4 px-5 py-5">
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="multa-patente">Patente</Label>
-                            <Combobox
-                                id="multa-patente"
-                                placeholder="Buscar patente..."
-                                options={opciones}
-                                value={form.data.vehiculo_id}
-                                onSelect={(o) =>
-                                    form.setData('vehiculo_id', o.value)
-                                }
-                                uppercase
-                            />
-                            {form.errors.vehiculo_id && (
-                                <p className="text-xs text-red-600">
-                                    {form.errors.vehiculo_id}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-fecha">
-                                    Fecha de infracción
-                                </Label>
-                                <Input
-                                    id="multa-fecha"
-                                    type="date"
-                                    value={form.data.fecha}
-                                    max={today}
-                                    onChange={(e) =>
-                                        form.setData('fecha', e.target.value)
-                                    }
-                                />
-                                {form.errors.fecha && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.fecha}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-vto">
-                                    Fecha de vencimiento
-                                </Label>
-                                <Input
-                                    id="multa-vto"
-                                    type="date"
-                                    value={form.data.fecha_vencimiento}
-                                    min={form.data.fecha}
-                                    disabled={puntoRojo}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'fecha_vencimiento',
-                                            e.target.value,
-                                        )
-                                    }
-                                    className={cn(
-                                        puntoRojo &&
-                                            'cursor-not-allowed opacity-50',
-                                    )}
-                                />
-                                {form.errors.fecha_vencimiento && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.fecha_vencimiento}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <p className="-mt-2 text-[11px] text-muted-foreground">
-                            {puntoRojo
-                                ? 'Las multas de punto rojo no tienen importe ni vencimiento.'
-                                : form.data.jurisdiccion === 'GBA'
-                                  ? 'Las multas de GBA (provincia) no tienen descuento.'
-                                  : 'CABA: pagando antes del vencimiento, la multa tiene un 50% de descuento (GBA no tiene descuento).'}
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="multa-monto">Monto total</Label>
-                                <MoneyInput
-                                    id="multa-monto"
-                                    placeholder={
-                                        puntoRojo ? 'Sin monto' : '0,00'
-                                    }
-                                    value={
-                                        form.data.monto === ''
-                                            ? null
-                                            : Number(form.data.monto)
-                                    }
-                                    disabled={puntoRojo}
-                                    onValueChange={(n) =>
-                                        form.setData(
-                                            'monto',
-                                            n == null ? '' : String(n),
-                                        )
-                                    }
-                                    className={cn(
-                                        puntoRojo &&
-                                            'cursor-not-allowed opacity-50',
-                                    )}
-                                />
-                                {form.errors.monto && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.monto}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label>Jurisdicción</Label>
-                                <div className="flex gap-1.5">
-                                    {(['CABA', 'GBA'] as const).map((j) => (
-                                        <button
-                                            key={j}
-                                            type="button"
-                                            onClick={() =>
-                                                form.setData('jurisdiccion', j)
-                                            }
-                                            className={cn(
-                                                'h-9 flex-1 rounded-lg border text-sm font-medium transition-all active:scale-[0.98]',
-                                                form.data.jurisdiccion === j
-                                                    ? 'border-primary/30 bg-primary/10 text-primary'
-                                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
-                                            )}
-                                        >
-                                            {j}
-                                        </button>
-                                    ))}
-                                </div>
-                                {form.errors.jurisdiccion && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.jurisdiccion}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="multa-desc">Descripción</Label>
-                            <textarea
-                                id="multa-desc"
-                                rows={3}
-                                placeholder="Motivo de la multa..."
-                                value={form.data.descripcion}
-                                onChange={(e) =>
-                                    form.setData('descripcion', e.target.value)
-                                }
-                                maxLength={1000}
-                                className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
-                            />
-                            {form.errors.descripcion && (
-                                <p className="text-xs text-red-600">
-                                    {form.errors.descripcion}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                            <Label>
-                                PDF de la multa{' '}
-                                <span className="font-normal text-muted-foreground">
-                                    (opcional)
-                                </span>
-                            </Label>
-                            <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
-                                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                <span
-                                    className={cn(
-                                        'min-w-0 flex-1 truncate',
-                                        form.data.pdf
-                                            ? 'text-foreground'
-                                            : 'text-muted-foreground',
-                                    )}
-                                >
-                                    {form.data.pdf
-                                        ? form.data.pdf.name
-                                        : 'Seleccionar archivo PDF...'}
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="application/pdf"
-                                    className="hidden"
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'pdf',
-                                            e.target.files?.[0] ?? null,
-                                        )
-                                    }
-                                />
-                            </label>
-                            {form.errors.pdf && (
-                                <p className="text-xs text-red-600">
-                                    {form.errors.pdf}
-                                </p>
-                            )}
-                        </div>
-
-                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
-                            <input
-                                type="checkbox"
-                                checked={form.data.punto_rojo}
-                                onChange={(e) => setPuntoRojo(e.target.checked)}
-                                className="h-4 w-4 rounded border-input accent-red-500"
-                            />
-                            <span className="flex items-center gap-1.5 text-sm text-foreground">
-                                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                                Punto rojo
-                            </span>
-                        </label>
-                    </div>
-
-                    <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={onClose}
-                        >
-                            <X className="h-4 w-4" /> Cancelar
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={!canSubmit || form.processing}
-                        >
-                            {form.processing ? (
-                                'Guardando...'
-                            ) : (
-                                <>
-                                    <Check className="h-4 w-4" /> Registrar
-                                </>
-                            )}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-/** Modal para editar el monto y la fecha de vencimiento de una multa. */
-function EditarMultaModal({
-    multa,
-    onClose,
-    onDelete,
-}: {
-    multa: Multa | null;
-    onClose: () => void;
-    onDelete: (id: number) => void;
-}) {
-    return (
-        <Dialog
-            open={!!multa}
-            onOpenChange={(o) => {
-                if (!o) onClose();
-            }}
-        >
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                {multa && (
-                    <EditarMultaForm
-                        key={multa.id}
-                        multa={multa}
-                        onClose={onClose}
-                        onDelete={onDelete}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditarMultaForm({
-    multa,
-    onClose,
-    onDelete,
-}: {
-    multa: Multa;
-    onClose: () => void;
-    onDelete: (id: number) => void;
-}) {
-    const [confirmDelete, setConfirmDelete] = useState(false);
-    const form = useForm({
-        monto: String(multa.monto),
-        fecha_vencimiento: multa.fecha_vencimiento ?? '',
-        punto_rojo: multa.punto_rojo,
-        pdf: null as File | null,
-    });
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        // El PDF se sube por multipart; en rutas PATCH hay que falsear el método.
-        // Los booleanos van como '1'/'0' porque FormData serializa todo a texto.
-        form.transform((data) => ({
-            ...data,
-            punto_rojo: data.punto_rojo ? '1' : '0',
-            _method: 'patch',
-        }));
-        form.post(`/multas/${multa.id}`, {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['multas', 'flash'],
-            forceFormData: true,
-            onSuccess: () => onClose(),
-        });
-    }
-
-    // Un punto rojo puede conservar su importe: si se deja el monto en blanco
-    // queda como seguimiento sin precio, y si se carga se comporta como una
-    // multa normal (suma en totales y se le cobra al chofer).
-    const conImporte = form.data.monto !== '' && Number(form.data.monto) > 0;
-    const camposOk = form.data.punto_rojo
-        ? !conImporte || form.data.fecha_vencimiento !== ''
-        : form.data.monto !== '' && form.data.fecha_vencimiento !== '';
-
-    return (
-        <>
-            <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
-                    <Pencil className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                    <DialogTitle className="text-base font-semibold">
-                        Editar multa
-                    </DialogTitle>
-                    <DialogDescription className="text-xs">
-                        <span className="font-mono font-semibold uppercase">
-                            {multa.patente}
-                        </span>{' '}
-                        · infracción del {formatFecha(multa.fecha)}
-                    </DialogDescription>
-                </div>
-            </div>
-
-            <form onSubmit={submit}>
-                <div className="flex flex-col gap-4 px-5 py-5">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="edit-monto">Monto total</Label>
-                            <MoneyInput
-                                id="edit-monto"
-                                placeholder="0,00"
-                                value={
-                                    form.data.monto === ''
-                                        ? null
-                                        : Number(form.data.monto)
-                                }
-                                onValueChange={(n) =>
-                                    form.setData(
-                                        'monto',
-                                        n == null ? '' : String(n),
-                                    )
-                                }
-                            />
-                            {form.errors.monto && (
-                                <p className="text-xs text-red-600">
-                                    {form.errors.monto}
-                                </p>
-                            )}
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="edit-vto">
-                                Fecha de vencimiento
-                            </Label>
-                            <Input
-                                id="edit-vto"
-                                type="date"
-                                value={form.data.fecha_vencimiento}
-                                min={multa.fecha}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'fecha_vencimiento',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                            {form.errors.fecha_vencimiento && (
-                                <p className="text-xs text-red-600">
-                                    {form.errors.fecha_vencimiento}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border px-3 py-2.5 transition-colors hover:bg-muted/40">
-                            <input
-                                type="checkbox"
-                                checked={form.data.punto_rojo}
-                                onChange={(e) =>
-                                    form.setData('punto_rojo', e.target.checked)
-                                }
-                                className="h-4 w-4 rounded border-input accent-red-500"
-                            />
-                            <span className="flex items-center gap-1.5 text-sm text-foreground">
-                                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                                Punto rojo
-                            </span>
-                        </label>
-                        {form.data.punto_rojo && (
-                            <p className="text-xs text-muted-foreground">
-                                {conImporte
-                                    ? 'Conserva el monto: se sigue mostrando el precio y cuenta en los totales y cobros.'
-                                    : 'Sin monto: es solo seguimiento, se muestra como "—" y no cuenta en totales ni cobros.'}
-                            </p>
-                        )}
-                        {form.errors.punto_rojo && (
-                            <p className="text-xs text-red-600">
-                                {form.errors.punto_rojo}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                        <Label>PDF de la multa</Label>
-                        <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
-                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            <span
-                                className={cn(
-                                    'min-w-0 flex-1 truncate',
-                                    form.data.pdf
-                                        ? 'text-foreground'
-                                        : 'text-muted-foreground',
-                                )}
-                            >
-                                {form.data.pdf
-                                    ? form.data.pdf.name
-                                    : multa.pdf_url
-                                      ? 'Reemplazar PDF (opcional)...'
-                                      : 'Subir PDF (opcional)...'}
-                            </span>
-                            <input
-                                type="file"
-                                accept="application/pdf"
-                                className="hidden"
-                                onChange={(e) =>
-                                    form.setData(
-                                        'pdf',
-                                        e.target.files?.[0] ?? null,
-                                    )
-                                }
-                            />
-                        </label>
-                        {multa.pdf_url && !form.data.pdf && (
-                            <a
-                                href={multa.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-primary hover:underline"
-                            >
-                                Ver PDF actual
-                            </a>
-                        )}
-                        {form.errors.pdf && (
-                            <p className="text-xs text-red-600">
-                                {form.errors.pdf}
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                <DialogFooter className="flex-row items-center border-t border-border px-5 py-4">
-                    {confirmDelete ? (
-                        <>
-                            <span className="mr-auto text-xs text-muted-foreground">
-                                ¿Seguro que querés eliminarla?
-                            </span>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setConfirmDelete(false)}
-                            >
-                                No
-                            </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="bg-red-500 hover:bg-red-600"
-                                onClick={() => onDelete(multa.id)}
-                            >
-                                <Trash2 className="h-3.5 w-3.5" /> Sí, eliminar
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(true)}
-                                className="mr-auto text-xs text-muted-foreground/60 underline-offset-2 transition-colors hover:text-red-500 hover:underline"
-                            >
-                                Eliminar multa
-                            </button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={onClose}
-                            >
-                                <X className="h-4 w-4" /> Cancelar
-                            </Button>
-                            <Button
-                                type="submit"
-                                disabled={!camposOk || form.processing}
-                            >
-                                {form.processing ? (
-                                    'Guardando...'
-                                ) : (
-                                    <>
-                                        <Check className="h-4 w-4" /> Guardar
-                                    </>
-                                )}
-                            </Button>
-                        </>
-                    )}
-                </DialogFooter>
-            </form>
-        </>
-    );
-}
-
-/** Etiqueta para choferes dados de baja. */
-function InactivoBadge() {
-    return (
-        <span
-            title="Chofer inactivo"
-            className="inline-flex shrink-0 items-center gap-1 rounded border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-zinc-500 uppercase dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-        >
-            Inactivo
-        </span>
-    );
-}
-
-function Chip({
-    activo,
-    onClick,
-    children,
-}: {
-    activo: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all active:scale-[0.97]',
-                activo
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-        >
-            {children}
-        </button>
     );
 }
 

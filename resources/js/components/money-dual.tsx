@@ -54,8 +54,8 @@ export function MoneyDual({
     }[size];
 
     const usdSize = {
-        sm: 'text-[10px]',
-        md: 'text-[11px]',
+        sm: 'text-xs',
+        md: 'text-xs',
         lg: 'text-xs',
         xl: 'text-sm',
     }[size];

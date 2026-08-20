@@ -40,7 +40,10 @@ export function CompanySwitcher() {
     }
 
     const switchEmpresa = (empresaId: number) => {
-        if (empresaId === active.id) return;
+        if (empresaId === active.id) {
+return;
+}
+
         router.post(
             empresaRoutes.switch.url(),
             { empresa_id: empresaId },

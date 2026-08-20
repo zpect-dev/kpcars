@@ -8,10 +8,8 @@ import {
     History,
     Loader2,
     Minus,
-    Package,
     Pencil,
     Plus,
-    Search,
     Settings2,
     Sparkles,
     Trash2,
@@ -21,8 +19,13 @@ import {
     X,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { EmptyState } from '@/components/app/empty-state';
+import { SearchInput } from '@/components/app/filter-bar';
+import { PageContainer } from '@/components/app/page-container';
 import { ExportDropdown } from '@/components/export-dropdown';
 import InputError from '@/components/input-error';
+import { EditarArticuloModal } from '@/components/inventario/editar-articulo-modal';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import { Combobox } from '@/components/ui/combobox';
 import type { ComboboxOption } from '@/components/ui/combobox';
@@ -34,11 +37,10 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { exportToExcel, exportToPdf } from '@/lib/export';
 import { cn } from '@/lib/utils';
-import { index, salidaMultiple, store, update, updateCosto } from '@/routes/articulos';
+import { index, salidaMultiple, store, updateCosto } from '@/routes/articulos';
 import { index as conteosIndex } from '@/routes/conteos';
 import { index as transactionsIndex } from '@/routes/transactions';
 import type { Articulo, Vehiculo } from '@/types';
@@ -168,6 +170,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         let result = tabItems;
 
         const q = itemSearch.toLowerCase().trim();
+
         if (q) {
             result = result.filter(
                 (i) =>
@@ -176,9 +179,13 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             );
         }
 
-        if (stockFilter === 'sin-stock') result = result.filter((i) => i.stock === 0);
-        else if (stockFilter === 'bajo')  result = result.filter((i) => i.stock > 0 && i.stock <= i.min_stock);
-        else if (stockFilter === 'normal') result = result.filter((i) => i.stock > i.min_stock);
+        if (stockFilter === 'sin-stock') {
+result = result.filter((i) => i.stock === 0);
+} else if (stockFilter === 'bajo')  {
+result = result.filter((i) => i.stock > 0 && i.stock <= i.min_stock);
+} else if (stockFilter === 'normal') {
+result = result.filter((i) => i.stock > i.min_stock);
+}
 
         // Al filtrar por crítico o bajo, mostrar los más urgentes primero
         if (stockFilter === 'sin-stock' || stockFilter === 'bajo') {
@@ -200,6 +207,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
             i.costo ?? 0,
             i.precio,
         ]);
+
         return { headers, rows };
     }
 
@@ -493,19 +501,15 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
         <>
             <Head title="Inventario" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div className="relative w-full sm:max-w-sm sm:flex-1">
-                        <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="Buscar por código o nombre..."
-                            className="bg-card pl-9 shadow-xs"
-                            value={itemSearch}
-                            onChange={(e) => setItemSearch(e.target.value)}
-                        />
-                    </div>
+                    <SearchInput
+                        className="w-full sm:max-w-sm sm:flex-1"
+                        value={itemSearch}
+                        onChange={setItemSearch}
+                        placeholder="Buscar por código o nombre..."
+                    />
                     {!isMechanic && (
                         <div className="flex gap-2">
                             <ExportDropdown
@@ -604,11 +608,12 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 <div className="flex flex-wrap gap-1.5">
                     {([
                         { key: 'all',       label: 'Todos',      value: stats.total,    dot: null },
-                        { key: 'sin-stock', label: 'Sin stock',  value: stats.sinStock, dot: 'bg-red-500' },
-                        { key: 'bajo',      label: 'Stock bajo', value: stats.bajo,     dot: 'bg-amber-500' },
-                        { key: 'normal',    label: 'Normal',     value: stats.normal,   dot: 'bg-green-500' },
+                        { key: 'sin-stock', label: 'Sin stock',  value: stats.sinStock, dot: 'bg-destructive' },
+                        { key: 'bajo',      label: 'Stock bajo', value: stats.bajo,     dot: 'bg-warning' },
+                        { key: 'normal',    label: 'Normal',     value: stats.normal,   dot: 'bg-success' },
                     ] as const).map((s) => {
                         const active = stockFilter === s.key;
+
                         return (
                             <button
                                 key={s.key}
@@ -679,10 +684,41 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     <tr>
                                         <td
                                             colSpan={canWrite ? 7 : 6}
-                                            className="px-6 py-12 text-center text-muted-foreground"
+                                            className="p-0"
                                         >
-                                            No hay artículos registrados o no
-                                            coinciden con la búsqueda.
+                                            <EmptyState
+                                                variant={
+                                                    itemSearch.trim()
+                                                        ? 'filtered'
+                                                        : 'empty'
+                                                }
+                                                icon={
+                                                    itemSearch.trim()
+                                                        ? undefined
+                                                        : Warehouse
+                                                }
+                                                title={
+                                                    itemSearch.trim()
+                                                        ? 'Ningún artículo coincide'
+                                                        : 'Todavía no hay artículos en esta zona'
+                                                }
+                                                description={
+                                                    itemSearch.trim()
+                                                        ? 'Probá con otro código o descripción.'
+                                                        : 'Cargá el primero para empezar a controlar el stock.'
+                                                }
+                                                action={
+                                                    itemSearch.trim()
+                                                        ? {
+                                                              label: 'Limpiar búsqueda',
+                                                              onClick: () =>
+                                                                  setItemSearch(
+                                                                      '',
+                                                                  ),
+                                                          }
+                                                        : undefined
+                                                }
+                                            />
                                         </td>
                                     </tr>
                                 ) : (
@@ -696,7 +732,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 className={cn(
                                                     'transition-colors',
                                                     lowStock
-                                                        ? 'bg-red-100 hover:bg-red-200/80 dark:bg-red-950/50 dark:hover:bg-red-950/70'
+                                                        ? 'bg-destructive-soft hover:bg-destructive/20'
                                                         : 'bg-card hover:bg-muted/40',
                                                 )}
                                             >
@@ -709,7 +745,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     className={cn(
                                                         'max-w-0 px-4 py-3 font-medium sm:px-6 sm:py-4',
                                                         lowStock
-                                                            ? 'text-red-800 dark:text-red-300'
+                                                            ? 'text-destructive-soft-foreground'
                                                             : 'text-foreground',
                                                     )}
                                                 >
@@ -723,15 +759,15 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 <td className="px-4 py-3 sm:px-6 sm:py-4">
                                                     <div className="flex items-center gap-1.5">
                                                         {item.stock === 0 && (
-                                                            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
+                                                            <AlertCircle aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />
                                                         )}
                                                         <div className="min-w-0">
                                                             <span className={cn(
                                                                 'font-semibold tabular-nums',
                                                                 item.stock === 0
-                                                                    ? 'text-red-700 dark:text-red-400'
+                                                                    ? 'text-destructive-soft-foreground'
                                                                     : lowStock
-                                                                        ? 'text-amber-700 dark:text-amber-400'
+                                                                        ? 'text-warning-soft-foreground'
                                                                         : 'text-foreground',
                                                             )}>
                                                                 {item.stock}
@@ -804,6 +840,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                                 onClick={
                                                                     cancelEditCost
                                                                 }
+                                                                aria-label="Cancelar la edición del costo"
                                                                 className="text-muted-foreground hover:text-foreground"
                                                             >
                                                                 <X className="h-3.5 w-3.5" />
@@ -866,8 +903,33 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 {/* Mobile cards — independientes, mismo estilo que el resto de la app */}
                 <div className="flex flex-col gap-2 pb-4 md:hidden">
                     {filteredItems.length === 0 ? (
-                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                            No hay artículos registrados o no coinciden con la búsqueda.
+                        <div className="rounded-xl border border-border bg-card shadow-sm">
+                            <EmptyState
+                                variant={
+                                    itemSearch.trim() ? 'filtered' : 'empty'
+                                }
+                                icon={
+                                    itemSearch.trim() ? undefined : Warehouse
+                                }
+                                title={
+                                    itemSearch.trim()
+                                        ? 'Ningún artículo coincide'
+                                        : 'Todavía no hay artículos en esta zona'
+                                }
+                                description={
+                                    itemSearch.trim()
+                                        ? 'Probá con otro código o descripción.'
+                                        : 'Cargá el primero para empezar a controlar el stock.'
+                                }
+                                action={
+                                    itemSearch.trim()
+                                        ? {
+                                              label: 'Limpiar búsqueda',
+                                              onClick: () => setItemSearch(''),
+                                          }
+                                        : undefined
+                                }
+                            />
                         </div>
                     ) : (
                         filteredItems.map((item) => {
@@ -892,16 +954,16 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     {/* Número de stock */}
                                     <div className="flex w-10 shrink-0 flex-col items-center justify-center">
                                         {sinStock ? (
-                                            <AlertCircle className="h-5 w-5 text-red-500" />
+                                            <AlertCircle aria-hidden="true" className="size-5 text-destructive" />
                                         ) : (
                                             <>
                                                 <span className={cn(
                                                     'text-xl font-bold tabular-nums leading-none',
-                                                    lowStock ? 'text-amber-500' : 'text-foreground',
+                                                    lowStock ? 'text-warning-soft-foreground' : 'text-foreground',
                                                 )}>
                                                     {item.stock}
                                                 </span>
-                                                <span className="text-[9px] text-muted-foreground">uds</span>
+                                                <span className="text-xs text-muted-foreground">uds</span>
                                             </>
                                         )}
                                     </div>
@@ -915,11 +977,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                             {item.descripcion}
                                         </p>
                                         {item.codigo && (
-                                            <span className="mt-0.5 inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-semibold text-foreground">
+                                            <span className="mt-0.5 inline-block rounded bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold text-foreground">
                                                 {item.codigo}
                                             </span>
                                         )}
-                                        <div className="mt-1.5 flex gap-3 text-[11px] text-muted-foreground">
+                                        <div className="mt-1.5 flex gap-3 text-xs text-muted-foreground">
                                             <span>Mín: <span className="font-medium text-foreground">{item.min_stock}</span></span>
                                             <span>Precio: <span className="font-medium text-foreground">{formatARS(Number(item.precio))}</span></span>
                                         </div>
@@ -929,7 +991,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     {(sinStock || lowStock) && (
                                         <div className={cn(
                                             'h-2 w-2 shrink-0 rounded-full',
-                                            sinStock ? 'bg-red-500' : 'bg-amber-500',
+                                            sinStock ? 'bg-destructive' : 'bg-warning',
                                         )} />
                                     )}
                                 </div>
@@ -937,7 +999,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                         })
                     )}
                 </div>
-            </div>
+            </PageContainer>
 
             {/* ─── Modal Edición de artículo ───────────────────────────────────── */}
             <EditarArticuloModal
@@ -959,8 +1021,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 <DialogContent className="max-h-[90dvh] w-[92vw] max-w-[92vw] gap-0 overflow-x-hidden overflow-y-auto p-0 sm:w-full sm:max-w-lg">
                     {/* Header */}
                     <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
-                            <ArrowUpCircle className="h-5 w-5 text-red-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive-soft">
+                            <ArrowUpCircle aria-hidden="true" className="size-5 text-destructive-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -1041,11 +1103,11 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     </span>
                                                     <span
                                                         className={cn(
-                                                            'text-[11px]',
+                                                            'text-xs',
                                                             remaining < 0
                                                                 ? 'text-destructive'
                                                                 : remaining <= 3
-                                                                  ? 'text-amber-500 dark:text-amber-400'
+                                                                  ? 'text-warning-soft-foreground'
                                                                   : 'text-muted-foreground',
                                                         )}
                                                     >
@@ -1173,7 +1235,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                         );
 
                                         return (
-                                            <div className="flex items-center justify-between gap-2 rounded-xl border border-amber-500/50 bg-amber-500/5 px-4 py-3">
+                                            <div className="flex items-center justify-between gap-2 rounded-xl border border-warning/50 bg-warning-soft/40 px-4 py-3">
                                                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                                                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                                                         <p className="font-mono text-sm font-bold tracking-widest text-foreground uppercase">
@@ -1191,7 +1253,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     </div>
                                                     {v?.user?.name && (
                                                         <div className="flex min-w-0 items-center gap-1.5">
-                                                            <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[9px] font-bold text-foreground">
+                                                            <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-foreground">
                                                                 {v.user.name
                                                                     .split(' ')
                                                                     .map(
@@ -1292,8 +1354,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                             <div className="flex items-center gap-2 sm:mr-auto">
                                 {salidaValida ? (
                                     <span className="relative flex h-2.5 w-2.5">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
                                     </span>
                                 ) : (
                                     <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/30" />
@@ -1345,8 +1407,8 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                 <DialogContent className="max-h-[90dvh] w-[92vw] max-w-[92vw] gap-0 overflow-x-hidden overflow-y-auto p-0 sm:w-full sm:max-w-md">
                     {/* Header */}
                     <div className="flex items-start gap-3 border-b border-border px-4 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
-                            <ArrowDownCircle className="h-5 w-5 text-orange-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft">
+                            <ArrowDownCircle aria-hidden="true" className="size-5 text-warning-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -1403,7 +1465,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                     : '¿Qué repuesto entró?'}
                             </Label>
                             {isRestock && matchedItem ? (
-                                <div className="flex items-center gap-3 rounded-xl border-2 border-orange-500/50 bg-orange-500/10 px-3.5 py-3">
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-warning/50 bg-warning-soft px-3.5 py-3">
                                     <div className="min-w-0 flex-1">
                                         <p className="truncate font-semibold text-foreground">
                                             {matchedItem.descripcion}
@@ -1429,7 +1491,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                 50,
                                             );
                                         }}
-                                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-orange-500/20 hover:text-foreground"
+                                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-warning/20 hover:text-foreground"
                                     >
                                         <X className="h-3.5 w-3.5" />
                                     </button>
@@ -1608,7 +1670,7 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
                                                     </span>
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-1 rounded-md bg-emerald-500/15 px-2.5 py-1 text-xs font-semibold text-emerald-500">
+                                            <div className="flex items-center gap-1 rounded-md bg-success-soft px-2.5 py-1 text-xs font-semibold text-success-soft-foreground">
                                                 <TrendingUp className="h-3 w-3" />
                                                 +{createForm.data.stock}
                                             </div>
@@ -1777,10 +1839,10 @@ export default function ItemsIndex({ items, vehiculos }: Props) {
 
                         <DialogFooter className="flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:flex-wrap sm:items-center">
                             {isRestock && Number(createForm.data.stock) > 0 && (
-                                <div className="flex items-center gap-2 text-sm font-medium text-emerald-500 sm:mr-auto">
+                                <div className="flex items-center gap-2 text-sm font-medium text-success sm:mr-auto">
                                     <span className="relative flex h-2.5 w-2.5">
-                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
-                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+                                        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-success" />
                                     </span>
                                     +{createForm.data.stock} unidades
                                 </div>
@@ -1833,224 +1895,3 @@ ItemsIndex.layout = {
 };
 
 // ─── Modal de edición de artículo ────────────────────────────────────────────
-
-function EditarArticuloModal({
-    item,
-    isAdmin,
-    canWrite,
-    onClose,
-}: {
-    item: Articulo | null;
-    isAdmin: boolean;
-    canWrite: boolean;
-    onClose: () => void;
-}) {
-    const form = useForm({
-        descripcion: '',
-        codigo: '',
-        repuestos: true as boolean,
-        min_stock: '0',
-        costo: '',
-    });
-
-    const [lastId, setLastId] = useState<number | null>(null);
-    if (item && item.id !== lastId) {
-        form.setData({
-            descripcion: item.descripcion,
-            codigo: item.codigo ?? '',
-            repuestos: Boolean(item.repuestos),
-            min_stock: String(item.min_stock),
-            costo: item.costo != null ? String(item.costo) : '',
-        });
-        setLastId(item.id);
-    }
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!item) return;
-        form.patch(update.url(item.id), {
-            preserveScroll: true,
-            preserveState: true,
-            onSuccess: onClose,
-        });
-    }
-
-    const sinStock = item ? item.stock === 0 : false;
-    const lowStock = item ? item.stock > 0 && item.stock <= item.min_stock : false;
-
-    const costoNum = parseFloat(form.data.costo);
-    const precioPreview = !isNaN(costoNum) && costoNum > 0
-        ? precioDesdeCosto(costoNum)
-        : item?.precio ?? 0;
-
-    return (
-        <Dialog open={!!item} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
-                {/* Header */}
-                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted">
-                        <Package className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <DialogTitle className="truncate text-base font-semibold">
-                            {item?.descripcion}
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            {item?.repuestos ? 'Repuesto' : 'Galpón'}
-                            {item?.codigo ? ` · Cód. ${item.codigo}` : ''}
-                        </DialogDescription>
-                    </div>
-                </div>
-
-                {/* Stock actual — info destacada */}
-                <div className="flex items-center gap-6 border-b border-border bg-muted/30 px-5 py-4">
-                    <div className="flex flex-col">
-                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Stock actual</span>
-                        <div className="flex items-baseline gap-1.5">
-                            <span className={cn(
-                                'text-3xl font-bold tabular-nums',
-                                sinStock ? 'text-red-500' : lowStock ? 'text-amber-500' : 'text-foreground',
-                            )}>
-                                {item?.stock ?? 0}
-                            </span>
-                            <span className="text-sm text-muted-foreground">unidades</span>
-                        </div>
-                    </div>
-                    {(sinStock || lowStock) && (
-                        <div className={cn(
-                            'flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium',
-                            sinStock
-                                ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-                        )}>
-                            <AlertCircle className="h-3.5 w-3.5" />
-                            {sinStock ? 'Sin stock' : 'Por debajo del mínimo'}
-                        </div>
-                    )}
-                </div>
-
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5 p-5">
-                    {/* Descripción */}
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="edit-descripcion" className="text-sm font-medium">Descripción</Label>
-                        <Input
-                            id="edit-descripcion"
-                            value={form.data.descripcion}
-                            onChange={(e) => form.setData('descripcion', e.target.value)}
-                            disabled={!canWrite}
-                        />
-                        <InputError message={form.errors.descripcion} />
-                    </div>
-
-                    {/* Código interno: se autogenera al crear, se puede ajustar acá. */}
-                    <div className="flex flex-col gap-1.5">
-                        <Label htmlFor="edit-codigo" className="text-sm font-medium">Código</Label>
-                        <Input
-                            id="edit-codigo"
-                            value={form.data.codigo}
-                            onChange={(e) => form.setData('codigo', e.target.value.toUpperCase())}
-                            disabled={!canWrite}
-                            className="font-mono uppercase"
-                            placeholder="AMO-01"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                            Código corto para anotar en papel y buscar rápido. Tiene que ser único.
-                        </p>
-                        <InputError message={form.errors.codigo} />
-                    </div>
-
-                    {/* Stock mínimo con stepper */}
-                    <div className="flex flex-col gap-1.5">
-                        <Label className="text-sm font-medium">Stock mínimo</Label>
-                        <p className="text-xs text-muted-foreground">
-                            Si el stock cae por debajo de este número, aparece una alerta.
-                        </p>
-                        <div className="flex items-center gap-3">
-                            <div className="flex overflow-hidden rounded-lg border border-border">
-                                <button
-                                    type="button"
-                                    onClick={() => form.setData('min_stock', String(Math.max(0, Number(form.data.min_stock) - 1)))}
-                                    className="flex h-10 w-10 items-center justify-center border-r border-border bg-muted transition-colors hover:bg-muted/70"
-                                >
-                                    <Minus className="h-4 w-4" />
-                                </button>
-                                <input
-                                    type="number"
-                                    inputMode="numeric"
-                                    min="0"
-                                    value={form.data.min_stock}
-                                    onChange={(e) => form.setData('min_stock', e.target.value)}
-                                    className="w-16 bg-card text-center text-xl font-bold tabular-nums outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => form.setData('min_stock', String(Number(form.data.min_stock) + 1))}
-                                    className="flex h-10 w-10 items-center justify-center border-l border-border bg-muted transition-colors hover:bg-muted/70"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <span className="text-sm text-muted-foreground">unidades mínimas</span>
-                        </div>
-                        <InputError message={form.errors.min_stock} />
-                    </div>
-
-                    {/* Tipo */}
-                    <div className="flex flex-col gap-1.5">
-                        <Label className="text-sm font-medium">Tipo</Label>
-                        <div className="flex gap-1 rounded-xl bg-muted p-1">
-                            <button
-                                type="button"
-                                onClick={() => form.setData('repuestos', true)}
-                                className={cn(
-                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
-                                    form.data.repuestos ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
-                                )}
-                            >
-                                <Wrench className="h-3.5 w-3.5" /> Repuesto
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => form.setData('repuestos', false)}
-                                className={cn(
-                                    'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all',
-                                    !form.data.repuestos ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground',
-                                )}
-                            >
-                                <Warehouse className="h-3.5 w-3.5" /> Galpón
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Costo — solo admin */}
-                    {isAdmin && (
-                        <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="edit-costo" className="text-sm font-medium">Costo (ARS)</Label>
-                            <MoneyInput
-                                id="edit-costo"
-                                value={form.data.costo === '' ? null : Number(form.data.costo)}
-                                onValueChange={(n) => form.setData('costo', n == null ? '' : String(n))}
-                                placeholder="0,00"
-                            />
-                            {precioPreview > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                    Precio de venta (+45%): <span className="font-semibold text-foreground">{formatARS(precioPreview)}</span>
-                                </p>
-                            )}
-                            <InputError message={form.errors.costo} />
-                        </div>
-                    )}
-
-                    <DialogFooter className="flex-row gap-2 border-t border-border pt-4">
-                        <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={form.processing} className="flex-1">
-                            {form.processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar cambios</>}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}

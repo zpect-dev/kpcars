@@ -1,7 +1,6 @@
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -11,13 +10,9 @@ import { store } from '@/routes/login';
 
 type Props = {
     status?: string;
-    canResetPassword: boolean;
 };
 
-export default function Login({
-    status,
-    canResetPassword,
-}: Props) {
+export default function Login({ status }: Props) {
     return (
         <>
             <Head title="Iniciar sesión" />
@@ -84,7 +79,7 @@ export default function Login({
             </Form>
 
             {status && (
-                <div className="mb-4 text-center text-sm font-medium text-green-600">
+                <div className="mb-4 text-center text-sm font-medium text-success">
                     {status}
                 </div>
             )}

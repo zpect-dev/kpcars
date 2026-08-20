@@ -1,11 +1,14 @@
+import { Crop as CropIcon, RotateCcw, RotateCw, Scan } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import ReactCrop, { cropToCanvas, type Crop, type PixelCrop } from 'react-image-crop';
+import ReactCrop, { cropToCanvas } from 'react-image-crop';
+import type { Crop, PixelCrop } from 'react-image-crop';
+// El CSS del widget queda justo detrás de su import: mover uno sin el otro
+// cambia el orden de la cascada.
 import 'react-image-crop/dist/ReactCrop.css';
-import { Crop as CropIcon, RotateCcw, RotateCw, Scan } from 'lucide-react';
+import { flattenPerspective } from '@/components/image-flatten';
+import type { Corners } from '@/components/image-flatten';
 import { Button } from '@/components/ui/button';
-import { flattenPerspective, type Corners } from '@/components/image-flatten';
-import { cn } from '@/lib/utils';
 import {
     Dialog,
     DialogContent,
@@ -13,6 +16,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 /**
  * Convierte un canvas ya recortado en un File, preservando el formato de origen
@@ -58,10 +62,13 @@ function rotateImage(src: string, degrees: number): Promise<string> {
             canvas.width = swap ? image.naturalHeight : image.naturalWidth;
             canvas.height = swap ? image.naturalWidth : image.naturalHeight;
             const ctx = canvas.getContext('2d');
+
             if (!ctx) {
                 reject(new Error('No 2d context'));
+
                 return;
             }
+
             ctx.imageSmoothingQuality = 'high';
             ctx.translate(canvas.width / 2, canvas.height / 2);
             ctx.rotate((degrees * Math.PI) / 180);
@@ -69,8 +76,10 @@ function rotateImage(src: string, degrees: number): Promise<string> {
             canvas.toBlob((blob) => {
                 if (!blob) {
                     reject(new Error('No se pudo rotar la imagen.'));
+
                     return;
                 }
+
                 resolve(URL.createObjectURL(blob));
             }, 'image/png');
         };
@@ -228,8 +237,10 @@ function ImageCropperDialog({
                 .then((url) => {
                     if (cancelled) {
                         URL.revokeObjectURL(url);
+
                         return;
                     }
+
                     objectUrl = url;
                     setDisplaySrc(url);
                 })
@@ -245,6 +256,7 @@ function ImageCropperDialog({
 
         return () => {
             cancelled = true;
+
             if (objectUrl) {
                 URL.revokeObjectURL(objectUrl);
             }
@@ -254,6 +266,7 @@ function ImageCropperDialog({
     // Revoca las imágenes aplanadas generadas al cerrar el editor.
     useEffect(() => {
         const urls = flattenedUrlsRef.current;
+
         return () => urls.forEach((u) => URL.revokeObjectURL(u));
     }, []);
 
@@ -262,11 +275,16 @@ function ImageCropperDialog({
     useEffect(() => {
         function onKey(e: KeyboardEvent) {
             // Ignora la autorepetición al mantener la tecla apretada.
-            if (e.repeat) return;
+            if (e.repeat) {
+return;
+}
+
             const t = e.target as HTMLElement | null;
+
             if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) {
                 return;
             }
+
             if (e.key === 'e' || e.key === 'E') {
                 e.preventDefault();
                 kbRef.current.toggle();
@@ -276,6 +294,7 @@ function ImageCropperDialog({
             }
         }
         window.addEventListener('keydown', onKey);
+
         return () => window.removeEventListener('keydown', onKey);
     }, []);
 
@@ -289,7 +308,10 @@ function ImageCropperDialog({
     }
 
     function toggleFlatten() {
-        if (busy) return;
+        if (busy) {
+return;
+}
+
         if (mode === 'crop') {
             // Primera E: entra al modo enderezar (aparece la grilla de esquinas).
             openFlatten();
@@ -301,13 +323,18 @@ function ImageCropperDialog({
 
     function updateCornerFromPointer(index: number, clientX: number, clientY: number) {
         const box = flattenBoxRef.current;
-        if (!box) return;
+
+        if (!box) {
+return;
+}
+
         const rect = box.getBoundingClientRect();
         const nx = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
         const ny = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
         setCorners((prev) => {
             const next = [...prev] as Corners;
             next[index] = { x: nx, y: ny };
+
             return next;
         });
     }
@@ -318,7 +345,10 @@ function ImageCropperDialog({
     }
 
     function onCornerPointerMove(index: number, e: ReactPointerEvent) {
-        if (dragCorner !== index) return;
+        if (dragCorner !== index) {
+return;
+}
+
         updateCornerFromPointer(index, e.clientX, e.clientY);
     }
 
@@ -329,6 +359,7 @@ function ImageCropperDialog({
     async function applyFlatten() {
         setBusy(true);
         setError(null);
+
         try {
             // Aplanamos la imagen que se está viendo (incluye la rotación actual).
             const url = await flattenPerspective(displaySrc, corners);
@@ -348,9 +379,14 @@ function ImageCropperDialog({
 
     async function applyCrop() {
         const img = imgRef.current;
-        if (!img) return;
+
+        if (!img) {
+return;
+}
+
         setBusy(true);
         setError(null);
+
         try {
             // La rotación ya está aplicada en `displaySrc`, por eso pasamos 0.
             const pixelCrop: PixelCrop =
@@ -418,9 +454,15 @@ function ImageCropperDialog({
                             title="Atajo: E"
                             disabled={busy}
                             onClick={() => {
-                                if (m === mode) return;
-                                if (m === 'flatten') openFlatten();
-                                else { setMode('crop'); setError(null); }
+                                if (m === mode) {
+return;
+}
+
+                                if (m === 'flatten') {
+openFlatten();
+} else {
+ setMode('crop'); setError(null); 
+}
                             }}
                             className={cn(
                                 'rounded px-3 py-1 font-medium transition-colors',
@@ -537,7 +579,7 @@ function ImageCropperDialog({
                     </div>
                 )}
 
-                {error && <p className="text-xs text-red-600">{error}</p>}
+                {error && <p className="text-xs text-destructive">{error}</p>}
 
                 <DialogFooter>
                     {mode === 'flatten' ? (
@@ -545,7 +587,9 @@ function ImageCropperDialog({
                             <Button
                                 type="button"
                                 variant="ghost"
-                                onClick={() => { setMode('crop'); setError(null); }}
+                                onClick={() => {
+ setMode('crop'); setError(null); 
+}}
                                 disabled={busy}
                             >
                                 Cancelar

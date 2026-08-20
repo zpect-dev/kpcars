@@ -19,10 +19,12 @@ import {
     User,
     UserCircle2,
     Warehouse,
-    Wrench,
-    type LucideIcon,
+    Wrench
+    
 } from 'lucide-react';
+import type {LucideIcon} from 'lucide-react';
 import { forwardRef, Fragment, useMemo, useRef, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -103,18 +105,21 @@ const TotalCard = forwardRef<
                 <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', destacada ? 'bg-primary/15' : 'bg-muted')}>
                     <Icon className={cn('h-4 w-4', destacada ? 'text-primary' : 'text-muted-foreground')} />
                 </div>
-                <p className={cn('text-[11px] font-medium tracking-wide text-muted-foreground uppercase', hint && 'underline decoration-dotted underline-offset-2')}>
+                <p className={cn('text-xs font-medium tracking-wide text-muted-foreground uppercase', hint && 'underline decoration-dotted underline-offset-2')}>
                     {label}
                 </p>
             </div>
             <p className={cn('mt-2 font-bold text-foreground', destacada ? 'text-2xl' : 'text-xl')}>{formatARS(value)}</p>
-            {sublabel && <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">{sublabel}</p>}
+            {sublabel && <p className="mt-0.5 text-xs font-medium text-muted-foreground">{sublabel}</p>}
         </div>
     );
 });
 
 function formatDateDia(d: string | null): string {
-    if (!d) return '—';
+    if (!d) {
+return '—';
+}
+
     return new Date(`${d}T00:00:00`).toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -244,8 +249,13 @@ export default function CobrosIndex({
         const k = vehiculoKey(detalleK, vehiculoId);
         setExpandedVehiculos((prev) => {
             const next = new Set(prev);
-            if (next.has(k)) next.delete(k);
-            else next.add(k);
+
+            if (next.has(k)) {
+next.delete(k);
+} else {
+next.add(k);
+}
+
             return next;
         });
     }
@@ -268,12 +278,19 @@ export default function CobrosIndex({
 
         setExpandedDetalles((prev) => {
             const next = new Set(prev);
-            if (isExpanded) next.delete(key);
-            else next.add(key);
+
+            if (isExpanded) {
+next.delete(key);
+} else {
+next.add(key);
+}
+
             return next;
         });
 
-        if (isExpanded || desgloseCache[key]?.data) return;
+        if (isExpanded || desgloseCache[key]?.data) {
+return;
+}
 
         setDesgloseCache((prev) => ({
             ...prev,
@@ -311,7 +328,7 @@ export default function CobrosIndex({
         <>
             <Head title={historico ? `Cierre de Caja #${historico.id}` : 'Caja'} />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header + estado del período */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
@@ -345,7 +362,7 @@ export default function CobrosIndex({
                                     Caja
                                 </h2>
                                 {abierta && apertura ? (
-                                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-success">
                                         <LockOpen className="h-3.5 w-3.5" />
                                         Período abierto desde {formatDate(apertura.created_at)}
                                         {apertura.user?.name ? ` por ${apertura.user.name}` : ''}
@@ -542,7 +559,7 @@ export default function CobrosIndex({
                     </div>
                 )}
 
-            </div>
+            </PageContainer>
 
             {/* Total general: flotante y fijo en pantalla (no vive dentro de ninguna pestaña, para no duplicar sus cifras) */}
             <div className="fixed right-4 bottom-4 z-40 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg">
@@ -559,8 +576,8 @@ export default function CobrosIndex({
             <Dialog open={showCierreModal} onOpenChange={setShowCierreModal}>
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/15">
-                            <Lock className="h-5 w-5 text-orange-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft">
+                            <Lock aria-hidden="true" className="size-5 text-warning-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Confirmar cierre de caja</DialogTitle>
@@ -605,8 +622,8 @@ export default function CobrosIndex({
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[640px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                            <Calendar className="h-5 w-5 text-sky-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                            <Calendar aria-hidden="true" className="size-5 text-primary" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Detalle del cierre</DialogTitle>
@@ -619,12 +636,20 @@ export default function CobrosIndex({
                     <div className="flex flex-col gap-4 px-5 py-4">
                     <div className="max-h-[50vh] space-y-4 overflow-y-auto">
                         {(() => {
-                            if (!selectedCierre) return null;
+                            if (!selectedCierre) {
+return null;
+}
+
                             const grupos = selectedCierre.detalles.reduce(
                                 (acc, d) => {
                                     const key = d.empresa_nombre ?? 'N/A';
-                                    if (!acc[key]) acc[key] = [];
+
+                                    if (!acc[key]) {
+acc[key] = [];
+}
+
                                     acc[key].push(d);
+
                                     return acc;
                                 },
                                 {} as Record<string, typeof selectedCierre.detalles>,
@@ -632,6 +657,7 @@ export default function CobrosIndex({
 
                             return Object.entries(grupos).map(([empresa, detalles]) => {
                                 const subtotal = detalles.reduce((s, d) => s + Number(d.total), 0);
+
                                 return (
                                     <div key={empresa} className="space-y-2">
                                         {!hideEmpresa && (
@@ -644,6 +670,7 @@ export default function CobrosIndex({
                                             const key = detalleKey(selectedCierre.id, d.inversion_id, d.empresa_id);
                                             const isOpen = expandedDetalles.has(key);
                                             const cached = desgloseCache[key];
+
                                             return (
                                                 <div key={idx} className="overflow-hidden rounded-lg border border-border">
                                                     <button
@@ -672,6 +699,7 @@ export default function CobrosIndex({
                                                                         const vk = vehiculoKey(key, v.vehiculo_id);
                                                                         const vOpen = expandedVehiculos.has(vk);
                                                                         const tx = (cached.transacciones ?? []).filter((t) => t.patente === v.patente);
+
                                                                         return (
                                                                             <li key={v.vehiculo_id}>
                                                                                 <button
@@ -696,7 +724,7 @@ export default function CobrosIndex({
                                                                                             <p className="px-4 py-3 text-xs text-muted-foreground">Sin transacciones.</p>
                                                                                         ) : (
                                                                                             <table className="w-full text-left text-xs">
-                                                                                                <thead className="bg-muted/30 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                                                                                <thead className="bg-muted/30 text-xs tracking-wider text-muted-foreground uppercase">
                                                                                                     <tr>
                                                                                                         <th className="px-4 py-2 font-medium">Artículo</th>
                                                                                                         <th className="px-2 py-2 text-right font-medium">Cant.</th>
@@ -761,7 +789,13 @@ export default function CobrosIndex({
                         <Button
                             variant="outline"
                             disabled={!selectedCierre}
-                            onClick={() => { if (!selectedCierre) return; window.open(`/pdf/cierres-caja/${selectedCierre.id}`, '_blank'); }}
+                            onClick={() => {
+ if (!selectedCierre) {
+return;
+}
+
+ window.open(`/pdf/cierres-caja/${selectedCierre.id}`, '_blank'); 
+}}
                         >
                             <Download className="mr-1.5 h-4 w-4" />
                             Exportar PDF
@@ -804,7 +838,9 @@ function InventarioPanel({
             closeGananciaTimer.current = null;
         }
     };
-    const openGananciaNow = () => { cancelCloseGanancia(); setShowGanancia(true); };
+    const openGananciaNow = () => {
+ cancelCloseGanancia(); setShowGanancia(true); 
+};
     const scheduleCloseGanancia = () => {
         cancelCloseGanancia();
         closeGananciaTimer.current = setTimeout(() => setShowGanancia(false), 90);
@@ -813,8 +849,13 @@ function InventarioPanel({
     function toggleIntegrado(invId: number) {
         setExpandedIntegrado((prev) => {
             const next = new Set(prev);
-            if (next.has(invId)) next.delete(invId);
-            else next.add(invId);
+
+            if (next.has(invId)) {
+next.delete(invId);
+} else {
+next.add(invId);
+}
+
             return next;
         });
     }
@@ -822,8 +863,13 @@ function InventarioPanel({
     function toggleVeh(vehId: number) {
         setExpandedVeh((prev) => {
             const next = new Set(prev);
-            if (next.has(vehId)) next.delete(vehId);
-            else next.add(vehId);
+
+            if (next.has(vehId)) {
+next.delete(vehId);
+} else {
+next.add(vehId);
+}
+
             return next;
         });
     }
@@ -848,9 +894,9 @@ function InventarioPanel({
                     >
                         <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Detalle de inventario</p>
                         <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-                            <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500" />
+                            <TrendingUp aria-hidden="true" className="size-4 shrink-0 text-success" />
                             <span className="flex-1 text-left text-foreground">Ganancia</span>
-                            <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{formatARS(totalGanancia)}</span>
+                            <span className="font-semibold tabular-nums text-success">{formatARS(totalGanancia)}</span>
                         </div>
                         <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
                             <Receipt className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -910,6 +956,7 @@ function InventarioPanel({
                 <div className="flex flex-col gap-2">
                     {resumenIntegrado.map((inv) => {
                         const open = expandedIntegrado.has(inv.inversion_id);
+
                         return (
                             <div key={inv.inversion_id} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                                 <button
@@ -930,7 +977,7 @@ function InventarioPanel({
                                 {open && (
                                     <div className="border-t border-border">
                                         <table className="w-full text-sm">
-                                            <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                            <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                                 <tr>
                                                     <th className="px-4 py-2 text-left font-medium">Vehículo</th>
                                                     <th className="px-3 py-2 text-right font-medium">Cobros</th>
@@ -941,6 +988,7 @@ function InventarioPanel({
                                             <tbody className="divide-y divide-border">
                                                 {inv.vehiculos.map((v) => {
                                                     const vOpen = expandedVeh.has(v.vehiculo_id);
+
                                                     return (
                                                         <Fragment key={v.vehiculo_id}>
                                                             <tr className="cursor-pointer hover:bg-muted/20" onClick={() => toggleVeh(v.vehiculo_id)}>
@@ -960,7 +1008,7 @@ function InventarioPanel({
                                                                     <td colSpan={4} className="px-4 py-3">
                                                                         <div className="grid gap-3 sm:grid-cols-2">
                                                                             <div>
-                                                                                <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Cobros (inventario)</p>
+                                                                                <p className="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Cobros (inventario)</p>
                                                                                 {v.cobros_detalle.length === 0 ? (
                                                                                     <p className="text-xs text-muted-foreground">Sin cobros.</p>
                                                                                 ) : (
@@ -975,7 +1023,7 @@ function InventarioPanel({
                                                                                 )}
                                                                             </div>
                                                                             <div>
-                                                                                <p className="mb-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">Gastos de flota</p>
+                                                                                <p className="mb-1 text-xs font-semibold tracking-wider text-muted-foreground uppercase">Gastos de flota</p>
                                                                                 {v.gastos_detalle.length === 0 ? (
                                                                                     <p className="text-xs text-muted-foreground">Sin gastos.</p>
                                                                                 ) : (
@@ -1030,10 +1078,22 @@ const CATEGORIAS_POR_GRUPO: Record<GastoGrupo, CategoriaGasto[]> = {
 };
 
 function cardIcon(key: string): LucideIcon {
-    if (key.startsWith('empresa_')) return Building2;
-    if (key === 'kevin') return UserCircle2;
-    if (key === 'stock') return Box;
-    if (key === 'galpon') return Warehouse;
+    if (key.startsWith('empresa_')) {
+return Building2;
+}
+
+    if (key === 'kevin') {
+return UserCircle2;
+}
+
+    if (key === 'stock') {
+return Box;
+}
+
+    if (key === 'galpon') {
+return Warehouse;
+}
+
     return HandCoins;
 }
 
@@ -1057,8 +1117,13 @@ function GastosPanel({
     function toggleCat(key: string) {
         setExpandedCats((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
+
+            if (next.has(key)) {
+next.delete(key);
+} else {
+next.add(key);
+}
+
             return next;
         });
     }
@@ -1076,11 +1141,19 @@ function GastosPanel({
 
     const gastosByCat = useMemo(() => {
         const map: Record<string, CobrosGastoLinea[]> = {};
-        for (const cat of categorias) map[cat.key] = [];
+
+        for (const cat of categorias) {
+map[cat.key] = [];
+}
+
         for (const g of gastosFiltrados) {
             const cat = categorias.find((c) => c.tipos.includes(g.tipo));
-            if (cat) map[cat.key].push(g);
+
+            if (cat) {
+map[cat.key].push(g);
+}
         }
+
         return map;
     }, [gastosFiltrados, categorias]);
 
@@ -1090,10 +1163,15 @@ function GastosPanel({
                 ? c.key.startsWith('empresa_') || c.key === 'galpon'
                 : c.key === 'kevin' || c.key === 'stock'
         ));
-        if (grupo !== 'galpon') return filtradas;
+
+        if (grupo !== 'galpon') {
+return filtradas;
+}
+
         // El total ("galpón") va al final, a la derecha — igual que en las otras dos pestañas.
         const galpon = filtradas.find((c) => c.key === 'galpon');
         const empresas = filtradas.filter((c) => c.key !== 'galpon');
+
         return galpon ? [...empresas, galpon] : empresas;
     }, [gastosResumen.cards, grupo]);
 
@@ -1112,10 +1190,11 @@ function GastosPanel({
         if (list.length === 0) {
             return <p className="px-2 py-4 text-center text-xs text-muted-foreground">Sin gastos en esta categoría.</p>;
         }
+
         return (
             <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                    <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                         <tr>
                             <th className="px-3 py-2 font-medium">Fecha</th>
                             <th className="px-3 py-2 font-medium">Descripción</th>
@@ -1152,6 +1231,7 @@ function GastosPanel({
                     const isGalponTotal = card.key === 'galpon';
                     const isEmpresa = card.key.startsWith('empresa_');
                     const pct = isEmpresa && totalFiltrado > 0 ? (Number(card.total) / totalFiltrado) * 100 : null;
+
                     return (
                         <TotalCard
                             key={card.key}
@@ -1210,7 +1290,7 @@ function GastosPanel({
                     <>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">Fecha</th>
                                         <th className="px-3 py-2 font-medium">Descripción</th>
@@ -1262,6 +1342,7 @@ function GastosPanel({
                         const catGastos = gastosByCat[cat.key] ?? [];
                         const catOpen = expandedCats.has(cat.key);
                         const catTotal = catGastos.reduce((s, g) => s + Number(g.monto), 0);
+
                         return (
                             <div key={cat.key} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                                 <button

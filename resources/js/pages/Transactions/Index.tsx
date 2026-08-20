@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     ArrowLeft,
     ChevronLeft,
@@ -13,10 +13,8 @@ import {
     Scale,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Input } from '@/components/ui/input';
+import { PageContainer } from '@/components/app/page-container';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -25,8 +23,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { index } from '@/routes/transactions';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { index as articulosIndex } from '@/routes/articulos';
+import { index } from '@/routes/transactions';
 import type { Articulo, Vehiculo, User } from '@/types';
 
 interface Transaccion {
@@ -93,7 +94,9 @@ export default function TransactionsIndex({
     }
 
     function handleAnnul() {
-        if (!selectedTx) return;
+        if (!selectedTx) {
+return;
+}
 
         setIsProcessing(true);
         router.post(
@@ -110,7 +113,14 @@ export default function TransactionsIndex({
         );
     }
     // ─── Filtro: Artículo (select con dropdown) ──────────────────────────────
-    const [articleSearch, setArticleSearch] = useState('');
+    // El artículo puede venir preseleccionado por query string: se resuelve
+    // como estado inicial perezoso, no con un efecto de montaje que pisaba el
+    // valor después del primer pintado.
+    const [articleSearch, setArticleSearch] = useState(
+        () =>
+            items.find((i) => String(i.id) === filters.article)?.descripcion ??
+            '',
+    );
     const [selectedArticleId, setSelectedArticleId] = useState(
         filters.article || '',
     );
@@ -120,20 +130,13 @@ export default function TransactionsIndex({
 
     const articleSuggestions = useMemo(() => {
         const q = articleSearch.toLowerCase().trim();
-        if (!q) return items;
+
+        if (!q) {
+return items;
+}
+
         return items.filter((i) => i.descripcion.toLowerCase().includes(q));
     }, [items, articleSearch]);
-
-    // Inicializar el texto del input con el artículo seleccionado desde filtros
-    useEffect(() => {
-        if (filters.article) {
-            const found = items.find((i) => String(i.id) === filters.article);
-            if (found) {
-                setArticleSearch(found.descripcion);
-                setSelectedArticleId(String(found.id));
-            }
-        }
-    }, []);
 
     function handleSelectArticle(item: Pick<Articulo, 'id' | 'descripcion'>) {
         setArticleSearch(item.descripcion);
@@ -143,7 +146,9 @@ export default function TransactionsIndex({
     }
 
     function handleArticleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (!showArticleDropdown || articleSuggestions.length === 0) return;
+        if (!showArticleDropdown || articleSuggestions.length === 0) {
+return;
+}
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -180,7 +185,11 @@ export default function TransactionsIndex({
 
     const plateSuggestions = useMemo(() => {
         const q = plateSearch.toLowerCase().trim();
-        if (!q) return vehiculos;
+
+        if (!q) {
+return vehiculos;
+}
+
         return vehiculos.filter(
             (v) =>
                 v.patente.toLowerCase().includes(q) ||
@@ -199,7 +208,9 @@ export default function TransactionsIndex({
     }
 
     function handlePlateKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-        if (!showPlateDropdown || plateSuggestions.length === 0) return;
+        if (!showPlateDropdown || plateSuggestions.length === 0) {
+return;
+}
 
         if (e.key === 'ArrowDown') {
             e.preventDefault();
@@ -245,6 +256,7 @@ export default function TransactionsIndex({
     useEffect(() => {
         if (!isMounted.current) {
             isMounted.current = true;
+
             return;
         }
 
@@ -256,16 +268,36 @@ export default function TransactionsIndex({
             toDate !== (filters.to || '') ||
             estado !== (filters.estado || 'todas');
 
-        if (!hasChanges) return;
+        if (!hasChanges) {
+return;
+}
 
         const timeoutId = setTimeout(() => {
             const activeFilters: Record<string, string> = {};
-            if (selectedArticleId) activeFilters.article = selectedArticleId;
-            if (selectedPlate) activeFilters.plate = selectedPlate;
-            if (applicantQuery) activeFilters.applicant = applicantQuery;
-            if (fromDate) activeFilters.from = fromDate;
-            if (toDate) activeFilters.to = toDate;
-            if (estado !== 'todas') activeFilters.estado = estado;
+
+            if (selectedArticleId) {
+activeFilters.article = selectedArticleId;
+}
+
+            if (selectedPlate) {
+activeFilters.plate = selectedPlate;
+}
+
+            if (applicantQuery) {
+activeFilters.applicant = applicantQuery;
+}
+
+            if (fromDate) {
+activeFilters.from = fromDate;
+}
+
+            if (toDate) {
+activeFilters.to = toDate;
+}
+
+            if (estado !== 'todas') {
+activeFilters.estado = estado;
+}
 
             router.get(index.url(), activeFilters, {
                 preserveState: true,
@@ -308,7 +340,7 @@ export default function TransactionsIndex({
         <>
             <Head title="Historial Transacciones" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                     <div className="flex items-center gap-3">
                         <Button
@@ -329,16 +361,31 @@ export default function TransactionsIndex({
                             size="sm"
                             onClick={() => {
                                 const params = new URLSearchParams();
-                                if (selectedArticleId)
-                                    params.set('article', selectedArticleId);
-                                if (selectedPlate)
-                                    params.set('plate', selectedPlate);
-                                if (applicantQuery)
-                                    params.set('applicant', applicantQuery);
-                                if (fromDate) params.set('from', fromDate);
-                                if (toDate) params.set('to', toDate);
-                                if (estado !== 'todas')
-                                    params.set('estado', estado);
+
+                                if (selectedArticleId) {
+params.set('article', selectedArticleId);
+}
+
+                                if (selectedPlate) {
+params.set('plate', selectedPlate);
+}
+
+                                if (applicantQuery) {
+params.set('applicant', applicantQuery);
+}
+
+                                if (fromDate) {
+params.set('from', fromDate);
+}
+
+                                if (toDate) {
+params.set('to', toDate);
+}
+
+                                if (estado !== 'todas') {
+params.set('estado', estado);
+}
+
                                 const qs = params.toString();
                                 window.open(
                                     '/pdf/transactions' + (qs ? '?' + qs : ''),
@@ -662,11 +709,11 @@ export default function TransactionsIndex({
                                             key={tx.id}
                                             className={cn(
                                                 'bg-card transition-colors hover:bg-muted/40',
-                                                // Devolución: fila teñida de
-                                                // violeta, el color propio del
-                                                // estado en todo el historial.
+                                                // Devolución: fila teñida con
+                                                // el tono informativo, el mismo
+                                                // en todo el historial.
                                                 tx.inactiva &&
-                                                    'bg-violet-500/5 text-muted-foreground',
+                                                    'bg-info-soft/40 text-muted-foreground',
                                             )}
                                         >
                                             <td
@@ -699,7 +746,7 @@ export default function TransactionsIndex({
                                                             'N/A'}
                                                     </span>
                                                     {tx.inactiva && (
-                                                        <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                                                        <span className="rounded border border-info/30 bg-info-soft px-1.5 py-0.5 text-xs font-semibold text-info-soft-foreground">
                                                             Stock devuelto al
                                                             inventario
                                                         </span>
@@ -713,13 +760,13 @@ export default function TransactionsIndex({
                                                         ingreso ni un egreso
                                                         vigente. */}
                                                     {tx.inactiva ? (
-                                                        <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                        <RotateCcw aria-hidden="true" className="size-4 text-info" />
                                                     ) : tx.tipo === 'IN' ? (
-                                                        <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                                        <ArrowDownCircle aria-hidden="true" className="size-4 text-success" />
                                                     ) : tx.tipo === 'AJUSTE' ? (
-                                                        <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                        <Scale aria-hidden="true" className="size-4 text-primary" />
                                                     ) : (
-                                                        <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                                        <ArrowUpCircle aria-hidden="true" className="size-4 text-destructive" />
                                                     )}
                                                     <span
                                                         className={cn(
@@ -787,7 +834,7 @@ export default function TransactionsIndex({
                                                                     tx,
                                                                 )
                                                             }
-                                                            className="text-muted-foreground transition-colors hover:text-amber-500"
+                                                            className="rounded text-muted-foreground transition-colors outline-none hover:text-warning-soft-foreground focus-visible:ring-2 focus-visible:ring-ring"
                                                             title="Anular transacción"
                                                         >
                                                             <RotateCcw className="h-4 w-4" />
@@ -815,7 +862,7 @@ export default function TransactionsIndex({
                                     key={tx.id}
                                     className={cn(
                                         'flex flex-col gap-1.5 p-4',
-                                        tx.inactiva && 'bg-violet-500/5',
+                                        tx.inactiva && 'bg-info-soft/40',
                                     )}
                                 >
                                     <div className="flex items-start justify-between gap-2">
@@ -832,20 +879,20 @@ export default function TransactionsIndex({
                                                     'N/A'}
                                             </p>
                                             {tx.inactiva && (
-                                                <span className="rounded border border-violet-500/30 bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-violet-600 dark:text-violet-400">
+                                                <span className="rounded border border-info/30 bg-info-soft px-1.5 py-0.5 text-xs font-semibold text-info-soft-foreground">
                                                     Stock devuelto al inventario
                                                 </span>
                                             )}
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5 text-sm">
                                             {tx.inactiva ? (
-                                                <RotateCcw className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                                                <RotateCcw aria-hidden="true" className="size-4 text-info" />
                                             ) : tx.tipo === 'IN' ? (
-                                                <ArrowDownCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+                                                <ArrowDownCircle aria-hidden="true" className="size-4 text-success" />
                                             ) : tx.tipo === 'AJUSTE' ? (
-                                                <Scale className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                <Scale aria-hidden="true" className="size-4 text-primary" />
                                             ) : (
-                                                <ArrowUpCircle className="h-4 w-4 text-red-500 dark:text-red-400" />
+                                                <ArrowUpCircle aria-hidden="true" className="size-4 text-destructive" />
                                             )}
                                             <span
                                                 className={cn(
@@ -897,7 +944,7 @@ export default function TransactionsIndex({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="h-8 gap-1.5 text-xs text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400"
+                                                className="h-8 gap-1.5 text-xs text-warning-soft-foreground hover:bg-warning-soft"
                                                 onClick={() =>
                                                     openAnnulModal(tx)
                                                 }
@@ -917,7 +964,7 @@ export default function TransactionsIndex({
                 <Dialog open={annulDialog} onOpenChange={setAnnulDialog}>
                     <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <DialogTitle className="flex items-center gap-2 text-destructive">
                                 <AlertTriangle className="h-5 w-5" />
                                 Confirmar Anulación
                             </DialogTitle>
@@ -978,7 +1025,7 @@ export default function TransactionsIndex({
                                 variant="outline"
                                 onClick={handleAnnul}
                                 disabled={isProcessing}
-                                className="gap-2 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400"
+                                className="gap-2 border-warning/30 bg-warning-soft text-warning-soft-foreground hover:bg-warning/20"
                             >
                                 {isProcessing ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1038,7 +1085,7 @@ export default function TransactionsIndex({
                         </button>
                     </div>
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }

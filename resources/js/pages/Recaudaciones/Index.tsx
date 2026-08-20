@@ -13,6 +13,8 @@ import {
     Unlock,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
+import { MoneyInput } from '@/components/money-input';
 import {
     EstadoBadge,
     formatARS,
@@ -20,14 +22,7 @@ import {
     RecaudacionesTabla,
     ResumenRecaudacionModal,
 } from '@/components/recaudaciones-tabla';
-import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import {
     Dialog,
     DialogContent,
@@ -36,6 +31,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Popover,
     PopoverContent,
@@ -112,10 +113,21 @@ export default function RecaudacionesIndex({
 
     function exportQuery(): string {
         const p = new URLSearchParams();
-        if (exportFiltros.q.trim()) p.set('q', exportFiltros.q.trim());
-        if (exportFiltros.estado !== 'all') p.set('estado', exportFiltros.estado);
-        if (exportFiltros.metodo !== 'all') p.set('metodo', exportFiltros.metodo);
+
+        if (exportFiltros.q.trim()) {
+p.set('q', exportFiltros.q.trim());
+}
+
+        if (exportFiltros.estado !== 'all') {
+p.set('estado', exportFiltros.estado);
+}
+
+        if (exportFiltros.metodo !== 'all') {
+p.set('metodo', exportFiltros.metodo);
+}
+
         const qs = p.toString();
+
         return qs ? `?${qs}` : '';
     }
 
@@ -200,7 +212,7 @@ export default function RecaudacionesIndex({
         <>
             <Head title="Recaudaciones" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
@@ -253,21 +265,21 @@ export default function RecaudacionesIndex({
                                         size="sm"
                                         onClick={() => setShowDescuentosModal(true)}
                                     >
-                                        <Percent className="mr-1.5 h-4 w-4 text-amber-500" />
+                                        <Percent aria-hidden="true" className="mr-1.5 size-4 text-warning" />
                                         Descuentos
                                     </Button>
                                 )}
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <Button variant="outline" size="sm">
-                                            <Target className="mr-1.5 h-4 w-4 text-indigo-500" />
+                                            <Target aria-hidden="true" className="mr-1.5 size-4 text-info" />
                                             Potencial
                                         </Button>
                                     </PopoverTrigger>
                                     <PopoverContent align="end" className="w-72 p-0">
                                         <div className="flex items-start gap-3 border-b border-border px-4 py-3">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15">
-                                                <Target className="h-5 w-5 text-indigo-500" />
+                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-info-soft">
+                                                <Target aria-hidden="true" className="size-5 text-info-soft-foreground" />
                                             </div>
                                             <div className="min-w-0">
                                                 <p className="text-sm font-semibold text-foreground">
@@ -301,7 +313,7 @@ export default function RecaudacionesIndex({
                                                 </div>
                                                 <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                                                     <div
-                                                        className="h-full rounded-full bg-indigo-500 transition-all"
+                                                        className="h-full rounded-full bg-info transition-all"
                                                         style={{
                                                             width: `${Math.min(porcentajeAlcanzado, 100)}%`,
                                                         }}
@@ -391,14 +403,20 @@ export default function RecaudacionesIndex({
                         onFiltrosChange={setExportFiltros}
                     />
                 )}
-            </div>
+            </PageContainer>
 
             {/* Modal descuentos */}
-            <Dialog open={showDescuentosModal} onOpenChange={(v) => { setShowDescuentosModal(v); if (!v) setFilterInversionDescuento(''); }}>
+            <Dialog open={showDescuentosModal} onOpenChange={(v) => {
+ setShowDescuentosModal(v);
+
+ if (!v) {
+setFilterInversionDescuento('');
+} 
+}}>
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[600px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                            <Percent className="h-5 w-5 text-amber-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft">
+                            <Percent aria-hidden="true" className="size-5 text-warning-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Descuentos del período</DialogTitle>
@@ -449,7 +467,7 @@ export default function RecaudacionesIndex({
                                     <tr key={f.id ?? f.vehiculo_id} className="bg-card hover:bg-muted/40">
                                         <td className="px-4 py-2.5 font-mono font-medium text-foreground">{f.patente}</td>
                                         <td className="px-4 py-2.5 text-foreground">{f.chofer}</td>
-                                        <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(Number(f.descuento))}</td>
+                                        <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-warning-soft-foreground">{formatARS(Number(f.descuento))}</td>
                                         <td className="px-4 py-2.5 text-muted-foreground">{f.descripcion || <span className="italic">—</span>}</td>
                                         <td className="px-4 py-2.5"><EstadoBadge estado={f.estado} deuda={Number(f.deuda)} /></td>
                                     </tr>
@@ -458,7 +476,7 @@ export default function RecaudacionesIndex({
                             <tfoot className="border-t-2 border-border bg-muted/30">
                                 <tr>
                                     <td colSpan={2} className="px-4 py-3 font-semibold text-foreground">Total descuentos</td>
-                                    <td className="px-4 py-3 text-right text-base font-bold tabular-nums text-amber-600 dark:text-amber-400">{formatARS(totalDescuentos)}</td>
+                                    <td className="px-4 py-3 text-right text-base font-bold tabular-nums text-warning-soft-foreground">{formatARS(totalDescuentos)}</td>
                                     <td colSpan={2} />
                                 </tr>
                             </tfoot>
@@ -474,7 +492,9 @@ export default function RecaudacionesIndex({
                             <FileSpreadsheet className="mr-1.5 h-4 w-4" />
                             Excel
                         </Button>
-                        <Button variant="outline" onClick={() => { setShowDescuentosModal(false); setFilterInversionDescuento(''); }}>Cerrar</Button>
+                        <Button variant="outline" onClick={() => {
+ setShowDescuentosModal(false); setFilterInversionDescuento(''); 
+}}>Cerrar</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -550,11 +570,11 @@ export default function RecaudacionesIndex({
                                     </p>
                                 </div>
                                 {e.apertura_abierta ? (
-                                    <span className="rounded-md bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                    <span className="rounded-md bg-success-soft px-2.5 py-0.5 text-xs font-medium text-success-soft-foreground">
                                         Abierta
                                     </span>
                                 ) : (
-                                    <span className="rounded-md bg-red-500/10 px-2.5 py-0.5 text-xs font-medium text-red-600 dark:text-red-400">
+                                    <span className="rounded-md bg-destructive-soft px-2.5 py-0.5 text-xs font-medium text-destructive-soft-foreground">
                                         Cerrada
                                     </span>
                                 )}
@@ -563,7 +583,7 @@ export default function RecaudacionesIndex({
                     </div>
 
                     {cierreUnificado.vehiculosCruzados.length > 0 && (
-                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                        <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
                             Hay vehículos asignados a una inversión de otra
                             empresa: <strong>{cierreUnificado.vehiculosCruzados.join(', ')}</strong>.
                             Corregí la inversión de esos vehículos antes de cerrar.
@@ -571,7 +591,7 @@ export default function RecaudacionesIndex({
                     )}
 
                     {!todasAbiertas ? (
-                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                        <div className="mt-3 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
                             Para ejecutar el cierre unificado, todas las empresas
                             deben tener su recaudación abierta.
                         </div>

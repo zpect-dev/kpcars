@@ -1,5 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
 import { Calendar, History, User } from 'lucide-react';
+import { useMemo } from 'react';
+import { DataTable } from '@/components/app/data-table/data-table';
+import { DataTableColumnHeader } from '@/components/app/data-table/data-table-column-header';
+import type { DataTableFeatures } from '@/components/app/data-table/features';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
 import { index } from '@/routes/cobros';
 import { show as historialShow } from '@/routes/cobros/historial';
@@ -26,7 +33,10 @@ function formatARS(value: number): string {
 }
 
 function formatDate(date: string | null): string {
-    if (!date) return '—';
+    if (!date) {
+        return '—';
+    }
+
     return new Date(date).toLocaleString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -37,101 +47,160 @@ function formatDate(date: string | null): string {
 }
 
 export default function CobrosHistorial({ cierres }: Props) {
+    const columns = useMemo<ColumnDef<DataTableFeatures, CierreRow>[]>(
+        () => [
+            {
+                id: 'cierre',
+                accessorFn: (row) => row.id,
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Cierre
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <span className="font-medium text-foreground tabular-nums">
+                        #{row.original.id}
+                    </span>
+                ),
+                meta: { label: 'Cierre', mobile: 'title' },
+            },
+            {
+                id: 'fecha',
+                accessorFn: (row) => row.created_at ?? '',
+                sortingFn: 'datetime',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Fecha
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-2">
+                        <Calendar
+                            aria-hidden="true"
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                        />
+                        {formatDate(row.original.created_at)}
+                    </div>
+                ),
+                meta: { label: 'Fecha', mobile: 'field' },
+            },
+            {
+                id: 'usuario',
+                accessorFn: (row) => row.user?.name ?? '',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Ejecutado por
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-2">
+                        <User
+                            aria-hidden="true"
+                            className="size-3.5 shrink-0 text-muted-foreground"
+                        />
+                        {row.original.user?.name ?? 'N/A'}
+                    </div>
+                ),
+                meta: { label: 'Ejecutado por', mobile: 'field' },
+            },
+            {
+                id: 'cobros',
+                accessorFn: (row) => Number(row.total_cobros),
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Cobros
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => formatARS(Number(row.original.total_cobros)),
+                meta: {
+                    label: 'Cobros',
+                    mobile: 'field',
+                    align: 'right',
+                    cellClassName: 'tabular-nums',
+                },
+            },
+            {
+                id: 'gastos',
+                accessorFn: (row) => Number(row.total_gastos),
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Gastos
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => formatARS(Number(row.original.total_gastos)),
+                meta: {
+                    label: 'Gastos',
+                    mobile: 'field',
+                    align: 'right',
+                    cellClassName: 'tabular-nums',
+                },
+            },
+            {
+                id: 'total',
+                accessorFn: (row) => Number(row.total),
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Total
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <span className="font-medium text-foreground">
+                        {formatARS(Number(row.original.total))}
+                    </span>
+                ),
+                meta: {
+                    label: 'Total',
+                    mobile: 'field',
+                    align: 'right',
+                    cellClassName: 'tabular-nums',
+                },
+            },
+            {
+                id: 'detalle',
+                enableSorting: false,
+                enableHiding: false,
+                header: '',
+                cell: ({ row }) => (
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href={historialShow.url(row.original.id)}>
+                            Ver
+                        </Link>
+                    </Button>
+                ),
+                meta: { label: 'Detalle', mobile: 'badge', align: 'right' },
+            },
+        ],
+        [],
+    );
+
     return (
         <>
             <Head title="Historial de Caja" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                        <History className="h-5 w-5 text-muted-foreground" />
-                        Historial de Cierres
-                    </h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        Cada cierre abre una réplica de solo lectura de cómo se veía Caja en ese período.
-                    </p>
-                </div>
+            <PageContainer>
+                <PageHeader
+                    title="Historial de Cierres"
+                    count={{
+                        value: cierres.length,
+                        singular: 'cierre',
+                        plural: 'cierres',
+                    }}
+                    description="Cada cierre abre una réplica de solo lectura de cómo se veía Caja en ese período."
+                />
 
-                {cierres.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground shadow-sm">
-                        Todavía no hay cierres de caja registrados.
-                    </div>
-                ) : (
-                    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                        {/* Desktop */}
-                        <div className="hidden md:block">
-                            <table className="w-full text-left text-sm">
-                                <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground uppercase">
-                                    <tr>
-                                        <th className="px-4 py-3 font-medium tracking-wider sm:px-6">Cierre</th>
-                                        <th className="px-4 py-3 font-medium tracking-wider sm:px-6">Fecha</th>
-                                        <th className="px-4 py-3 font-medium tracking-wider sm:px-6">Ejecutado por</th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">Cobros</th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">Gastos</th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">Total</th>
-                                        <th className="px-4 py-3 text-right font-medium tracking-wider sm:px-6">Detalle</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {cierres.map((c) => (
-                                        <tr key={c.id} className="transition-colors hover:bg-muted/40">
-                                            <td className="px-4 py-3 font-medium sm:px-6">#{c.id}</td>
-                                            <td className="px-4 py-3 sm:px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    {formatDate(c.created_at)}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 sm:px-6">
-                                                <div className="flex items-center gap-2">
-                                                    <User className="h-3.5 w-3.5 text-muted-foreground" />
-                                                    {c.user?.name ?? 'N/A'}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-muted-foreground sm:px-6">
-                                                {formatARS(Number(c.total_cobros))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-muted-foreground sm:px-6">
-                                                {formatARS(Number(c.total_gastos))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-medium sm:px-6">
-                                                {formatARS(Number(c.total))}
-                                            </td>
-                                            <td className="px-4 py-3 text-right sm:px-6">
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={historialShow.url(c.id)}>Ver</Link>
-                                                </Button>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Mobile */}
-                        <ul className="divide-y divide-border md:hidden">
-                            {cierres.map((c) => (
-                                <li key={c.id} className="flex items-center justify-between p-4">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium text-foreground">
-                                            Cierre #{c.id} · {formatDate(c.created_at)}
-                                        </p>
-                                        <p className="truncate text-xs text-muted-foreground">
-                                            {c.user?.name ?? 'N/A'} · Cobros {formatARS(Number(c.total_cobros))} · Gastos {formatARS(Number(c.total_gastos))}
-                                        </p>
-                                    </div>
-                                    <div className="flex shrink-0 items-center gap-2">
-                                        <span className="text-sm font-semibold">{formatARS(Number(c.total))}</span>
-                                        <Button variant="outline" size="sm" asChild>
-                                            <Link href={historialShow.url(c.id)}>Ver</Link>
-                                        </Button>
-                                    </div>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                )}
-            </div>
+                <DataTable
+                    columns={columns}
+                    data={cierres}
+                    getRowId={(row) => String(row.id)}
+                    initialSorting={[{ id: 'fecha', desc: true }]}
+                    empty={{
+                        icon: History,
+                        title: 'Todavía no hay cierres de caja',
+                        description:
+                            'Cuando se cierre un período de caja, queda archivado acá.',
+                    }}
+                />
+            </PageContainer>
         </>
     );
 }

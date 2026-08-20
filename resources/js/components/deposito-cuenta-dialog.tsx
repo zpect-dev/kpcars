@@ -246,7 +246,7 @@ export function DepositoCuentaDialog({
                                     className={cn(
                                         'text-lg font-semibold',
                                         saldo < 0
-                                            ? 'text-red-600 dark:text-red-400'
+                                            ? 'text-destructive'
                                             : 'text-foreground',
                                     )}
                                 >
@@ -258,7 +258,7 @@ export function DepositoCuentaDialog({
                 </div>
 
                 {saldoActual < 0 && (
-                    <p className="rounded-md bg-red-100 px-3 py-2 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
+                    <p className="rounded-md bg-destructive-soft px-3 py-2 text-sm text-destructive-soft-foreground">
                         El saldo en {monedaVisible} quedó negativo: los
                         descuentos superan lo depositado.
                     </p>
@@ -267,7 +267,7 @@ export function DepositoCuentaDialog({
                 {/* Extracto */}
                 <div className="overflow-x-auto rounded-md border border-border">
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-xs tracking-wider text-muted-foreground uppercase dark:bg-muted">
+                        <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                             <tr>
                                 <th className="px-3 py-2 text-left">Fecha</th>
                                 <th className="px-3 py-2 text-left">
@@ -314,7 +314,7 @@ export function DepositoCuentaDialog({
                                             className={cn(
                                                 'px-3 py-2 text-right font-medium whitespace-nowrap',
                                                 mov.monto < 0
-                                                    ? 'text-red-600 dark:text-red-400'
+                                                    ? 'text-destructive'
                                                     : 'text-foreground',
                                             )}
                                         >

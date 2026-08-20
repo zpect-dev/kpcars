@@ -1,4 +1,4 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, usePage } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import DeleteUser from '@/components/delete-user';
 import Heading from '@/components/heading';
@@ -8,24 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/profile';
 
-export default function Profile({
-    status,
-}: {
-    status?: string;
-}) {
+export default function Profile() {
     const { auth } = usePage().props;
 
     return (
         <>
-            <Head title="Profile settings" />
+            <Head title="Configuración de perfil" />
 
-            <h1 className="sr-only">Profile settings</h1>
+            <h1 className="sr-only">Configuración de perfil</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profile information"
-                    description="Update your name and DNI"
+                    title="Datos personales"
+                    description="Actualizá tu nombre y DNI"
                 />
 
                 <Form
@@ -38,7 +34,7 @@ export default function Profile({
                     {({ processing, errors }) => (
                         <>
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="name">Nombre</Label>
 
                                 <Input
                                     id="name"
@@ -47,7 +43,7 @@ export default function Profile({
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Full name"
+                                    placeholder="Nombre y apellido"
                                 />
 
                                 <InputError
@@ -80,7 +76,7 @@ export default function Profile({
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Save
+                                    Guardar
                                 </Button>
                             </div>
                         </>
@@ -96,7 +92,7 @@ export default function Profile({
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profile settings',
+            title: 'Configuración de perfil',
             href: edit(),
         },
     ],

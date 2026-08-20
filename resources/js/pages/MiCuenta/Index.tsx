@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { ChevronDown, Landmark, Receipt, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { formatARS, formatUSD } from '@/components/money-dual';
 import { cn } from '@/lib/utils';
 
@@ -170,23 +171,23 @@ const CONCEPTO_STYLES: Record<
 > = {
     parte_completa: {
         label: 'Parte completa',
-        badge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-        dot: 'bg-emerald-500',
+        badge: 'bg-success-soft text-success-soft-foreground',
+        dot: 'bg-success',
     },
     media_parte_deudor: {
         label: 'Media parte',
-        badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-        dot: 'bg-amber-500',
+        badge: 'bg-warning-soft text-warning-soft-foreground',
+        dot: 'bg-warning',
     },
     cero_deudor: {
         label: 'Sin parte',
-        badge: 'bg-red-500/10 text-red-700 dark:text-red-400',
-        dot: 'bg-red-500',
+        badge: 'bg-destructive-soft text-destructive-soft-foreground',
+        dot: 'bg-destructive',
     },
     redistribucion_financiador: {
         label: 'Financiamiento',
-        badge: 'bg-violet-500/10 text-violet-700 dark:text-violet-400',
-        dot: 'bg-violet-500',
+        badge: 'bg-info-soft text-info-soft-foreground',
+        dot: 'bg-info',
     },
 };
 
@@ -245,7 +246,7 @@ function MoneyHead({
     secondCol?: string;
 }) {
     return (
-        <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+        <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
             <tr>
                 <th className="px-3 py-2 text-left font-medium">{firstCol}</th>
                 {secondCol !== undefined && (
@@ -313,7 +314,7 @@ function TablaSueldo({
                                     <td className="px-3 py-2.5 text-left">
                                         <span
                                             className={cn(
-                                                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap',
+                                                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap',
                                                 c.badge,
                                             )}
                                         >
@@ -507,7 +508,7 @@ export default function MiCuentaIndex({
         <>
             <Head title="Recaudación" />
 
-            <div className="flex h-full flex-1 flex-col gap-5 p-4 sm:p-6">
+            <PageContainer className="gap-5 sm:p-6">
                 {' '}
                 {/* Botones de sección */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -570,7 +571,7 @@ export default function MiCuentaIndex({
                                             {grupo.nombre}
                                         </h2>
                                         <div className="flex items-baseline gap-2 rounded-lg bg-primary/10 px-3 py-1.5">
-                                            <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                                 Recaudación total
                                             </span>
                                             <span className="text-lg font-bold text-primary tabular-nums">
@@ -690,7 +691,7 @@ export default function MiCuentaIndex({
                                 <TablaSueldo
                                     titulo="Financiamiento"
                                     icon={Landmark}
-                                    accent="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                                    accent="bg-info-soft text-info-soft-foreground"
                                     detalles={detallesFinancia}
                                     tasa={ultimoCierre.tasa}
                                 />
@@ -704,7 +705,7 @@ export default function MiCuentaIndex({
                                     </h2>
                                     <div className="overflow-x-auto rounded-lg border border-border bg-card">
                                         <table className="w-full text-sm">
-                                            <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+                                            <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
                                                 <tr>
                                                     <th className="px-3 py-2 text-left font-medium">
                                                         Fecha
@@ -776,7 +777,7 @@ export default function MiCuentaIndex({
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm">
-                                        <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+                                        <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
                                             <tr>
                                                 <th className="px-3 py-2 text-left font-medium">
                                                     Fecha
@@ -898,7 +899,7 @@ export default function MiCuentaIndex({
                                                 ) : (
                                                     <div className="overflow-x-auto">
                                                         <table className="w-full text-sm">
-                                                            <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+                                                            <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
                                                                 <tr>
                                                                     <th className="px-3 py-2 text-left font-medium">
                                                                         Fecha
@@ -934,7 +935,7 @@ export default function MiCuentaIndex({
                                                                                 <span className="flex items-center gap-2">
                                                                                     {g.tipo ===
                                                                                         'repuesto' && (
-                                                                                        <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-primary uppercase">
+                                                                                        <span className="rounded bg-primary/15 px-1.5 py-0.5 text-xs font-medium tracking-wide text-primary uppercase">
                                                                                             Repuesto
                                                                                         </span>
                                                                                     )}
@@ -981,7 +982,7 @@ export default function MiCuentaIndex({
                         </section>
                     </div>
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }

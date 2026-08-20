@@ -1,19 +1,20 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Building2,
     ChevronDown,
     Plus,
-    Search,
     Trash2,
     Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { EmptyState } from '@/components/app/empty-state';
+import { SearchInput } from '@/components/app/filter-bar';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import { Combobox  } from '@/components/ui/combobox';
 import type {ComboboxOption} from '@/components/ui/combobox';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 interface Persona {
@@ -113,40 +114,42 @@ map.set(emp, []);
         <>
             <Head title="Configurar inversores" />
 
-            <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 p-4 sm:p-6">
-                {/* Header */}
-                <div className="flex flex-col gap-3">
-                    <Link
-                        href="/users?role=inversor"
-                        className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Volver a Personal
-                    </Link>
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                            Configurar inversores
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Abrí una inversión y asigná sus inversores, su rol y
-                            su deuda en dólares.
-                        </p>
-                    </div>
+            <PageContainer className="mx-auto w-full max-w-3xl gap-5">
+                <PageHeader
+                    title="Configurar inversores"
+                    description="Abrí una inversión y asigná sus inversores, su rol y su deuda en dólares."
+                    onBack={() => router.get('/users?role=inversor')}
+                />
 
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={busqueda}
-                            onChange={(e) => setBusqueda(e.target.value)}
-                            placeholder="Buscar inversión…"
-                            className="pl-9"
-                        />
-                    </div>
-                </div>
+                <SearchInput
+                    value={busqueda}
+                    onChange={setBusqueda}
+                    placeholder="Buscar inversión…"
+                />
 
                 {porEmpresa.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-                        No se encontraron inversiones.
+                    <div className="rounded-xl border border-border bg-card">
+                        <EmptyState
+                            variant={busqueda.trim() ? 'filtered' : 'empty'}
+                            title={
+                                busqueda.trim()
+                                    ? 'Ninguna inversión coincide'
+                                    : 'Todavía no hay inversiones'
+                            }
+                            description={
+                                busqueda.trim()
+                                    ? 'Probá con otro nombre.'
+                                    : 'Las inversiones se crean desde el listado de vehículos.'
+                            }
+                            action={
+                                busqueda.trim()
+                                    ? {
+                                          label: 'Limpiar búsqueda',
+                                          onClick: () => setBusqueda(''),
+                                      }
+                                    : undefined
+                            }
+                        />
                     </div>
                 ) : (
                     porEmpresa.map(([empresa, invs]) => (
@@ -171,26 +174,30 @@ map.set(emp, []);
                         </section>
                     ))
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }
 
+/**
+ * Financiador no es un estado bueno ni malo, es una categoría: por eso va con
+ * el tono informativo y no con uno de la escala al-día/deudor.
+ */
 const ROLES: { key: Rol; label: string; active: string }[] = [
     {
         key: 'normal',
         label: 'Al día',
-        active: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+        active: 'bg-success-soft text-success-soft-foreground',
     },
     {
         key: 'financiador',
         label: 'Financiador',
-        active: 'bg-violet-500/15 text-violet-700 dark:text-violet-400',
+        active: 'bg-info-soft text-info-soft-foreground',
     },
     {
         key: 'deudor',
         label: 'Deudor',
-        active: 'bg-red-500/15 text-red-700 dark:text-red-400',
+        active: 'bg-destructive-soft text-destructive-soft-foreground',
     },
 ];
 
@@ -324,10 +331,10 @@ return;
                         </span>
                         <span
                             className={cn(
-                                'rounded border px-1.5 py-0.5 text-[10px] font-semibold',
+                                'rounded border px-1.5 py-0.5 text-xs font-semibold',
                                 inversion.completa
-                                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                                    : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                                    ? 'border-success/30 bg-success-soft text-success-soft-foreground'
+                                    : 'border-warning/30 bg-warning-soft text-warning-soft-foreground',
                             )}
                             title={
                                 inversion.completa
@@ -338,19 +345,19 @@ return;
                             {inversion.autos}/10
                         </span>
                     </span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             {socios.length}/{maxInversores}
                         </span>
                         {resumen.financiador > 0 && (
-                            <span className="text-violet-500 dark:text-violet-400">
+                            <span className="text-info">
                                 {resumen.financiador} financiador
                                 {resumen.financiador !== 1 ? 'es' : ''}
                             </span>
                         )}
                         {resumen.deudor > 0 && (
-                            <span className="text-red-500 dark:text-red-400">
+                            <span className="text-destructive">
                                 {resumen.deudor} deudor
                                 {resumen.deudor !== 1 ? 'es' : ''}
                             </span>
@@ -448,7 +455,7 @@ function SocioRow({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
             {/* Inversor */}
             <div className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
                     {initials(socio.user.name)}
                 </span>
                 <span className="truncate text-sm font-medium text-foreground">
@@ -466,8 +473,9 @@ function SocioRow({
                             key={rol.key}
                             type="button"
                             onClick={() => onRol(rol.key)}
+                            aria-pressed={activo}
                             className={cn(
-                                'border-l border-border px-2.5 py-1 text-xs font-medium transition-colors first:border-l-0',
+                                'border-l border-border px-2.5 py-1 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset first:border-l-0',
                                 activo
                                     ? rol.active
                                     : 'text-muted-foreground hover:bg-muted',
@@ -493,13 +501,13 @@ function SocioRow({
                             className="h-8 w-28 px-2 py-1 text-right text-sm tabular-nums"
                         />
                         {arsEquiv != null && (
-                            <span className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
+                            <span className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                                 ≈ ARS {formatNum(arsEquiv)}
                             </span>
                         )}
                     </div>
                 ) : (
-                    <span className="shrink-0 text-[11px] text-muted-foreground italic">
+                    <span className="shrink-0 text-xs text-muted-foreground italic">
                         sin monto
                     </span>
                 ))}
@@ -509,7 +517,8 @@ function SocioRow({
                 type="button"
                 onClick={onQuitar}
                 title="Quitar de la inversión"
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-500"
+                aria-label="Quitar de la inversión"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors outline-none hover:border-destructive/40 hover:bg-destructive-soft hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring"
             >
                 <Trash2 className="h-3.5 w-3.5" />
             </button>

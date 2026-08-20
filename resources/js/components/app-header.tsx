@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from 'lucide-react';
+import { useState } from 'react';
 import AppLogo from '@/components/app-logo';
 import AppLogoIcon from '@/components/app-logo-icon';
 import { Breadcrumbs } from '@/components/breadcrumbs';
@@ -73,10 +73,15 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { url } = usePage();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-    // Close the mobile menu when the URL changes (navigation)
-    useEffect(() => {
+    // Cerrar el menú móvil al navegar. Se ajusta durante el render en vez de
+    // con un efecto: así React descarta el árbol y vuelve a renderizar antes
+    // de pintar, sin el parpadeo de un segundo commit.
+    const [urlPrevia, setUrlPrevia] = useState(url);
+
+    if (url !== urlPrevia) {
+        setUrlPrevia(url);
         setIsMobileMenuOpen(false);
-    }, [url]);
+    }
 
     return (
         <>
@@ -90,6 +95,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                     variant="ghost"
                                     size="icon"
                                     className="mr-2 h-[34px] w-[34px]"
+                                    aria-label="Abrir menú de navegación"
                                 >
                                     <Menu className="h-5 w-5" />
                                 </Button>
@@ -99,7 +105,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 className="flex h-full w-64 flex-col items-stretch justify-between bg-sidebar"
                             >
                                 <SheetTitle className="sr-only">
-                                    Navigation menu
+                                    Menú de navegación
                                 </SheetTitle>
                                 <SheetHeader className="flex justify-start text-left">
                                     <AppLogoIcon className="h-6 w-6 text-black dark:text-white" />
@@ -191,6 +197,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 variant="ghost"
                                 size="icon"
                                 className="group h-9 w-9 cursor-pointer"
+                                aria-label="Buscar"
                             >
                                 <Search className="!size-5 opacity-80 group-hover:opacity-100" />
                             </Button>
@@ -224,6 +231,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <Button
                                     variant="ghost"
                                     className="size-10 rounded-full p-1"
+                                    aria-label="Abrir menú de la cuenta"
                                 >
                                     <Avatar className="size-8 overflow-hidden rounded-full">
                                         <AvatarImage

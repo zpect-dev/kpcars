@@ -1,172 +1,53 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     Building2,
-    Check,
     ChevronDown,
-    CircleCheck,
     ClipboardList,
-    Download,
-    FileText,
+    CircleCheck,
     Filter,
-    HandCoins,
-    RefreshCw,
     Search,
-    Trash2,
+    RefreshCw,
     TriangleAlert,
-    User as UserIcon,
     X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+    EstadoBadge,
+    FilterButton,
+    Highlight,
+    StatCard,
+} from '@/components/actas/atomos';
+import { CobrarActaForm, CobroButton } from '@/components/actas/cobrar-modal';
+import { ReportesPanel } from '@/components/actas/reportes-panel';
+import {
+    formatFecha,
+    ORDEN_LABEL,
+} from '@/components/actas/tipos';
+import type {
+    Acta,
+    ChoferFiltro,
+    EstadoFiltro,
+    Grupo,
+    JurisFiltro,
+    Orden,
+    Reporte,
+    ReporteDetalle,
+    Stats,
+    UltimaSync,
+} from '@/components/actas/tipos';
+import { EmptyState } from '@/components/app/empty-state';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 import { formatARS } from '@/components/money-dual';
-import { useImageCropper } from '@/components/image-cropper';
-import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import { cn } from '@/lib/utils';
-
-interface Acta {
-    id: number;
-    patente: string;
-    jurisdiccion: string;
-    acta: string | null;
-    motivo: string | null;
-    monto: number | null;
-    fecha_infraccion: string | null;
-    fecha_vencimiento: string | null;
-    estado: 'vigente' | 'resuelta';
-    resuelta_en: string | null;
-    vista_primera_en: string | null;
-    vehiculo: string | null;
-    conductor_id: number | null;
-    conductor: string | null;
-    posible_duplicado: boolean;
-    pago_voluntario: boolean;
-    punto_rojo: boolean;
-    sin_importe: boolean;
-    monto_efectivo: number;
-    cobrado: boolean;
-    cobrada_en: string | null;
-    monto_cobrado: number;
-    adeudado: number;
-    pagos: Pago[];
-}
-
-interface Pago {
-    id: number;
-    fecha: string | null;
-    monto: number;
-    comprobante_url: string | null;
-    es_transferencia: boolean;
-}
-
-/** Estado del cobro al chofer: sin cobrar / parcial / cobrada. */
-function estadoCobro(a: Acta): 'sin' | 'parcial' | 'cobrada' {
-    if (a.cobrado) return 'cobrada';
-    if (a.monto_cobrado > 0) return 'parcial';
-    return 'sin';
-}
-
-interface UltimaSync {
-    ok: boolean;
-    origen: string;
-    error: string | null;
-    cuando: string | null;
-}
-
-interface Stats {
-    vigentes: number;
-    resueltas: number;
-    monto_vigente: number;
-    bsas: number;
-    caba: number;
-}
-
-/** Fila de la lista de reportes: una corrida de sincronización y lo que movió. */
-interface Reporte {
-    id: number;
-    cuando: string | null;
-    origen: string;
-    ok: boolean;
-    error: string | null;
-    snapshot: string | null;
-    nuevas: number;
-    monto_nuevas: number;
-    resueltas: number;
-    monto_resueltas: number;
-    reabiertas: number;
-    deuda_vigente: number;
-    pagos: number;
-    cobrado: number;
-    sin_movimiento: boolean;
-}
-
-interface ActaFila {
-    id: number;
-    patente: string;
-    conductor: string | null;
-    jurisdiccion: string;
-    acta: string | null;
-    motivo: string | null;
-    monto: number | null;
-    fecha_infraccion: string | null;
-    fecha_vencimiento: string | null;
-    adeudado: number;
-}
-
-interface CobroFila {
-    id: number;
-    fecha: string | null;
-    registrado_en: string | null;
-    monto: number;
-    es_transferencia: boolean;
-    patente: string | null;
-    conductor: string | null;
-}
-
-interface DesgloseFila {
-    label: string;
-    nuevas: number;
-    monto_nuevas: number;
-    pagos: number;
-    cobrado: number;
-    adeuda: number;
-}
-
-interface ReporteDetalle {
-    run: {
-        id: number;
-        cuando: string | null;
-        origen: string;
-        ok: boolean;
-        error: string | null;
-        snapshot: string | null;
-    };
-    periodo: { desde: string | null; hasta: string | null };
-    totales: {
-        nuevas: number;
-        monto_nuevas: number;
-        resueltas: number;
-        monto_resueltas: number;
-        reabiertas: number;
-        deuda_vigente: number;
-        pagos: number;
-        cobrado: number;
-    };
-    nuevas: ActaFila[];
-    resueltas: ActaFila[];
-    cobros: CobroFila[];
-    por_chofer: DesgloseFila[];
-    por_vehiculo: DesgloseFila[];
-}
 
 interface Props {
     actas: Acta[];
@@ -178,83 +59,6 @@ interface Props {
     reporteDetalle: ReporteDetalle | null;
 }
 
-type EstadoFiltro = 'todas' | 'vigente' | 'resuelta';
-type JurisFiltro = 'todas' | 'BSAS' | 'CABA';
-type ChoferFiltro = 'todos' | 'con' | 'sin';
-type Orden = 'vigentes' | 'monto' | 'cantidad' | 'alfabetico';
-
-interface Grupo {
-    key: string;
-    patente: string;
-    sub: string;
-    conductor: string | null;
-    actas: Acta[];
-    vigentes: number;
-    total: number;
-}
-
-const ORDEN_LABEL: Record<Orden, string> = {
-    vigentes: 'Vigentes',
-    monto: 'Monto',
-    cantidad: 'Cantidad',
-    alfabetico: 'A-Z',
-};
-
-/** Fecha ISO (Y-m-d) a dd/mm/aaaa, sin corrimiento de zona horaria. */
-function formatFecha(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
-
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-
-    return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
-}
-
-/** Resalta las coincidencias de la búsqueda dentro de un texto. */
-function Highlight({ text, query }: { text: string; query: string }) {
-    const q = query.trim();
-
-    if (!q) {
-        return <>{text}</>;
-    }
-
-    const idx = text.toLowerCase().indexOf(q.toLowerCase());
-
-    if (idx === -1) {
-        return <>{text}</>;
-    }
-
-    return (
-        <>
-            {text.slice(0, idx)}
-            <mark className="rounded bg-amber-200 px-0.5 text-foreground dark:bg-amber-500/40">
-                {text.slice(idx, idx + q.length)}
-            </mark>
-            {text.slice(idx + q.length)}
-        </>
-    );
-}
-
-/** Fecha ISO con hora a dd/mm/aaaa HH:mm. */
-function formatFechaHora(iso: string | null): string {
-    if (!iso) {
-        return '—';
-    }
-
-    const d = new Date(iso);
-
-    if (Number.isNaN(d.getTime())) {
-        return iso;
-    }
-
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-
-    return `${dd}/${mm}/${d.getFullYear()} ${hh}:${mi}`;
-}
 
 export default function ActasIndex({
     actas,
@@ -340,10 +144,17 @@ export default function ActasIndex({
                     .reduce((s, a) => s + a.monto_efectivo, 0),
             }))
             .sort((a, b) => {
-                if (orden === 'monto') return b.total - a.total || alfa(a, b);
-                if (orden === 'cantidad')
-                    return b.actas.length - a.actas.length || alfa(a, b);
-                if (orden === 'alfabetico') return alfa(a, b);
+                if (orden === 'monto') {
+return b.total - a.total || alfa(a, b);
+}
+
+                if (orden === 'cantidad') {
+return b.actas.length - a.actas.length || alfa(a, b);
+}
+
+                if (orden === 'alfabetico') {
+return alfa(a, b);
+}
 
                 // 'vigentes' (default)
                 return (
@@ -408,44 +219,45 @@ export default function ActasIndex({
         <>
             <Head title="Multas (feed)" />
 
-            <div className="flex h-full flex-1 flex-col gap-5 p-4 sm:p-6">
-                {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                                Multas (feed)
-                            </h1>
-                            <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-amber-600 uppercase dark:text-amber-400">
-                                Beta
-                            </span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
+            <PageContainer className="gap-5 sm:p-6">
+                <PageHeader
+                    title="Multas (feed)"
+                    meta={
+                        <span className="rounded-md border border-warning/30 bg-warning-soft px-2 py-0.5 text-xs font-semibold tracking-wide text-warning-soft-foreground uppercase">
+                            Beta
+                        </span>
+                    }
+                    description={
+                        <>
                             Multas traídas automáticamente del feed externo.
                             {ultimoSnapshot
                                 ? ` Última actualización: ${formatFecha(ultimoSnapshot)}.`
                                 : ' Todavía sin datos: sincronizá para empezar.'}
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        onClick={sincronizar}
-                        disabled={sincronizando}
-                        className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-                    >
-                        <RefreshCw
-                            className={cn(
-                                'h-4 w-4',
-                                sincronizando && 'animate-spin',
-                            )}
-                        />
-                        {sincronizando ? 'Sincronizando…' : 'Sincronizar ahora'}
-                    </button>
-                </div>
+                        </>
+                    }
+                    actions={
+                        <Button
+                            size="sm"
+                            onClick={sincronizar}
+                            disabled={sincronizando}
+                        >
+                            <RefreshCw
+                                aria-hidden="true"
+                                className={cn(
+                                    'size-4',
+                                    sincronizando && 'animate-spin',
+                                )}
+                            />
+                            {sincronizando
+                                ? 'Sincronizando…'
+                                : 'Sincronizar ahora'}
+                        </Button>
+                    }
+                />
 
                 {/* Aviso: última sincronización falló */}
                 {ultimaSync && !ultimaSync.ok && (
-                    <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-400">
+                    <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
                         <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
                         <div className="min-w-0">
                             <p className="font-medium">
@@ -581,6 +393,7 @@ export default function ActasIndex({
                             type="button"
                             onClick={limpiarFiltros}
                             title="Limpiar filtros"
+                            aria-label="Limpiar filtros"
                             className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <X className="h-3.5 w-3.5" />
@@ -640,8 +453,32 @@ export default function ActasIndex({
 
                 {/* Lista agrupada por vehículo */}
                 {grupos.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card p-12 text-center text-sm text-muted-foreground">
-                        No hay multas que coincidan con los filtros.
+                    <div className="rounded-xl border border-border bg-card shadow-sm">
+                        <EmptyState
+                            variant={hayFiltros ? 'filtered' : 'empty'}
+                            icon={hayFiltros ? undefined : ClipboardList}
+                            title={
+                                hayFiltros
+                                    ? 'Ninguna multa coincide con los filtros'
+                                    : 'Todavía no hay multas en el feed'
+                            }
+                            description={
+                                hayFiltros
+                                    ? 'Probá con otra patente o quitá algún filtro.'
+                                    : 'Sincronizá con el feed externo para traer las multas.'
+                            }
+                            action={
+                                hayFiltros
+                                    ? {
+                                          label: 'Limpiar filtros',
+                                          onClick: limpiarFiltros,
+                                      }
+                                    : {
+                                          label: 'Sincronizar ahora',
+                                          onClick: sincronizar,
+                                      }
+                            }
+                        />
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2">
@@ -681,12 +518,12 @@ export default function ActasIndex({
                                                 : 'multa'}
                                         </span>
                                         {g.vigentes > 0 ? (
-                                            <span className="shrink-0 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                            <span className="shrink-0 rounded-md bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-soft-foreground">
                                                 {g.vigentes} vigente
                                                 {g.vigentes !== 1 ? 's' : ''}
                                             </span>
                                         ) : (
-                                            <span className="shrink-0 rounded-md bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                            <span className="shrink-0 rounded-md bg-success-soft px-2 py-0.5 text-xs font-semibold text-success-soft-foreground">
                                                 Al día
                                             </span>
                                         )}
@@ -699,28 +536,28 @@ export default function ActasIndex({
                                         <div className="border-t border-border">
                                             {/* Header — solo desktop */}
                                             <div className="hidden items-center gap-4 border-b border-border bg-muted/30 px-4 py-2 sm:flex">
-                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-[80px] shrink-0 text-xs font-medium text-muted-foreground">
                                                     Fecha inf.
                                                 </span>
-                                                <span className="w-[80px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-[80px] shrink-0 text-xs font-medium text-muted-foreground">
                                                     Vencimiento
                                                 </span>
-                                                <span className="w-[64px] shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-[64px] shrink-0 text-xs font-medium text-muted-foreground">
                                                     Jurisd.
                                                 </span>
-                                                <span className="w-32 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-32 shrink-0 text-xs font-medium text-muted-foreground">
                                                     Conductor
                                                 </span>
-                                                <span className="min-w-0 flex-1 text-[11px] font-medium text-muted-foreground">
+                                                <span className="min-w-0 flex-1 text-xs font-medium text-muted-foreground">
                                                     Motivo
                                                 </span>
-                                                <span className="w-28 shrink-0 text-right text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-28 shrink-0 text-right text-xs font-medium text-muted-foreground">
                                                     Monto
                                                 </span>
-                                                <span className="w-24 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-24 shrink-0 text-xs font-medium text-muted-foreground">
                                                     Estado
                                                 </span>
-                                                <span className="w-28 shrink-0 text-[11px] font-medium text-muted-foreground">
+                                                <span className="w-28 shrink-0 text-xs font-medium text-muted-foreground">
                                                     Cobro chofer
                                                 </span>
                                             </div>
@@ -741,7 +578,7 @@ export default function ActasIndex({
                                                         )}
                                                     </span>
                                                     <span className="w-[64px] shrink-0">
-                                                        <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                                        <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                                                             {a.jurisdiccion}
                                                         </span>
                                                     </span>
@@ -768,7 +605,7 @@ export default function ActasIndex({
                                                             {a.posible_duplicado && (
                                                                 <span
                                                                     title="Posible duplicado de una multa cargada a mano (misma unidad, fecha y monto)"
-                                                                    className="inline-flex shrink-0 items-center rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+                                                                    className="inline-flex shrink-0 items-center rounded-md bg-warning-soft px-1.5 py-0.5 text-xs font-semibold text-warning-soft-foreground"
                                                                 >
                                                                     ¿Dup.
                                                                     manual?
@@ -776,15 +613,15 @@ export default function ActasIndex({
                                                             )}
                                                         </span>
                                                         {a.acta && (
-                                                            <span className="truncate font-mono text-[11px] text-muted-foreground">
+                                                            <span className="truncate font-mono text-xs text-muted-foreground">
                                                                 {a.acta}
                                                             </span>
                                                         )}
                                                     </span>
                                                     <span className="flex w-28 shrink-0 flex-col items-start sm:items-end">
                                                         {a.punto_rojo ? (
-                                                            <span className="inline-flex items-center gap-1 rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-destructive-soft px-1.5 py-0.5 text-xs font-semibold text-destructive-soft-foreground">
+                                                                <span aria-hidden="true" className="size-1.5 rounded-full bg-destructive" />
                                                                 Punto rojo
                                                             </span>
                                                         ) : a.pago_voluntario &&
@@ -799,7 +636,7 @@ export default function ActasIndex({
                                                                             2,
                                                                     )}
                                                                 </span>
-                                                                <span className="text-sm font-semibold text-green-600 tabular-nums dark:text-green-400">
+                                                                <span className="text-sm font-semibold text-success tabular-nums">
                                                                     {formatARS(
                                                                         a.monto,
                                                                     )}
@@ -835,7 +672,7 @@ export default function ActasIndex({
                         })}
                     </div>
                 )}
-            </div>
+            </PageContainer>
 
             <Dialog
                 open={cobrando !== null}
@@ -851,1032 +688,6 @@ export default function ActasIndex({
                 </DialogContent>
             </Dialog>
         </>
-    );
-}
-
-function CobroButton({ acta, onClick }: { acta: Acta; onClick: () => void }) {
-    if (acta.sin_importe) {
-        return (
-            <span className="text-[11px] text-muted-foreground/60 italic">
-                Sin importe
-            </span>
-        );
-    }
-
-    const estado = estadoCobro(acta);
-
-    const estilos = {
-        sin: 'border-border text-muted-foreground hover:bg-muted hover:text-foreground',
-        parcial:
-            'border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 dark:text-amber-400',
-        cobrada:
-            'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-400',
-    }[estado];
-
-    const label = {
-        sin: 'Cobrar',
-        parcial: 'Parcial',
-        cobrada: 'Cobrada',
-    }[estado];
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-colors',
-                estilos,
-            )}
-        >
-            <HandCoins className="h-3.5 w-3.5" />
-            {label}
-        </button>
-    );
-}
-
-function CobrarActaForm({
-    acta,
-    onClose,
-}: {
-    acta: Acta;
-    onClose: () => void;
-}) {
-    const today = new Date().toISOString().slice(0, 10);
-    const total = acta.monto_efectivo;
-    const pagado = acta.monto_cobrado;
-    const falta = Math.max(total - pagado, 0);
-    const fully = acta.cobrado;
-
-    const form = useForm({
-        monto: fully ? '' : String(falta.toFixed(2)),
-        fecha_cobro: today,
-        comprobante: null as File | null,
-        es_transferencia: false,
-    });
-
-    const { cropImage, cropperElement } = useImageCropper();
-
-    async function handleComprobante(f: File | null) {
-        // Solo las imágenes pasan por el editor de recorte; los PDF van directo.
-        if (f && f.type.startsWith('image/')) {
-            try {
-                form.setData('comprobante', await cropImage(f));
-            } catch {
-                // recorte cancelado
-            }
-            return;
-        }
-        form.setData('comprobante', f);
-    }
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        // Comprobante por multipart; la ruta es PATCH, hay que falsear el método.
-        form.transform((data) => ({ ...data, _method: 'patch' }));
-        form.post(`/actas/${acta.id}/cobrado`, {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['actas', 'stats', 'flash'],
-            forceFormData: true,
-            onSuccess: () => onClose(),
-        });
-    }
-
-    function reiniciar() {
-        router.patch(
-            `/actas/${acta.id}/cobrado`,
-            { reset: true },
-            {
-                preserveScroll: true,
-                preserveState: true,
-                only: ['actas', 'stats', 'flash'],
-                onSuccess: () => onClose(),
-            },
-        );
-    }
-
-    function eliminarPago(pagoId: number) {
-        router.delete(`/actas/${acta.id}/pagos/${pagoId}`, {
-            preserveScroll: true,
-            preserveState: true,
-            only: ['actas', 'stats', 'flash'],
-            onSuccess: () => onClose(),
-        });
-    }
-
-    const montoNum = Number(form.data.monto);
-    const puedeRegistrar =
-        montoNum > 0 && form.data.fecha_cobro !== '' && !form.processing;
-
-    return (
-        <form onSubmit={submit}>
-            {cropperElement}
-            <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
-                    <UserIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-                <div className="flex-1">
-                    <DialogTitle className="text-base font-semibold">
-                        Cobro al chofer
-                    </DialogTitle>
-                    <DialogDescription className="text-xs">
-                        <span className="font-mono font-semibold uppercase">
-                            {acta.patente}
-                        </span>
-                        {acta.conductor ? ` · ${acta.conductor}` : ''}
-                    </DialogDescription>
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-4 px-5 py-5">
-                {/* Resumen del cobro */}
-                <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-muted/30 p-3 text-center">
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Total
-                        </p>
-                        <p className="text-sm font-bold text-foreground tabular-nums">
-                            {formatARS(total)}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Pagado
-                        </p>
-                        <p className="text-sm font-bold text-green-600 tabular-nums dark:text-green-400">
-                            {formatARS(pagado)}
-                        </p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] tracking-wide text-muted-foreground uppercase">
-                            Falta
-                        </p>
-                        <p
-                            className={cn(
-                                'text-sm font-bold tabular-nums',
-                                falta > 0
-                                    ? 'text-foreground'
-                                    : 'text-muted-foreground',
-                            )}
-                        >
-                            {formatARS(falta)}
-                        </p>
-                    </div>
-                </div>
-
-                {/* Pagos registrados */}
-                {acta.pagos.length > 0 && (
-                    <div className="flex flex-col gap-1.5">
-                        <p className="text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-                            Pagos registrados
-                        </p>
-                        <div className="flex flex-col divide-y divide-border overflow-hidden rounded-xl border border-border">
-                            {acta.pagos.map((p) => (
-                                <div
-                                    key={p.id}
-                                    className="flex items-center gap-2 px-3 py-2"
-                                >
-                                    <span className="w-20 shrink-0 text-xs text-muted-foreground tabular-nums">
-                                        {formatFecha(p.fecha)}
-                                    </span>
-                                    <span className="text-sm font-semibold text-foreground tabular-nums">
-                                        {formatARS(p.monto)}
-                                    </span>
-                                    <span className="flex-1">
-                                        {p.es_transferencia ? (
-                                            <span
-                                                className="inline-flex items-center rounded border border-blue-500/30 bg-blue-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
-                                                title="Pagado por transferencia"
-                                            >
-                                                Transferencia
-                                            </span>
-                                        ) : (
-                                            <span
-                                                className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"
-                                                title="Pagado en efectivo"
-                                            >
-                                                Efectivo
-                                            </span>
-                                        )}
-                                    </span>
-                                    {p.comprobante_url ? (
-                                        <a
-                                            href={p.comprobante_url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            title="Ver comprobante"
-                                            className="inline-flex items-center gap-1 rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                        >
-                                            <FileText className="h-3 w-3" />{' '}
-                                            Comp.
-                                        </a>
-                                    ) : (
-                                        <span className="text-[10px] text-muted-foreground/60">
-                                            sin comprobante
-                                        </span>
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => eliminarPago(p.id)}
-                                        title="Eliminar pago"
-                                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
-                                    >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {fully ? (
-                    <p className="text-center text-sm font-medium text-green-600 dark:text-green-400">
-                        Cobrada por completo
-                        {acta.cobrada_en
-                            ? ` el ${formatFecha(acta.cobrada_en)}`
-                            : ''}
-                        .
-                    </p>
-                ) : (
-                    <>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-monto">
-                                    Monto que pagó
-                                </Label>
-                                <MoneyInput
-                                    id="cobro-monto"
-                                    value={
-                                        form.data.monto === ''
-                                            ? null
-                                            : Number(form.data.monto)
-                                    }
-                                    onValueChange={(n) =>
-                                        form.setData(
-                                            'monto',
-                                            n == null ? '' : String(n),
-                                        )
-                                    }
-                                />
-                                {form.errors.monto && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.monto}
-                                    </p>
-                                )}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="cobro-fecha">
-                                    Fecha del pago
-                                </Label>
-                                <Input
-                                    id="cobro-fecha"
-                                    type="date"
-                                    value={form.data.fecha_cobro}
-                                    max={today}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'fecha_cobro',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                                {form.errors.fecha_cobro && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.fecha_cobro}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Método de pago: efectivo (sin comprobante) o transferencia. */}
-                        <div className="flex flex-col gap-1.5">
-                            <Label>Método de pago</Label>
-                            <div className="inline-flex overflow-hidden rounded-lg border border-border">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        form.setData('es_transferencia', false);
-                                        form.setData('comprobante', null);
-                                    }}
-                                    className={cn(
-                                        'flex-1 px-3 py-2 text-sm font-medium transition-colors',
-                                        !form.data.es_transferencia
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
-                                    )}
-                                >
-                                    Efectivo
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        form.setData('es_transferencia', true)
-                                    }
-                                    className={cn(
-                                        'flex-1 border-l border-border px-3 py-2 text-sm font-medium transition-colors',
-                                        form.data.es_transferencia
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-transparent text-muted-foreground hover:bg-muted',
-                                    )}
-                                >
-                                    Transferencia
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* El comprobante solo aplica a la transferencia; en efectivo no se pide. */}
-                        {form.data.es_transferencia && (
-                            <div className="flex flex-col gap-1.5">
-                                <Label>
-                                    Comprobante{' '}
-                                    <span className="font-normal text-muted-foreground">
-                                        (opcional)
-                                    </span>
-                                </Label>
-                                <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-dashed border-input bg-background px-3 py-2.5 text-sm transition-colors hover:bg-muted/40">
-                                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span
-                                        className={cn(
-                                            'min-w-0 flex-1 truncate',
-                                            form.data.comprobante
-                                                ? 'text-foreground'
-                                                : 'text-muted-foreground',
-                                        )}
-                                    >
-                                        {form.data.comprobante
-                                            ? form.data.comprobante.name
-                                            : 'Adjuntar comprobante (PDF o imagen)...'}
-                                    </span>
-                                    <input
-                                        type="file"
-                                        accept="application/pdf,image/*"
-                                        className="hidden"
-                                        onChange={(e) => {
-                                            handleComprobante(
-                                                e.target.files?.[0] ?? null,
-                                            );
-                                            e.target.value = '';
-                                        }}
-                                    />
-                                </label>
-                                {form.errors.comprobante && (
-                                    <p className="text-xs text-red-600">
-                                        {form.errors.comprobante}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        <p className="-mt-1 text-[11px] text-muted-foreground">
-                            Si el pago no cubre el total, el acta queda como
-                            cobro parcial (pendiente).
-                        </p>
-                    </>
-                )}
-            </div>
-
-            <DialogFooter className="flex flex-row flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4">
-                {pagado > 0 && (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={reiniciar}
-                        className="mr-auto text-red-600 hover:text-red-700 dark:text-red-400"
-                    >
-                        Reiniciar cobro
-                    </Button>
-                )}
-                <Button type="button" variant="outline" onClick={onClose}>
-                    <X className="h-4 w-4" /> Cerrar
-                </Button>
-                {!fully && (
-                    <Button type="submit" disabled={!puedeRegistrar}>
-                        {form.processing ? (
-                            'Guardando...'
-                        ) : (
-                            <>
-                                <Check className="h-4 w-4" /> Registrar pago
-                            </>
-                        )}
-                    </Button>
-                )}
-            </DialogFooter>
-        </form>
-    );
-}
-
-/** Cuántas corridas se ven sin desplegar "Ver todas". */
-const REPORTES_VISIBLES = 5;
-/** Cuántas filas de cada lista se muestran en pantalla (el resto, en el PDF). */
-const FILAS_DETALLE = 8;
-/** Cuántas filas de desglose se muestran antes de mandar al PDF. */
-const FILAS_DESGLOSE = 6;
-
-/** Titular del panel plegado: qué movió la última corrida. */
-function resumenUltimo(r: Reporte): string {
-    const cuando = formatFechaHora(r.cuando);
-
-    if (!r.ok) {
-        return `Última (${cuando}): falló`;
-    }
-
-    if (r.sin_movimiento) {
-        return `Última (${cuando}): sin movimiento`;
-    }
-
-    return `Última (${cuando}): +${r.nuevas} por ${formatARS(r.monto_nuevas)} · cobrado ${formatARS(r.cobrado)}`;
-}
-
-/**
- * Reportes de sincronización: una fila por corrida, con lo que sumó, lo que se
- * pagó al organismo y lo que se le cobró a los choferes desde esa corrida.
- */
-function ReportesPanel({
-    reportes,
-    detalle,
-}: {
-    reportes: Reporte[];
-    detalle: ReporteDetalle | null;
-}) {
-    // El panel arranca plegado: en la barra alcanza con el último movimiento.
-    const [listaAbierta, setListaAbierta] = useState(false);
-    const [abierto, setAbierto] = useState<number | null>(null);
-    const [verTodos, setVerTodos] = useState(false);
-
-    if (reportes.length === 0) {
-        return null;
-    }
-
-    const visibles = verTodos ? reportes : reportes.slice(0, REPORTES_VISIBLES);
-
-    function toggle(id: number) {
-        if (abierto === id) {
-            setAbierto(null);
-
-            return;
-        }
-
-        setAbierto(id);
-        // El detalle no viaja en la carga inicial: se pide al desplegar la fila.
-        // reload() ya preserva scroll y estado.
-        router.reload({
-            only: ['reporteDetalle'],
-            data: { reporte: id },
-        });
-    }
-
-    return (
-        <div className="rounded-xl border border-border bg-card">
-            {/* Barra plegada: una línea con lo último que pasó. */}
-            <button
-                type="button"
-                onClick={() => setListaAbierta((v) => !v)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-muted/50"
-            >
-                <ClipboardList className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="shrink-0 font-medium text-foreground">
-                    Reportes
-                </span>
-                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {resumenUltimo(reportes[0])}
-                </span>
-                <ChevronDown
-                    className={cn(
-                        'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
-                        listaAbierta && 'rotate-180',
-                    )}
-                />
-            </button>
-
-            {listaAbierta && (
-                <>
-                    <div className="divide-y divide-border border-t border-border">
-                        {visibles.map((r) => (
-                            <div key={r.id}>
-                                <button
-                                    type="button"
-                                    onClick={() => toggle(r.id)}
-                                    className="flex w-full flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5 text-left text-xs transition-colors hover:bg-muted/50"
-                                >
-                                    <ChevronDown
-                                        className={cn(
-                                            'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
-                                            abierto === r.id && 'rotate-180',
-                                        )}
-                                    />
-
-                                    {/* La automática es la norma: solo se aclara
-                                        cuando la corrida fue a mano. */}
-                                    <span
-                                        className="shrink-0 text-muted-foreground tabular-nums"
-                                        title={
-                                            r.origen === 'schedule'
-                                                ? 'Sincronización automática'
-                                                : 'Sincronización manual'
-                                        }
-                                    >
-                                        {formatFechaHora(r.cuando)}
-                                        {r.origen !== 'schedule' && ' (manual)'}
-                                    </span>
-
-                                    {!r.ok ? (
-                                        <span className="min-w-0 truncate font-medium text-red-600 dark:text-red-400">
-                                            Falló{r.error ? `: ${r.error}` : ''}
-                                        </span>
-                                    ) : r.sin_movimiento ? (
-                                        <span className="text-muted-foreground">
-                                            Sin movimiento
-                                        </span>
-                                    ) : (
-                                        <>
-                                            <span
-                                                className="font-medium text-amber-600 tabular-nums dark:text-amber-400"
-                                                title="Multas nuevas"
-                                            >
-                                                +{r.nuevas}{' '}
-                                                {formatARS(r.monto_nuevas)}
-                                            </span>
-                                            <span
-                                                className="text-muted-foreground tabular-nums"
-                                                title="Pagadas al organismo"
-                                            >
-                                                −{r.resueltas}{' '}
-                                                {formatARS(r.monto_resueltas)}
-                                            </span>
-                                            <span
-                                                className="font-medium text-emerald-600 tabular-nums dark:text-emerald-400"
-                                                title="Cobrado a choferes en el período"
-                                            >
-                                                {formatARS(r.cobrado)}
-                                            </span>
-                                            <span
-                                                className="ml-auto text-muted-foreground tabular-nums"
-                                                title="Deuda vigente al cierre"
-                                            >
-                                                deuda{' '}
-                                                {formatARS(r.deuda_vigente)}
-                                            </span>
-                                        </>
-                                    )}
-                                </button>
-
-                                {abierto === r.id && (
-                                    <ReporteDetalleBloque
-                                        runId={r.id}
-                                        detalle={detalle}
-                                    />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-
-                    {reportes.length > REPORTES_VISIBLES && (
-                        <button
-                            type="button"
-                            onClick={() => setVerTodos((v) => !v)}
-                            className="w-full border-t border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
-                        >
-                            {verTodos
-                                ? 'Ver menos'
-                                : `Ver todas (${reportes.length})`}
-                        </button>
-                    )}
-                </>
-            )}
-        </div>
-    );
-}
-
-/** Detalle de un reporte: desgloses y listas de lo que movió la corrida. */
-function ReporteDetalleBloque({
-    runId,
-    detalle,
-}: {
-    runId: number;
-    detalle: ReporteDetalle | null;
-}) {
-    // El prop parcial todavía no llegó (o es el de otra fila).
-    if (!detalle || detalle.run.id !== runId) {
-        return (
-            <div className="flex items-center gap-2 border-t border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                Cargando detalle…
-            </div>
-        );
-    }
-
-    const t = detalle.totales;
-
-    return (
-        <div className="flex flex-col gap-2 border-t border-border bg-muted/30 px-3 py-2">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                <Chip
-                    label="Nuevas"
-                    valor={`${t.nuevas} · ${formatARS(t.monto_nuevas)}`}
-                    tone="amber"
-                />
-                <Chip
-                    label="Pagadas al organismo"
-                    valor={`${t.resueltas} · ${formatARS(t.monto_resueltas)}`}
-                    tone="plain"
-                />
-                <Chip
-                    label="Cobrado"
-                    valor={`${t.pagos} · ${formatARS(t.cobrado)}`}
-                    tone="emerald"
-                />
-                <Chip
-                    label="Deuda al cierre"
-                    valor={formatARS(t.deuda_vigente)}
-                    tone="plain"
-                />
-
-                <a
-                    href={`/actas/reportes/${runId}/pdf`}
-                    className="ml-auto inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
-                >
-                    <Download className="h-3.5 w-3.5" />
-                    PDF
-                </a>
-            </div>
-
-            <p className="text-[11px] text-muted-foreground">
-                Cobros del período: los registrados desde el{' '}
-                {formatFechaHora(detalle.periodo.desde)} hasta{' '}
-                {detalle.periodo.hasta
-                    ? `el ${formatFechaHora(detalle.periodo.hasta)} (sincronización siguiente)`
-                    : 'hoy'}
-                .
-                {t.reabiertas > 0 &&
-                    ` ${t.reabiertas} multa${t.reabiertas === 1 ? '' : 's'} reapareció en el feed tras figurar como pagada.`}
-            </p>
-
-            <div className="grid gap-2 lg:grid-cols-2">
-                <TablaDesglose
-                    titulo="Por chofer"
-                    header="Chofer"
-                    filas={detalle.por_chofer}
-                />
-                <TablaDesglose
-                    titulo="Por vehículo"
-                    header="Patente"
-                    filas={detalle.por_vehiculo}
-                />
-            </div>
-
-            <ListaActas
-                titulo="Multas nuevas"
-                vacio="Esta sincronización no trajo multas nuevas."
-                actas={detalle.nuevas}
-            />
-
-            <ListaActas
-                titulo="Pagadas al organismo"
-                vacio="Ninguna multa desapareció del feed en esta sincronización."
-                actas={detalle.resueltas}
-            />
-
-            <ListaCobros cobros={detalle.cobros} />
-        </div>
-    );
-}
-
-function Chip({
-    label,
-    valor,
-    tone,
-}: {
-    label: string;
-    valor: string;
-    tone: 'amber' | 'emerald' | 'plain';
-}) {
-    const color = {
-        amber: 'text-amber-600 dark:text-amber-400',
-        emerald: 'text-emerald-600 dark:text-emerald-400',
-        plain: 'text-foreground',
-    }[tone];
-
-    return (
-        <span className="flex items-baseline gap-1.5">
-            <span className="text-muted-foreground">{label}</span>
-            <span className={cn('font-medium tabular-nums', color)}>
-                {valor}
-            </span>
-        </span>
-    );
-}
-
-/** Sección plegable del detalle: en el título ya se ve cuántas filas trae. */
-function SeccionPlegable({
-    titulo,
-    cantidad,
-    children,
-}: {
-    titulo: string;
-    cantidad: number;
-    children: React.ReactNode;
-}) {
-    const [abierta, setAbierta] = useState(false);
-
-    return (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-            <button
-                type="button"
-                onClick={() => setAbierta((v) => !v)}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted/50"
-            >
-                <ChevronDown
-                    className={cn(
-                        'h-3 w-3 shrink-0 text-muted-foreground transition-transform',
-                        abierta && 'rotate-180',
-                    )}
-                />
-                {titulo}
-                <span className="text-muted-foreground">({cantidad})</span>
-            </button>
-
-            {abierta && (
-                <div className="border-t border-border">{children}</div>
-            )}
-        </div>
-    );
-}
-
-function TablaDesglose({
-    titulo,
-    header,
-    filas,
-}: {
-    titulo: string;
-    header: string;
-    filas: DesgloseFila[];
-}) {
-    const visibles = filas.slice(0, FILAS_DESGLOSE);
-
-    return (
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-            <div className="border-b border-border px-2 py-1 text-[11px] font-medium text-muted-foreground">
-                {titulo}
-            </div>
-
-            {filas.length === 0 ? (
-                <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                    Sin movimiento.
-                </p>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-[11px]">
-                        <thead className="text-muted-foreground">
-                            <tr className="border-b border-border">
-                                <th className="px-2 py-1 text-left font-normal">
-                                    {header}
-                                </th>
-                                <th className="px-2 py-1 text-right font-normal">
-                                    Nuevas
-                                </th>
-                                <th className="px-2 py-1 text-right font-normal">
-                                    Cobrado
-                                </th>
-                                <th className="px-2 py-1 text-right font-normal">
-                                    Adeuda hoy
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {visibles.map((f) => (
-                                <tr key={f.label}>
-                                    <td className="max-w-[140px] truncate px-2 py-1 text-foreground">
-                                        {f.label}
-                                    </td>
-                                    <td className="px-2 py-1 text-right tabular-nums">
-                                        {f.nuevas} · {formatARS(f.monto_nuevas)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right text-emerald-600 tabular-nums dark:text-emerald-400">
-                                        {formatARS(f.cobrado)}
-                                    </td>
-                                    <td className="px-2 py-1 text-right text-red-600 tabular-nums dark:text-red-400">
-                                        {formatARS(f.adeuda)}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-
-                    {filas.length > visibles.length && (
-                        <p className="border-t border-border px-2 py-1 text-[11px] text-muted-foreground">
-                            y {filas.length - visibles.length} más — en el PDF.
-                        </p>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function ListaActas({
-    titulo,
-    vacio,
-    actas,
-}: {
-    titulo: string;
-    vacio: string;
-    actas: ActaFila[];
-}) {
-    const visibles = actas.slice(0, FILAS_DETALLE);
-
-    return (
-        <SeccionPlegable titulo={titulo} cantidad={actas.length}>
-            {actas.length === 0 ? (
-                <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                    {vacio}
-                </p>
-            ) : (
-                <>
-                    <div className="divide-y divide-border">
-                        {visibles.map((a) => (
-                            <div
-                                key={a.id}
-                                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 py-1 text-[11px]"
-                            >
-                                <span className="font-medium text-foreground">
-                                    {a.patente}
-                                </span>
-                                <span className="text-muted-foreground">
-                                    {a.conductor ?? 'Sin chofer'}
-                                </span>
-                                <span className="text-muted-foreground">
-                                    {a.jurisdiccion}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                                    {a.motivo ?? 'Sin motivo informado'}
-                                </span>
-                                <span className="text-muted-foreground tabular-nums">
-                                    {formatFecha(a.fecha_infraccion)}
-                                </span>
-                                <span className="font-medium text-foreground tabular-nums">
-                                    {a.monto === null
-                                        ? 'Sin monto'
-                                        : formatARS(a.monto)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-
-                    {actas.length > visibles.length && (
-                        <p className="border-t border-border px-2 py-1 text-[11px] text-muted-foreground">
-                            y {actas.length - visibles.length} más — están todas
-                            en el PDF.
-                        </p>
-                    )}
-                </>
-            )}
-        </SeccionPlegable>
-    );
-}
-
-function ListaCobros({ cobros }: { cobros: CobroFila[] }) {
-    const visibles = cobros.slice(0, FILAS_DETALLE);
-
-    return (
-        <SeccionPlegable
-            titulo="Cobros a choferes en el período"
-            cantidad={cobros.length}
-        >
-            {cobros.length === 0 ? (
-                <p className="px-2 py-1.5 text-[11px] text-muted-foreground">
-                    Sin cobros registrados en el período.
-                </p>
-            ) : (
-                <>
-                    <div className="divide-y divide-border">
-                        {visibles.map((c) => (
-                            <div
-                                key={c.id}
-                                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-2 py-1 text-[11px]"
-                            >
-                                <span className="text-muted-foreground tabular-nums">
-                                    {formatFecha(c.fecha)}
-                                </span>
-                                <span className="font-medium text-foreground">
-                                    {c.patente ?? '—'}
-                                </span>
-                                <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                                    {c.conductor ?? 'Sin chofer'}
-                                </span>
-                                <span className="text-muted-foreground">
-                                    {c.es_transferencia
-                                        ? 'Transferencia'
-                                        : 'Efectivo'}
-                                </span>
-                                <span className="font-medium text-emerald-600 tabular-nums dark:text-emerald-400">
-                                    {formatARS(c.monto)}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-
-                    {cobros.length > visibles.length && (
-                        <p className="border-t border-border px-2 py-1 text-[11px] text-muted-foreground">
-                            y {cobros.length - visibles.length} más — están
-                            todos en el PDF.
-                        </p>
-                    )}
-                </>
-            )}
-        </SeccionPlegable>
-    );
-}
-
-function StatCard({
-    label,
-    value,
-    sub,
-    tone,
-    icon: Icon,
-}: {
-    label: string;
-    value: string;
-    sub: string;
-    tone: 'amber' | 'emerald';
-    icon: typeof TriangleAlert;
-}) {
-    const tones = {
-        amber: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-        emerald: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    }[tone];
-
-    return (
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
-            <span
-                className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    tones,
-                )}
-            >
-                <Icon className="h-5 w-5" />
-            </span>
-            <div className="flex min-w-0 flex-col">
-                <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                    {label}
-                </span>
-                <span className="text-2xl font-bold text-foreground tabular-nums">
-                    {value}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                    {sub}
-                </span>
-            </div>
-        </div>
-    );
-}
-
-function EstadoBadge({ acta }: { acta: Acta }) {
-    if (acta.estado === 'resuelta') {
-        return (
-            <span
-                className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-emerald-700 dark:text-emerald-400"
-                title={
-                    acta.resuelta_en
-                        ? `Dejó de aparecer el ${formatFecha(acta.resuelta_en)}`
-                        : undefined
-                }
-            >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Pagada
-            </span>
-        );
-    }
-
-    return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-amber-700 dark:text-amber-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            Vigente
-        </span>
-    );
-}
-
-function FilterButton({
-    active,
-    onClick,
-    children,
-}: {
-    active: boolean;
-    onClick: () => void;
-    children: React.ReactNode;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'flex h-full items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
-                active
-                    ? 'border-primary/30 bg-primary/10 text-primary'
-                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
-            )}
-        >
-            {children}
-        </button>
     );
 }
 

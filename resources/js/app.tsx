@@ -32,7 +32,11 @@ createInertiaApp({
         );
     },
     progress: {
-        color: '#4B5563',
+        // Ámbar de marca (--primary) en vez del gris por defecto, y con menos
+        // demora para que una navegación lenta acuse recibo enseguida.
+        color: '#DD8A31',
+        delay: 120,
+        showSpinner: false,
     },
 });
 

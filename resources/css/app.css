@@ -42,6 +42,23 @@
 
     --color-destructive: var(--destructive);
     --color-destructive-foreground: var(--destructive-foreground);
+    --color-destructive-soft: var(--destructive-soft);
+    --color-destructive-soft-foreground: var(--destructive-soft-foreground);
+
+    --color-success: var(--success);
+    --color-success-foreground: var(--success-foreground);
+    --color-success-soft: var(--success-soft);
+    --color-success-soft-foreground: var(--success-soft-foreground);
+
+    --color-warning: var(--warning);
+    --color-warning-foreground: var(--warning-foreground);
+    --color-warning-soft: var(--warning-soft);
+    --color-warning-soft-foreground: var(--warning-soft-foreground);
+
+    --color-info: var(--info);
+    --color-info-foreground: var(--info-foreground);
+    --color-info-soft: var(--info-soft);
+    --color-info-soft-foreground: var(--info-soft-foreground);
 
     --color-border: var(--border);
     --color-input: var(--input);
@@ -78,8 +95,42 @@
     --muted-foreground: oklch(0.50 0.01 60);
     --accent: oklch(0.95 0.008 75);
     --accent-foreground: oklch(0.20 0.01 60);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
+    --destructive: oklch(0.585 0.234 27);
+    --destructive-foreground: oklch(0.585 0.234 27);
+
+    /*
+     * Colores de estado. Cada tono tiene cuatro piezas:
+     *   --tono                    color sólido (texto sobre fondo neutro, o fondo con -foreground encima)
+     *   --tono-foreground         texto sobre el sólido
+     *   --tono-soft               fondo sutil, para badges y avisos
+     *   --tono-soft-foreground    texto sobre el fondo sutil
+     * Usar siempre estos tokens en vez de bg-green-100 / text-red-600 y similares:
+     * los tokens ya traen su equivalente en tema oscuro.
+     *
+     * El croma de cada valor está al tope de lo que entra en sRGB para su
+     * luminosidad, y la luminosidad es la más alta que todavía da 4.5:1 sobre
+     * su superficie. Es decir: lo más vivos posible sin perder legibilidad.
+     * El ámbar es el que menos margen tiene — sRGB no da amarillos saturados
+     * que sean legibles sobre blanco, y por eso tira a dorado.
+     */
+    --destructive-soft: oklch(0.90 0.051 27);
+    --destructive-soft-foreground: oklch(0.49 0.196 27);
+
+    --success: oklch(0.55 0.149 150);
+    --success-foreground: oklch(1 0 0);
+    --success-soft: oklch(0.91 0.09 150);
+    --success-soft-foreground: oklch(0.46 0.125 150);
+
+    --warning: oklch(0.57 0.116 80);
+    --warning-foreground: oklch(1 0 0);
+    --warning-soft: oklch(0.90 0.092 80);
+    --warning-soft-foreground: oklch(0.47 0.096 80);
+
+    --info: oklch(0.565 0.157 250);
+    --info-foreground: oklch(1 0 0);
+    --info-soft: oklch(0.90 0.05 250);
+    --info-soft-foreground: oklch(0.47 0.131 250);
+
     --border: oklch(0.90 0.006 80);
     --input: oklch(0.90 0.006 80);
     --ring: oklch(0.74 0.17 62);
@@ -114,8 +165,28 @@
     --muted-foreground: oklch(0.66 0.006 250);
     --accent: oklch(0.235 0.008 250);
     --accent-foreground: oklch(0.975 0.003 250);
-    --destructive: oklch(0.72 0.18 25);
-    --destructive-foreground: oklch(0.72 0.18 25);
+    --destructive: oklch(0.68 0.204 27);
+    --destructive-foreground: oklch(0.68 0.204 27);
+
+    /* Ver la nota sobre colores de estado en :root. */
+    --destructive-soft: oklch(0.32 0.085 27);
+    --destructive-soft-foreground: oklch(0.75 0.148 27);
+
+    --success: oklch(0.76 0.185 150);
+    --success-foreground: oklch(0.18 0.04 150);
+    --success-soft: oklch(0.32 0.08 150);
+    --success-soft-foreground: oklch(0.82 0.17 150);
+
+    --warning: oklch(0.80 0.16 80);
+    --warning-foreground: oklch(0.18 0.04 80);
+    --warning-soft: oklch(0.32 0.066 80);
+    --warning-soft-foreground: oklch(0.85 0.142 80);
+
+    --info: oklch(0.68 0.172 250);
+    --info-foreground: oklch(0.16 0.04 250);
+    --info-soft: oklch(0.32 0.08 250);
+    --info-soft-foreground: oklch(0.76 0.125 250);
+
     --border: oklch(0.30 0.006 250);
     --input: oklch(0.30 0.006 250);
     --ring: oklch(0.78 0.16 55 / 0.4);

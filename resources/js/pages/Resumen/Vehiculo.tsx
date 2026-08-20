@@ -7,6 +7,7 @@ import {
     TrendingUp,
     Wrench,
 } from 'lucide-react';
+import { PageContainer } from '@/components/app/page-container';
 import { cn } from '@/lib/utils';
 
 interface Filtros {
@@ -102,7 +103,7 @@ export default function ResumenVehiculo({
         <>
             <Head title={`Vehículo ${vehiculo.patente}`} />
 
-            <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 p-4 sm:p-6">
+            <PageContainer className="mx-auto w-full max-w-4xl gap-5 sm:p-6">
                 {/* Header */}
                 <div className="flex flex-col gap-3">
                     <Link
@@ -168,7 +169,7 @@ export default function ResumenVehiculo({
                     vacioTexto="Sin recaudaciones en el período."
                 >
                     <table className="w-full text-sm">
-                        <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+                        <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
                             <tr>
                                 <th className="px-4 py-2 text-left font-medium">
                                     Fecha
@@ -191,13 +192,13 @@ export default function ResumenVehiculo({
                                         <span className="inline-flex items-center gap-2">
                                             {r.concepto}
                                             {r.en_curso && (
-                                                <span className="rounded border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                                <span className="rounded border border-warning/30 bg-warning-soft px-1.5 py-0.5 text-xs font-semibold text-warning-soft-foreground">
                                                     En curso
                                                 </span>
                                             )}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2 text-right font-medium whitespace-nowrap text-emerald-600 tabular-nums dark:text-emerald-400">
+                                    <td className="px-4 py-2 text-right font-medium whitespace-nowrap text-success tabular-nums">
                                         {formatARS(r.monto)}
                                     </td>
                                 </tr>
@@ -215,7 +216,7 @@ export default function ResumenVehiculo({
                     vacioTexto="Sin egresos en el período."
                 >
                     <table className="w-full text-sm">
-                        <thead className="border-b border-border text-[11px] tracking-wider text-muted-foreground uppercase">
+                        <thead className="border-b border-border text-xs tracking-wider text-muted-foreground uppercase">
                             <tr>
                                 <th className="px-4 py-2 text-left font-medium">
                                     Fecha
@@ -239,12 +240,12 @@ export default function ResumenVehiculo({
                                     </td>
                                     <td className="px-4 py-2">
                                         {e.tipo === 'repuesto' ? (
-                                            <span className="inline-flex items-center gap-1.5 rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                            <span className="inline-flex items-center gap-1.5 rounded border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary">
                                                 <Package className="h-3 w-3" />
                                                 Repuesto
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center gap-1.5 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                            <span className="inline-flex items-center gap-1.5 rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">
                                                 <Wrench className="h-3 w-3" />
                                                 Gasto
                                             </span>
@@ -253,7 +254,7 @@ export default function ResumenVehiculo({
                                     <td className="px-4 py-2 text-muted-foreground">
                                         {e.descripcion ?? '—'}
                                     </td>
-                                    <td className="px-4 py-2 text-right font-medium whitespace-nowrap text-red-600 tabular-nums dark:text-red-400">
+                                    <td className="px-4 py-2 text-right font-medium whitespace-nowrap text-destructive tabular-nums">
                                         {formatARS(e.monto)}
                                     </td>
                                 </tr>
@@ -261,14 +262,14 @@ export default function ResumenVehiculo({
                         </tbody>
                     </table>
                 </Seccion>
-            </div>
+            </PageContainer>
         </>
     );
 }
 
 const TONE = {
-    ok: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
-    bad: 'text-red-600 dark:text-red-400 bg-red-500/10',
+    ok: 'text-success-soft-foreground bg-success-soft',
+    bad: 'text-destructive-soft-foreground bg-destructive-soft',
 } as const;
 
 function StatCard({
@@ -296,7 +297,7 @@ function StatCard({
                 <p className="truncate text-lg font-bold text-foreground tabular-nums">
                     {formatARS(value)}
                 </p>
-                <p className="truncate text-[11px] tracking-wide text-muted-foreground uppercase">
+                <p className="truncate text-xs tracking-wide text-muted-foreground uppercase">
                     {label}
                 </p>
             </div>

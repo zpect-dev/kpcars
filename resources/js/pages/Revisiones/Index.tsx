@@ -12,6 +12,9 @@ import {
     X,
 } from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmDialog } from '@/components/app/confirm-dialog';
+import { EmptyState } from '@/components/app/empty-state';
+import { PageContainer } from '@/components/app/page-container';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +22,6 @@ import {
     DialogContent,
     DialogDescription,
     DialogFooter,
-    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -53,9 +55,13 @@ const MESES = [
 const STEPS = ['Documentación', 'Estado', 'Mecánica', 'Equipamiento', 'Finalización'];
 
 function formatMonthYear(dateStr?: string | null): string {
-    if (!dateStr) return 'N/A';
+    if (!dateStr) {
+return 'N/A';
+}
+
     const part = dateStr.split('T')[0].split(' ')[0];
     const [y, m] = part.split('-');
+
     return `${m}/${y}`;
 }
 
@@ -85,7 +91,7 @@ function MonthYearPicker({ value, onChange, label }: { value: string; onChange: 
                     </SelectContent>
                 </Select>
                 {value && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => onChange('')}>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => onChange('')} aria-label="Limpiar filtro">
                         <X className="h-4 w-4" />
                     </Button>
                 )}
@@ -142,6 +148,8 @@ export default function Revisiones({ vehiculos }: Props) {
     const [step, setStep] = useState(0);
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<'all' | 'revisado' | 'pendiente'>('all');
+    const [cierreOpen, setCierreOpen] = useState(false);
+    const [cerrando, setCerrando] = useState(false);
     
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
@@ -160,7 +168,10 @@ export default function Revisiones({ vehiculos }: Props) {
     });
 
     function preloadDate(dateStr?: string | null): string {
-        if (!dateStr) return '';
+        if (!dateStr) {
+return '';
+}
+
         return dateStr.split('T')[0].split(' ')[0].slice(0, 7);
     }
 
@@ -189,13 +200,22 @@ export default function Revisiones({ vehiculos }: Props) {
     }
 
     function canAdvance(): boolean {
-        if (step === 1) return form.data.limpieza !== '' && form.data.nivel_nafta !== '';
-        if (step === 2) return form.data.kilometraje !== '' && Number(form.data.kilometraje) >= 0;
+        if (step === 1) {
+return form.data.limpieza !== '' && form.data.nivel_nafta !== '';
+}
+
+        if (step === 2) {
+return form.data.kilometraje !== '' && Number(form.data.kilometraje) >= 0;
+}
+
         return true;
     }
 
     function handleSubmit() {
-        if (!selectedRow) return;
+        if (!selectedRow) {
+return;
+}
+
         form.post(`/revisiones/${selectedRow.vehiculo.id}`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -225,7 +245,7 @@ export default function Revisiones({ vehiculos }: Props) {
         <>
             <Head title="Revisiones Semanales" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex flex-col gap-1">
@@ -238,12 +258,12 @@ export default function Revisiones({ vehiculos }: Props) {
                     </div>
                     <div className="flex items-center gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-md bg-green-100 px-2.5 py-0.5 font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-success-soft px-2.5 py-0.5 font-medium text-success-soft-foreground">
+                                <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
                                 {revisadosCount} revisados
                             </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-md bg-red-100 px-2.5 py-0.5 font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                                <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-destructive-soft px-2.5 py-0.5 font-medium text-destructive-soft-foreground">
+                                <span aria-hidden="true" className="size-1.5 rounded-full bg-destructive" />
                                 {pendientesCount} pendientes
                             </span>
                         </div>
@@ -260,11 +280,7 @@ export default function Revisiones({ vehiculos }: Props) {
                                 </Button>
                                 {auth.user.role === 'administrador' && (
                                     <Button
-                                        onClick={() => {
-                                            if(confirm('¿Estás seguro de cerrar el periodo de revisiones actual? Esto guardará el historial e iniciará un nuevo periodo en blanco.')) {
-                                                router.post(cerrarRevisiones.url());
-                                            }
-                                        }}
+                                        onClick={() => setCierreOpen(true)}
                                     >
                                         Cerrar Revisiones
                                     </Button>
@@ -310,9 +326,9 @@ export default function Revisiones({ vehiculos }: Props) {
                                             'flex h-full flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97] lg:flex-none',
                                             filterStatus === val
                                                 ? val === 'revisado'
-                                                    ? 'border-green-500/50 bg-green-500/10 text-green-700 dark:text-green-400'
+                                                    ? 'border-success/50 bg-success-soft text-success-soft-foreground'
                                                     : val === 'pendiente'
-                                                      ? 'border-red-500/50 bg-red-500/10 text-red-700 dark:text-red-400'
+                                                      ? 'border-destructive/50 bg-destructive-soft text-destructive-soft-foreground'
                                                       : 'border-primary/50 bg-primary/10 text-primary'
                                                 : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                         )}
@@ -327,7 +343,9 @@ export default function Revisiones({ vehiculos }: Props) {
                         <div className="flex w-full items-center justify-end lg:w-auto">
                             <button
                                 type="button"
-                                onClick={() => { setSearch(''); setFilterStatus('all'); }}
+                                onClick={() => {
+ setSearch(''); setFilterStatus('all'); 
+}}
                                 disabled={!search && filterStatus === 'all'}
                                 title="Limpiar filtros"
                                 className={cn(
@@ -346,8 +364,12 @@ export default function Revisiones({ vehiculos }: Props) {
 
                 {/* Grid de Cards Clickables */}
                 {filtered.length === 0 ? (
-                    <div className="flex items-center justify-center rounded-xl border border-dashed border-border bg-transparent py-16 text-muted-foreground">
-                        No hay vehículos que coincidan con los filtros.
+                    <div className="rounded-xl border border-dashed border-border">
+                        <EmptyState
+                            variant="filtered"
+                            title="Ningún vehículo coincide con los filtros"
+                            description="Probá con otra patente o cambiá el filtro de estado."
+                        />
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -360,14 +382,20 @@ export default function Revisiones({ vehiculos }: Props) {
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' || e.key === ' ') {
                                         e.preventDefault();
-                                        row.revision_semanal ? openDetail(row) : (isInversor ? null : openWizard(row));
+
+                                        if (row.revision_semanal) {
+                                            openDetail(row);
+                                        } else if (!isInversor) {
+                                            openWizard(row);
+                                        }
+
                                     }
                                 }}
                                 className={cn(
                                     "flex cursor-pointer flex-col justify-between gap-4 rounded-xl border bg-card p-4 shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98] outline-none focus-visible:ring-2 focus-visible:ring-primary",
                                     row.revision_semanal
-                                        ? "border-green-500/50 hover:border-green-500/80 dark:border-green-900/50"
-                                        : "border-red-500/50 hover:border-red-500/80 dark:border-red-900/50"
+                                        ? "border-success/50 hover:border-success/80"
+                                        : "border-destructive/50 hover:border-destructive/80"
                                 )}
                             >
                                 <div className="flex items-start justify-between gap-4">
@@ -376,12 +404,12 @@ export default function Revisiones({ vehiculos }: Props) {
                                         <p className="mt-1 text-sm text-muted-foreground">{row.vehiculo.marca} {row.vehiculo.modelo}</p>
                                     </div>
                                     {row.revision_semanal ? (
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-success-soft px-2 py-0.5 text-xs font-medium text-success-soft-foreground">
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                             Revisado
                                         </span>
                                     ) : (
-                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                        <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-destructive-soft px-2 py-0.5 text-xs font-medium text-destructive-soft-foreground">
                                             <AlertCircle className="h-3.5 w-3.5" />
                                             Pendiente
                                         </span>
@@ -398,14 +426,14 @@ export default function Revisiones({ vehiculos }: Props) {
                                                 Nafta {row.revision_semanal.nivel_nafta}
                                             </span>
                                             {row.revision_semanal.observaciones && (
-                                                <span className="rounded-md bg-amber-100 px-2 py-1 font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                                <span className="rounded-md bg-warning-soft px-2 py-1 font-medium text-warning-soft-foreground">
                                                     Obs
                                                 </span>
                                             )}
                                         </div>
                                         {row.revision_semanal.revisor && (
                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                                <UserCheck className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
+                                                <UserCheck aria-hidden="true" className="size-3.5 shrink-0 text-success" />
                                                 <span className="truncate">
                                                     Revisado por <span className="font-medium text-foreground">{row.revision_semanal.revisor.name}</span>
                                                 </span>
@@ -421,15 +449,15 @@ export default function Revisiones({ vehiculos }: Props) {
                         ))}
                     </div>
                 )}
-            </div>
+            </PageContainer>
 
             {/* Wizard Dialog */}
             <Dialog open={wizardOpen} onOpenChange={(o) => !o && setWizardOpen(false)}>
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
                     {/* Header */}
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/15">
-                            <ClipboardCheck className="h-5 w-5 text-teal-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                            <ClipboardCheck aria-hidden="true" className="size-5 text-primary" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -448,7 +476,7 @@ export default function Revisiones({ vehiculos }: Props) {
                                 key={i}
                                 className={cn(
                                     'h-1.5 flex-1 rounded-full transition-colors',
-                                    i <= step ? 'bg-teal-500' : 'bg-muted',
+                                    i <= step ? 'bg-primary' : 'bg-muted',
                                 )}
                             />
                         ))}
@@ -575,8 +603,8 @@ export default function Revisiones({ vehiculos }: Props) {
             <Dialog open={detailOpen} onOpenChange={(o) => !o && setDetailOpen(false)}>
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-500/15">
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success-soft">
+                            <CheckCircle2 aria-hidden="true" className="size-5 text-success-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -644,6 +672,25 @@ export default function Revisiones({ vehiculos }: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConfirmDialog
+                open={cierreOpen}
+                onOpenChange={setCierreOpen}
+                tone="warning"
+                title="¿Cerrar el período de revisiones?"
+                description="Se guarda el período actual en el historial y arranca uno nuevo en blanco. No se puede reabrir."
+                confirmLabel="Cerrar período"
+                processing={cerrando}
+                onConfirm={() => {
+                    setCerrando(true);
+                    router.post(cerrarRevisiones.url(), {}, {
+                        onFinish: () => {
+                            setCerrando(false);
+                            setCierreOpen(false);
+                        },
+                    });
+                }}
+            />
         </>
     );
 }

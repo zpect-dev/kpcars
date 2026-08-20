@@ -20,16 +20,24 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { EmptyState } from '@/components/app/empty-state';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
+import type {DocMode, DocPreview} from '@/components/documentos';
+import {
+    DocumentSection,
+    DocSingleDropzone,
+    DocPreviewDialog
+    
+    
+} from '@/components/documentos';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Combobox  } from '@/components/ui/combobox';
-import type {ComboboxOption} from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
-    DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
@@ -42,8 +50,8 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -51,63 +59,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+import {
+    ESTADO_PATENTE_OPCIONES,
+    estadoPatenteBadge,
+    faltaAlgunDocVehiculo,
+    faltaCedula,
+    faltaSeguroDoc,
+    faltaTitulo,
+} from '@/components/vehiculos/estado-vehiculo';
+import type { EstadoPatente } from '@/components/vehiculos/estado-vehiculo';
+import { VehiculoForm } from '@/components/vehiculos/vehiculo-form';
 import { cn } from '@/lib/utils';
 import type { Empresa, Inversion, User, Vehiculo } from '@/types';
-import {
-    DocumentSection,
-    DocSingleDropzone,
-    DocPreviewDialog,
-    type DocMode,
-    type DocPreview,
-} from '@/components/documentos';
-
-type EstadoPatente = 'buen_estado' | 'mal_estado' | 'provisional' | 'no_posee' | null;
-
-const ESTADO_PATENTE_OPCIONES: { value: Exclude<EstadoPatente, null>; label: string }[] = [
-    { value: 'buen_estado', label: 'Buen estado' },
-    { value: 'mal_estado', label: 'Mal estado' },
-    { value: 'provisional', label: 'Provisional' },
-    { value: 'no_posee', label: 'No posee' },
-];
-
-function estadoPatenteBadge(estado: EstadoPatente): { label: string; badge: string; dot: string } {
-    switch (estado) {
-        case 'buen_estado':
-            return { label: 'Buen estado', badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500' };
-        case 'mal_estado':
-            return { label: 'Mal estado', badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', dot: 'bg-red-500' };
-        case 'provisional':
-            return { label: 'Provisional', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500' };
-        case 'no_posee':
-            return { label: 'No posee', badge: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700/50 dark:text-zinc-300', dot: 'bg-zinc-500' };
-        default:
-            return { label: 'Sin estado', badge: 'bg-muted text-muted-foreground', dot: 'bg-muted-foreground/40' };
-    }
-}
-
-/**
- * Documentos del vehículo. Cédula y título están completos con un PDF o con
- * frente + dorso; el seguro con su archivo. "Falta" si no hay ninguna modalidad.
- */
-function faltaCedula(v: Vehiculo): boolean {
-    const c = v.documentos?.cedula;
-    return !c?.pdf && !(c?.frente && c?.dorso);
-}
-
-function faltaTitulo(v: Vehiculo): boolean {
-    const t = v.documentos?.titulo;
-    return !t?.pdf && !(t?.frente && t?.dorso);
-}
-
-function faltaSeguroDoc(v: Vehiculo): boolean {
-    return !v.documentos?.seguro?.archivo;
-}
-
-/** Al vehículo le falta al menos un documento (cédula, título o seguro). */
-function faltaAlgunDocVehiculo(v: Vehiculo): boolean {
-    return faltaCedula(v) || faltaTitulo(v) || faltaSeguroDoc(v);
-}
 
 interface Filters {
     empresa_id?: string;
@@ -224,6 +188,7 @@ return null;
     // de la otra modalidad, para no enviar PDF e imágenes juntos.
     function applyDocMode(tipo: 'cedula' | 'titulo', setMode: (m: DocMode) => void, mode: DocMode) {
         setMode(mode);
+
         if (mode === 'pdf') {
             docsForm.setData(`${tipo}_frente`, null);
             docsForm.setData(`${tipo}_dorso`, null);
@@ -234,7 +199,11 @@ return null;
 
     function handleDocsSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!docsVehiculo) return;
+
+        if (!docsVehiculo) {
+return;
+}
+
         docsForm.post(`/vehiculos/${docsVehiculo.id}/documentos`, {
             preserveScroll: true,
             onSuccess: () => setDocsVehiculo(null),
@@ -317,27 +286,51 @@ continue;
             );
         }
 
-        if (asignacionFiltro === 'con') result = result.filter((v) => !!v.user_id);
-        if (asignacionFiltro === 'sin') result = result.filter((v) => !v.user_id);
+        if (asignacionFiltro === 'con') {
+result = result.filter((v) => !!v.user_id);
+}
 
-        if (filterEstadoPatente === '__none__') result = result.filter((v) => !v.estado_patente);
-        else if (filterEstadoPatente) result = result.filter((v) => v.estado_patente === filterEstadoPatente);
+        if (asignacionFiltro === 'sin') {
+result = result.filter((v) => !v.user_id);
+}
 
-        if (filterTitular.trim()) result = result.filter((v) => v.propietario?.toLowerCase().includes(filterTitular.toLowerCase()));
+        if (filterEstadoPatente === '__none__') {
+result = result.filter((v) => !v.estado_patente);
+} else if (filterEstadoPatente) {
+result = result.filter((v) => v.estado_patente === filterEstadoPatente);
+}
 
-        if (filterVtv === 'none') result = result.filter((v) => !v.fecha_vencimiento_vtv);
-        else if (filterVtv) result = result.filter((v) => !!v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === filterVtv);
+        if (filterTitular.trim()) {
+result = result.filter((v) => v.propietario?.toLowerCase().includes(filterTitular.toLowerCase()));
+}
 
-        if (filterGnc === 'none') result = result.filter((v) => !v.fecha_vencimiento_gnc);
-        else if (filterGnc) result = result.filter((v) => !!v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === filterGnc);
+        if (filterVtv === 'none') {
+result = result.filter((v) => !v.fecha_vencimiento_vtv);
+} else if (filterVtv) {
+result = result.filter((v) => !!v.fecha_vencimiento_vtv && vtvStatus(v.fecha_vencimiento_vtv) === filterVtv);
+}
 
-        if (filterSeguro === 'none') result = result.filter((v) => !v.seguro_vencimiento);
-        else if (filterSeguro) result = result.filter((v) => !!v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === filterSeguro);
+        if (filterGnc === 'none') {
+result = result.filter((v) => !v.fecha_vencimiento_gnc);
+} else if (filterGnc) {
+result = result.filter((v) => !!v.fecha_vencimiento_gnc && vtvStatus(v.fecha_vencimiento_gnc) === filterGnc);
+}
 
-        if (filterDocs === 'faltan') result = result.filter(faltaAlgunDocVehiculo);
-        else if (filterDocs === 'cedula') result = result.filter(faltaCedula);
-        else if (filterDocs === 'titulo') result = result.filter(faltaTitulo);
-        else if (filterDocs === 'seguro') result = result.filter(faltaSeguroDoc);
+        if (filterSeguro === 'none') {
+result = result.filter((v) => !v.seguro_vencimiento);
+} else if (filterSeguro) {
+result = result.filter((v) => !!v.seguro_vencimiento && seguroStatus(v.seguro_vencimiento) === filterSeguro);
+}
+
+        if (filterDocs === 'faltan') {
+result = result.filter(faltaAlgunDocVehiculo);
+} else if (filterDocs === 'cedula') {
+result = result.filter(faltaCedula);
+} else if (filterDocs === 'titulo') {
+result = result.filter(faltaTitulo);
+} else if (filterDocs === 'seguro') {
+result = result.filter(faltaSeguroDoc);
+}
 
         return result;
     }, [vehiculos, search, asignacionFiltro, filterEstadoPatente, filterTitular, filterVtv, filterGnc, filterSeguro, filterDocs]);
@@ -630,11 +623,11 @@ active.inversion_id = inversionId;
 
         switch (status) {
             case 'ok':
-                return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+                return 'bg-success-soft text-success-soft-foreground';
             case 'warning':
-                return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
+                return 'bg-warning-soft text-warning-soft-foreground';
             case 'expired':
-                return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+                return 'bg-destructive-soft text-destructive-soft-foreground';
             default:
                 return '';
         }
@@ -653,7 +646,10 @@ return '';
 
     // El seguro vence en una fecha exacta (no mes/año como VTV/GNC).
     function seguroStatus(dateStr?: string | null): 'ok' | 'warning' | 'expired' | null {
-        if (!dateStr) return null;
+        if (!dateStr) {
+return null;
+}
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const datePart = dateStr.split('T')[0].split(' ')[0];
@@ -661,26 +657,37 @@ return '';
         const venc = new Date(year, month - 1, day);
         venc.setHours(0, 0, 0, 0);
 
-        if (venc < today) return 'expired';
+        if (venc < today) {
+return 'expired';
+}
+
         const oneMonth = new Date(today);
         oneMonth.setMonth(oneMonth.getMonth() + 1);
-        if (venc <= oneMonth) return 'warning';
+
+        if (venc <= oneMonth) {
+return 'warning';
+}
+
         return 'ok';
     }
 
     function seguroColorClass(dateStr?: string | null): string {
         switch (seguroStatus(dateStr)) {
-            case 'ok':      return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-            case 'warning': return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400';
-            case 'expired': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
+            case 'ok':      return 'bg-success-soft text-success-soft-foreground';
+            case 'warning': return 'bg-warning-soft text-warning-soft-foreground';
+            case 'expired': return 'bg-destructive-soft text-destructive-soft-foreground';
             default:        return '';
         }
     }
 
     function formatSeguro(dateStr?: string | null): string {
-        if (!dateStr) return '';
+        if (!dateStr) {
+return '';
+}
+
         const datePart = dateStr.split('T')[0].split(' ')[0];
         const [year, month, day] = datePart.split('-');
+
         return `${day}/${month}/${year}`;
     }
 
@@ -766,23 +773,17 @@ return;
         <>
             <Head title="Vehículos" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                                Vehículos
-                            </h1>
-                            <span className="inline-flex items-center rounded-md border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                                {filteredVehiculos.length}{' '}
-                                {filteredVehiculos.length === 1
-                                    ? 'vehículo'
-                                    : 'vehículos'}
-                            </span>
-
-                            {/* Resumen de alertas: un solo control discreto en vez de varios chips de color */}
-                            {!isInversor && alertItems.length > 0 && (
+            <PageContainer>
+                <PageHeader
+                    title="Vehículos"
+                    count={{
+                        value: filteredVehiculos.length,
+                        singular: 'vehículo',
+                        plural: 'vehículos',
+                    }}
+                    meta={
+                        /* Resumen de alertas: un solo control discreto en vez de varios chips de color */
+                        !isInversor && alertItems.length > 0 && (
                                 <Popover open={isAlertsOpen} onOpenChange={setIsAlertsOpen}>
                                     <PopoverTrigger asChild>
                                         <button
@@ -791,7 +792,7 @@ return;
                                         >
                                             <span className={cn(
                                                 'h-1.5 w-1.5 rounded-full',
-                                                hasUrgentAlerts ? 'bg-red-500' : 'bg-amber-500',
+                                                hasUrgentAlerts ? 'bg-destructive' : 'bg-warning',
                                             )} />
                                             {totalAlerts} {totalAlerts === 1 ? 'alerta' : 'alertas'}
                                             <ChevronDown className="h-3 w-3" />
@@ -803,13 +804,15 @@ return;
                                                 <button
                                                     key={item.label}
                                                     type="button"
-                                                    onClick={() => { item.onSelect(); setIsAlertsOpen(false); }}
+                                                    onClick={() => {
+ item.onSelect(); setIsAlertsOpen(false); 
+}}
                                                     className="flex w-full items-center justify-between gap-3 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
                                                 >
                                                     <span className="flex items-center gap-2 text-foreground">
                                                         <span className={cn(
                                                             'h-1.5 w-1.5 rounded-full',
-                                                            item.tone === 'red' ? 'bg-red-500' : 'bg-amber-500',
+                                                            item.tone === 'red' ? 'bg-destructive' : 'bg-warning',
                                                         )} />
                                                         {item.label}
                                                     </span>
@@ -821,11 +824,11 @@ return;
                                         </div>
                                     </PopoverContent>
                                 </Popover>
-                            )}
-                        </div>
-                    </div>
-                    {!isInversor && (
-                        <div className="flex items-center gap-2">
+                            )
+                    }
+                    actions={
+                        !isInversor && (
+                            <>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -901,8 +904,8 @@ params.set('search', search.trim());
                                 )}
                                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
                                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/15">
-                                            <FileUp className="h-5 w-5 text-blue-500" />
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-info-soft">
+                                            <FileUp className="h-5 w-5 text-info-soft-foreground" />
                                         </div>
                                         <div className="flex-1">
                                             <DialogTitle className="text-base font-semibold">Importar asignaciones</DialogTitle>
@@ -951,8 +954,8 @@ params.set('search', search.trim());
                                     </DialogTrigger>
                                     <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[420px]">
                                         <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-                                                <Wallet className="h-5 w-5 text-emerald-500" />
+                                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-soft">
+                                                <Wallet className="h-5 w-5 text-success-soft-foreground" />
                                             </div>
                                             <div className="flex-1">
                                                 <DialogTitle className="text-base font-semibold">Nueva inversión</DialogTitle>
@@ -987,7 +990,13 @@ params.set('search', search.trim());
 
                             <Dialog
                                 open={isCreateOpen}
-                                onOpenChange={(o) => { setIsCreateOpen(o); if (!o) createForm.reset(); }}
+                                onOpenChange={(o) => {
+ setIsCreateOpen(o);
+
+ if (!o) {
+createForm.reset();
+} 
+}}
                             >
                                 <DialogTrigger asChild>
                                     <Button size="sm">
@@ -999,8 +1008,8 @@ params.set('search', search.trim());
                                 </DialogTrigger>
                                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
                                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                                            <Car className="h-5 w-5 text-sky-500" />
+                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                                            <Car className="h-5 w-5 text-primary" />
                                         </div>
                                         <div className="flex-1">
                                             <DialogTitle className="text-base font-semibold">Registrar vehículo</DialogTitle>
@@ -1020,9 +1029,10 @@ params.set('search', search.trim());
                                     />
                                 </DialogContent>
                             </Dialog>
-                        </div>
-                    )}
-                </div>
+                            </>
+                        )
+                    }
+                />
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
@@ -1123,8 +1133,8 @@ params.set('search', search.trim());
                                         className={cn(
                                             'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                             asignacionFiltro === val
-                                                ? val === 'con' ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
-                                                : val === 'sin' ? 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                ? val === 'con' ? 'border-success/30 bg-success-soft text-success-soft-foreground'
+                                                : val === 'sin' ? 'border-warning/30 bg-warning-soft text-warning-soft-foreground'
                                                 : 'border-primary/30 bg-primary/10 text-primary'
                                                 : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                         )}
@@ -1198,6 +1208,7 @@ params.set('search', search.trim());
                                                         { value: 'no_posee',    label: 'No posee',     desc: 'Sin patente física',      count: vCounts.estadoPatente.no_posee },
                                                     ].map((opt) => {
                                                         const isActive = filterEstadoPatente === opt.value;
+
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterEstadoPatente(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
@@ -1239,6 +1250,7 @@ params.set('search', search.trim());
                                                         { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de VTV cargada',      count: vCounts.vtv.none },
                                                     ].map((opt) => {
                                                         const isActive = filterVtv === opt.value;
+
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterVtv(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
@@ -1280,6 +1292,7 @@ params.set('search', search.trim());
                                                         { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de GNC cargada',      count: vCounts.gnc.none },
                                                     ].map((opt) => {
                                                         const isActive = filterGnc === opt.value;
+
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterGnc(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
@@ -1321,6 +1334,7 @@ params.set('search', search.trim());
                                                         { value: 'none',    label: 'Sin registro', desc: 'Sin fecha de seguro cargada',   count: vCounts.seguro.none },
                                                     ].map((opt) => {
                                                         const isActive = filterSeguro === opt.value;
+
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterSeguro(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
@@ -1362,6 +1376,7 @@ params.set('search', search.trim());
                                                         { value: 'seguro', label: 'Sin seguro',        desc: 'Sin archivo de seguro cargado',            count: vCounts.docs.seguro },
                                                     ].map((opt) => {
                                                         const isActive = filterDocs === opt.value;
+
                                                         return (
                                                             <button key={opt.value} type="button" onClick={() => setFilterDocs(isActive ? '' : opt.value)}
                                                                 className={cn('flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors', isActive ? 'bg-muted' : 'hover:bg-muted/60')}
@@ -1389,6 +1404,7 @@ params.set('search', search.trim());
                                     onClick={clearFilters}
                                     disabled={!hasActiveFilters}
                                     title="Limpiar filtros"
+                                    aria-label="Limpiar filtros"
                                     className={cn(
                                         'flex h-full w-9 items-center justify-center rounded-lg border transition-all duration-150',
                                         hasActiveFilters
@@ -1446,10 +1462,39 @@ params.set('search', search.trim());
                                     <tr>
                                         <td
                                             colSpan={hideEmpresa ? 8 : 9}
-                                            className="px-4 py-12 text-center text-muted-foreground sm:px-6"
+                                            className="p-0"
                                         >
-                                            No hay vehículos que coincidan con
-                                            los filtros.
+                                            <EmptyState
+                                                variant={
+                                                    hasActiveFilters
+                                                        ? 'filtered'
+                                                        : 'empty'
+                                                }
+                                                icon={
+                                                    hasActiveFilters
+                                                        ? undefined
+                                                        : Car
+                                                }
+                                                title={
+                                                    hasActiveFilters
+                                                        ? 'Ningún vehículo coincide con los filtros'
+                                                        : 'Todavía no hay vehículos'
+                                                }
+                                                description={
+                                                    hasActiveFilters
+                                                        ? 'Probá con otra patente o quitá algún filtro.'
+                                                        : 'Registrá el primero para empezar a hacer seguimiento.'
+                                                }
+                                                action={
+                                                    hasActiveFilters
+                                                        ? {
+                                                              label: 'Limpiar filtros',
+                                                              onClick:
+                                                                  clearFilters,
+                                                          }
+                                                        : undefined
+                                                }
+                                            />
                                         </td>
                                     </tr>
                                 ) : (
@@ -1471,10 +1516,12 @@ params.set('search', search.trim());
                                                         return (
                                                             <button
                                                                 type="button"
-                                                                onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
+                                                                onClick={(e) => {
+ e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); 
+}}
                                                                 title="Editar estado de la patente"
                                                                 className={cn(
-                                                                    'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-80',
+                                                                    'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80',
                                                                     b.badge,
                                                                 )}
                                                             >
@@ -1649,7 +1696,7 @@ params.set('search', search.trim());
                                                                             vehiculo,
                                                                         )
                                                                     }
-                                                                    className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
+                                                                    variant="destructive"
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                     Eliminar
@@ -1667,14 +1714,29 @@ params.set('search', search.trim());
                     </div>
 
                 </div>
-            </div>
 
-            {/* Tarjetas mobile */}
-            <div className="flex flex-col gap-2 pb-2 md:hidden">
+                {/* Tarjetas mobile */}
+                <div className="flex flex-col gap-2 pb-2 md:hidden">
                 {filteredVehiculos.length === 0 ? (
-                    <div className="py-12 text-center text-sm text-muted-foreground">
-                        No hay vehículos que coincidan con los filtros.
-                    </div>
+                    <EmptyState
+                        variant={hasActiveFilters ? 'filtered' : 'empty'}
+                        icon={hasActiveFilters ? undefined : Car}
+                        title={
+                            hasActiveFilters
+                                ? 'Ningún vehículo coincide con los filtros'
+                                : 'Todavía no hay vehículos'
+                        }
+                        description={
+                            hasActiveFilters
+                                ? 'Probá con otra patente o quitá algún filtro.'
+                                : 'Registrá el primero para empezar a hacer seguimiento.'
+                        }
+                        action={
+                            hasActiveFilters
+                                ? { label: 'Limpiar filtros', onClick: clearFilters }
+                                : undefined
+                        }
+                    />
                 ) : (
                     filteredVehiculos.map((vehiculo) => {
                         const alertBorder = (
@@ -1734,7 +1796,7 @@ params.set('search', search.trim());
                                                     <DropdownMenuItem onSelect={() => openEdit(vehiculo)}>
                                                         <Pencil className="h-4 w-4" /> Editar
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => setDeletingVehiculo(vehiculo)} className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400">
+                                                    <DropdownMenuItem onSelect={() => setDeletingVehiculo(vehiculo)} variant="destructive">
                                                         <Trash2 className="h-4 w-4" /> Eliminar
                                                     </DropdownMenuItem>
                                                 </>
@@ -1748,7 +1810,7 @@ params.set('search', search.trim());
                                     {vehiculo.user?.name ? (
                                         <span className="text-sm text-foreground">{vehiculo.user.name}</span>
                                     ) : (
-                                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                        <span className="inline-flex items-center gap-1 rounded-md bg-warning-soft px-2 py-0.5 text-xs font-medium text-warning-soft-foreground">
                                             <UserX className="h-3 w-3" /> Sin conductor
                                         </span>
                                     )}
@@ -1757,42 +1819,47 @@ params.set('search', search.trim());
                                 {/* Chips de estado */}
                                 <div className="flex flex-wrap gap-1.5">
                                     {vehiculo.inversion?.nombre && (
-                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium uppercase text-muted-foreground">
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs font-medium uppercase text-muted-foreground">
                                             {vehiculo.inversion.nombre}
                                         </span>
                                     )}
                                     {vehiculo.estado_patente && (() => {
                                         const b = estadoPatenteBadge(vehiculo.estado_patente);
+
                                         return (
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); }}
-                                                className={cn('inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-opacity hover:opacity-80', b.badge)}>
+                                            <button type="button" onClick={(e) => {
+ e.stopPropagation(); setEstadoPatenteVehiculo(vehiculo); 
+}}
+                                                className={cn('inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80', b.badge)}>
                                                 <span className={cn('h-1.5 w-1.5 rounded-full', b.dot)} />
                                                 {b.label}
                                             </button>
                                         );
                                     })()}
                                     {vehiculo.fecha_vencimiento_vtv ? (
-                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_vtv))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium', vtvColorClass(vehiculo.fecha_vencimiento_vtv))}>
                                             VTV {formatVtv(vehiculo.fecha_vencimiento_vtv)}
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin VTV</span>
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">Sin VTV</span>
                                     )}
                                     {vehiculo.fecha_vencimiento_gnc && (
-                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', vtvColorClass(vehiculo.fecha_vencimiento_gnc))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium', vtvColorClass(vehiculo.fecha_vencimiento_gnc))}>
                                             GNC {formatVtv(vehiculo.fecha_vencimiento_gnc)}
                                         </span>
                                     )}
                                     {vehiculo.seguro_vencimiento ? (
-                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium', seguroColorClass(vehiculo.seguro_vencimiento))}>
+                                        <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium', seguroColorClass(vehiculo.seguro_vencimiento))}>
                                             Seg. {formatSeguro(vehiculo.seguro_vencimiento)}
                                         </span>
                                     ) : (
-                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">Sin seguro</span>
+                                        <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">Sin seguro</span>
                                     )}
                                     {faltaAlgunDocVehiculo(vehiculo) && (
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); openDocumentos(vehiculo); }}
-                                            className="inline-flex items-center gap-1 rounded-md bg-red-500/10 px-2 py-0.5 text-[11px] font-medium text-red-600 dark:text-red-400">
+                                        <button type="button" onClick={(e) => {
+ e.stopPropagation(); openDocumentos(vehiculo); 
+}}
+                                            className="inline-flex items-center gap-1 rounded-md bg-destructive-soft px-2 py-0.5 text-xs font-medium text-destructive-soft-foreground">
                                             Faltan docs
                                         </button>
                                     )}
@@ -1801,17 +1868,22 @@ params.set('search', search.trim());
                         );
                     })
                 )}
-            </div>
+                </div>
+            </PageContainer>
 
             {/* Edit Dialog */}
             <Dialog
                 open={editingVehiculo !== null}
-                onOpenChange={(open) => { if (!open) { setEditingVehiculo(null); editForm.reset(); } }}
+                onOpenChange={(open) => {
+ if (!open) {
+ setEditingVehiculo(null); editForm.reset(); 
+} 
+}}
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[480px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                            <Car className="h-5 w-5 text-sky-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                            <Car className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Editar vehículo</DialogTitle>
@@ -1840,8 +1912,8 @@ params.set('search', search.trim());
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                            <UserX className="h-5 w-5 text-amber-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft">
+                            <UserX className="h-5 w-5 text-warning-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Desasignar conductor</DialogTitle>
@@ -1864,8 +1936,8 @@ params.set('search', search.trim());
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
-                            <Trash2 className="h-5 w-5 text-red-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive-soft">
+                            <Trash2 className="h-5 w-5 text-destructive-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Eliminar vehículo</DialogTitle>
@@ -1888,8 +1960,8 @@ params.set('search', search.trim());
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[360px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                            <Car className="h-5 w-5 text-sky-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                            <Car className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Estado de la patente</DialogTitle>
@@ -1902,6 +1974,7 @@ params.set('search', search.trim());
                         {ESTADO_PATENTE_OPCIONES.map((opt) => {
                             const b = estadoPatenteBadge(opt.value);
                             const selected = estadoPatenteVehiculo?.estado_patente === opt.value;
+
                             return (
                                 <button
                                     key={opt.value}
@@ -1929,12 +2002,16 @@ params.set('search', search.trim());
             {/* Documentos del vehículo */}
             <Dialog
                 open={docsVehiculo !== null}
-                onOpenChange={(open) => { if (!open) { setDocsVehiculo(null); docsForm.reset(); } }}
+                onOpenChange={(open) => {
+ if (!open) {
+ setDocsVehiculo(null); docsForm.reset(); 
+} 
+}}
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15">
-                            <FileText className="h-5 w-5 text-sky-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
+                            <FileText className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Documentos del vehículo</DialogTitle>
@@ -2010,337 +2087,6 @@ params.set('search', search.trim());
 
             <DocPreviewDialog preview={docPreview} onClose={() => setDocPreview(null)} />
         </>
-    );
-}
-
-const MESES_VTV = [
-    'Enero',
-    'Febrero',
-    'Marzo',
-    'Abril',
-    'Mayo',
-    'Junio',
-    'Julio',
-    'Agosto',
-    'Septiembre',
-    'Octubre',
-    'Noviembre',
-    'Diciembre',
-];
-
-function VtvMonthYearPicker({
-    value,
-    onChange,
-}: {
-    value: string;
-    onChange: (value: string) => void;
-}) {
-    const [yearPart, monthPart] = value ? value.split('-') : ['', ''];
-    const currentYear = new Date().getFullYear();
-    const years = Array.from({ length: 12 }, (_, i) => currentYear - 1 + i);
-
-    const setMonth = (m: string) => {
-        const y = yearPart || String(currentYear);
-        onChange(`${y}-${m}`);
-    };
-    const setYear = (y: string) => {
-        const m = monthPart || '01';
-        onChange(`${y}-${m}`);
-    };
-
-    return (
-        <div className="flex gap-2">
-            <Select value={monthPart} onValueChange={setMonth}>
-                <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Mes" />
-                </SelectTrigger>
-                <SelectContent>
-                    {MESES_VTV.map((nombre, i) => (
-                        <SelectItem
-                            key={i}
-                            value={String(i + 1).padStart(2, '0')}
-                        >
-                            {nombre}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <Select value={yearPart} onValueChange={setYear}>
-                <SelectTrigger className="w-[110px]">
-                    <SelectValue placeholder="Año" />
-                </SelectTrigger>
-                <SelectContent>
-                    {years.map((y) => (
-                        <SelectItem key={y} value={String(y)}>
-                            {y}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            {value && (
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onChange('')}
-                    aria-label="Limpiar VTV"
-                >
-                    <X className="h-4 w-4" />
-                </Button>
-            )}
-        </div>
-    );
-}
-
-// --- Reusable form component for create & edit ---
-interface VehiculoFormProps {
-    form: ReturnType<
-        typeof useForm<{
-            patente: string;
-            marca: string;
-            modelo: string;
-            anio: string;
-            propietario: string;
-            precio: string;
-            inversion_id: string;
-            empresa_id: string;
-            user_id: string;
-            fecha_vencimiento_vtv: string;
-            fecha_vencimiento_gnc: string;
-            estado_patente: string;
-        }>
-    >;
-    onSubmit: (e: React.FormEvent) => void;
-    onCancel?: () => void;
-    onDocumentos?: () => void;
-    empresas: Pick<Empresa, 'id' | 'nombre'>[];
-    inversiones: Pick<Inversion, 'id' | 'nombre'>[];
-    users: Pick<User, 'id' | 'name'>[];
-    submitLabel: string;
-}
-
-function VehiculoForm({
-    form,
-    onSubmit,
-    onCancel,
-    onDocumentos,
-    empresas,
-    inversiones,
-    users,
-    submitLabel,
-}: VehiculoFormProps) {
-    const canSubmit =
-        !form.processing &&
-        form.data.patente.trim() !== '' &&
-        form.data.marca.trim() !== '' &&
-        form.data.modelo.trim() !== '' &&
-        form.data.anio.trim() !== '' &&
-        form.data.inversion_id !== '';
-
-    const inversionOptions: ComboboxOption[] = inversiones.map((i) => ({
-        value: String(i.id),
-        label: i.nombre,
-    }));
-
-    const empresaOptions: ComboboxOption[] = empresas.map((e) => ({
-        value: String(e.id),
-        label: e.nombre,
-    }));
-
-    const userOptions: ComboboxOption[] = users.map((u) => ({
-        value: String(u.id),
-        label: u.name,
-    }));
-
-    return (
-        <form onSubmit={onSubmit}>
-        <div className="flex max-h-[60vh] flex-col gap-4 overflow-y-auto px-5 py-5">
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="patente">Patente</Label>
-                    <Input
-                        id="patente"
-                        type="text"
-                        placeholder="Ej. ABC123"
-                        value={form.data.patente}
-                        onChange={(e) => form.setData('patente', e.target.value.toUpperCase())}
-                    />
-                    <InputError message={form.errors.patente} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="anio">Año</Label>
-                    <Input
-                        id="anio"
-                        type="text"
-                        placeholder="Ej. 2024"
-                        value={form.data.anio}
-                        onChange={(e) => form.setData('anio', e.target.value)}
-                    />
-                    <InputError message={form.errors.anio} />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="marca">Marca</Label>
-                    <Input
-                        id="marca"
-                        type="text"
-                        placeholder="Ej. Toyota"
-                        value={form.data.marca}
-                        onChange={(e) => form.setData('marca', e.target.value)}
-                    />
-                    <InputError message={form.errors.marca} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="modelo">Modelo</Label>
-                    <Input
-                        id="modelo"
-                        type="text"
-                        placeholder="Ej. Corolla"
-                        value={form.data.modelo}
-                        onChange={(e) => form.setData('modelo', e.target.value)}
-                    />
-                    <InputError message={form.errors.modelo} />
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-                <Label>Estado de patente</Label>
-                <Select
-                    value={form.data.estado_patente || '__none__'}
-                    onValueChange={(v) => form.setData('estado_patente', v === '__none__' ? '' : v)}
-                >
-                    <SelectTrigger>
-                        <SelectValue>
-                            {form.data.estado_patente ? (
-                                <span className="flex items-center gap-2">
-                                    <span className={cn('h-2 w-2 shrink-0 rounded-full', estadoPatenteBadge(form.data.estado_patente as EstadoPatente).dot)} />
-                                    {estadoPatenteBadge(form.data.estado_patente as EstadoPatente).label}
-                                </span>
-                            ) : (
-                                <span className="text-muted-foreground">Sin estado</span>
-                            )}
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="__none__">Sin estado</SelectItem>
-                        {ESTADO_PATENTE_OPCIONES.map((opt) => {
-                            const b = estadoPatenteBadge(opt.value);
-                            return (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                    <span className="flex items-center gap-2">
-                                        <span className={cn('h-2 w-2 shrink-0 rounded-full', b.dot)} />
-                                        {opt.label}
-                                    </span>
-                                </SelectItem>
-                            );
-                        })}
-                    </SelectContent>
-                </Select>
-                <InputError message={form.errors.estado_patente} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="propietario">Titular</Label>
-                    <Input
-                        id="propietario"
-                        type="text"
-                        placeholder="Nombre del titular"
-                        value={form.data.propietario}
-                        onChange={(e) => form.setData('propietario', e.target.value)}
-                    />
-                    <InputError message={form.errors.propietario} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="precio">Precio</Label>
-                    <MoneyInput
-                        id="precio"
-                        placeholder="Ej. 360.000,00"
-                        value={form.data.precio === '' ? null : Number(form.data.precio)}
-                        onValueChange={(n) => form.setData('precio', n == null ? '' : String(n))}
-                    />
-                    <InputError message={form.errors.precio} />
-                </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-                <Label htmlFor="inversion_id">Inversión</Label>
-                <Combobox
-                    id="inversion_id"
-                    placeholder="Buscar inversión..."
-                    options={inversionOptions}
-                    value={form.data.inversion_id}
-                    onSelect={(o) => form.setData('inversion_id', o.value)}
-                />
-                <InputError message={form.errors.inversion_id} />
-            </div>
-
-            {empresaOptions.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                    <Label htmlFor="empresa_id">Empresa</Label>
-                    <Combobox
-                        id="empresa_id"
-                        placeholder="Buscar empresa..."
-                        options={empresaOptions}
-                        value={form.data.empresa_id}
-                        onSelect={(o) => form.setData('empresa_id', o.value)}
-                    />
-                    <InputError message={form.errors.empresa_id} />
-                </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-                <Label htmlFor="user_id">Conductor asignado</Label>
-                <Combobox
-                    id="user_id"
-                    placeholder="Buscar conductor..."
-                    options={userOptions}
-                    value={form.data.user_id}
-                    onSelect={(o) => form.setData('user_id', o.value)}
-                />
-                <InputError message={form.errors.user_id} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                    <Label>Vencimiento VTV</Label>
-                    <VtvMonthYearPicker
-                        value={form.data.fecha_vencimiento_vtv}
-                        onChange={(v) => form.setData('fecha_vencimiento_vtv', v)}
-                    />
-                    <InputError message={form.errors.fecha_vencimiento_vtv} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <Label>Vencimiento GNC</Label>
-                    <VtvMonthYearPicker
-                        value={form.data.fecha_vencimiento_gnc}
-                        onChange={(v) => form.setData('fecha_vencimiento_gnc', v)}
-                    />
-                    <InputError message={form.errors.fecha_vencimiento_gnc} />
-                </div>
-            </div>
-
-        </div>
-        <DialogFooter className="flex-row items-center border-t border-border px-5 py-4 sm:justify-between">
-            {onDocumentos && (
-                <Button type="button" variant="ghost" size="sm" onClick={onDocumentos}>
-                    <FileText className="h-4 w-4" /> Documentos
-                </Button>
-            )}
-            <div className="flex items-center gap-2">
-                {onCancel && (
-                    <Button type="button" variant="outline" onClick={onCancel}>
-                        Cancelar
-                    </Button>
-                )}
-                <Button type="submit" disabled={!canSubmit}>
-                    {form.processing ? 'Procesando...' : <><Check className="h-4 w-4" /> {submitLabel}</>}
-                </Button>
-            </div>
-        </DialogFooter>
-        </form>
     );
 }
 

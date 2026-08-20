@@ -1,15 +1,15 @@
 import { Head, router } from '@inertiajs/react';
-import { Check, ChevronDown, Download, MessageSquareText, Search, Wrench, X } from 'lucide-react';
+import { Check, ChevronDown, Download, MessageSquareText, Wrench, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { EmptyState } from '@/components/app/empty-state';
+import { FilterBar, FilterField, SearchInput } from '@/components/app/filter-bar';
+import { FormDialog } from '@/components/app/form-dialog';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
+import { StatusBadge } from '@/components/app/status-badge';
+import type { StatusTone } from '@/components/app/status-badge';
 import { Button } from '@/components/ui/button';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -51,64 +51,115 @@ interface Props {
     items: ItemDef[];
 }
 
-const GRAVEDAD: { v: number; label: string; active: string; dot: string }[] = [
-    { v: 1, label: 'Bien',     active: 'border-green-500 bg-green-500 text-white',     dot: 'bg-green-500' },
-    { v: 2, label: 'Leve',     active: 'border-emerald-500 bg-emerald-500 text-white', dot: 'bg-emerald-400' },
-    { v: 3, label: 'Moderado', active: 'border-amber-500 bg-amber-500 text-white',     dot: 'bg-amber-500' },
-    { v: 4, label: 'Grave',    active: 'border-orange-500 bg-orange-500 text-white',   dot: 'bg-orange-500' },
-    { v: 5, label: 'Crítico',  active: 'border-red-500 bg-red-500 text-white',         dot: 'bg-red-500' },
+/**
+ * Escala de gravedad de 1 a 5. Es una rampa continua, no cinco categorías
+ * sueltas: se arma bajando la intensidad de los tokens semánticos en los
+ * escalones intermedios. El número y la etiqueta son lo que informa; el color
+ * sólo ayuda a barrer la lista con la vista.
+ */
+const GRAVEDAD: {
+    v: number;
+    label: string;
+    active: string;
+    dot: string;
+    tone: StatusTone;
+    /** El escalón más alto va en sólido para no confundirse con el anterior. */
+    solid: boolean;
+}[] = [
+    { v: 1, label: 'Bien',     active: 'border-success bg-success text-success-foreground',             dot: 'bg-success',        tone: 'success',     solid: false },
+    { v: 2, label: 'Leve',     active: 'border-success/70 bg-success/70 text-success-foreground',       dot: 'bg-success/70',     tone: 'success',     solid: false },
+    { v: 3, label: 'Moderado', active: 'border-warning bg-warning text-warning-foreground',             dot: 'bg-warning',        tone: 'warning',     solid: false },
+    { v: 4, label: 'Grave',    active: 'border-destructive/70 bg-destructive/70 text-white',            dot: 'bg-destructive/70', tone: 'destructive', solid: false },
+    { v: 5, label: 'Crítico',  active: 'border-destructive bg-destructive text-white',                  dot: 'bg-destructive',    tone: 'destructive', solid: true  },
 ];
 
-const PRIORIDAD: Record<Prioridad, { label: string; badge: string; dot: string; border: string; row: string }> = {
-    alta:  { label: 'Alta',  badge: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',         dot: 'bg-red-500',   border: 'border-l-red-500',   row: 'bg-red-500/5' },
-    media: { label: 'Media', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', dot: 'bg-amber-500', border: 'border-l-amber-500', row: 'bg-amber-500/5' },
-    baja:  { label: 'Baja',  badge: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', dot: 'bg-green-500', border: 'border-l-green-500', row: 'bg-green-500/5' },
+const PRIORIDAD: Record<
+    Prioridad,
+    { label: string; tone: StatusTone; border: string }
+> = {
+    alta: { label: 'Alta', tone: 'destructive', border: 'border-l-destructive' },
+    media: { label: 'Media', tone: 'warning', border: 'border-l-warning' },
+    baja: { label: 'Baja', tone: 'success', border: 'border-l-success' },
 };
 
 const ITEM_ROW_BG: Record<number, string> = {
     1: '',
     2: '',
-    3: 'bg-amber-500/5',
-    4: 'bg-orange-500/8',
-    5: 'bg-red-500/8',
+    3: 'bg-warning-soft/40',
+    4: 'bg-destructive-soft/40',
+    5: 'bg-destructive-soft/70',
 };
 
 const PESO: Record<Prioridad, number> = { alta: 3, media: 2, baja: 1 };
 
 function prioridadDe(valores: Record<string, RevisionItem>): Prioridad {
-    const maximo = Object.values(valores).reduce((max, it) => Math.max(max, it.gravedad ?? 1), 1);
+    const maximo = Object.values(valores).reduce(
+        (max, it) => Math.max(max, it.gravedad ?? 1),
+        1,
+    );
+
     return maximo <= 2 ? 'baja' : maximo === 3 ? 'media' : 'alta';
 }
 
 function formatDateTime(iso: string): string {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+
+    if (isNaN(d.getTime())) {
+        return iso;
+    }
+
     const pad = (n: number) => String(n).padStart(2, '0');
+
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function PrioridadBadge({ prioridad }: { prioridad: Prioridad }) {
     const p = PRIORIDAD[prioridad];
+
     return (
-        <span className={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold', p.badge)}>
-            <span className={cn('h-1.5 w-1.5 rounded-full', p.dot)} />
+        <StatusBadge tone={p.tone} dot>
             {p.label}
-        </span>
+        </StatusBadge>
     );
 }
 
-function GravedadSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+/** Etiqueta de un ítem con problema, con la gravedad puesta en el texto. */
+function GravedadBadge({ gravedad, children }: { gravedad: number; children: React.ReactNode }) {
+    const g = GRAVEDAD[gravedad - 1];
+
     return (
-        <div className="flex gap-1">
+        <StatusBadge
+            tone={g.tone}
+            variant={g.solid ? 'solid' : 'soft'}
+            size="sm"
+        >
+            {children}
+        </StatusBadge>
+    );
+}
+
+function GravedadSelector({
+    value,
+    onChange,
+}: {
+    value: number;
+    onChange: (v: number) => void;
+}) {
+    return (
+        <div className="flex gap-1" role="group" aria-label="Gravedad del ítem">
             {GRAVEDAD.map((g) => (
                 <Tooltip key={g.v}>
                     <TooltipTrigger asChild>
                         <button
                             type="button"
                             onClick={() => onChange(g.v)}
+                            aria-pressed={value === g.v}
+                            aria-label={`${g.v} — ${g.label}`}
                             className={cn(
-                                'flex h-8 flex-1 items-center justify-center rounded-md border text-xs font-semibold tabular-nums transition-all active:scale-[0.97]',
-                                value === g.v ? g.active : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
+                                'flex h-8 flex-1 items-center justify-center rounded-md border text-xs font-semibold tabular-nums transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.97]',
+                                value === g.v
+                                    ? g.active
+                                    : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                             )}
                         >
                             {g.v}
@@ -128,124 +179,225 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
     const [filtro, setFiltro] = useState<Filtro>('all');
     const [abierto, setAbierto] = useState<Fila | null>(null);
 
-    const stats = useMemo(() => ({
-        alta:      filas.filter((f) => f.revision?.prioridad === 'alta').length,
-        media:     filas.filter((f) => f.revision?.prioridad === 'media').length,
-        baja:      filas.filter((f) => f.revision?.prioridad === 'baja').length,
-        pendiente: filas.filter((f) => !f.revision).length,
-    }), [filas]);
+    const stats = useMemo(
+        () => ({
+            alta: filas.filter((f) => f.revision?.prioridad === 'alta').length,
+            media: filas.filter((f) => f.revision?.prioridad === 'media').length,
+            baja: filas.filter((f) => f.revision?.prioridad === 'baja').length,
+            pendiente: filas.filter((f) => !f.revision).length,
+        }),
+        [filas],
+    );
 
     const filtradas = useMemo(() => {
         const q = search.toLowerCase().trim();
         const result = filas.filter((f) => {
-            if (filtro === 'pendiente' && f.revision) return false;
-            if (filtro !== 'all' && filtro !== 'pendiente' && f.revision?.prioridad !== filtro) return false;
-            if (q) return f.patente.toLowerCase().includes(q) || f.chofer.toLowerCase().includes(q);
+            if (filtro === 'pendiente' && f.revision) {
+                return false;
+            }
+
+            if (
+                filtro !== 'all' &&
+                filtro !== 'pendiente' &&
+                f.revision?.prioridad !== filtro
+            ) {
+                return false;
+            }
+
+            if (q) {
+                return (
+                    f.patente.toLowerCase().includes(q) ||
+                    f.chofer.toLowerCase().includes(q)
+                );
+            }
+
             return true;
         });
+
         return [...result].sort((a, b) => {
             const pa = a.revision ? PESO[a.revision.prioridad] : 0;
             const pb = b.revision ? PESO[b.revision.prioridad] : 0;
-            if (pa !== pb) return pb - pa;
+
+            if (pa !== pb) {
+                return pb - pa;
+            }
+
             const ma = a.revision?.promedio ?? -1;
             const mb = b.revision?.promedio ?? -1;
-            if (ma !== mb) return mb - ma;
+
+            if (ma !== mb) {
+                return mb - ma;
+            }
+
             return a.patente.localeCompare(b.patente, 'es', { numeric: true });
         });
     }, [filas, search, filtro]);
 
     function toggleFiltro(val: Filtro) {
-        setFiltro((prev) => prev === val ? 'all' : val);
+        setFiltro((prev) => (prev === val ? 'all' : val));
+    }
+
+    const hayFiltros = search.trim() !== '' || filtro !== 'all';
+
+    function limpiarFiltros() {
+        setSearch('');
+        setFiltro('all');
     }
 
     function buildPdfUrl() {
         const p = new URLSearchParams();
-        if (search.trim()) p.set('q', search.trim());
-        if (filtro !== 'all') p.set('prioridad', filtro);
+
+        if (search.trim()) {
+            p.set('q', search.trim());
+        }
+
+        if (filtro !== 'all') {
+            p.set('prioridad', filtro);
+        }
+
         const qs = p.toString();
+
         return `/revision-mecanica/pdf${qs ? `?${qs}` : ''}`;
     }
+
+    const chips = [
+        { key: 'alta' as const, label: 'Alta', value: stats.alta, dot: 'bg-destructive' },
+        { key: 'media' as const, label: 'Media', value: stats.media, dot: 'bg-warning' },
+        { key: 'baja' as const, label: 'Baja', value: stats.baja, dot: 'bg-success' },
+        { key: 'pendiente' as const, label: 'Sin revisar', value: stats.pendiente, dot: null },
+    ];
 
     return (
         <>
             <Head title="Revisión Mecánica" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                    <div className="flex flex-col gap-1">
-                        <h1 className="text-lg font-semibold text-foreground sm:text-xl">Revisión Mecánica</h1>
-                        <p className="text-xs text-muted-foreground">
-                            Vehículos con chofer asignado. Tocá uno para revisar su estado mecánico y definir la prioridad de reparación.
-                        </p>
-                    </div>
-                    <a
-                        href={buildPdfUrl()}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-transparent px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        <Download className="h-4 w-4" />
-                        <span className="hidden sm:inline">Exportar PDF</span>
-                    </a>
-                </div>
-
-                {/* Stats — clickeables para filtrar */}
-                <div className="flex flex-wrap gap-1.5">
-                    {([
-                        { key: 'alta',      label: 'Alta',       value: stats.alta,      dot: 'bg-red-500' },
-                        { key: 'media',     label: 'Media',      value: stats.media,     dot: 'bg-amber-500' },
-                        { key: 'baja',      label: 'Baja',       value: stats.baja,      dot: 'bg-green-500' },
-                        { key: 'pendiente', label: 'Sin revisar', value: stats.pendiente, dot: null },
-                    ] as const).map((s) => {
-                        const active = filtro === s.key;
-                        return (
-                            <button
-                                key={s.key}
-                                type="button"
-                                onClick={() => toggleFiltro(s.key)}
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                                    active
-                                        ? 'border-primary bg-primary text-primary-foreground'
-                                        : 'border-border bg-card text-muted-foreground hover:text-foreground',
-                                )}
+            <PageContainer>
+                <PageHeader
+                    title="Revisión Mecánica"
+                    count={{
+                        value: filtradas.length,
+                        singular: 'vehículo',
+                        plural: 'vehículos',
+                    }}
+                    description="Vehículos con chofer asignado. Tocá uno para revisar su estado mecánico y definir la prioridad de reparación."
+                    actions={
+                        <Button variant="outline" size="sm" asChild>
+                            <a
+                                href={buildPdfUrl()}
+                                target="_blank"
+                                rel="noopener noreferrer"
                             >
-                                {s.dot && <span className={cn('h-1.5 w-1.5 rounded-full', active ? 'bg-primary-foreground/60' : s.dot)} />}
-                                {s.label}
-                                <span className={cn('tabular-nums', active ? 'opacity-70' : 'text-foreground')}>{s.value}</span>
-                            </button>
-                        );
-                    })}
-                </div>
+                                <Download className="size-4" />
+                                <span className="hidden sm:inline">
+                                    Exportar PDF
+                                </span>
+                            </a>
+                        </Button>
+                    }
+                />
 
-                {/* Buscador */}
-                <div className="relative">
-                    <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                        type="text"
-                        placeholder="Buscar patente o chofer..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9"
-                    />
-                </div>
+                <FilterBar
+                    hasActiveFilters={hayFiltros}
+                    onClear={limpiarFiltros}
+                    gridClassName="lg:grid-cols-[minmax(240px,1fr)_auto_auto]"
+                >
+                    <FilterField label="Buscar" htmlFor="rm-search">
+                        <SearchInput
+                            id="rm-search"
+                            value={search}
+                            onChange={setSearch}
+                            placeholder="Patente o chofer..."
+                        />
+                    </FilterField>
+
+                    <FilterField label="Prioridad">
+                        <div className="flex h-9 flex-wrap gap-1.5">
+                            {chips.map((s) => {
+                                const active = filtro === s.key;
+
+                                return (
+                                    <button
+                                        key={s.key}
+                                        type="button"
+                                        aria-pressed={active}
+                                        onClick={() => toggleFiltro(s.key)}
+                                        className={cn(
+                                            'inline-flex h-full items-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                            active
+                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                : 'border-border bg-card text-muted-foreground hover:text-foreground',
+                                        )}
+                                    >
+                                        {s.dot && (
+                                            <span
+                                                aria-hidden="true"
+                                                className={cn(
+                                                    'size-1.5 rounded-full',
+                                                    active
+                                                        ? 'bg-primary-foreground/60'
+                                                        : s.dot,
+                                                )}
+                                            />
+                                        )}
+                                        {s.label}
+                                        <span
+                                            className={cn(
+                                                'tabular-nums',
+                                                active
+                                                    ? 'opacity-70'
+                                                    : 'text-foreground',
+                                            )}
+                                        >
+                                            {s.value}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </FilterField>
+                </FilterBar>
 
                 {/* Lista */}
                 {filtradas.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                        No hay vehículos que coincidan.
+                    <div className="rounded-xl border border-border bg-card shadow-sm">
+                        <EmptyState
+                            variant={hayFiltros ? 'filtered' : 'empty'}
+                            icon={hayFiltros ? undefined : Wrench}
+                            title={
+                                hayFiltros
+                                    ? 'Ningún vehículo coincide con los filtros'
+                                    : 'No hay vehículos con chofer asignado'
+                            }
+                            description={
+                                hayFiltros
+                                    ? 'Probá con otra patente o quitá el filtro de prioridad.'
+                                    : 'La revisión mecánica sólo lista vehículos que tengan un chofer asignado.'
+                            }
+                            action={
+                                hayFiltros
+                                    ? {
+                                          label: 'Limpiar filtros',
+                                          onClick: limpiarFiltros,
+                                      }
+                                    : undefined
+                            }
+                        />
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2 pb-4">
                         {filtradas.map((f) => {
-                            const p = f.revision ? PRIORIDAD[f.revision.prioridad] : null;
+                            const p = f.revision
+                                ? PRIORIDAD[f.revision.prioridad]
+                                : null;
                             const problemas = f.revision
                                 ? items
-                                    .map((it) => ({ label: it.label, g: f.revision!.items[it.key]?.gravedad ?? 1 }))
-                                    .filter((x) => x.g >= 3)
-                                    .sort((a, b) => b.g - a.g)
-                                    .slice(0, 4)
+                                      .map((it) => ({
+                                          label: it.label,
+                                          g: f.revision!.items[it.key]?.gravedad ?? 1,
+                                      }))
+                                      .filter((x) => x.g >= 3)
+                                      .sort((a, b) => b.g - a.g)
+                                      .slice(0, 4)
                                 : [];
 
                             return (
@@ -254,57 +406,70 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                                     type="button"
                                     onClick={() => setAbierto(f)}
                                     className={cn(
-                                        'flex w-full items-center gap-3 rounded-xl border border-l-4 bg-card p-3 text-left shadow-sm transition-colors hover:bg-muted/40',
+                                        'flex w-full items-center gap-3 rounded-xl border border-l-4 bg-card p-3 text-left shadow-sm transition-colors outline-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring',
                                         p ? p.border : 'border-l-border',
                                     )}
                                 >
-                                    <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold uppercase tracking-wide text-foreground">
+                                    <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-sm font-bold tracking-wide text-foreground uppercase">
                                         {f.patente}
                                     </span>
 
                                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="truncate text-sm font-medium text-foreground">{f.chofer}</span>
-                                            <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">{f.marca} {f.modelo}</span>
+                                            <span className="truncate text-sm font-medium text-foreground">
+                                                {f.chofer}
+                                            </span>
+                                            <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
+                                                {f.marca} {f.modelo}
+                                            </span>
                                         </div>
                                         {problemas.length > 0 && (
                                             <div className="flex flex-wrap gap-1">
                                                 {problemas.map((pr) => (
-                                                    <span
+                                                    <GravedadBadge
                                                         key={pr.label}
-                                                        className={cn(
-                                                            'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium',
-                                                            pr.g === 5 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                                            : pr.g === 4 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-                                                        )}
+                                                        gravedad={pr.g}
                                                     >
-                                                        <span className={cn('h-1.5 w-1.5 rounded-full', GRAVEDAD[pr.g - 1].dot)} />
-                                                        {pr.label}
-                                                    </span>
+                                                        {pr.label} ·{' '}
+                                                        {GRAVEDAD[pr.g - 1].label}
+                                                    </GravedadBadge>
                                                 ))}
                                             </div>
                                         )}
                                         {!f.revision && (
-                                            <span className="text-xs text-muted-foreground">Sin revisión registrada</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                Sin revisión registrada
+                                            </span>
                                         )}
                                     </div>
 
                                     <div className="flex shrink-0 flex-col items-end gap-1">
-                                        {f.revision
-                                            ? <PrioridadBadge prioridad={f.revision.prioridad} />
-                                            : <span className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Sin revisar</span>
-                                        }
+                                        {f.revision ? (
+                                            <PrioridadBadge
+                                                prioridad={f.revision.prioridad}
+                                            />
+                                        ) : (
+                                            <StatusBadge tone="neutral">
+                                                Sin revisar
+                                            </StatusBadge>
+                                        )}
                                         {f.revision && (
-                                            <span className="text-[11px] tabular-nums text-muted-foreground">{formatDateTime(f.revision.fecha)}</span>
+                                            <span className="text-xs text-muted-foreground tabular-nums">
+                                                {formatDateTime(
+                                                    f.revision.fecha,
+                                                )}
+                                            </span>
                                         )}
                                     </div>
 
                                     {f.revision?.observaciones && (
                                         <Tooltip>
                                             <TooltipTrigger asChild>
-                                                <span className="shrink-0 text-muted-foreground">
-                                                    <MessageSquareText className="h-4 w-4" />
+                                                <span
+                                                    className="shrink-0 text-muted-foreground"
+                                                    aria-label="Tiene observaciones"
+                                                >
+                                                    <MessageSquareText className="size-4" />
                                                 </span>
                                             </TooltipTrigger>
                                             <TooltipContent className="max-w-xs whitespace-pre-wrap">
@@ -317,7 +482,7 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
                         })}
                     </div>
                 )}
-            </div>
+            </PageContainer>
 
             <RevisionModal
                 fila={abierto}
@@ -328,21 +493,40 @@ export default function RevisionMecanicaIndex({ filas, items }: Props) {
     );
 }
 
-function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: ItemDef[]; onClose: () => void }) {
+function RevisionModal({
+    fila,
+    items,
+    onClose,
+}: {
+    fila: Fila | null;
+    items: ItemDef[];
+    onClose: () => void;
+}) {
     const [valores, setValores] = useState<Record<string, RevisionItem>>({});
     const [observaciones, setObservaciones] = useState('');
     const [processing, setProcessing] = useState(false);
     const [expandedDesc, setExpandedDesc] = useState<Set<string>>(new Set());
 
     useEffect(() => {
-        if (!fila) return;
+        if (!fila) {
+            return;
+        }
+
         const init: Record<string, RevisionItem> = {};
         const initExpanded = new Set<string>();
+
         for (const it of items) {
             const prev = fila.revision?.items?.[it.key];
-            init[it.key] = { gravedad: prev?.gravedad ?? 1, descripcion: prev?.descripcion ?? '' };
-            if ((prev?.gravedad ?? 1) > 1 || prev?.descripcion) initExpanded.add(it.key);
+            init[it.key] = {
+                gravedad: prev?.gravedad ?? 1,
+                descripcion: prev?.descripcion ?? '',
+            };
+
+            if ((prev?.gravedad ?? 1) > 1 || prev?.descripcion) {
+                initExpanded.add(it.key);
+            }
         }
+
         setValores(init);
         setObservaciones(fila.revision?.observaciones ?? '');
         setExpandedDesc(initExpanded);
@@ -350,8 +534,15 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
     }, [fila?.vehiculo_id]);
 
     const promedio = useMemo(() => {
-        if (items.length === 0) return 0;
-        const suma = items.reduce((acc, it) => acc + (valores[it.key]?.gravedad ?? 1), 0);
+        if (items.length === 0) {
+            return 0;
+        }
+
+        const suma = items.reduce(
+            (acc, it) => acc + (valores[it.key]?.gravedad ?? 1),
+            0,
+        );
+
         return suma / items.length;
     }, [valores, items]);
 
@@ -360,9 +551,11 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
     function setItem(key: string, patch: Partial<RevisionItem>) {
         setValores((v) => {
             const next = { ...v, [key]: { ...v[key], ...patch } };
+
             if (patch.gravedad !== undefined && patch.gravedad > 1) {
                 setExpandedDesc((s) => new Set([...s, key]));
             }
+
             return next;
         });
     }
@@ -370,164 +563,216 @@ function RevisionModal({ fila, items, onClose }: { fila: Fila | null; items: Ite
     function toggleDesc(key: string) {
         setExpandedDesc((s) => {
             const next = new Set(s);
-            next.has(key) ? next.delete(key) : next.add(key);
+
+            if (next.has(key)) {
+                next.delete(key);
+            } else {
+                next.add(key);
+            }
+
             return next;
         });
     }
 
     function submit() {
-        if (!fila) return;
+        if (!fila) {
+            return;
+        }
+
         setProcessing(true);
-        router.post(`/revision-mecanica/${fila.vehiculo_id}`, { items: valores, observaciones } as never, {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            `/revision-mecanica/${fila.vehiculo_id}`,
+            { items: valores, observaciones } as never,
+            {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+                onFinish: () => setProcessing(false),
+            },
+        );
     }
 
-    const problemasCount = items.filter((it) => (valores[it.key]?.gravedad ?? 1) >= 3).length;
+    const problemasCount = items.filter(
+        (it) => (valores[it.key]?.gravedad ?? 1) >= 3,
+    ).length;
 
     return (
-        <Dialog open={!!fila} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg">
-                {/* Header */}
-                <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15">
-                        <Wrench className="h-5 w-5 text-indigo-500" />
-                    </div>
-                    <div className="flex-1">
-                        <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-                            <span className="font-mono uppercase">{fila?.patente}</span>
-                            <span className="text-sm font-normal text-muted-foreground">{fila?.marca} {fila?.modelo}</span>
-                        </DialogTitle>
-                        <DialogDescription className="text-xs">
-                            {fila?.chofer} · Revisá cada ítem de 1 (Bien) a 5 (Crítico)
-                        </DialogDescription>
-                    </div>
-                </div>
-
-                {/* Resumen rápido si hay problemas */}
-                {problemasCount > 0 && (
-                    <div className="flex items-center gap-2 border-b border-border bg-amber-500/5 px-5 py-2">
-                        <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                            {problemasCount} ítem{problemasCount !== 1 ? 's' : ''} con atención requerida
-                        </span>
-                        <div className="flex flex-wrap gap-1">
-                            {items
-                                .filter((it) => (valores[it.key]?.gravedad ?? 1) >= 3)
-                                .sort((a, b) => (valores[b.key]?.gravedad ?? 1) - (valores[a.key]?.gravedad ?? 1))
-                                .map((it) => {
-                                    const g = valores[it.key]?.gravedad ?? 1;
-                                    return (
-                                        <span
-                                            key={it.key}
-                                            className={cn(
-                                                'rounded-md px-1.5 py-0.5 text-[10px] font-medium',
-                                                g === 5 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                                : g === 4 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-                                            )}
-                                        >
-                                            {it.label}
-                                        </span>
-                                    );
-                                })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Ítems */}
-                <div className="flex max-h-[55vh] flex-col divide-y divide-border overflow-y-auto">
-                    {items.map((it) => {
-                        const g = valores[it.key]?.gravedad ?? 1;
-                        const showDesc = expandedDesc.has(it.key);
-                        const hasDesc = !!(valores[it.key]?.descripcion);
-                        return (
-                            <div
-                                key={it.key}
-                                className={cn(
-                                    'flex flex-col gap-2 px-5 py-3 transition-colors',
-                                    ITEM_ROW_BG[g] ?? '',
-                                )}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <span className={cn(
-                                        'text-sm font-medium',
-                                        g >= 5 ? 'text-red-700 dark:text-red-400'
-                                        : g >= 4 ? 'text-orange-700 dark:text-orange-400'
-                                        : g >= 3 ? 'text-amber-700 dark:text-amber-400'
-                                        : 'text-foreground',
-                                    )}>
-                                        {it.label}
-                                    </span>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                            {GRAVEDAD[g - 1]?.label}
-                                        </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleDesc(it.key)}
-                                            className={cn(
-                                                'text-muted-foreground/60 transition-colors hover:text-muted-foreground',
-                                                hasDesc && 'text-muted-foreground',
-                                            )}
-                                            title={showDesc ? 'Ocultar nota' : 'Agregar nota'}
-                                        >
-                                            <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showDesc && 'rotate-180')} />
-                                        </button>
-                                    </div>
-                                </div>
-                                <GravedadSelector
-                                    value={g}
-                                    onChange={(v) => setItem(it.key, { gravedad: v })}
-                                />
-                                {showDesc && (
-                                    <Input
-                                        type="text"
-                                        placeholder="Nota (opcional)..."
-                                        className="h-8 text-sm"
-                                        value={valores[it.key]?.descripcion ?? ''}
-                                        onChange={(e) => setItem(it.key, { descripcion: e.target.value })}
-                                        autoFocus
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
-
-                    {/* Observaciones generales */}
-                    <div className="flex flex-col gap-2 px-5 py-3">
-                        <Label className="text-sm font-medium text-muted-foreground">Observaciones generales</Label>
-                        <textarea
-                            rows={3}
-                            placeholder="Observaciones generales (opcional)..."
-                            value={observaciones}
-                            onChange={(e) => setObservaciones(e.target.value)}
-                            maxLength={2000}
-                            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                    </div>
-                </div>
-
+        <FormDialog
+            open={!!fila}
+            onOpenChange={(open) => !open && onClose()}
+            size="lg"
+            icon={Wrench}
+            title={
+                <span className="flex items-center gap-2">
+                    <span className="font-mono uppercase">{fila?.patente}</span>
+                    <span className="text-sm font-normal text-muted-foreground">
+                        {fila?.marca} {fila?.modelo}
+                    </span>
+                </span>
+            }
+            description={`${fila?.chofer ?? ''} · Revisá cada ítem de 1 (Bien) a 5 (Crítico)`}
+            footer={
                 <DialogFooter className="flex-row items-center justify-between border-t border-border px-5 py-4">
                     <div className="flex items-center gap-3">
                         <div className="flex flex-col">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Promedio</span>
-                            <span className="text-lg font-bold tabular-nums text-foreground">{promedio.toFixed(2)}</span>
+                            <span className="text-xs tracking-wider text-muted-foreground uppercase">
+                                Promedio
+                            </span>
+                            <span className="text-lg font-bold text-foreground tabular-nums">
+                                {promedio.toFixed(2)}
+                            </span>
                         </div>
                         <PrioridadBadge prioridad={prioridad} />
                     </div>
                     <div className="flex gap-2">
-                        <Button type="button" variant="outline" onClick={onClose}>
-                            <X className="h-4 w-4" /> Cancelar
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                            disabled={processing}
+                        >
+                            <X className="size-4" /> Cancelar
                         </Button>
-                        <Button type="button" onClick={submit} disabled={processing}>
-                            {processing ? 'Guardando...' : <><Check className="h-4 w-4" /> Guardar</>}
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={processing}
+                        >
+                            {processing ? (
+                                'Guardando...'
+                            ) : (
+                                <>
+                                    <Check className="size-4" /> Guardar
+                                </>
+                            )}
                         </Button>
                     </div>
                 </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            }
+        >
+            {/* Resumen rápido si hay problemas */}
+            {problemasCount > 0 && (
+                <div className="-mx-5 -mt-5 flex flex-wrap items-center gap-2 border-b border-border bg-warning-soft/40 px-5 py-2">
+                    <span className="text-xs font-medium text-warning-soft-foreground">
+                        {problemasCount} ítem{problemasCount !== 1 ? 's' : ''} con
+                        atención requerida
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                        {items
+                            .filter((it) => (valores[it.key]?.gravedad ?? 1) >= 3)
+                            .sort(
+                                (a, b) =>
+                                    (valores[b.key]?.gravedad ?? 1) -
+                                    (valores[a.key]?.gravedad ?? 1),
+                            )
+                            .map((it) => (
+                                <GravedadBadge
+                                    key={it.key}
+                                    gravedad={valores[it.key]?.gravedad ?? 1}
+                                >
+                                    {it.label}
+                                </GravedadBadge>
+                            ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Ítems */}
+            <div className="-mx-5 flex flex-col divide-y divide-border">
+                {items.map((it) => {
+                    const g = valores[it.key]?.gravedad ?? 1;
+                    const showDesc = expandedDesc.has(it.key);
+                    const hasDesc = !!valores[it.key]?.descripcion;
+
+                    return (
+                        <div
+                            key={it.key}
+                            className={cn(
+                                'flex flex-col gap-2 px-5 py-3 transition-colors',
+                                ITEM_ROW_BG[g] ?? '',
+                            )}
+                        >
+                            <div className="flex items-center justify-between">
+                                <span
+                                    className={cn(
+                                        'text-sm font-medium',
+                                        g >= 4
+                                            ? 'text-destructive'
+                                            : g === 3
+                                              ? 'text-warning-soft-foreground'
+                                              : 'text-foreground',
+                                    )}
+                                >
+                                    {it.label}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                        {GRAVEDAD[g - 1]?.label}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleDesc(it.key)}
+                                        aria-expanded={showDesc}
+                                        aria-label={
+                                            showDesc
+                                                ? `Ocultar la nota de ${it.label}`
+                                                : `Agregar una nota a ${it.label}`
+                                        }
+                                        className={cn(
+                                            'rounded text-muted-foreground/60 transition-colors outline-none hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                                            hasDesc && 'text-muted-foreground',
+                                        )}
+                                    >
+                                        <ChevronDown
+                                            className={cn(
+                                                'size-3.5 transition-transform',
+                                                showDesc && 'rotate-180',
+                                            )}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+                            <GravedadSelector
+                                value={g}
+                                onChange={(v) => setItem(it.key, { gravedad: v })}
+                            />
+                            {showDesc && (
+                                <Input
+                                    type="text"
+                                    placeholder="Nota (opcional)..."
+                                    className="h-8 text-sm"
+                                    value={valores[it.key]?.descripcion ?? ''}
+                                    onChange={(e) =>
+                                        setItem(it.key, {
+                                            descripcion: e.target.value,
+                                        })
+                                    }
+                                    autoFocus
+                                />
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Observaciones generales */}
+            <div className="flex flex-col gap-2">
+                <Label
+                    htmlFor="observaciones"
+                    className="text-sm font-medium text-muted-foreground"
+                >
+                    Observaciones generales
+                </Label>
+                <textarea
+                    id="observaciones"
+                    rows={3}
+                    placeholder="Observaciones generales (opcional)..."
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    maxLength={2000}
+                    className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                />
+            </div>
+        </FormDialog>
     );
 }
 

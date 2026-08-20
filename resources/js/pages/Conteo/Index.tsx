@@ -15,6 +15,10 @@ import {
     X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { EmptyState } from '@/components/app/empty-state';
+import { SearchInput } from '@/components/app/filter-bar';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,7 +68,11 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
 
     const filteredItems = useMemo(() => {
         const q = search.toLowerCase().trim();
-        if (!q) return zonaItems;
+
+        if (!q) {
+return zonaItems;
+}
+
         return zonaItems.filter(
             (i) =>
                 i.descripcion.toLowerCase().includes(q) ||
@@ -84,7 +92,10 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
     );
 
     function switchZona(z: Zona) {
-        if (z === zona) return;
+        if (z === zona) {
+return;
+}
+
         setZona(z);
         setSearch('');
     }
@@ -94,7 +105,10 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
     }
 
     function handlePreview() {
-        if (enteredLines.length === 0) return;
+        if (enteredLines.length === 0) {
+return;
+}
+
         setProcessing(true);
         router.post(
             previewRoute.url(),
@@ -118,6 +132,7 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
 
     const confirmValid = diffLines.every((l) => {
         const a = ajustes[l.articulo_id];
+
         return a && a.motivo !== '' && a.nota.trim() !== '';
     });
 
@@ -129,7 +144,10 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
     }
 
     function handleConfirm() {
-        if (!confirmValid) return;
+        if (!confirmValid) {
+return;
+}
+
         setProcessing(true);
         const lineas = previewLineas.map((l) => ({
             articulo_id: l.articulo_id,
@@ -151,11 +169,15 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
             setMovs((prev) => {
                 const next = { ...prev };
                 delete next[articuloId];
+
                 return next;
             });
+
             return;
         }
+
         setMovs((prev) => ({ ...prev, [articuloId]: 'loading' }));
+
         try {
             const res = await fetch(movimientosRoute.url(articuloId), {
                 headers: { Accept: 'application/json' },
@@ -172,19 +194,21 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
         <>
             <Head title="Conteo de inventario" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
-                <div className="flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                        <ClipboardList className="h-5 w-5 text-primary" />
-                        <h1 className="text-lg font-semibold text-foreground">Conteo de inventario</h1>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                        {view === 'entrada'
+            <PageContainer>
+                <PageHeader
+                    title="Conteo de inventario"
+                    meta={
+                        <ClipboardList
+                            aria-hidden="true"
+                            className="size-5 text-primary"
+                        />
+                    }
+                    description={
+                        view === 'entrada'
                             ? 'Contá a ciegas: cargá lo que hay físicamente. El sistema calcula las diferencias al terminar.'
-                            : 'Revisá las diferencias, investigá los movimientos y clasificá cada ajuste antes de confirmar.'}
-                    </p>
-                </div>
+                            : 'Revisá las diferencias, investigá los movimientos y clasificá cada ajuste antes de confirmar.'
+                    }
+                />
 
                 {view === 'entrada' ? (
                     <EntradaView
@@ -224,7 +248,7 @@ export default function ConteoIndex({ items, motivos, historial, preview }: Prop
                         onConfirm={handleConfirm}
                     />
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }
@@ -288,26 +312,44 @@ function EntradaView({
             </div>
 
             {/* Buscador */}
-            <div className="relative w-full sm:max-w-sm">
-                <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    type="text"
-                    placeholder="Buscar por código o descripción..."
-                    className="bg-card pl-9 shadow-xs"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                />
-            </div>
+            <SearchInput
+                className="w-full sm:max-w-sm"
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por código o descripción..."
+            />
 
             {/* Lista de artículos con input de físico */}
             <div className="flex flex-col gap-2 pb-2">
                 {filteredItems.length === 0 ? (
-                    <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                        No hay artículos en esta zona o no coinciden con la búsqueda.
+                    <div className="rounded-xl border border-border bg-card shadow-sm">
+                        <EmptyState
+                            variant={search.trim() ? 'filtered' : 'empty'}
+                            icon={Warehouse}
+                            title={
+                                search.trim()
+                                    ? 'Ningún artículo coincide'
+                                    : 'No hay artículos en esta zona'
+                            }
+                            description={
+                                search.trim()
+                                    ? 'Probá con otro código o descripción.'
+                                    : 'Cargá artículos en el inventario para poder contarlos.'
+                            }
+                            action={
+                                search.trim()
+                                    ? {
+                                          label: 'Limpiar búsqueda',
+                                          onClick: () => setSearch(''),
+                                      }
+                                    : undefined
+                            }
+                        />
                     </div>
                 ) : (
                     filteredItems.map((item) => {
                         const counted = (fisico[item.id] ?? '') !== '';
+
                         return (
                             <div
                                 key={item.id}
@@ -362,7 +404,7 @@ function EntradaView({
                                     <span className="text-foreground">{c.user?.name ?? '—'}</span>
                                     <span className="ml-auto text-xs text-muted-foreground">
                                         {c.lineas_count} contados ·{' '}
-                                        <span className={cn(c.ajustes_count > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : '')}>
+                                        <span className={cn(c.ajustes_count > 0 ? 'font-semibold text-warning-soft-foreground' : '')}>
                                             {c.ajustes_count} ajustes
                                         </span>
                                     </span>
@@ -428,12 +470,12 @@ function RevisionView({
             {/* Resumen */}
             <div className="flex flex-wrap gap-2">
                 <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
-                    <Check className="h-4 w-4 text-emerald-500" />
+                    <Check aria-hidden="true" className="size-4 text-success" />
                     <span className="font-semibold text-foreground tabular-nums">{okCount}</span>
                     <span className="text-muted-foreground">sin diferencia</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm shadow-sm">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <AlertTriangle aria-hidden="true" className="size-4 text-warning" />
                     <span className="font-semibold text-foreground tabular-nums">{diffLines.length}</span>
                     <span className="text-muted-foreground">con diferencia</span>
                 </div>
@@ -450,13 +492,13 @@ function RevisionView({
                             key={l.articulo_id}
                             className={cn(
                                 'rounded-xl border bg-card shadow-sm',
-                                isDiff ? (faltante ? 'border-red-500/50' : 'border-amber-500/50') : 'border-border',
+                                isDiff ? (faltante ? 'border-destructive/50' : 'border-warning/50') : 'border-border',
                             )}
                         >
                             <div className="flex items-center gap-3 p-3">
                                 <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-medium text-foreground">{l.descripcion}</p>
-                                    <div className="mt-0.5 flex gap-3 text-[11px] text-muted-foreground tabular-nums">
+                                    <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground tabular-nums">
                                         <span>Esperado: <span className="font-medium text-foreground">{l.esperado}</span></span>
                                         <span>Físico: <span className="font-medium text-foreground">{l.fisico}</span></span>
                                     </div>
@@ -466,15 +508,15 @@ function RevisionView({
                                         className={cn(
                                             'flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-sm font-bold tabular-nums',
                                             faltante
-                                                ? 'bg-red-500/15 text-red-600 dark:text-red-400'
-                                                : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+                                                ? 'bg-destructive-soft text-destructive-soft-foreground'
+                                                : 'bg-warning-soft text-warning-soft-foreground',
                                         )}
                                     >
                                         {faltante ? <TrendingDown className="h-3.5 w-3.5" /> : <TrendingUp className="h-3.5 w-3.5" />}
                                         {l.diferencia > 0 ? `+${l.diferencia}` : l.diferencia}
                                     </span>
                                 ) : (
-                                    <Check className="h-4 w-4 shrink-0 text-emerald-500" />
+                                    <Check aria-hidden="true" className="size-4 shrink-0 text-success" />
                                 )}
                             </div>
 
@@ -500,7 +542,7 @@ function RevisionView({
                                                 <div
                                                     key={m.id}
                                                     className={cn(
-                                                        'flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-[11px]',
+                                                        'flex flex-wrap items-center gap-x-2 gap-y-1 px-2.5 py-1.5 text-xs',
                                                         m.inactiva && 'opacity-50 line-through',
                                                     )}
                                                 >
@@ -592,14 +634,21 @@ function RevisionView({
 
 function MovTipoBadge({ tipo, cantidad }: { tipo: ConteoMovimiento['tipo']; cantidad: number }) {
     const map = {
-        IN: { label: `+${cantidad}`, cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
-        OUT: { label: `-${cantidad}`, cls: 'bg-red-500/15 text-red-600 dark:text-red-400' },
+        IN: {
+            label: `+${cantidad}`,
+            cls: 'bg-success-soft text-success-soft-foreground',
+        },
+        OUT: {
+            label: `-${cantidad}`,
+            cls: 'bg-destructive-soft text-destructive-soft-foreground',
+        },
         AJUSTE: {
             label: cantidad > 0 ? `+${cantidad}` : `${cantidad}`,
-            cls: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
+            cls: 'bg-info-soft text-info-soft-foreground',
         },
     } as const;
     const cfg = map[tipo];
+
     return (
         <span className={cn('shrink-0 rounded px-1.5 py-0.5 font-mono font-semibold tabular-nums', cfg.cls)}>
             {tipo === 'AJUSTE' ? 'AJ ' : tipo === 'IN' ? 'IN ' : 'OUT '}

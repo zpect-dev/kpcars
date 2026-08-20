@@ -8,13 +8,16 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppointmentCalendar } from '@/pages/Appointments/AppointmentCalendar';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox  } from '@/components/ui/combobox';
+import type {ComboboxOption} from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { AppointmentCalendar } from '@/pages/Appointments/AppointmentCalendar';
 
 type EventoTipo = 'alta' | 'baja';
 
@@ -60,6 +63,7 @@ interface Props {
 function formatDateRange(iso: string): string {
     const d = iso.length >= 10 ? iso.slice(0, 10) : iso;
     const [y, m, day] = d.split('-');
+
     return `${day}/${m}/${y}`;
 }
 
@@ -75,6 +79,7 @@ function VehiculoChip({ vehiculo }: { vehiculo: Vehiculo | null }) {
     if (!vehiculo) {
         return <span className="text-xs italic text-muted-foreground/50">Sin vehículo</span>;
     }
+
     return (
         <span className="inline-flex items-center rounded-md border border-border bg-muted/60 px-1.5 py-0.5 font-mono text-xs font-semibold uppercase tracking-wide text-foreground">
             {vehiculo.patente}
@@ -86,14 +91,27 @@ function VehiculoChip({ vehiculo }: { vehiculo: Vehiculo | null }) {
 function InlineDate({ value, onSave, className }: { value: string; onSave: (v: string) => void; className?: string }) {
     const initial = toDateInput(value);
     const [local, setLocal] = useState(initial);
-    useEffect(() => setLocal(toDateInput(value)), [value]);
+
+    // Si el servidor devuelve otra fecha, se descarta lo tipeado. Se ajusta
+    // durante el render en vez de con un efecto: así no hay un commit
+    // intermedio con el valor viejo.
+    const [valorPrevio, setValorPrevio] = useState(value);
+
+    if (value !== valorPrevio) {
+        setValorPrevio(value);
+        setLocal(toDateInput(value));
+    }
 
     return (
         <Input
             type="date"
             value={local}
             onChange={(e) => setLocal(e.target.value)}
-            onBlur={() => { if (local && local !== initial) onSave(local); }}
+            onBlur={() => {
+ if (local && local !== initial) {
+onSave(local);
+} 
+}}
             className={cn('h-8 w-[9.5rem] text-xs', className)}
         />
     );
@@ -110,7 +128,7 @@ function EventoRow({ e }: { e: ChoferEvento }) {
         <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 shadow-sm">
             <div className={cn(
                 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                esAlta ? 'bg-green-500/15 text-green-600 dark:text-green-400' : 'bg-red-500/15 text-red-600 dark:text-red-400',
+                esAlta ? 'bg-success-soft text-success-soft-foreground' : 'bg-destructive-soft text-destructive-soft-foreground',
             )}>
                 {esAlta ? <UserPlus className="h-4 w-4" /> : <UserMinus className="h-4 w-4" />}
             </div>
@@ -132,14 +150,31 @@ function CambioRow({ c }: { c: Cambio }) {
     const [inicio, setInicio] = useState(inicioInit);
     const [fin, setFin] = useState(finInit);
 
-    useEffect(() => {
+    // Mismo criterio que InlineDate: las fechas del servidor mandan sobre lo
+    // que haya en pantalla, y el ajuste va en el render.
+    const [fechasPrevias, setFechasPrevias] = useState({
+        inicio: c.fecha_inicio,
+        fin: c.fecha_fin,
+    });
+
+    if (
+        c.fecha_inicio !== fechasPrevias.inicio ||
+        c.fecha_fin !== fechasPrevias.fin
+    ) {
+        setFechasPrevias({ inicio: c.fecha_inicio, fin: c.fecha_fin });
         setInicio(toDateInput(c.fecha_inicio));
         setFin(toDateInput(c.fecha_fin));
-    }, [c.fecha_inicio, c.fecha_fin]);
+    }
 
     function save(nextInicio: string, nextFin: string) {
-        if (!nextInicio) return;
-        if (nextFin && nextFin < nextInicio) return; // guarda: fin no puede ser anterior al inicio
+        if (!nextInicio) {
+return;
+}
+
+        if (nextFin && nextFin < nextInicio) {
+return;
+} // guarda: fin no puede ser anterior al inicio
+
         router.patch(
             `/historial/asignacion/${c.id}`,
             { fecha_inicio: nextInicio, fecha_fin: nextFin || null },
@@ -164,12 +199,16 @@ function CambioRow({ c }: { c: Cambio }) {
             </div>
             <div className="flex shrink-0 items-end gap-3 pl-12 sm:pl-0">
                 <div className="flex flex-col gap-1">
-                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Inicio</Label>
-                    <InlineDate value={c.fecha_inicio} onSave={(v) => { setInicio(v); save(v, fin); }} />
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Inicio</Label>
+                    <InlineDate value={c.fecha_inicio} onSave={(v) => {
+ setInicio(v); save(v, fin); 
+}} />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Fin</Label>
-                    <InlineDate value={c.fecha_fin ?? ''} onSave={(v) => { setFin(v); save(inicio, v); }} />
+                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Fin</Label>
+                    <InlineDate value={c.fecha_fin ?? ''} onSave={(v) => {
+ setFin(v); save(inicio, v); 
+}} />
                 </div>
             </div>
         </div>
@@ -181,10 +220,11 @@ type Vista = 'all' | 'alta' | 'baja' | 'cambio';
 function VistaFiltro({ vista, onChange }: { vista: Vista; onChange: (v: Vista) => void }) {
     const opciones: { val: Vista; label: string; active: string }[] = [
         { val: 'all',    label: 'Todos',   active: 'border-primary/30 bg-primary/10 text-primary' },
-        { val: 'alta',   label: 'Altas',   active: 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400' },
-        { val: 'baja',   label: 'Bajas',   active: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400' },
-        { val: 'cambio', label: 'Cambios', active: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400' },
+        { val: 'alta',   label: 'Altas',   active: 'border-success/30 bg-success-soft text-success-soft-foreground' },
+        { val: 'baja',   label: 'Bajas',   active: 'border-destructive/30 bg-destructive-soft text-destructive-soft-foreground' },
+        { val: 'cambio', label: 'Cambios', active: 'border-info/30 bg-info-soft text-info-soft-foreground' },
     ];
+
     return (
         <div className="flex flex-wrap gap-1.5">
             {opciones.map(({ val, label, active }) => (
@@ -215,19 +255,34 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
     useEffect(() => {
         if (!isMounted.current) {
             isMounted.current = true;
+
             return;
         }
+
         const hasChanges =
             from !== (filters.from || '') ||
             to !== (filters.to || '') ||
             chofer !== (filters.chofer || '');
-        if (!hasChanges) return;
+
+        if (!hasChanges) {
+return;
+}
 
         const timeoutId = setTimeout(() => {
             const active: Record<string, string> = {};
-            if (from) active.from = from;
-            if (to) active.to = to;
-            if (chofer) active.chofer = chofer;
+
+            if (from) {
+active.from = from;
+}
+
+            if (to) {
+active.to = to;
+}
+
+            if (chofer) {
+active.chofer = chofer;
+}
+
             router.get('/historial', active, { preserveState: true, preserveScroll: true, replace: true });
         }, 300);
 
@@ -259,14 +314,11 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
         <>
             <Head title="Historial" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                {/* Header */}
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">Historial</h1>
-                    <p className="text-xs text-muted-foreground">
-                        Ajustá las fechas de altas, bajas y cambios de vehículo. Los cambios se guardan automáticamente.
-                    </p>
-                </div>
+            <PageContainer>
+                <PageHeader
+                    title="Historial"
+                    description="Ajustá las fechas de altas, bajas y cambios de vehículo. Los cambios se guardan automáticamente."
+                />
 
                 {/* Filtros */}
                 <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
@@ -292,7 +344,9 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                                     <AppointmentCalendar
                                         mode="range"
                                         rangeValue={{ from, to }}
-                                        onRangeChange={(range) => { setFrom(range.from); setTo(range.to); }}
+                                        onRangeChange={(range) => {
+ setFrom(range.from); setTo(range.to); 
+}}
                                         title={null}
                                         className="border-0 bg-popover"
                                         isFilterMode
@@ -335,24 +389,24 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
 
                 {/* Stats */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-green-500/20 bg-green-500/5 px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-success/20 bg-success-soft/40 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2.5">
-                            <UserPlus className="h-4 w-4 text-green-500" />
-                            <span className="text-sm text-green-700 dark:text-green-400">Altas de choferes</span>
+                            <UserPlus aria-hidden="true" className="size-4 text-success" />
+                            <span className="text-sm text-success-soft-foreground">Altas de choferes</span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-foreground">{stats.altas}</span>
                     </div>
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-destructive/20 bg-destructive-soft/40 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2.5">
-                            <UserMinus className="h-4 w-4 text-red-500" />
-                            <span className="text-sm text-red-700 dark:text-red-400">Bajas de choferes</span>
+                            <UserMinus aria-hidden="true" className="size-4 text-destructive" />
+                            <span className="text-sm text-destructive-soft-foreground">Bajas de choferes</span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-foreground">{stats.bajas}</span>
                     </div>
-                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between overflow-hidden rounded-xl border border-info/20 bg-info-soft/40 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2.5">
-                            <Car className="h-4 w-4 text-indigo-500" />
-                            <span className="text-sm text-indigo-700 dark:text-indigo-400">Cambios de vehículo</span>
+                            <Car aria-hidden="true" className="size-4 text-info" />
+                            <span className="text-sm text-info-soft-foreground">Cambios de vehículo</span>
                         </div>
                         <span className="text-lg font-bold tabular-nums text-foreground">{stats.cambios}</span>
                     </div>
@@ -365,7 +419,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                 {(vista === 'all' || vista === 'alta') && (
                 <div className="flex flex-col gap-3">
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <UserPlus className="h-4 w-4 text-green-500" />
+                        <UserPlus aria-hidden="true" className="size-4 text-success" />
                         Altas de choferes
                         <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{altas.length}</span>
                     </h2>
@@ -385,7 +439,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                 {(vista === 'all' || vista === 'baja') && (
                 <div className="flex flex-col gap-3">
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <UserMinus className="h-4 w-4 text-red-500" />
+                        <UserMinus aria-hidden="true" className="size-4 text-destructive" />
                         Bajas de choferes
                         <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{bajas.length}</span>
                     </h2>
@@ -405,7 +459,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                 {(vista === 'all' || vista === 'cambio') && (
                 <div className="flex flex-col gap-3 pb-4">
                     <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Car className="h-4 w-4 text-indigo-500" />
+                        <Car aria-hidden="true" className="size-4 text-info" />
                         Cambios de vehículo
                         <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground tabular-nums">{cambios.length}</span>
                     </h2>
@@ -420,7 +474,7 @@ export default function HistorialIndex({ filters, eventos, cambios, choferes, st
                     )}
                 </div>
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }

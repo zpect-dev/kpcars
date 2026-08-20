@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { ArrowLeft, FileDown, FileSpreadsheet } from 'lucide-react';
+import { PageContainer } from '@/components/app/page-container';
 import { Button } from '@/components/ui/button';
 
 interface Cierre {
@@ -57,7 +58,10 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 function formatFecha(d: string | null): string {
-    if (!d) return '—';
+    if (!d) {
+return '—';
+}
+
     return new Date(d).toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -74,11 +78,11 @@ export default function CierresGastoShow({ cierre, porTipo, porVehiculo, cajaChi
         <>
             <Head title={`Cierre de Gastos #${cierre.id}`} />
 
-            <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+            <PageContainer className="gap-5 sm:p-6">
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" onClick={() => history.back()}>
+                        <Button variant="ghost" size="icon" onClick={() => history.back()} aria-label="Volver">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
                         <div>
@@ -178,7 +182,7 @@ export default function CierresGastoShow({ cierre, porTipo, porVehiculo, cajaChi
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-muted/20 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                    <thead className="bg-muted/20 text-xs tracking-wider text-muted-foreground uppercase">
                                         <tr>
                                             <th className="px-4 py-2 font-medium">Fecha</th>
                                             <th className="px-4 py-2 font-medium">Tipo</th>
@@ -200,7 +204,7 @@ export default function CierresGastoShow({ cierre, porTipo, porVehiculo, cajaChi
                                                 </td>
                                                 <td
                                                     className={`px-4 py-2 text-right font-medium whitespace-nowrap ${
-                                                        m.monto < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                                                        m.monto < 0 ? 'text-destructive' : 'text-success'
                                                     }`}
                                                 >
                                                     {formatARS(m.monto)}
@@ -213,7 +217,7 @@ export default function CierresGastoShow({ cierre, porTipo, porVehiculo, cajaChi
                         )}
                     </div>
                 )}
-            </div>
+            </PageContainer>
         </>
     );
 }

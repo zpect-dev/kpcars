@@ -1,7 +1,14 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { Calendar, ChevronRight, Lock } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { Calendar, Lock } from 'lucide-react';
+import { useMemo } from 'react';
+import { DataTable } from '@/components/app/data-table/data-table';
+import { DataTableColumnHeader } from '@/components/app/data-table/data-table-column-header';
+import type { DataTableFeatures } from '@/components/app/data-table/features';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
+import { StatusBadge } from '@/components/app/status-badge';
 import { MoneyDual } from '@/components/money-dual';
-import { cn } from '@/lib/utils';
 
 interface Cierre {
     id: number;
@@ -18,6 +25,7 @@ interface Paginator {
     last_page: number;
     next_page_url: string | null;
     prev_page_url: string | null;
+    total?: number;
 }
 
 interface Props {
@@ -25,7 +33,10 @@ interface Props {
 }
 
 function formatFecha(d: string | null): string {
-    if (!d) return '—';
+    if (!d) {
+        return '—';
+    }
+
     return new Date(d).toLocaleDateString('es-AR', {
         day: '2-digit',
         month: '2-digit',
@@ -34,113 +45,126 @@ function formatFecha(d: string | null): string {
 }
 
 export default function CierresSueldoIndex({ cierres }: Props) {
+    const columns = useMemo<ColumnDef<DataTableFeatures, Cierre>[]>(
+        () => [
+            {
+                id: 'cierre',
+                accessorFn: (row) => row.id,
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Cierre
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <div className="flex items-center gap-3">
+                        <span
+                            aria-hidden="true"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                        >
+                            <Calendar className="size-4" />
+                        </span>
+                        <span className="font-semibold text-foreground tabular-nums">
+                            #{row.original.id}
+                        </span>
+                    </div>
+                ),
+                meta: { label: 'Cierre', mobile: 'title' },
+            },
+            {
+                id: 'fecha',
+                accessorFn: (row) => row.fecha ?? '',
+                sortingFn: 'datetime',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Fecha
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => formatFecha(row.original.fecha),
+                meta: { label: 'Fecha', mobile: 'field' },
+            },
+            {
+                id: 'ejecutado_por',
+                accessorFn: (row) => row.ejecutado_por?.name ?? '—',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Ejecutado por
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => row.original.ejecutado_por?.name ?? '—',
+                meta: { label: 'Ejecutado por', mobile: 'field' },
+            },
+            {
+                id: 'abonos',
+                accessorFn: (row) => Number(row.total_abonado),
+                enableSorting: false,
+                header: 'Abonos',
+                cell: ({ row }) =>
+                    row.original.total_abonado > 0 ? (
+                        <StatusBadge tone="info" size="sm">
+                            Con abonos de deuda
+                        </StatusBadge>
+                    ) : null,
+                meta: { label: 'Abonos', mobile: 'badge' },
+            },
+            {
+                id: 'total',
+                accessorFn: (row) => Number(row.total_pagado),
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Total pagado
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <MoneyDual
+                        ars={Number(row.original.total_pagado)}
+                        tasa={row.original.tasa ? Number(row.original.tasa) : null}
+                        orientation="stacked"
+                        size="sm"
+                        className="items-end"
+                    />
+                ),
+                meta: { label: 'Total pagado', mobile: 'field', align: 'right' },
+            },
+        ],
+        [],
+    );
+
     return (
         <>
             <Head title="Cierres de Sueldo" />
 
-            <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+            <PageContainer>
+                <PageHeader
+                    title="Cierres de Sueldo"
+                    description="Cada cierre se genera automáticamente al cerrar la recaudación de las dos empresas."
+                />
 
-                {/* Header */}
-                <div>
-                    <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-                        Cierres de Sueldo
-                    </h1>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                        Cada cierre se genera automáticamente al cerrar la
-                        recaudación de las dos empresas.
-                    </p>
-                </div>
-
-                {/* List */}
-                {cierres.data.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-card p-12 text-center">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                            <Lock className="h-6 w-6" />
-                        </div>
-                        <span className="text-base font-semibold text-foreground">Sin cierres</span>
-                        <span className="text-sm text-muted-foreground">
-                            Los cierres aparecen acá cuando ejecutás el cierre
-                            unificado desde Recaudaciones.
-                        </span>
-                    </div>
-                ) : (
-                    <div className="overflow-hidden rounded-2xl border border-border bg-card">
-                        {cierres.data.map((c, i, arr) => {
-                            const isLast = i === arr.length - 1;
-                            return (
-                                <button
-                                    key={c.id}
-                                    type="button"
-                                    onClick={() => router.get(`/cierres-sueldo/${c.id}`)}
-                                    className={cn(
-                                        'flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-accent/40',
-                                        !isLast && 'border-b border-border',
-                                    )}
-                                >
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                        <Calendar className="h-4 w-4" />
-                                    </div>
-
-                                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                                        <span className="text-sm font-semibold text-foreground">
-                                            Cierre #{c.id}
-                                        </span>
-                                        <span className="text-xs text-muted-foreground">
-                                            {formatFecha(c.fecha)}
-                                            {c.ejecutado_por && ` · ${c.ejecutado_por.name}`}
-                                            {c.total_abonado > 0 && ' · con abonos de deuda'}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex shrink-0 items-center gap-3">
-                                        <MoneyDual
-                                            ars={Number(c.total_pagado)}
-                                            tasa={c.tasa ? Number(c.tasa) : null}
-                                            orientation="stacked"
-                                            size="sm"
-                                            className="items-end"
-                                        />
-                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-
-                {/* Pagination */}
-                {(cierres.prev_page_url || cierres.next_page_url) && (
-                    <div className="flex items-center justify-between">
-                        <Link
-                            href={cierres.prev_page_url ?? '#'}
-                            preserveScroll
-                            className={cn(
-                                'text-sm',
-                                cierres.prev_page_url
-                                    ? 'text-foreground hover:underline'
-                                    : 'pointer-events-none text-muted-foreground/50',
-                            )}
-                        >
-                            ← Anterior
-                        </Link>
-                        <span className="text-xs text-muted-foreground">
-                            Página {cierres.current_page} de {cierres.last_page}
-                        </span>
-                        <Link
-                            href={cierres.next_page_url ?? '#'}
-                            preserveScroll
-                            className={cn(
-                                'text-sm',
-                                cierres.next_page_url
-                                    ? 'text-foreground hover:underline'
-                                    : 'pointer-events-none text-muted-foreground/50',
-                            )}
-                        >
-                            Siguiente →
-                        </Link>
-                    </div>
-                )}
-            </div>
+                <DataTable
+                    columns={columns}
+                    data={cierres.data}
+                    getRowId={(row) => String(row.id)}
+                    onRowClick={(row) =>
+                        router.get(`/cierres-sueldo/${row.id}`)
+                    }
+                    serverPagination={{
+                        pageIndex: cierres.current_page - 1,
+                        pageCount: cierres.last_page,
+                        rowCount: cierres.total,
+                        onPageChange: (pageIndex) =>
+                            router.get(
+                                '/cierres-sueldo',
+                                { page: pageIndex + 1 },
+                                { preserveScroll: true, preserveState: true },
+                            ),
+                    }}
+                    empty={{
+                        icon: Lock,
+                        title: 'Sin cierres',
+                        description:
+                            'Los cierres aparecen acá cuando ejecutás el cierre unificado desde Recaudaciones.',
+                    }}
+                />
+            </PageContainer>
         </>
     );
 }

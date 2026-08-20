@@ -11,6 +11,7 @@ import {
     X,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { formatARS, formatUSD } from '@/components/money-dual';
 import { Button } from '@/components/ui/button';
 import { CONCEPTO_LABEL, CONCEPTO_PILL } from '@/lib/concepto';
@@ -163,7 +164,7 @@ function DetalleInversiones({
         <div className="overflow-hidden rounded-xl border border-border/60">
             <table className="w-full text-xs">
                 <thead>
-                    <tr className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                    <tr className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                         <th className="px-3 py-2 pl-4 text-left font-semibold whitespace-nowrap">
                             Inversión
                         </th>
@@ -199,7 +200,7 @@ function DetalleInversiones({
                                 className={cn(
                                     'transition-colors hover:bg-accent/30',
                                     esFinanciador
-                                        ? 'bg-violet-500/[0.06]'
+                                        ? 'bg-info-soft/40'
                                         : j % 2 === 1 &&
                                               'bg-foreground/[0.015]',
                                 )}
@@ -210,7 +211,7 @@ function DetalleInversiones({
                                             className={cn(
                                                 'h-1.5 w-1.5 rounded-full',
                                                 esFinanciador
-                                                    ? 'bg-violet-500'
+                                                    ? 'bg-info'
                                                     : 'bg-border',
                                             )}
                                         />
@@ -221,7 +222,7 @@ function DetalleInversiones({
                                     {g.base ? (
                                         <span
                                             className={cn(
-                                                'inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                                                'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium',
                                                 CONCEPTO_PILL[
                                                     g.base.concepto
                                                 ] ??
@@ -248,7 +249,7 @@ function DetalleInversiones({
                                 </td>
                                 <td className="px-3 py-2 pl-6 text-right whitespace-nowrap tabular-nums">
                                     {g.redistribucion ? (
-                                        <span className="font-medium text-violet-500 dark:text-violet-400">
+                                        <span className="font-medium text-info-soft-foreground">
                                             +{' '}
                                             {formatARS(g.redistribucion.monto)}
                                         </span>
@@ -273,7 +274,7 @@ function DetalleInversiones({
                 <tfoot>
                     <tr className="border-t-2 border-border bg-muted/60">
                         <td
-                            className="px-3 py-2.5 pl-4 text-[11px] font-bold tracking-wider text-foreground uppercase"
+                            className="px-3 py-2.5 pl-4 text-xs font-bold tracking-wider text-foreground uppercase"
                             colSpan={2}
                         >
                             Total
@@ -283,7 +284,7 @@ function DetalleInversiones({
                         </td>
                         <td className="px-3 py-2.5 pl-6 text-right font-semibold whitespace-nowrap tabular-nums">
                             {totRedis > 0 ? (
-                                <span className="text-violet-500 dark:text-violet-400">
+                                <span className="text-info-soft-foreground">
                                     + {formatARS(totRedis)}
                                 </span>
                             ) : (
@@ -294,7 +295,7 @@ function DetalleInversiones({
                         </td>
                         <td
                             className={cn(
-                                'px-3 py-2.5 pr-4 pl-6 text-right text-sm font-extrabold whitespace-nowrap text-emerald-600 tabular-nums dark:text-emerald-400',
+                                'px-3 py-2.5 pr-4 pl-6 text-right text-sm font-extrabold whitespace-nowrap text-success tabular-nums',
                                 totalCol,
                             )}
                         >
@@ -302,9 +303,9 @@ function DetalleInversiones({
                         </td>
                     </tr>
                     {abonoTotal > 0 && (
-                        <tr className="border-t border-border/60 bg-emerald-500/[0.06]">
+                        <tr className="border-t border-border/60 bg-success-soft/40">
                             <td
-                                className="px-3 py-2 pl-4 text-emerald-600 dark:text-emerald-400"
+                                className="px-3 py-2 pl-4 text-success"
                                 colSpan={2}
                             >
                                 <span className="inline-flex items-center gap-1.5">
@@ -313,7 +314,7 @@ function DetalleInversiones({
                                 </span>
                             </td>
                             <td
-                                className="px-3 py-2 pr-4 pl-6 text-right font-semibold whitespace-nowrap text-emerald-600 tabular-nums dark:text-emerald-400"
+                                className="px-3 py-2 pr-4 pl-6 text-right font-semibold whitespace-nowrap text-success tabular-nums"
                                 colSpan={3}
                             >
                                 − {formatARS(abonoTotal)}
@@ -343,7 +344,7 @@ export default function CierreSueldoShow({
         <>
             <Head title={`Cierre de Sueldos #${cierre.id}`} />
 
-            <div className="flex flex-1 flex-col gap-5 p-4 sm:p-6">
+            <PageContainer className="gap-5 sm:p-6">
                 {/* ── Header ─────────────────────────────────────────────── */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -443,7 +444,7 @@ export default function CierreSueldoShow({
                 {socios.length > 0 && mostrarDeudores && (
                     <div className="overflow-hidden rounded-2xl border border-border bg-card">
                         <div className="flex items-center gap-3 border-b border-border px-5 py-4">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning-soft-foreground">
                                 <HandCoins className="h-5 w-5" />
                             </div>
                             <div className="min-w-0 flex-1">
@@ -520,7 +521,7 @@ export default function CierreSueldoShow({
                                             {formatARS(row.total)}
                                         </span>
                                         {usd != null && (
-                                            <span className="text-[11px] text-muted-foreground tabular-nums">
+                                            <span className="text-xs text-muted-foreground tabular-nums">
                                                 {formatUSD(usd)}
                                             </span>
                                         )}
@@ -530,7 +531,7 @@ export default function CierreSueldoShow({
                         })}
                     </div>
                 </div>
-            </div>
+            </PageContainer>
         </>
     );
 }
@@ -605,7 +606,7 @@ function SocioDecisionRow({
                 <p className="truncate text-sm font-medium text-foreground">
                     {socio.user.name}
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                     Sueldo generado {formatARS(socio.sueldo_generado)}
                 </p>
             </div>
@@ -619,7 +620,7 @@ function SocioDecisionRow({
                     className={cn(
                         'inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed',
                         socio.abona
-                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                            ? 'bg-success-soft text-success-soft-foreground'
                             : 'bg-transparent text-muted-foreground hover:bg-muted',
                     )}
                 >
@@ -632,7 +633,7 @@ function SocioDecisionRow({
                     className={cn(
                         'inline-flex items-center gap-1 border-l border-border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed',
                         !socio.abona
-                            ? 'bg-red-500/15 text-red-500 dark:text-red-400'
+                            ? 'bg-destructive-soft text-destructive-soft-foreground'
                             : 'bg-transparent text-muted-foreground hover:bg-muted',
                     )}
                 >
@@ -644,7 +645,7 @@ function SocioDecisionRow({
             {socio.abona ? (
                 <div className="flex shrink-0 flex-col items-end">
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                             Abona
                         </span>
                         <input
@@ -664,7 +665,7 @@ function SocioDecisionRow({
                         />
                     </div>
                     {usd != null && (
-                        <span className="mt-0.5 text-[10px] text-muted-foreground tabular-nums">
+                        <span className="mt-0.5 text-xs text-muted-foreground tabular-nums">
                             {formatUSD(usd)}
                         </span>
                     )}
@@ -680,15 +681,9 @@ function SocioDecisionRow({
 
 const TONE = {
     orange: { icon: 'text-primary', bg: 'bg-primary/10' },
-    ok: {
-        icon: 'text-emerald-600 dark:text-emerald-400',
-        bg: 'bg-emerald-500/10',
-    },
-    info: { icon: 'text-sky-500 dark:text-sky-400', bg: 'bg-sky-500/10' },
-    violet: {
-        icon: 'text-violet-500 dark:text-violet-400',
-        bg: 'bg-violet-500/10',
-    },
+    ok: { icon: 'text-success', bg: 'bg-success-soft' },
+    info: { icon: 'text-info', bg: 'bg-info-soft' },
+    violet: { icon: 'text-info-soft-foreground', bg: 'bg-info-soft' },
 };
 
 function HeroStat({
@@ -712,7 +707,7 @@ function HeroStat({
     return (
         <div className="flex min-h-[132px] flex-col justify-between gap-2 rounded-2xl border border-border bg-card p-4 sm:p-5">
             <div className="flex items-center justify-between">
-                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                     {label}
                 </span>
                 <div
@@ -730,7 +725,7 @@ function HeroStat({
                     {formatARS(ars)}
                 </span>
                 {usd != null && (
-                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                         {formatUSD(usd)}
                     </span>
                 )}
@@ -755,31 +750,31 @@ function estadoSocio(detalles: Detalle[], abono: boolean) {
     if (deudorMedia || (deudorCero && abono)) {
         return {
             label: 'Deudor · abonó',
-            stripe: 'bg-amber-500/70',
-            badge: 'border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+            stripe: 'bg-warning/70',
+            badge: 'border-warning/25 bg-warning-soft text-warning-soft-foreground',
         };
     }
 
     if (deudorCero) {
         return {
             label: 'Deudor · sin abono',
-            stripe: 'bg-red-500/70',
-            badge: 'border-red-500/25 bg-red-500/10 text-red-500 dark:text-red-400',
+            stripe: 'bg-destructive/70',
+            badge: 'border-destructive/25 bg-destructive-soft text-destructive-soft-foreground',
         };
     }
 
     if (financia) {
         return {
             label: 'Financia',
-            stripe: 'bg-violet-500/70',
-            badge: 'border-violet-500/25 bg-violet-500/10 text-violet-500 dark:text-violet-400',
+            stripe: 'bg-info/70',
+            badge: 'border-info/25 bg-info-soft text-info-soft-foreground',
         };
     }
 
     return {
         label: 'Flota',
-        stripe: 'bg-emerald-500/50',
-        badge: 'border-emerald-500/20 bg-emerald-500/8 text-emerald-600 dark:text-emerald-400',
+        stripe: 'bg-success/50',
+        badge: 'border-success/20 bg-success-soft text-success-soft-foreground',
     };
 }
 
@@ -831,7 +826,7 @@ function EmpresaSection({
                 </div>
                 <div className="flex items-center gap-5">
                     <div className="flex flex-col items-end leading-tight">
-                        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                        <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                             Recaudado
                         </span>
                         <span className="text-sm font-semibold text-foreground tabular-nums">
@@ -839,10 +834,10 @@ function EmpresaSection({
                         </span>
                     </div>
                     <div className="flex flex-col items-end leading-tight">
-                        <span className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                        <span className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
                             Distribuido
                         </span>
-                        <span className="text-sm font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                        <span className="text-sm font-semibold text-success tabular-nums">
                             {formatARS(empresa.distribuido)}
                         </span>
                     </div>
@@ -899,7 +894,7 @@ function EmpresaSection({
                                                 </span>
                                                 <span
                                                     className={cn(
-                                                        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium',
+                                                        'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium',
                                                         estado.badge,
                                                     )}
                                                 >
@@ -907,13 +902,13 @@ function EmpresaSection({
                                                     {estado.label}
                                                 </span>
                                                 {abono && (
-                                                    <span className="inline-flex items-center rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                    <span className="inline-flex items-center rounded-md border border-success/25 bg-success-soft px-2 py-0.5 text-xs font-medium text-success-soft-foreground">
                                                         Abonó{' '}
                                                         {formatARS(abono.total)}
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
                                                 {row.detalles.length} inversión
                                                 {row.detalles.length !== 1
                                                     ? 'es'
@@ -928,7 +923,7 @@ function EmpresaSection({
                                                     {formatARS(row.total)}
                                                 </span>
                                                 {usd != null && (
-                                                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                                                    <span className="text-xs text-muted-foreground tabular-nums">
                                                         {formatUSD(usd)}
                                                     </span>
                                                 )}
@@ -959,7 +954,7 @@ function EmpresaSection({
                 {/* Recaudación por inversión */}
                 <div className="border-t border-border lg:border-t-0">
                     <div className="border-b border-border px-5 py-3">
-                        <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                             Recaudación por inversión
                         </p>
                     </div>
@@ -985,7 +980,7 @@ function EmpresaSection({
                                                 {formatARS(r.monto)}
                                             </span>
                                             {usd != null && (
-                                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                                <span className="text-xs text-muted-foreground tabular-nums">
                                                     {formatUSD(usd)}
                                                 </span>
                                             )}

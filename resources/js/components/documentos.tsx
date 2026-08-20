@@ -1,15 +1,16 @@
-import { useState, useMemo } from 'react';
 import { Camera, Copy, Crop, Download, FileText, Share2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { cn } from '@/lib/utils';
+import { useImageCropper  } from '@/components/image-cropper';
+import type {CropInput} from '@/components/image-cropper';
 import InputError from '@/components/input-error';
-import { useImageCropper, type CropInput } from '@/components/image-cropper';
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 
 export interface DocUrls {
     pdf: string | null;
@@ -33,26 +34,33 @@ const PDF_ACCEPT = { 'application/pdf': ['.pdf'] };
 async function shareDoc(url: string, name: string) {
     if (!navigator.share) {
         await navigator.clipboard.writeText(url);
+
         return 'copied';
     }
+
     try {
         const res = await fetch(url);
         const blob = await res.blob();
         const ext = blob.type.includes('pdf') ? '.pdf' : blob.type.includes('png') ? '.png' : '.jpg';
         const file = new File([blob], `${name}${ext}`, { type: blob.type });
+
         if (navigator.canShare?.({ files: [file] })) {
             await navigator.share({ files: [file], title: name });
+
             return 'shared';
         }
     } catch {
         // si falla el fetch o el canShare, intento con URL
     }
+
     try {
         await navigator.share({ url, title: name });
+
         return 'shared';
     } catch {
         // usuario canceló
     }
+
     return null;
 }
 
@@ -61,6 +69,7 @@ function ShareButton({ url, name, className }: { url: string; name: string; clas
 
     async function handleShare() {
         const result = await shareDoc(url, name);
+
         if (result === 'copied') {
             setState('copied');
             setTimeout(() => setState('idle'), 2000);
@@ -74,7 +83,7 @@ function ShareButton({ url, name, className }: { url: string; name: string; clas
             className={cn(
                 'inline-flex items-center gap-1 text-xs font-medium transition-colors',
                 state === 'copied'
-                    ? 'text-green-600 dark:text-green-400'
+                    ? 'text-success'
                     : 'text-muted-foreground hover:text-foreground',
                 className,
             )}
@@ -104,7 +113,11 @@ export function DocImageDropzone({
 
     async function handleCropDrop(files: File[]) {
         const f = files[0];
-        if (!f) return;
+
+        if (!f) {
+return;
+}
+
         try {
             onDrop([await cropImage(f)]);
         } catch {
@@ -118,7 +131,11 @@ export function DocImageDropzone({
             : existingUrl
               ? { url: existingUrl, name: label }
               : null;
-        if (!input) return;
+
+        if (!input) {
+return;
+}
+
         try {
             onDrop([await cropImage(input)]);
         } catch {
@@ -144,7 +161,7 @@ export function DocImageDropzone({
     return (
         <div className="flex flex-col gap-1">
             {cropperElement}
-            <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+            <span className="text-xs font-medium text-muted-foreground">{label}</span>
             <div
                 {...getRootProps()}
                 className={cn(
@@ -165,14 +182,14 @@ export function DocImageDropzone({
                             <button
                                 type="button"
                                 onClick={recropCurrent}
-                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white"
                             >
                                 <Crop className="h-3 w-3" /> Recortar
                             </button>
                             <button
                                 type="button"
                                 onClick={open}
-                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                                className="inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white"
                             >
                                 <Camera className="h-3 w-3" /> Reemplazar
                             </button>
@@ -185,7 +202,7 @@ export function DocImageDropzone({
                         className="flex h-full w-full flex-col items-center justify-center text-muted-foreground hover:text-foreground"
                     >
                         <Camera className="mb-1 h-5 w-5 opacity-50" />
-                        <span className="text-[10px] font-medium uppercase opacity-70">Subir</span>
+                        <span className="text-xs font-medium uppercase opacity-70">Subir</span>
                     </button>
                 )}
             </div>
@@ -196,11 +213,11 @@ export function DocImageDropzone({
                         download
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
                     >
                         <Download className="h-3 w-3" /> Descargar
                     </a>
-                    <ShareButton url={existingUrl!} name={label} className="text-[11px]" />
+                    <ShareButton url={existingUrl!} name={label} className="text-xs" />
                 </div>
             )}
         </div>
@@ -256,7 +273,7 @@ export function DocPdfDropzone({
                             className="pointer-events-none h-full w-full"
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
-                            <span className="rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-black">Ampliar</span>
+                            <span className="rounded bg-white/90 px-2 py-1 text-xs font-medium text-black">Ampliar</span>
                         </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">
@@ -355,7 +372,7 @@ export function DocumentSection({
             )}
 
             {mode === 'imagenes' && (
-                <p className="text-[11px] text-muted-foreground">Podés subir el frente y el dorso por separado (una cara ahora y la otra más adelante).</p>
+                <p className="text-xs text-muted-foreground">Podés subir el frente y el dorso por separado (una cara ahora y la otra más adelante).</p>
             )}
 
             <InputError message={error} />
@@ -385,7 +402,11 @@ export function DocSingleDropzone({
 
     async function handleDrop(files: File[]) {
         const f = files[0];
-        if (!f) return;
+
+        if (!f) {
+return;
+}
+
         // Solo las imágenes pasan por el editor de recorte; los PDF van directo.
         if (f.type.startsWith('image/')) {
             try {
@@ -393,8 +414,10 @@ export function DocSingleDropzone({
             } catch {
                 // recorte cancelado
             }
+
             return;
         }
+
         onDrop(files);
     }
 
@@ -404,7 +427,11 @@ export function DocSingleDropzone({
             : existingUrl
               ? { url: existingUrl, name: title }
               : null;
-        if (!input) return;
+
+        if (!input) {
+return;
+}
+
         try {
             onDrop([await cropImage(input)]);
         } catch {
@@ -453,7 +480,7 @@ export function DocSingleDropzone({
                             <img src={previewUrl} alt={title} className="h-full w-full object-cover" />
                         )}
                         <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
-                            <span className="rounded bg-white/90 px-2 py-1 text-[11px] font-medium text-black">Ampliar</span>
+                            <span className="rounded bg-white/90 px-2 py-1 text-xs font-medium text-black">Ampliar</span>
                         </div>
                     </div>
                     <div className="flex items-center justify-between gap-2">

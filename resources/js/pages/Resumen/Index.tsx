@@ -12,6 +12,7 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -131,6 +132,7 @@ function SortHeader<T extends string>({
             ? ChevronUp
             : ChevronDown
         : ChevronsUpDown;
+
     return (
         <th className={cn('px-3 py-2 font-medium', right && 'text-right')}>
             <button
@@ -169,7 +171,7 @@ function StatCard({
             <span
                 className={cn(
                     'text-lg font-bold tabular-nums',
-                    negative ? 'text-red-600' : 'text-foreground',
+                    negative ? 'text-destructive' : 'text-foreground',
                 )}
             >
                 {formatARS(value)}
@@ -212,16 +214,26 @@ export default function ResumenIndex({
 
     // Si cambian los filtros (nuevos datos del servidor), la selección deja
     // de tener sentido: se limpia para no exportar filas que ya no se ven.
-    useEffect(() => {
+    // Va durante el render y no en un efecto, para que no quede un commit
+    // intermedio con filas marcadas que ya no existen.
+    const [resumenPrevio, setResumenPrevio] = useState(resumen);
+
+    if (resumen !== resumenPrevio) {
+        setResumenPrevio(resumen);
         setSelectedVehiculos(new Set());
         setSelectedTipos(new Set());
-    }, [resumen]);
+    }
 
     function toggleVehiculo(id: number) {
         setSelectedVehiculos((prev) => {
             const next = new Set(prev);
-            if (next.has(id)) next.delete(id);
-            else next.add(id);
+
+            if (next.has(id)) {
+next.delete(id);
+} else {
+next.add(id);
+}
+
             return next;
         });
     }
@@ -231,11 +243,13 @@ export default function ResumenIndex({
         const visibleIds = sortedPorVehiculo.map((f) => f.vehiculo_id);
         setSelectedVehiculos((prev) => {
             const next = new Set(prev);
+
             if (visibleIds.every((id) => next.has(id))) {
                 visibleIds.forEach((id) => next.delete(id));
             } else {
                 visibleIds.forEach((id) => next.add(id));
             }
+
             return next;
         });
     }
@@ -243,8 +257,13 @@ export default function ResumenIndex({
     function toggleTipo(t: string) {
         setSelectedTipos((prev) => {
             const next = new Set(prev);
-            if (next.has(t)) next.delete(t);
-            else next.add(t);
+
+            if (next.has(t)) {
+next.delete(t);
+} else {
+next.add(t);
+}
+
             return next;
         });
     }
@@ -266,6 +285,7 @@ export default function ResumenIndex({
         const filas = resumen.por_vehiculo.filter((f) =>
             selectedVehiculos.has(f.vehiculo_id),
         );
+
         return {
             ingresos: filas.reduce((s, f) => s + f.ingresos, 0),
             egresos: filas.reduce((s, f) => s + f.egresos, 0),
@@ -327,10 +347,16 @@ export default function ResumenIndex({
                       (f.chofer_nombre ?? '').toLowerCase().includes(q),
               )
             : resumen.por_vehiculo;
-        if (!sortVehiculoKey) return base;
+
+        if (!sortVehiculoKey) {
+return base;
+}
+
         const dir = sortVehiculoDir === 'asc' ? 1 : -1;
+
         return [...base].sort((a, b) => {
             let cmp = 0;
+
             switch (sortVehiculoKey) {
                 case 'patente':
                     cmp = a.patente.localeCompare(b.patente, 'es', {
@@ -373,6 +399,7 @@ export default function ResumenIndex({
                     cmp = a.neto - b.neto;
                     break;
             }
+
             return cmp * dir;
         });
     }, [
@@ -395,10 +422,15 @@ export default function ResumenIndex({
     );
 
     const sortedPorTipo = useMemo(() => {
-        if (!sortTipoKey) return resumen.por_tipo;
+        if (!sortTipoKey) {
+return resumen.por_tipo;
+}
+
         const dir = sortTipoDir === 'asc' ? 1 : -1;
+
         return [...resumen.por_tipo].sort((a, b) => {
             let cmp = 0;
+
             switch (sortTipoKey) {
                 case 'categoria':
                     cmp = a.label.localeCompare(b.label, 'es');
@@ -410,6 +442,7 @@ export default function ResumenIndex({
                     cmp = a.porcentaje - b.porcentaje;
                     break;
             }
+
             return cmp * dir;
         });
     }, [resumen.por_tipo, sortTipoKey, sortTipoDir]);
@@ -531,6 +564,7 @@ export default function ResumenIndex({
             p.append('sel_vehiculo_ids[]', String(id)),
         );
         selectedTipos.forEach((t) => p.append('sel_tipos[]', t));
+
         return p.toString();
     }, [exportQs, selectedVehiculos, selectedTipos]);
 
@@ -540,11 +574,8 @@ export default function ResumenIndex({
         <>
             <Head title="Resumen" />
 
-            <div
-                className={cn(
-                    'flex h-full flex-1 flex-col gap-4 p-4',
-                    totalSeleccionados > 0 && 'pb-24',
-                )}
+            <PageContainer
+                className={cn(totalSeleccionados > 0 && 'pb-24')}
             >
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -804,7 +835,7 @@ export default function ResumenIndex({
                     ) : (
                         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                     <tr>
                                         <th className="w-8 px-3 py-2">
                                             <Checkbox
@@ -939,7 +970,7 @@ export default function ResumenIndex({
                                                 className={cn(
                                                     'px-3 py-2 text-right font-bold whitespace-nowrap tabular-nums',
                                                     f.neto < 0
-                                                        ? 'text-red-600'
+                                                        ? 'text-destructive'
                                                         : 'text-foreground',
                                                 )}
                                             >
@@ -972,7 +1003,7 @@ export default function ResumenIndex({
                     ) : (
                         <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                     <tr>
                                         <th className="w-8 px-3 py-2">
                                             <Checkbox
@@ -1054,7 +1085,7 @@ export default function ResumenIndex({
                         </div>
                     )}
                 </div>
-            </div>
+            </PageContainer>
 
             {/* Barra flotante: aparece con selección activa, para pedir el reporte de exactamente lo tildado */}
             {totalSeleccionados > 0 && (
@@ -1088,7 +1119,7 @@ export default function ResumenIndex({
                                 className={cn(
                                     'text-sm font-bold tabular-nums',
                                     seleccionVehiculo.neto < 0
-                                        ? 'text-red-600'
+                                        ? 'text-destructive'
                                         : 'text-foreground',
                                 )}
                             >

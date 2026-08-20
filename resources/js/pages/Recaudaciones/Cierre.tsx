@@ -1,6 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { ChevronDown, ClipboardList, Download, FileDown, FileSpreadsheet, History } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { formatDate, RecaudacionesTabla, ResumenRecaudacionModal } from '@/components/recaudaciones-tabla';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,10 +35,21 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
 
     function exportQuery(): string {
         const p = new URLSearchParams();
-        if (exportFiltros.q.trim()) p.set('q', exportFiltros.q.trim());
-        if (exportFiltros.estado !== 'all') p.set('estado', exportFiltros.estado);
-        if (exportFiltros.metodo !== 'all') p.set('metodo', exportFiltros.metodo);
+
+        if (exportFiltros.q.trim()) {
+p.set('q', exportFiltros.q.trim());
+}
+
+        if (exportFiltros.estado !== 'all') {
+p.set('estado', exportFiltros.estado);
+}
+
+        if (exportFiltros.metodo !== 'all') {
+p.set('metodo', exportFiltros.metodo);
+}
+
         const qs = p.toString();
+
         return qs ? `?${qs}` : '';
     }
 
@@ -45,7 +57,7 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
         <>
             <Head title={`Cierre #${cierre.id}`} />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
@@ -116,7 +128,7 @@ export default function RecaudacionesCierre({ cierre, filas, totalGeneral }: Pro
                         onFiltrosChange={setExportFiltros}
                     />
                 )}
-            </div>
+            </PageContainer>
 
             {/* Modal resumen por inversión */}
             <ResumenRecaudacionModal

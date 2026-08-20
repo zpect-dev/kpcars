@@ -1,129 +1,81 @@
 import { Head, router, usePage, useForm } from '@inertiajs/react';
-import { useMemo, useState, useEffect } from 'react';
 import {
-    ArrowDown,
-    ArrowUp,
-    ArrowUpDown,
     Check,
     ChevronDown,
-    Crop,
     Download,
     Filter,
     Plus,
-    Search,
-    Camera,
     UserPlus,
     UserCog,
-    Trash2,
 } from 'lucide-react';
-import type { MouseEvent } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useMemo, useState, useEffect } from 'react';
+import { ConfirmDialog } from '@/components/app/confirm-dialog';
+import { EmptyState } from '@/components/app/empty-state';
+import { SearchInput } from '@/components/app/filter-bar';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
+import {
+    DepositoCuentaDialog,
+    formatSaldos,
+} from '@/components/deposito-cuenta-dialog';
+import type { TipoMovimientoOption } from '@/components/deposito-cuenta-dialog';
+import {
+    DocumentSection,
+    DocPreviewDialog
+    
+} from '@/components/documentos';
+import type {DocMode} from '@/components/documentos';
+import InputError from '@/components/input-error';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
-    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
-import InputError from '@/components/input-error';
-import { cn } from '@/lib/utils';
-
-import { index as usersIndex, updateRole, store } from '@/routes/users';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { AvatarDropzone } from '@/components/users/avatar-dropzone';
 import {
-    DocumentSection,
-    DocPreviewDialog,
-    type DocUrls,
-    type DocMode,
-} from '@/components/documentos';
-import { useImageCropper, type CropInput } from '@/components/image-cropper';
+    DepositosField,
+    FilterPopoverItem,
+    SortHeader,
+} from '@/components/users/campos';
 import {
-    DepositoCuentaDialog,
-    formatSaldos,
-    saldoTotalARS,
-    type CuentaDeposito,
-    type TipoMovimientoOption,
-} from '@/components/deposito-cuenta-dialog';
-
-/** Fila del depósito inicial que se carga en el alta del chofer. */
-interface DepositoInicial {
-    monto: number;
-    moneda: string;
-    fecha: string;
-}
-
-interface InversionAsignada {
-    id: number;
-    nombre: string;
-    empresa: { id: number; nombre: string } | null;
-    pivot: {
-        es_financiador: boolean | number;
-        deuda: string | number;
-        es_deudor?: boolean | number;
-    };
-}
-
-interface User {
-    id: number;
-    name: string;
-    dni: string;
-    role: string;
-    inactivo: boolean;
-    estado_actualizado_en?: string | null;
-    created_at?: string | null;
-    alta_fecha?: string | null;
-    baja_fecha?: string | null;
-    correo?: string | null;
-    telefono?: string | null;
-    direccion?: string | null;
-    fecha_ingreso?: string | null;
-    fecha_vencimiento_licencia?: string | null;
-    profile_photo_url?: string | null;
-    empresa_default_id?: number | null;
-    empresa_restringida_id?: number | null;
-    empresas?: { id: number; nombre: string }[];
-    inversiones?: InversionAsignada[];
-    /** Cuenta de depósito (garantía): saldo por moneda + extracto. */
-    deposito?: CuentaDeposito | null;
-    documentos?: {
-        licencia: DocUrls;
-        dni: DocUrls;
-    };
-    vehiculo?: {
-        patente: string;
-        marca: string;
-        modelo: string;
-        precio?: number;
-    } | null;
-    licencia_por_vencer?: boolean;
-    sin_licencia?: boolean;
-    falta_foto?: boolean;
-}
-
-interface RoleOption {
-    value: string;
-    label: string;
-}
-
-interface Empresa {
-    id: number;
-    nombre: string;
-}
-
-interface MonedaOption {
-    value: string;
-    label: string;
-    symbol: string;
-}
+    coincideAlerta,
+    coincideBusqueda,
+    depositoTotalARS,
+    estadoFecha,
+    formatEstadoFecha,
+    formatLicenciaFecha,
+    getSortValue,
+    faltaAlgunDocChofer,
+    faltaDocDni,
+    faltaDocLicencia,
+    FILTER_SECTIONS,
+    parseLicenciaDate,
+    FILTER_SHORT_LABELS,
+    sinDeposito,
+    sinDireccion,
+} from '@/components/users/logica';
+import type {
+    DepositoInicial,
+    Empresa,
+    FilterAlertValue,
+    MonedaOption,
+    RoleOption,
+    SortField,
+    User,
+} from '@/components/users/tipos';
+import { cn } from '@/lib/utils';
+import { index as usersIndex, updateRole, store } from '@/routes/users';
 
 interface Props {
     users: User[];
@@ -136,475 +88,6 @@ interface Props {
     puedeConfigInversiones?: boolean;
 }
 
-function AvatarDropzone({
-    file,
-    currentUrl,
-    onDrop,
-}: {
-    file: File | null;
-    currentUrl?: string | null;
-    onDrop: (files: File[]) => void;
-}) {
-    const { cropImage, cropperElement } = useImageCropper();
-
-    async function handleDrop(files: File[]) {
-        const f = files[0];
-        if (!f) return;
-        try {
-            onDrop([await cropImage(f)]);
-        } catch {
-            // recorte cancelado: no cambia nada
-        }
-    }
-
-    const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
-        onDrop: handleDrop,
-        accept: {
-            'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
-        },
-        maxFiles: 1,
-        multiple: false,
-        noClick: true,
-    });
-
-    const previewUrl = useMemo(
-        () => (file ? URL.createObjectURL(file) : currentUrl),
-        [file, currentUrl],
-    );
-
-    async function recropCurrent(e: MouseEvent) {
-        e.stopPropagation();
-        const input: CropInput | null = file
-            ? file
-            : currentUrl
-              ? { url: currentUrl, name: 'avatar' }
-              : null;
-        if (!input) return;
-        try {
-            onDrop([await cropImage(input)]);
-        } catch {
-            // recorte cancelado: no cambia nada
-        }
-    }
-
-    return (
-        <>
-            {cropperElement}
-            <div
-                {...getRootProps()}
-                onClick={open}
-                className={`group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 transition-colors ${isDragActive ? 'border-solid border-primary bg-primary/10' : 'border-dashed border-border bg-muted hover:border-primary/50'}`}
-            >
-                <input {...getInputProps()} />
-                {previewUrl ? (
-                    <>
-                        <img
-                            src={previewUrl}
-                            alt="Avatar"
-                            className="h-full w-full bg-muted object-cover"
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                            <span title="Reemplazar" className="text-white">
-                                <Camera className="h-5 w-5" />
-                            </span>
-                            <button
-                                type="button"
-                                onClick={recropCurrent}
-                                title="Recortar"
-                                className="text-white transition-transform hover:scale-110"
-                            >
-                                <Crop className="h-5 w-5" />
-                            </button>
-                        </div>
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center text-muted-foreground outline-none">
-                        <Camera className="mb-1 h-6 w-6 opacity-50 transition-opacity group-hover:opacity-100" />
-                        <span className="text-[10px] font-medium uppercase opacity-70 group-hover:opacity-100">
-                            Subir
-                        </span>
-                    </div>
-                )}
-            </div>
-        </>
-    );
-}
-
-type FilterAlertValue =
-    | 'all'
-    | 'licencia_vencida'
-    | 'licencia_por_vencer'
-    | 'sin_licencia'
-    | 'falta_foto'
-    | 'falta_telefono'
-    | 'falta_correo'
-    | 'falta_direccion'
-    | 'con_direccion'
-    | 'falta_deposito'
-    | 'deposito_bajo'
-    | 'falta_docs'
-    | 'falta_doc_dni'
-    | 'falta_doc_licencia';
-
-const FILTER_SHORT_LABELS: Record<FilterAlertValue, string> = {
-    all: 'Todos',
-    licencia_vencida: 'Lic. vencida',
-    licencia_por_vencer: 'Lic. por vencer',
-    sin_licencia: 'Sin licencia',
-    falta_foto: 'Sin foto',
-    falta_telefono: 'Sin teléfono',
-    falta_correo: 'Sin correo',
-    falta_direccion: 'Sin dirección',
-    con_direccion: 'Con dirección',
-    falta_deposito: 'Sin depósito',
-    deposito_bajo: 'Depósito bajo',
-    falta_docs: 'Faltan documentos',
-    falta_doc_dni: 'Sin foto DNI',
-    falta_doc_licencia: 'Sin foto licencia',
-};
-
-const FILTER_SECTIONS: {
-    label: string;
-    items: { val: FilterAlertValue; label: string; desc: string }[];
-}[] = [
-    {
-        label: 'Licencia',
-        items: [
-            {
-                val: 'licencia_vencida',
-                label: 'Vencida',
-                desc: 'La licencia ya está vencida',
-            },
-            {
-                val: 'licencia_por_vencer',
-                label: 'Próxima a vencer',
-                desc: 'Vence en los próximos 30 días',
-            },
-            {
-                val: 'sin_licencia',
-                label: 'Sin fecha cargada',
-                desc: 'No tiene vencimiento registrado',
-            },
-        ],
-    },
-    {
-        label: 'Documentos',
-        items: [
-            {
-                val: 'falta_docs',
-                label: 'Faltan documentos',
-                desc: 'Le falta el DNI, la licencia o la foto de perfil',
-            },
-            {
-                val: 'falta_doc_dni',
-                label: 'Sin foto de DNI',
-                desc: 'Le falta frente o dorso del DNI',
-            },
-            {
-                val: 'falta_doc_licencia',
-                label: 'Sin foto de licencia',
-                desc: 'No tiene foto ni PDF de licencia cargado',
-            },
-        ],
-    },
-    {
-        label: 'Contacto',
-        items: [
-            {
-                val: 'falta_foto',
-                label: 'Sin foto de perfil',
-                desc: 'Sin imagen de identificación',
-            },
-            {
-                val: 'falta_telefono',
-                label: 'Sin teléfono',
-                desc: 'Sin número de contacto',
-            },
-            {
-                val: 'falta_correo',
-                label: 'Sin correo',
-                desc: 'Sin dirección de email',
-            },
-        ],
-    },
-    {
-        label: 'Domicilio',
-        items: [
-            {
-                val: 'falta_direccion',
-                label: 'Sin dirección',
-                desc: 'No tiene domicilio cargado',
-            },
-            {
-                val: 'con_direccion',
-                label: 'Con dirección',
-                desc: 'Tiene el domicilio cargado',
-            },
-        ],
-    },
-    {
-        label: 'Garantía',
-        items: [
-            {
-                val: 'falta_deposito',
-                label: 'Sin depósito',
-                desc: 'Sin garantía registrada',
-            },
-            {
-                val: 'deposito_bajo',
-                label: 'Depósito bajo',
-                desc: 'Total (ARS + USD convertido) menor a 1.5× el valor del auto',
-            },
-        ],
-    },
-];
-
-function FilterPopoverItem({
-    label,
-    desc,
-    count,
-    isActive,
-    onClick,
-}: {
-    label: string;
-    desc?: string;
-    count: number;
-    isActive: boolean;
-    onClick: () => void;
-}) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-                'flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors',
-                isActive ? 'bg-muted' : 'hover:bg-muted/60',
-            )}
-        >
-            <div
-                className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
-                    isActive
-                        ? 'border-foreground bg-foreground'
-                        : 'border-border bg-transparent',
-                )}
-            >
-                {isActive && <Check className="h-3 w-3 text-background" />}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col">
-                <span
-                    className={cn(
-                        'text-sm leading-tight',
-                        isActive
-                            ? 'font-semibold text-foreground'
-                            : 'text-foreground',
-                    )}
-                >
-                    {label}
-                </span>
-                {desc && (
-                    <span className="mt-0.5 text-xs leading-tight text-muted-foreground">
-                        {desc}
-                    </span>
-                )}
-            </div>
-            <span
-                className={cn(
-                    'shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums',
-                    isActive
-                        ? 'bg-background text-foreground'
-                        : 'bg-muted text-muted-foreground',
-                )}
-            >
-                {count}
-            </span>
-        </button>
-    );
-}
-
-type SortField =
-    | 'nombre'
-    | 'dni'
-    | 'licencia'
-    | 'estado'
-    | 'fecha_estado'
-    | 'deposito'
-    | 'vehiculo';
-
-function SortHeader({
-    label,
-    field,
-    sortField,
-    sortDir,
-    onSort,
-}: {
-    label: string;
-    field: SortField;
-    sortField: SortField | null;
-    sortDir: 'asc' | 'desc';
-    onSort: (field: SortField) => void;
-}) {
-    const active = sortField === field;
-    return (
-        <button
-            type="button"
-            onClick={() => onSort(field)}
-            className={cn(
-                'inline-flex items-center gap-1 transition-colors hover:text-foreground',
-                active && 'text-foreground',
-            )}
-        >
-            {label}
-            {active ? (
-                sortDir === 'asc' ? (
-                    <ArrowUp className="h-3.5 w-3.5" />
-                ) : (
-                    <ArrowDown className="h-3.5 w-3.5" />
-                )
-            ) : (
-                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-            )}
-        </button>
-    );
-}
-
-/**
- * Repetidor del depósito inicial (monto + moneda + fecha) para el alta del
- * chofer. Después del alta la cuenta se mueve desde el extracto: los ingresos
- * se suman, nunca reemplazan al anterior.
- */
-function DepositosField({
-    depositos,
-    monedas,
-    onChange,
-    error,
-}: {
-    depositos: DepositoInicial[];
-    monedas: MonedaOption[];
-    onChange: (d: DepositoInicial[]) => void;
-    error?: string;
-}) {
-    const hoy = new Date().toISOString().slice(0, 10);
-
-    function agregar() {
-        const usadas = new Set(depositos.map((d) => d.moneda));
-        const libre =
-            monedas.find((m) => !usadas.has(m.value))?.value ??
-            monedas[0]?.value ??
-            'ARS';
-        onChange([...depositos, { monto: 0, moneda: libre, fecha: hoy }]);
-    }
-    function actualizar(i: number, patch: Partial<DepositoInicial>) {
-        onChange(
-            depositos.map((d, idx) => (idx === i ? { ...d, ...patch } : d)),
-        );
-    }
-    function quitar(i: number) {
-        onChange(depositos.filter((_, idx) => idx !== i));
-    }
-
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-                <Label>Depósito inicial (garantía)</Label>
-                <button
-                    type="button"
-                    onClick={agregar}
-                    className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <Plus className="h-3.5 w-3.5" /> Agregar
-                </button>
-            </div>
-
-            {depositos.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                    Sin depósito cargado. Puede ser parcial: después se agregan
-                    más entregas desde la cuenta.
-                </p>
-            ) : (
-                depositos.map((d, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                        <MoneyInput
-                            value={d.monto || null}
-                            onValueChange={(n) =>
-                                actualizar(i, { monto: n ?? 0 })
-                            }
-                            placeholder="0,00"
-                            className="flex-1"
-                        />
-                        <Input
-                            type="date"
-                            value={d.fecha}
-                            onChange={(e) =>
-                                actualizar(i, { fecha: e.target.value })
-                            }
-                            className="w-36"
-                        />
-                        <select
-                            value={d.moneda}
-                            onChange={(e) =>
-                                actualizar(i, { moneda: e.target.value })
-                            }
-                            className="flex h-9 w-24 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                        >
-                            {monedas.map((m) => (
-                                <option
-                                    key={m.value}
-                                    value={m.value}
-                                    className="bg-background text-foreground"
-                                >
-                                    {m.value}
-                                </option>
-                            ))}
-                        </select>
-                        <button
-                            type="button"
-                            onClick={() => quitar(i)}
-                            title="Quitar"
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </button>
-                    </div>
-                ))
-            )}
-            {error && <InputError message={error} />}
-        </div>
-    );
-}
-
-/** Saldo total de la cuenta de depósito expresado en ARS (USD × cotización). */
-function depositoTotalARS(u: User, cotizacion: number): number {
-    return saldoTotalARS(u.deposito, cotizacion);
-}
-
-/**
- * El chofer no tiene depósito respaldando: nunca cargó o el saldo quedó
- * consumido por retiros y descuentos de multas.
- */
-function sinDeposito(u: User): boolean {
-    return (u.deposito?.saldos ?? []).every((s) => s.saldo <= 0);
-}
-
-/** Al chofer le falta el DNI (frente o dorso sin cargar). */
-function faltaDocDni(u: User): boolean {
-    return !u.documentos?.dni?.frente || !u.documentos?.dni?.dorso;
-}
-
-/** Al chofer le falta la licencia (sin foto de frente ni PDF). */
-function faltaDocLicencia(u: User): boolean {
-    return !u.documentos?.licencia?.frente && !u.documentos?.licencia?.pdf;
-}
-
-/** El chofer no tiene domicilio cargado (nulo o sólo espacios). */
-function sinDireccion(u: User): boolean {
-    return !u.direccion?.trim();
-}
-
-/** Al chofer le falta algún documento: DNI, licencia o foto de perfil. */
-function faltaAlgunDocChofer(u: User): boolean {
-    return faltaDocDni(u) || faltaDocLicencia(u) || u.falta_foto === true;
-}
 
 export default function UsersIndex({
     users,
@@ -640,105 +123,74 @@ export default function UsersIndex({
 
     function buildChoferesPdfUrl() {
         const p = new URLSearchParams();
-        if (filterStatus) p.set('status', filterStatus);
-        if (searchTerm.trim()) p.set('q', searchTerm.trim());
-        if (filterAlert !== 'all') p.set('alert', filterAlert);
+
+        if (filterStatus) {
+p.set('status', filterStatus);
+}
+
+        if (searchTerm.trim()) {
+p.set('q', searchTerm.trim());
+}
+
+        if (filterAlert !== 'all') {
+p.set('alert', filterAlert);
+}
+
         const qs = p.toString();
+
         return `/users/choferes/pdf${qs ? `?${qs}` : ''}`;
     }
 
-    const filteredUsers = useMemo(() => {
-        let result = users;
-        if (searchTerm) {
-            const q = searchTerm.toLowerCase();
-            result = result.filter(
-                (u) =>
-                    u.name.toLowerCase().includes(q) ||
-                    u.dni.toLowerCase().includes(q) ||
-                    (u.vehiculo?.patente?.toLowerCase().includes(q) ?? false),
-            );
-        }
-        if (filterRole === 'chofer' && filterAlert !== 'all') {
-            result = result.filter((u) => {
-                if (filterAlert === 'licencia_vencida') {
-                    if (!u.fecha_vencimiento_licencia) return false;
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return (
-                        parseLicenciaDate(u.fecha_vencimiento_licencia) < today
-                    );
+    const filteredUsers = useMemo(
+        () =>
+            // Un solo filter con predicados puros: encadenar reasignaciones de
+            // `users` hacía que el compilador de React no pudiera preservar
+            // esta memoización y descartara el componente entero.
+            users.filter((u) => {
+                if (searchTerm && !coincideBusqueda(u, searchTerm)) {
+                    return false;
                 }
-                if (filterAlert === 'licencia_por_vencer')
-                    return u.licencia_por_vencer === true;
-                if (filterAlert === 'sin_licencia')
-                    return u.sin_licencia === true;
-                if (filterAlert === 'falta_foto') return u.falta_foto === true;
-                if (filterAlert === 'falta_docs') return faltaAlgunDocChofer(u);
-                if (filterAlert === 'falta_doc_dni') return faltaDocDni(u);
-                if (filterAlert === 'falta_doc_licencia')
-                    return faltaDocLicencia(u);
-                if (filterAlert === 'falta_telefono') return !u.telefono;
-                if (filterAlert === 'falta_correo') return !u.correo;
-                if (filterAlert === 'falta_direccion') return sinDireccion(u);
-                if (filterAlert === 'con_direccion') return !sinDireccion(u);
-                if (filterAlert === 'falta_deposito') return sinDeposito(u);
-                if (filterAlert === 'deposito_bajo') {
-                    if (!u.vehiculo?.precio) return false;
-                    return (
-                        depositoTotalARS(u, cotizacionDolar) <
-                        1.5 * u.vehiculo.precio
-                    );
-                }
-                return true;
-            });
-        }
-        return result;
-    }, [users, searchTerm, filterAlert, filterRole, cotizacionDolar]);
 
-    function getSortValue(
-        user: User,
-        field: SortField,
-    ): string | number | null {
-        switch (field) {
-            case 'nombre':
-                return user.name?.toLowerCase() ?? '';
-            case 'dni':
-                return user.dni ?? '';
-            case 'licencia':
-                return user.fecha_vencimiento_licencia
-                    ? parseLicenciaDate(
-                          user.fecha_vencimiento_licencia,
-                      ).getTime()
-                    : null;
-            case 'estado':
-                return user.inactivo ? 1 : 0;
-            case 'fecha_estado': {
-                const fecha = estadoFecha(user);
-                if (!fecha) return null;
-                const parsed = new Date(fecha);
-                return isNaN(parsed.getTime()) ? null : parsed.getTime();
-            }
-            case 'deposito':
-                return depositoTotalARS(user, cotizacionDolar);
-            case 'vehiculo':
-                return user.vehiculo?.patente?.toLowerCase() ?? null;
-            default:
-                return null;
-        }
-    }
+                if (
+                    filterRole === 'chofer' &&
+                    filterAlert !== 'all' &&
+                    !coincideAlerta(u, filterAlert, cotizacionDolar)
+                ) {
+                    return false;
+                }
+
+                return true;
+            }),
+        [users, searchTerm, filterAlert, filterRole, cotizacionDolar],
+    );
 
     const sortedUsers = useMemo(() => {
-        if (!sortField) return filteredUsers;
+        if (!sortField) {
+return filteredUsers;
+}
+
         const dir = sortDir === 'asc' ? 1 : -1;
+
         return [...filteredUsers].sort((a, b) => {
-            const va = getSortValue(a, sortField);
-            const vb = getSortValue(b, sortField);
-            if (va == null && vb == null) return 0;
-            if (va == null) return 1;
-            if (vb == null) return -1;
+            const va = getSortValue(a, sortField, cotizacionDolar);
+            const vb = getSortValue(b, sortField, cotizacionDolar);
+
+            if (va == null && vb == null) {
+return 0;
+}
+
+            if (va == null) {
+return 1;
+}
+
+            if (vb == null) {
+return -1;
+}
+
             if (typeof va === 'string' && typeof vb === 'string') {
                 return va.localeCompare(vb, 'es', { numeric: true }) * dir;
             }
+
             return ((va as number) - (vb as number)) * dir;
         });
     }, [filteredUsers, sortField, sortDir, cotizacionDolar]);
@@ -753,8 +205,8 @@ export default function UsersIndex({
     }
 
     const alertCounts = useMemo(() => {
-        if (filterRole !== 'chofer')
-            return {
+        if (filterRole !== 'chofer') {
+return {
                 licencia_vencida: 0,
                 licencia_por_vencer: 0,
                 sin_licencia: 0,
@@ -769,11 +221,17 @@ export default function UsersIndex({
                 falta_deposito: 0,
                 deposito_bajo: 0,
             };
+}
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+
         return {
             licencia_vencida: users.filter((u) => {
-                if (!u.fecha_vencimiento_licencia) return false;
+                if (!u.fecha_vencimiento_licencia) {
+return false;
+}
+
                 return parseLicenciaDate(u.fecha_vencimiento_licencia) < today;
             }).length,
             licencia_por_vencer: users.filter((u) => u.licencia_por_vencer)
@@ -789,7 +247,10 @@ export default function UsersIndex({
             con_direccion: users.filter((u) => !sinDireccion(u)).length,
             falta_deposito: users.filter((u) => sinDeposito(u)).length,
             deposito_bajo: users.filter((u) => {
-                if (!u.vehiculo?.precio) return false;
+                if (!u.vehiculo?.precio) {
+return false;
+}
+
                 return (
                     depositoTotalARS(u, cotizacionDolar) <
                     1.5 * u.vehiculo.precio
@@ -799,12 +260,18 @@ export default function UsersIndex({
     }, [users, filterRole, cotizacionDolar]);
 
     function confirmToggleStatus(user: User) {
-        if (user.id === auth.user.id) return;
+        if (user.id === auth.user.id) {
+return;
+}
+
         setUserToToggle(user);
     }
 
     function executeToggleStatus() {
-        if (!userToToggle) return;
+        if (!userToToggle) {
+return;
+}
+
         router.patch(
             `/users/${userToToggle.id}/toggle-status`,
             {},
@@ -926,7 +393,10 @@ export default function UsersIndex({
 
     function handleEditSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!userToEdit) return;
+
+        if (!userToEdit) {
+return;
+}
 
         editForm.post(`/users/${userToEdit.id}`, {
             onSuccess: () => closeEditModal(),
@@ -965,6 +435,7 @@ export default function UsersIndex({
         mode: DocMode,
     ) {
         setMode(mode);
+
         if (mode === 'pdf') {
             form.setData(`${tipo}_frente`, null);
             form.setData(`${tipo}_dorso`, null);
@@ -979,7 +450,9 @@ export default function UsersIndex({
 
         // Si no tiene el 54 al inicio, intentamos agregarlo o mantenerlo simple
         // Pero basándonos en tu requerimiento: +54 9 11 2585-9685
-        if (digits.length <= 2) return '+54 ';
+        if (digits.length <= 2) {
+return '+54 ';
+}
 
         let formatted = '+54 ';
         const rest = digits.slice(2); // Lo que viene después del 54
@@ -987,12 +460,15 @@ export default function UsersIndex({
         if (rest.length > 0) {
             // El 9 (móvil)
             formatted += rest.slice(0, 1);
+
             if (rest.length > 1) {
                 // Espacio y el 11 (área)
                 formatted += ' ' + rest.slice(1, 3);
+
                 if (rest.length > 3) {
                     // Espacio y los primeros 4 del número
                     formatted += ' ' + rest.slice(3, 7);
+
                     if (rest.length > 7) {
                         // Guion y los últimos 4
                         formatted += '-' + rest.slice(7, 11);
@@ -1000,6 +476,7 @@ export default function UsersIndex({
                 }
             }
         }
+
         return formatted;
     }
 
@@ -1011,64 +488,42 @@ export default function UsersIndex({
     // Fecha a mostrar en la columna Alta/Baja, tomada de la auditoría
     // (chofer_eventos) — misma fuente que el reporte y editable desde el modal.
     // Fallback a los campos del usuario por si un chofer no tuviera eventos.
-    function estadoFecha(user: User): string | null {
-        if (user.inactivo)
-            return user.baja_fecha ?? user.estado_actualizado_en ?? null;
-        return user.alta_fecha ?? user.created_at ?? null;
-    }
 
-    function formatEstadoFecha(fechaStr?: string | null): string | null {
-        if (!fechaStr) return null;
-        const fecha = new Date(fechaStr);
-        if (isNaN(fecha.getTime())) return null;
-        return fecha.toLocaleDateString('es-AR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-        });
-    }
 
-    function parseLicenciaDate(fechaStr: string): Date {
-        const datePart = fechaStr.split('T')[0].split(' ')[0];
-        const [year, month, day] = datePart.split('-').map(Number);
-        return new Date(year, month - 1, day);
-    }
 
-    function formatLicenciaFecha(fechaStr: string): string {
-        return parseLicenciaDate(fechaStr).toLocaleDateString('es-AR', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
-    }
 
     function getLicenciaStatus(fechaStr: string | null | undefined) {
-        if (!fechaStr) return null;
+        if (!fechaStr) {
+return null;
+}
+
         const fecha = parseLicenciaDate(fechaStr);
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const diff = Math.floor((fecha.getTime() - today.getTime()) / 86400000);
-        if (diff < 0)
-            return {
+
+        if (diff < 0) {
+return {
                 label: 'Vencida',
-                cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+                cls: 'bg-destructive-soft text-destructive-soft-foreground',
             };
-        if (diff <= 30)
-            return {
+}
+
+        if (diff <= 30) {
+return {
                 label: 'Por vencer',
-                cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+                cls: 'bg-warning-soft text-warning-soft-foreground',
             };
+}
+
         return {
             label: 'Vigente',
-            cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+            cls: 'bg-success-soft text-success-soft-foreground',
         };
     }
 
     const { auth } = usePage<any>().props;
     const isInversor = auth.user.role === 'inversor';
-    // El operador trabaja en una sola empresa por vez (sesión); ocultamos la columna.
-    const hideEmpresa = true;
-
     useEffect(() => {
         if (!filterRole || (filterRole === 'chofer' && !filterStatus)) {
             router.get(
@@ -1077,6 +532,10 @@ export default function UsersIndex({
                 { preserveState: false, replace: true },
             );
         }
+    // Sólo al montar: es una redirección para fijar el filtro por defecto de la
+    // URL. Con filterRole/filterStatus en las dependencias se volvería a
+    // disparar cada vez que el usuario cambia de filtro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
     const pageTitle = filterRole
         ? `Usuarios - ${filterRole.charAt(0).toUpperCase() + filterRole.slice(1)}`
@@ -1097,34 +556,27 @@ export default function UsersIndex({
         <>
             <Head title={pageTitle} />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {filterRole === 'chofer' ? (
                     <div className="flex flex-col gap-4">
-                        {/* Page header */}
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                                        Choferes
-                                    </h1>
-                                    <span className="inline-flex items-center rounded-md border border-border/50 bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                                        {choferCounts?.activos ?? 0} activos
-                                    </span>
-                                </div>
-                            </div>
-                            {!isInversor && (
-                                <Button
-                                    size="sm"
-                                    onClick={openCreateModal}
-                                    className="shrink-0"
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    <span className="hidden sm:inline">
-                                        Nuevo chofer
-                                    </span>
-                                </Button>
-                            )}
-                        </div>
+                        <PageHeader
+                            title="Choferes"
+                            count={{
+                                value: choferCounts?.activos ?? 0,
+                                singular: 'activo',
+                                plural: 'activos',
+                            }}
+                            actions={
+                                !isInversor && (
+                                    <Button size="sm" onClick={openCreateModal}>
+                                        <Plus className="size-4" />
+                                        <span className="hidden sm:inline">
+                                            Nuevo chofer
+                                        </span>
+                                    </Button>
+                                )
+                            }
+                        />
 
                         {/* Filter bar */}
                         <div className="rounded-xl border border-border bg-card p-3 shadow-sm sm:p-4">
@@ -1134,19 +586,12 @@ export default function UsersIndex({
                                     <Label htmlFor="chofer-search">
                                         Buscar
                                     </Label>
-                                    <div className="relative">
-                                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            id="chofer-search"
-                                            type="text"
-                                            placeholder="Buscar por nombre, DNI o patente..."
-                                            className="pl-9"
-                                            value={searchTerm}
-                                            onChange={(e) =>
-                                                setSearchTerm(e.target.value)
-                                            }
-                                        />
-                                    </div>
+                                    <SearchInput
+                                        id="chofer-search"
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                        placeholder="Buscar por nombre, DNI o patente..."
+                                    />
                                 </div>
 
                                 {/* Estado */}
@@ -1168,7 +613,7 @@ export default function UsersIndex({
                                             className={cn(
                                                 'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                                 filterStatus === 'activos'
-                                                    ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
+                                                    ? 'border-success/30 bg-success-soft text-success-soft-foreground'
                                                     : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
@@ -1192,7 +637,7 @@ export default function UsersIndex({
                                             className={cn(
                                                 'flex h-full items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 active:scale-[0.97]',
                                                 filterStatus === 'inactivos'
-                                                    ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+                                                    ? 'border-destructive/30 bg-destructive-soft text-destructive-soft-foreground'
                                                     : 'border-border bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground',
                                             )}
                                         >
@@ -1280,6 +725,7 @@ export default function UsersIndex({
                                                             i ===
                                                             FILTER_SECTIONS.length -
                                                                 1;
+
                                                         return (
                                                             <div
                                                                 key={
@@ -1378,7 +824,7 @@ export default function UsersIndex({
                                                     <div className="flex flex-1 flex-col gap-1">
                                                         <Label
                                                             htmlFor="cotizacion"
-                                                            className="text-[11px] text-muted-foreground"
+                                                            className="text-xs text-muted-foreground"
                                                         >
                                                             Cotización dólar
                                                             (ARS x USD)
@@ -1433,16 +879,11 @@ export default function UsersIndex({
                 ) : (
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
-                            <div className="relative w-full lg:max-w-xs">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Buscar por nombre o DNI..."
-                                    className="bg-card pl-9 shadow-sm"
+                            <div className="w-full lg:max-w-xs">
+                                <SearchInput
                                     value={searchTerm}
-                                    onChange={(e) =>
-                                        setSearchTerm(e.target.value)
-                                    }
+                                    onChange={setSearchTerm}
+                                    placeholder="Buscar por nombre o DNI..."
                                 />
                             </div>
                         </div>
@@ -1609,10 +1050,23 @@ export default function UsersIndex({
                                             colSpan={
                                                 filterRole === 'chofer' ? 8 : 6
                                             }
-                                            className="px-4 py-12 text-center text-muted-foreground sm:px-6"
+                                            className="p-0"
                                         >
-                                            No se encontraron usuarios que
-                                            coincidan con la búsqueda.
+                                            <EmptyState
+                                                variant={
+                                                    searchTerm ||
+                                                    filterAlert !== 'all'
+                                                        ? 'filtered'
+                                                        : 'empty'
+                                                }
+                                                title="No se encontraron usuarios"
+                                                description={
+                                                    searchTerm ||
+                                                    filterAlert !== 'all'
+                                                        ? 'Probá con otro nombre o quitá los filtros de alerta.'
+                                                        : 'Todavía no hay nadie cargado con este rol.'
+                                                }
+                                            />
                                         </td>
                                     </tr>
                                 ) : (
@@ -1720,10 +1174,11 @@ export default function UsersIndex({
                                                                 getLicenciaStatus(
                                                                     user.fecha_vencimiento_licencia,
                                                                 );
+
                                                             return s ? (
                                                                 <span
                                                                     className={cn(
-                                                                        'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                                                                        'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-xs font-semibold',
                                                                         s.cls,
                                                                     )}
                                                                 >
@@ -1742,7 +1197,11 @@ export default function UsersIndex({
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (isInversor) return;
+
+                                                        if (isInversor) {
+return;
+}
+
                                                         confirmToggleStatus(
                                                             user,
                                                         );
@@ -1755,14 +1214,14 @@ export default function UsersIndex({
                                                     className={cn(
                                                         'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                         user.inactivo
-                                                            ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                                                            : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+                                                            ? 'bg-destructive-soft text-destructive-soft-foreground'
+                                                            : 'bg-success-soft text-success-soft-foreground',
                                                         !isInversor &&
                                                             user.id !==
                                                                 auth.user.id
                                                             ? user.inactivo
-                                                                ? 'cursor-pointer hover:bg-red-100'
-                                                                : 'cursor-pointer hover:bg-green-100'
+                                                                ? 'cursor-pointer hover:bg-destructive/20'
+                                                                : 'cursor-pointer hover:bg-success/20'
                                                             : 'cursor-default',
                                                     )}
                                                 >
@@ -1770,8 +1229,8 @@ export default function UsersIndex({
                                                         className={cn(
                                                             'h-1.5 w-1.5 rounded-full',
                                                             user.inactivo
-                                                                ? 'bg-red-500'
-                                                                : 'bg-green-500',
+                                                                ? 'bg-destructive'
+                                                                : 'bg-success',
                                                         )}
                                                     />
                                                     {user.inactivo
@@ -1915,9 +1374,20 @@ export default function UsersIndex({
                     {/* Mobile cards */}
                     <ul className="divide-y divide-border md:hidden">
                         {sortedUsers.length === 0 ? (
-                            <li className="px-4 py-12 text-center text-sm text-muted-foreground">
-                                No se encontraron usuarios que coincidan con la
-                                búsqueda.
+                            <li>
+                                <EmptyState
+                                    variant={
+                                        searchTerm || filterAlert !== 'all'
+                                            ? 'filtered'
+                                            : 'empty'
+                                    }
+                                    title="No se encontraron usuarios"
+                                    description={
+                                        searchTerm || filterAlert !== 'all'
+                                            ? 'Probá con otro nombre o quitá los filtros de alerta.'
+                                            : 'Todavía no hay nadie cargado con este rol.'
+                                    }
+                                />
                             </li>
                         ) : (
                             sortedUsers.map((user) => (
@@ -1929,7 +1399,10 @@ export default function UsersIndex({
                                         !isInversor && openEditModal(user)
                                     }
                                     onKeyDown={(e) => {
-                                        if (isInversor) return;
+                                        if (isInversor) {
+return;
+}
+
                                         if (
                                             e.key === 'Enter' ||
                                             e.key === ' '
@@ -1995,7 +1468,11 @@ export default function UsersIndex({
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                if (isInversor) return;
+
+                                                if (isInversor) {
+return;
+}
+
                                                 confirmToggleStatus(user);
                                             }}
                                             disabled={
@@ -2005,13 +1482,13 @@ export default function UsersIndex({
                                             className={cn(
                                                 'inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors focus:outline-none',
                                                 user.inactivo
-                                                    ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
-                                                    : 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+                                                    ? 'bg-destructive-soft text-destructive-soft-foreground'
+                                                    : 'bg-success-soft text-success-soft-foreground',
                                                 !isInversor &&
                                                     user.id !== auth.user.id
                                                     ? user.inactivo
-                                                        ? 'cursor-pointer hover:bg-red-100'
-                                                        : 'cursor-pointer hover:bg-green-100'
+                                                        ? 'cursor-pointer hover:bg-destructive/20'
+                                                        : 'cursor-pointer hover:bg-success/20'
                                                     : 'cursor-default',
                                             )}
                                         >
@@ -2019,8 +1496,8 @@ export default function UsersIndex({
                                                 className={cn(
                                                     'h-1.5 w-1.5 rounded-full',
                                                     user.inactivo
-                                                        ? 'bg-red-500'
-                                                        : 'bg-green-500',
+                                                        ? 'bg-destructive'
+                                                        : 'bg-success',
                                                 )}
                                             />
                                             {user.inactivo
@@ -2081,10 +1558,11 @@ export default function UsersIndex({
                                                             getLicenciaStatus(
                                                                 user.fecha_vencimiento_licencia,
                                                             );
+
                                                         return s ? (
                                                             <span
                                                                 className={cn(
-                                                                    'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-[10px] font-semibold',
+                                                                    'inline-flex w-fit items-center rounded-md px-2 py-0.5 text-xs font-semibold',
                                                                     s.cls,
                                                                 )}
                                                             >
@@ -2152,7 +1630,7 @@ export default function UsersIndex({
 
                                     {filterRole === 'chofer' && (
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                                            <span className="text-xs tracking-wider text-muted-foreground uppercase">
                                                 Vehículo
                                             </span>
                                             {user.vehiculo ? (
@@ -2171,7 +1649,7 @@ export default function UsersIndex({
                         )}
                     </ul>
                 </div>
-            </div>
+            </PageContainer>
 
             <Dialog
                 open={showCreateModal}
@@ -2179,8 +1657,8 @@ export default function UsersIndex({
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
-                            <UserPlus className="h-5 w-5 text-violet-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-info-soft">
+                            <UserPlus aria-hidden="true" className="size-5 text-info-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -2295,6 +1773,7 @@ export default function UsersIndex({
                                                     createForm.data.empresas.includes(
                                                         e.id,
                                                     );
+
                                                 return (
                                                     <label
                                                         key={e.id}
@@ -2391,7 +1870,7 @@ export default function UsersIndex({
                                 <>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 border-t border-border/60" />
-                                        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                        <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                             Contacto y licencia
                                         </span>
                                         <div className="flex-1 border-t border-border/60" />
@@ -2516,7 +1995,7 @@ export default function UsersIndex({
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
-                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                     Garantía
                                 </span>
                                 <div className="flex-1 border-t border-border/60" />
@@ -2536,7 +2015,7 @@ export default function UsersIndex({
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
-                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                     Documentación
                                 </span>
                                 <div className="flex-1 border-t border-border/60" />
@@ -2638,8 +2117,8 @@ export default function UsersIndex({
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/15">
-                            <UserCog className="h-5 w-5 text-violet-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-info-soft">
+                            <UserCog aria-hidden="true" className="size-5 text-info-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">
@@ -2720,6 +2199,7 @@ export default function UsersIndex({
                                                     editForm.data.empresas.includes(
                                                         e.id,
                                                     );
+
                                                 return (
                                                     <label
                                                         key={e.id}
@@ -2814,7 +2294,7 @@ export default function UsersIndex({
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
-                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                     Contacto y licencia
                                 </span>
                                 <div className="flex-1 border-t border-border/60" />
@@ -2934,7 +2414,7 @@ export default function UsersIndex({
                                 <>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1 border-t border-border/60" />
-                                        <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                        <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                             Alta y baja
                                         </span>
                                         <div className="flex-1 border-t border-border/60" />
@@ -2993,7 +2473,7 @@ export default function UsersIndex({
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
-                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                     Garantía
                                 </span>
                                 <div className="flex-1 border-t border-border/60" />
@@ -3027,7 +2507,7 @@ export default function UsersIndex({
 
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 border-t border-border/60" />
-                                <span className="text-[10px] font-semibold tracking-widest text-muted-foreground uppercase">
+                                <span className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                                     Documentación
                                 </span>
                                 <div className="flex-1 border-t border-border/60" />
@@ -3142,47 +2622,25 @@ export default function UsersIndex({
             </Dialog>
 
             {/* Modal Confirmar Toggle de Estado */}
-            <Dialog
+            <ConfirmDialog
                 open={!!userToToggle}
                 onOpenChange={(open) => !open && setUserToToggle(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirmar Cambio de Estado</DialogTitle>
-                        <DialogDescription>
-                            ¿Estás seguro de que deseas{' '}
-                            {userToToggle?.inactivo ? 'activar' : 'desactivar'}{' '}
-                            al usuario <strong>{userToToggle?.name}</strong>?
-                            {!userToToggle?.inactivo && (
-                                <span className="mt-2 block font-semibold text-red-600 dark:text-red-400">
-                                    Nota: Al desactivar al usuario, se cerrarán
-                                    sus asignaciones activas de vehículos y se
-                                    desvinculará de cualquier placa asociada
-                                    automáticamente.
-                                </span>
-                            )}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setUserToToggle(null)}
-                        >
-                            Cancelar
-                        </Button>
-                        <Button
-                            variant={
-                                !userToToggle?.inactivo
-                                    ? 'destructive'
-                                    : 'default'
-                            }
-                            onClick={executeToggleStatus}
-                        >
-                            Confirmar
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                tone={userToToggle?.inactivo ? 'default' : 'destructive'}
+                title={
+                    userToToggle?.inactivo
+                        ? `¿Reactivar a ${userToToggle?.name}?`
+                        : `¿Dar de baja a ${userToToggle?.name}?`
+                }
+                description={
+                    userToToggle?.inactivo
+                        ? 'Vuelve a quedar disponible para asignarle vehículos.'
+                        : 'Se cierran sus asignaciones activas de vehículos y se lo desvincula de cualquier placa asociada. La baja no borra su historial.'
+                }
+                confirmLabel={
+                    userToToggle?.inactivo ? 'Reactivar' : 'Dar de baja'
+                }
+                onConfirm={executeToggleStatus}
+            />
 
             <DocPreviewDialog
                 preview={previewImage}

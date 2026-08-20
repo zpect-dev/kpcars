@@ -94,14 +94,21 @@ void main() {
 
 function compileShader(gl: WebGLRenderingContext, type: number, source: string): WebGLShader {
     const shader = gl.createShader(type);
-    if (!shader) throw new Error('No se pudo crear el shader.');
+
+    if (!shader) {
+throw new Error('No se pudo crear el shader.');
+}
+
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
+
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
         const log = gl.getShaderInfoLog(shader);
         gl.deleteShader(shader);
+
         throw new Error(log || 'Error compilando el shader.');
     }
+
     return shader;
 }
 
@@ -133,18 +140,27 @@ export async function flattenPerspective(src: string, corners: Corners): Promise
         preserveDrawingBuffer: true,
         premultipliedAlpha: false,
     });
-    if (!gl) throw new Error('WebGL no está disponible en este dispositivo.');
+
+    if (!gl) {
+throw new Error('WebGL no está disponible en este dispositivo.');
+}
 
     const program = gl.createProgram();
-    if (!program) throw new Error('No se pudo crear el programa WebGL.');
+
+    if (!program) {
+throw new Error('No se pudo crear el programa WebGL.');
+}
+
     const vert = compileShader(gl, gl.VERTEX_SHADER, VERT_SRC);
     const frag = compileShader(gl, gl.FRAGMENT_SHADER, FRAG_SRC);
     gl.attachShader(program, vert);
     gl.attachShader(program, frag);
     gl.linkProgram(program);
+
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         throw new Error(gl.getProgramInfoLog(program) || 'Error enlazando WebGL.');
     }
+
     gl.useProgram(program);
 
     // Quad de pantalla completa (TRIANGLE_STRIP: TL, TR, BL, BR). uv con y hacia
@@ -191,6 +207,9 @@ export async function flattenPerspective(src: string, corners: Corners): Promise
     gl.deleteShader(frag);
     gl.deleteProgram(program);
 
-    if (!blob) throw new Error('No se pudo aplanar la imagen.');
+    if (!blob) {
+throw new Error('No se pudo aplanar la imagen.');
+}
+
     return URL.createObjectURL(blob);
 }

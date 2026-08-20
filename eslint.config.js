@@ -24,6 +24,30 @@ const paddingAroundControl = [
     ]),
 ];
 
+/**
+ * Utilidades de color de la paleta cruda de Tailwind (bg-red-500, text-green-700,
+ * border-amber-400...). El tema define tokens semánticos —success, warning, info,
+ * destructive, cada uno con su variante -soft— que ya traen su equivalente en
+ * modo oscuro. Una clase cruda no lo trae, y por eso hoy conviven verde y
+ * esmeralda para lo mismo, y fondos claros que en tema oscuro quedan ilegibles.
+ */
+const RAW_COLOR_PATTERN = String.raw`\b(?:bg|text|border|ring|from|via|to|divide|fill|stroke|outline|decoration|placeholder|caret|accent|shadow)-(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(?:50|100|200|300|400|500|600|700|800|900|950)\b`;
+
+const RAW_COLOR_MESSAGE =
+    'Color crudo de la paleta de Tailwind. Usá un token semántico del tema (success, warning, info, destructive, muted, primary...) o el componente StatusBadge.';
+
+const noRawColors = (severity) => [
+    severity,
+    {
+        selector: `Literal[value=/${RAW_COLOR_PATTERN}/]`,
+        message: RAW_COLOR_MESSAGE,
+    },
+    {
+        selector: `TemplateElement[value.raw=/${RAW_COLOR_PATTERN}/]`,
+        message: RAW_COLOR_MESSAGE,
+    },
+];
+
 /** @type {import('eslint').Linter.Config[]} */
 export default [
     js.configs.recommended,
@@ -107,6 +131,9 @@ export default [
     },
     {
         ignores: [
+            // Copia de trabajo de un worktree viejo: no es código del proyecto
+            // y duplicaba cada problema del lint.
+            '.claude',
             'vendor',
             'node_modules',
             'public',
@@ -127,6 +154,21 @@ export default [
         rules: {
             curly: ['error', 'all'],
             '@stylistic/brace-style': ['error', '1tbs', { allowSingleLine: false }],
+        },
+    },
+    {
+        // Deuda existente: hoy quedan más de mil usos repartidos por las vistas.
+        // Avisa para que no crezca; la migración va vista por vista.
+        files: ['resources/js/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-syntax': noRawColors('warn'),
+        },
+    },
+    {
+        // La capa compartida arranca limpia y se queda limpia.
+        files: ['resources/js/components/app/**/*.{ts,tsx}'],
+        rules: {
+            'no-restricted-syntax': noRawColors('error'),
         },
     },
 ];

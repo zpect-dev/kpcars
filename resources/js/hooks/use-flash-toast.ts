@@ -11,7 +11,9 @@ export function useFlashToast(): void {
                 error?: string;
             } | undefined;
 
-            if (!flash) return;
+            if (!flash) {
+return;
+}
 
             if (flash.success) {
                 toast.success(flash.success);

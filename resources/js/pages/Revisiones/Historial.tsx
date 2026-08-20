@@ -1,5 +1,12 @@
-import { Head, Link } from '@inertiajs/react';
-import { ChevronRight, CalendarClock } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import type { ColumnDef } from '@tanstack/react-table';
+import { CalendarClock } from 'lucide-react';
+import { useMemo } from 'react';
+import { DataTable } from '@/components/app/data-table/data-table';
+import { DataTableColumnHeader } from '@/components/app/data-table/data-table-column-header';
+import type { DataTableFeatures } from '@/components/app/data-table/features';
+import { PageContainer } from '@/components/app/page-container';
+import { PageHeader } from '@/components/app/page-header';
 
 interface Cierre {
     id: number;
@@ -10,9 +17,15 @@ interface Cierre {
 }
 
 interface Props {
+    /**
+     * Paginador de Laravel. Los campos de página son opcionales porque la vista
+     * también funciona si el controlador manda la colección entera.
+     */
     cierres: {
         data: Cierre[];
-        links: any[];
+        current_page?: number;
+        last_page?: number;
+        total?: number;
     };
 }
 
@@ -20,61 +33,105 @@ function formatDateRange(inicioStr: string, finStr: string) {
     const inicio = new Date(inicioStr + 'T00:00:00');
     const fin = new Date(finStr + 'T00:00:00');
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    
+
     return `Del ${inicio.getDate()} de ${meses[inicio.getMonth()]} al ${fin.getDate()} de ${meses[fin.getMonth()]}, ${fin.getFullYear()}`;
 }
 
 export default function Historial({ cierres }: Props) {
+    const columns = useMemo<ColumnDef<DataTableFeatures, Cierre>[]>(
+        () => [
+            {
+                id: 'cierre',
+                accessorFn: (row) => row.id,
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Cierre
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <span className="font-semibold text-foreground tabular-nums">
+                        #{row.original.id}
+                    </span>
+                ),
+                meta: { label: 'Cierre', mobile: 'title' },
+            },
+            {
+                id: 'periodo',
+                accessorFn: (row) => row.periodo_inicio,
+                sortingFn: 'datetime',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Período
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) =>
+                    formatDateRange(
+                        row.original.periodo_inicio,
+                        row.original.periodo_fin,
+                    ),
+                meta: { label: 'Período', mobile: 'field' },
+            },
+            {
+                id: 'cerrado_por',
+                accessorFn: (row) => row.user?.name ?? '—',
+                header: ({ column }) => (
+                    <DataTableColumnHeader column={column}>
+                        Cerrado por
+                    </DataTableColumnHeader>
+                ),
+                cell: ({ row }) => (
+                    <span className="font-medium text-foreground">
+                        {row.original.user?.name ?? '—'}
+                    </span>
+                ),
+                meta: { label: 'Cerrado por', mobile: 'field' },
+            },
+        ],
+        [],
+    );
+
+    const paginaServidor =
+        cierres.current_page != null && cierres.last_page != null
+            ? {
+                  pageIndex: cierres.current_page - 1,
+                  pageCount: cierres.last_page,
+                  rowCount: cierres.total,
+                  onPageChange: (pageIndex: number) =>
+                      router.get(
+                          '/revisiones/historial',
+                          { page: pageIndex + 1 },
+                          { preserveScroll: true, preserveState: true },
+                      ),
+              }
+            : undefined;
+
     return (
         <>
             <Head title="Historial de Revisiones" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-lg font-semibold text-foreground sm:text-xl">
-                        Historial de Revisiones
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Registro de todos los periodos cerrados de revisiones
-                    </p>
-                </div>
+            <PageContainer>
+                <PageHeader
+                    title="Historial de Revisiones"
+                    description="Registro de todos los períodos cerrados de revisiones"
+                />
 
-                <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                    {cierres.data.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-                            <CalendarClock className="h-8 w-8 text-muted-foreground/50" />
-                            <p>No hay cierres registrados aún.</p>
-                        </div>
-                    ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {cierres.data.map((cierre) => {
-                                return (
-                                    <Link
-                                        key={cierre.id}
-                                        href={`/revisiones/historial/${cierre.id}`}
-                                        className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/30 hover:bg-muted/50 hover:shadow-sm"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold">
-                                                Cierre #{cierre.id}
-                                            </span>
-                                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
-                                        </div>
-                                        <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                                            <span>
-                                                {formatDateRange(cierre.periodo_inicio, cierre.periodo_fin)}
-                                            </span>
-                                            <span className="text-xs">
-                                                Cerrado por: <span className="font-medium text-foreground">{cierre.user?.name}</span>
-                                            </span>
-                                        </div>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </div>
+                <DataTable
+                    columns={columns}
+                    data={cierres.data}
+                    getRowId={(row) => String(row.id)}
+                    initialSorting={[{ id: 'periodo', desc: true }]}
+                    onRowClick={(row) =>
+                        router.get(`/revisiones/historial/${row.id}`)
+                    }
+                    serverPagination={paginaServidor}
+                    empty={{
+                        icon: CalendarClock,
+                        title: 'No hay cierres registrados',
+                        description:
+                            'Al cerrar un período de revisiones, el resumen queda archivado acá.',
+                    }}
+                />
+            </PageContainer>
         </>
     );
 }

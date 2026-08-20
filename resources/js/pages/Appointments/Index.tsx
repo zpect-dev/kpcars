@@ -13,9 +13,20 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Vehiculo } from '@/types';
+import { EmptyState } from '@/components/app/empty-state';
+import { PageContainer } from '@/components/app/page-container';
+import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox  } from '@/components/ui/combobox';
+import type {ComboboxOption} from '@/components/ui/combobox';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -26,18 +37,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import InputError from '@/components/input-error';
 import { cn } from '@/lib/utils';
+import type { Vehiculo } from '@/types';
 import { AppointmentCalendar } from './AppointmentCalendar';
 
 type AppointmentStatus = 'agendado' | 'en_proceso' | 'completado' | 'cancelado';
@@ -91,33 +93,33 @@ const STATUS_META: Record<AppointmentStatus, { label: string; icon: typeof Clock
     agendado: {
         label: 'Agendado',
         icon: Clock,
-        badge: 'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/20',
+        badge: 'bg-warning-soft text-warning-soft-foreground ring-1 ring-inset ring-warning/25',
         border: 'border-l-amber-500',
-        cardBg: 'bg-amber-50/50 dark:bg-amber-500/[0.06]',
+        cardBg: 'bg-warning-soft/40',
     },
     en_proceso: {
         label: 'En curso',
         icon: Wrench,
-        badge: 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/20 dark:bg-blue-500/15 dark:text-blue-300 dark:ring-blue-400/20',
+        badge: 'bg-info-soft text-info-soft-foreground ring-1 ring-inset ring-info/25',
         border: 'border-l-blue-500',
-        cardBg: 'bg-blue-50/50 dark:bg-blue-500/[0.06]',
+        cardBg: 'bg-info-soft/40',
     },
     completado: {
         // Badge sólido (no pastel) para que un turno terminado resalte de inmediato en la lista.
         label: 'Completado',
         icon: CheckCircle2,
-        badge: 'bg-emerald-600 text-white font-bold shadow-sm dark:bg-emerald-500 dark:text-emerald-950',
+        badge: 'bg-success font-bold text-success-foreground shadow-sm',
         border: 'border-l-emerald-500',
-        cardBg: 'bg-emerald-50/50 dark:bg-emerald-500/[0.06]',
+        cardBg: 'bg-success-soft/40',
     },
     cancelado: {
         // Gris en vez de rojo: el rojo queda reservado exclusivamente para "Emergencia",
         // así ambos conceptos no compiten por el mismo color.
         label: 'Cancelado',
         icon: Ban,
-        badge: 'bg-zinc-200 text-zinc-600 ring-1 ring-inset ring-zinc-400/30 dark:bg-zinc-700/40 dark:text-zinc-400 dark:ring-zinc-500/30',
+        badge: 'bg-muted text-muted-foreground ring-1 ring-inset ring-border',
         border: 'border-l-zinc-400',
-        cardBg: 'bg-zinc-100/60 dark:bg-zinc-500/[0.06]',
+        cardBg: 'bg-muted/40',
     },
 };
 
@@ -131,11 +133,11 @@ const STATUS_ORDER: Record<AppointmentStatus, number> = {
 
 // Dot color + active bg/text per status tab
 const TAB_CONFIG: Record<'all' | AppointmentStatus, { dot: string; active: string }> = {
-    all:        { dot: 'bg-zinc-400 dark:bg-zinc-500',  active: 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900' },
-    agendado:   { dot: 'bg-amber-400',                   active: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' },
-    en_proceso: { dot: 'bg-blue-400',                    active: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' },
-    completado: { dot: 'bg-green-400',                   active: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' },
-    cancelado:  { dot: 'bg-red-400',                     active: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' },
+    all:        { dot: 'bg-muted-foreground/50',  active: 'bg-foreground text-background' },
+    agendado:   { dot: 'bg-warning',              active: 'bg-warning-soft text-warning-soft-foreground' },
+    en_proceso: { dot: 'bg-info',                 active: 'bg-info-soft text-info-soft-foreground' },
+    completado: { dot: 'bg-success',              active: 'bg-success-soft text-success-soft-foreground' },
+    cancelado:  { dot: 'bg-destructive',          active: 'bg-destructive-soft text-destructive-soft-foreground' },
 };
 
 const TABS: { key: 'all' | AppointmentStatus; label: string }[] = [
@@ -149,13 +151,19 @@ const TABS: { key: 'all' | AppointmentStatus; label: string }[] = [
 function formatDate(iso: string): string {
     const d = iso.length >= 10 ? iso.slice(0, 10) : iso;
     const [y, m, day] = d.split('-');
+
     return `${day}/${m}/${y}`;
 }
 
 function formatDateTime(iso: string): string {
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+
+    if (isNaN(d.getTime())) {
+return iso;
+}
+
     const pad = (n: number) => String(n).padStart(2, '0');
+
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -170,7 +178,10 @@ export default function AppointmentsIndex({
     maxSlots,
     canScheduleWednesday,
 }: Props) {
-    const today = useRef(new Date().toISOString().slice(0, 10)).current;
+    // La fecha de hoy se calcula una sola vez y no cambia mientras la vista
+    // esté montada. Va como estado con inicializador perezoso y no como ref:
+    // leer `.current` durante el render es lo que marca el compilador.
+    const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
     const [from, setFrom] = useState(filters.from || '');
     const [to, setTo] = useState(filters.to || '');
@@ -214,17 +225,26 @@ export default function AppointmentsIndex({
     useEffect(() => {
         if (!isMounted.current) {
             isMounted.current = true;
+
             return;
         }
+
         const hasChanges =
             from !== (filters.from || '') ||
             to !== (filters.to || '') ||
             plate !== (filters.plate || '');
-        if (!hasChanges) return;
+
+        if (!hasChanges) {
+return;
+}
 
         const timeoutId = setTimeout(() => {
             const active: Record<string, string> = { from, to };
-            if (plate) active.plate = plate;
+
+            if (plate) {
+active.plate = plate;
+}
+
             router.get('/appointments', active, {
                 preserveState: true,
                 preserveScroll: true,
@@ -235,10 +255,15 @@ export default function AppointmentsIndex({
         return () => clearTimeout(timeoutId);
     }, [from, to, plate, filters]);
 
-    // Reset tab when server data changes (new filter applied)
-    useEffect(() => {
+    // Al llegar datos nuevos del servidor (otro filtro), la pestaña de estado
+    // vuelve a "todos": la que estaba puede haber quedado vacía. Se ajusta
+    // durante el render, no con un efecto, para no pintar dos veces.
+    const [datosPrevios, setDatosPrevios] = useState(appointments.data);
+
+    if (appointments.data !== datosPrevios) {
+        setDatosPrevios(appointments.data);
         setStatusTab('all');
-    }, [appointments.data]);
+    }
 
     const tabCounts = useMemo(() => ({
         all:        appointments.data.length,
@@ -252,6 +277,7 @@ export default function AppointmentsIndex({
         const data = statusTab === 'all'
             ? appointments.data
             : appointments.data.filter((a) => a.status === statusTab);
+
         // Orden por estado: lo pendiente/en curso arriba, lo completado/cancelado abajo.
         return [...data].sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
     }, [appointments.data, statusTab]);
@@ -286,8 +312,10 @@ export default function AppointmentsIndex({
             setSelectedMecanicoId('');
             setCompletionDescription('');
             setTimeout(() => setCompleteDialog({ id }), 10);
+
             return;
         }
+
         router.patch(`/appointments/${id}/status`, { status: next }, {
             preserveScroll: true,
             preserveState: true,
@@ -295,7 +323,10 @@ export default function AppointmentsIndex({
     }
 
     function submitComplete() {
-        if (!completeDialog || !selectedMecanicoId || completionDescription.trim() === '') return;
+        if (!completeDialog || !selectedMecanicoId || completionDescription.trim() === '') {
+return;
+}
+
         router.patch(
             `/appointments/${completeDialog.id}/status`,
             {
@@ -319,7 +350,7 @@ export default function AppointmentsIndex({
         <>
             <Head title="Turnos" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="flex flex-col gap-1">
@@ -329,10 +360,10 @@ export default function AppointmentsIndex({
                         <span className={cn(
                             'inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium',
                             remainingToday > 0
-                                ? 'bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400'
-                                : 'bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400',
+                                ? 'bg-success-soft text-success-soft-foreground'
+                                : 'bg-destructive-soft text-destructive-soft-foreground',
                         )}>
-                            <span className={cn('h-1.5 w-1.5 rounded-full', remainingToday > 0 ? 'bg-green-500' : 'bg-red-500')} />
+                            <span className={cn('h-1.5 w-1.5 rounded-full', remainingToday > 0 ? 'bg-success' : 'bg-destructive')} />
                             {remainingToday === 0
                                 ? 'Sin cupos disponibles para hoy'
                                 : `${remainingToday} ${remainingToday === 1 ? 'cupo disponible' : 'cupos disponibles'} para hoy`}
@@ -344,10 +375,23 @@ export default function AppointmentsIndex({
                             size="sm"
                             onClick={() => {
                                 const params = new URLSearchParams();
-                                if (from) params.set('from', from);
-                                if (to) params.set('to', to);
-                                if (plate) params.set('plate', plate);
-                                if (statusTab !== 'all') params.set('status', statusTab);
+
+                                if (from) {
+params.set('from', from);
+}
+
+                                if (to) {
+params.set('to', to);
+}
+
+                                if (plate) {
+params.set('plate', plate);
+}
+
+                                if (statusTab !== 'all') {
+params.set('status', statusTab);
+}
+
                                 const qs = params.toString();
                                 window.open('/pdf/appointments' + (qs ? '?' + qs : ''), '_blank');
                             }}
@@ -361,6 +405,7 @@ export default function AppointmentsIndex({
                                 open={isDialogOpen}
                                 onOpenChange={(open) => {
                                     setIsDialogOpen(open);
+
                                     if (!open) {
                                         form.reset();
                                         form.clearErrors();
@@ -375,8 +420,8 @@ export default function AppointmentsIndex({
                                 </DialogTrigger>
                                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
                                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/15">
-                                            <CalendarPlus className="h-5 w-5 text-indigo-500" />
+                                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-info-soft">
+                                            <CalendarPlus aria-hidden="true" className="size-5 text-info-soft-foreground" />
                                         </div>
                                         <div className="flex-1">
                                             <DialogTitle className="text-base font-semibold">Agendar turno</DialogTitle>
@@ -390,7 +435,7 @@ export default function AppointmentsIndex({
                                             <div className={cn(
                                                 'flex items-center gap-3 rounded-xl border p-3 transition-colors',
                                                 form.data.type === 'emergencia'
-                                                    ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                                                    ? 'border-destructive/40 bg-destructive-soft'
                                                     : 'border-border bg-card',
                                             )}>
                                                 <button
@@ -400,7 +445,7 @@ export default function AppointmentsIndex({
                                                     onClick={() => form.setData('type', form.data.type === 'normal' ? 'emergencia' : 'normal')}
                                                     className={cn(
                                                         'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                                        form.data.type === 'emergencia' ? 'bg-red-600' : 'bg-gray-200 dark:bg-gray-700',
+                                                        form.data.type === 'emergencia' ? 'bg-destructive' : 'bg-muted',
                                                     )}
                                                 >
                                                     <span className={cn(
@@ -409,7 +454,7 @@ export default function AppointmentsIndex({
                                                     )} />
                                                 </button>
                                                 <div className="flex items-center gap-1.5">
-                                                    <AlertTriangle className={cn('h-4 w-4', form.data.type === 'emergencia' ? 'text-red-600' : 'text-muted-foreground')} />
+                                                    <AlertTriangle className={cn('h-4 w-4', form.data.type === 'emergencia' ? 'text-destructive' : 'text-muted-foreground')} />
                                                     <Label className="cursor-pointer select-none text-sm">Turno de emergencia</Label>
                                                 </div>
                                             </div>
@@ -436,7 +481,10 @@ export default function AppointmentsIndex({
                                                     onSelect={(o) => {
                                                         form.setData('license_plate', o.value);
                                                         const v = vehiculos.find((veh) => veh.patente === o.value);
-                                                        if (v && v.user_id) form.setData('conductor_id', v.user_id);
+
+                                                        if (v && v.user_id) {
+form.setData('conductor_id', v.user_id);
+}
                                                     }}
                                                     uppercase
                                                 />
@@ -508,7 +556,9 @@ export default function AppointmentsIndex({
                                     <AppointmentCalendar
                                         mode="range"
                                         rangeValue={{ from, to }}
-                                        onRangeChange={(range) => { setFrom(range.from); setTo(range.to); }}
+                                        onRangeChange={(range) => {
+ setFrom(range.from); setTo(range.to); 
+}}
                                         title={null}
                                         className="border-0 bg-popover"
                                         dailySlots={dailySlots}
@@ -558,6 +608,7 @@ export default function AppointmentsIndex({
                         const count = tabCounts[key];
                         const isActive = statusTab === key;
                         const cfg = TAB_CONFIG[key];
+
                         return (
                             <button
                                 key={key}
@@ -577,7 +628,7 @@ export default function AppointmentsIndex({
                                 )} />
                                 {label}
                                 <span className={cn(
-                                    'min-w-[1.25rem] rounded-md px-1 py-px text-center text-[10px] font-bold tabular-nums',
+                                    'min-w-[1.25rem] rounded-md px-1 py-px text-center text-xs font-bold tabular-nums',
                                     isActive
                                         ? 'bg-black/10 dark:bg-white/20'
                                         : 'bg-background text-foreground/60',
@@ -592,21 +643,26 @@ export default function AppointmentsIndex({
                 {/* Appointment cards */}
                 <div className="flex flex-col gap-3 pb-4">
                     {filteredAppointments.length === 0 ? (
-                        <div className="rounded-xl border border-border bg-card py-12 text-center text-sm text-muted-foreground shadow-sm">
-                            No hay turnos que coincidan con los filtros.
+                        <div className="rounded-xl border border-border bg-card shadow-sm">
+                            <EmptyState
+                                variant="filtered"
+                                title="Ningún turno coincide con los filtros"
+                                description="Probá con otra fecha, otra patente o cambiá el filtro de estado."
+                            />
                         </div>
                     ) : (
                         filteredAppointments.map((a) => {
                             const statusMeta = STATUS_META[a.status];
                             const StatusIcon = statusMeta.icon;
                             const isEmergencia = a.type === 'emergencia';
+
                             return (
                             <div
                                 key={a.id}
                                 className={cn(
                                     'flex gap-3 rounded-xl border border-border p-4 shadow-sm border-l-4 transition-colors',
                                     statusMeta.border,
-                                    isEmergencia ? 'border-t-4 border-t-red-500 bg-red-50/60 dark:bg-red-950/10' : statusMeta.cardBg,
+                                    isEmergencia ? 'border-t-4 border-t-destructive bg-destructive-soft/40' : statusMeta.cardBg,
                                     a.status === 'cancelado' && 'opacity-70',
                                 )}
                             >
@@ -624,13 +680,13 @@ export default function AppointmentsIndex({
                                                 {a.service}
                                             </span>
                                             {isEmergencia && (
-                                                <span className="inline-flex items-center gap-1 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-sm">
+                                                <span className="inline-flex items-center gap-1 rounded-md bg-destructive px-2 py-0.5 text-xs font-bold text-white uppercase dark:text-background uppercase tracking-wide text-white shadow-sm">
                                                     <AlertTriangle className="h-3 w-3" />
                                                     Emergencia
                                                 </span>
                                             )}
                                             <span className={cn(
-                                                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold',
+                                                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold',
                                                 statusMeta.badge,
                                             )}>
                                                 <StatusIcon className="h-3 w-3" />
@@ -681,7 +737,7 @@ export default function AppointmentsIndex({
                                                             <DropdownMenuItem
                                                                 disabled={a.status === 'cancelado'}
                                                                 onSelect={() => changeStatus(a.id, 'cancelado')}
-                                                                className="text-red-600 focus:text-red-700 dark:text-red-400 dark:focus:text-red-300"
+                                                                variant="destructive"
                                                             >
                                                                 <Ban className="h-4 w-4" />
                                                                 Cancelar turno
@@ -731,7 +787,7 @@ export default function AppointmentsIndex({
                         })
                     )}
                 </div>
-            </div>
+            </PageContainer>
 
             {/* Complete dialog */}
             <Dialog
@@ -746,8 +802,8 @@ export default function AppointmentsIndex({
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[425px]">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-                            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-success-soft">
+                            <CheckCircle2 aria-hidden="true" className="size-5 text-success-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Completar turno</DialogTitle>
@@ -765,6 +821,7 @@ export default function AppointmentsIndex({
                                 <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
                                     {mecanicosVisibles.map((m) => {
                                         const isSelected = selectedMecanicoId === String(m.id);
+
                                         return (
                                             <button
                                                 key={m.id}
@@ -773,12 +830,12 @@ export default function AppointmentsIndex({
                                                 className={cn(
                                                     'flex w-full items-center justify-between px-3.5 py-2.5 text-left text-sm transition-colors',
                                                     isSelected
-                                                        ? 'bg-emerald-500/10 font-medium text-foreground'
+                                                        ? 'bg-success-soft font-medium text-foreground'
                                                         : 'text-muted-foreground hover:bg-muted/60',
                                                 )}
                                             >
                                                 <span>{m.name}</span>
-                                                {isSelected && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                                                {isSelected && <CheckCircle2 aria-hidden="true" className="size-4 text-success" />}
                                             </button>
                                         );
                                     })}
@@ -802,7 +859,9 @@ export default function AppointmentsIndex({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => { setCompleteDialog(null); setSelectedMecanicoId(''); setCompletionDescription(''); }}
+                            onClick={() => {
+ setCompleteDialog(null); setSelectedMecanicoId(''); setCompletionDescription(''); 
+}}
                         >
                             Cancelar
                         </Button>

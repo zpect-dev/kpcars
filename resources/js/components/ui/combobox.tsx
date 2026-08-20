@@ -218,7 +218,7 @@ export function Combobox({
                                         {option.code && (
                                             <span
                                                 className={cn(
-                                                    'shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px] font-semibold',
+                                                    'shrink-0 rounded px-1.5 py-0.5 font-mono text-xs font-semibold',
                                                     highlightedIndex === idx
                                                         ? 'bg-background/70 text-foreground'
                                                         : 'bg-muted text-muted-foreground',

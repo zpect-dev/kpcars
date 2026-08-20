@@ -18,19 +18,20 @@ import {
     UserCircle2,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import { PageContainer } from '@/components/app/page-container';
 import { ExportDropdown } from '@/components/export-dropdown';
+import { MoneyInput } from '@/components/money-input';
 import { Button } from '@/components/ui/button';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { Combobox  } from '@/components/ui/combobox';
+import type {ComboboxOption} from '@/components/ui/combobox';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogFooter,
-    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { MoneyInput } from '@/components/money-input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -156,9 +157,19 @@ const TIPO_LABEL: Record<Tipo, string> = {
 
 function cardIcon(key: string): React.ReactNode {
     const cls = 'h-5 w-5 text-muted-foreground';
-    if (key.startsWith('empresa_')) return <Building2 className={cls} />;
-    if (key === 'kevin') return <UserCircle2 className={cls} />;
-    if (key === 'galpon') return <Warehouse className={cls} />;
+
+    if (key.startsWith('empresa_')) {
+return <Building2 className={cls} />;
+}
+
+    if (key === 'kevin') {
+return <UserCircle2 className={cls} />;
+}
+
+    if (key === 'galpon') {
+return <Warehouse className={cls} />;
+}
+
     return <HandCoins className={cls} />;
 }
 
@@ -168,6 +179,7 @@ const TIPOS_POR_EMPRESA = ['galpon', 'taller', 'oficina'];
 /** Agrega el reparto por empresa (congelado por gasto) sumando una lista de gastos. */
 function empresasBreakdown(list: Gasto[]): { empresa_id: number; nombre: string; total: number }[] {
     const map = new Map<number, { empresa_id: number; nombre: string; total: number }>();
+
     for (const g of list) {
         for (const e of g.distribuciones_empresas ?? []) {
             const cur = map.get(e.empresa_id) ?? {
@@ -179,6 +191,7 @@ function empresasBreakdown(list: Gasto[]): { empresa_id: number; nombre: string;
             map.set(e.empresa_id, cur);
         }
     }
+
     return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
 
@@ -206,6 +219,7 @@ function formatDateDia(d: string): string {
         month: '2-digit',
         year: 'numeric',
     });
+
     return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} ${fecha}`;
 }
 
@@ -238,8 +252,13 @@ export default function GastosIndex({
     function toggleCat(key: string) {
         setExpandedCats((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
+
+            if (next.has(key)) {
+next.delete(key);
+} else {
+next.add(key);
+}
+
             return next;
         });
     }
@@ -247,8 +266,13 @@ export default function GastosIndex({
     function toggleInv(key: string) {
         setExpandedInversiones((prev) => {
             const next = new Set(prev);
-            if (next.has(key)) next.delete(key);
-            else next.add(key);
+
+            if (next.has(key)) {
+next.delete(key);
+} else {
+next.add(key);
+}
+
             return next;
         });
     }
@@ -302,16 +326,25 @@ export default function GastosIndex({
 
     function handleCajaSubmit() {
         const newErrors: Record<string, string> = {};
-        if (!cajaFecha) newErrors.fecha = 'Requerido';
+
+        if (!cajaFecha) {
+newErrors.fecha = 'Requerido';
+}
+
         // El ajuste admite monto negativo; el resto sólo importes positivos.
-        if (!cajaMonto || Number(cajaMonto) === 0) newErrors.monto = 'Monto inválido';
-        else if (cajaTipo !== 'ajuste' && Number(cajaMonto) < 0)
-            newErrors.monto = 'Usá un ajuste para cargar un monto negativo';
-        if (cajaTipo === 'ajuste' && !cajaNota.trim())
-            newErrors.nota = 'Indicá el motivo del ajuste';
+        if (!cajaMonto || Number(cajaMonto) === 0) {
+newErrors.monto = 'Monto inválido';
+} else if (cajaTipo !== 'ajuste' && Number(cajaMonto) < 0) {
+newErrors.monto = 'Usá un ajuste para cargar un monto negativo';
+}
+
+        if (cajaTipo === 'ajuste' && !cajaNota.trim()) {
+newErrors.nota = 'Indicá el motivo del ajuste';
+}
 
         if (Object.keys(newErrors).length > 0) {
             setCajaErrors(newErrors);
+
             return;
         }
 
@@ -351,6 +384,7 @@ export default function GastosIndex({
             g.monto,
             g.recibio,
         ]);
+
         return { headers, rows };
     }
 
@@ -374,10 +408,15 @@ export default function GastosIndex({
             kevin: [],
             flota: [],
         };
+
         for (const g of gastos) {
-            if (g.tipo === 'vehiculo') map.flota.push(g);
-            else if (map[g.tipo]) map[g.tipo].push(g);
+            if (g.tipo === 'vehiculo') {
+map.flota.push(g);
+} else if (map[g.tipo]) {
+map[g.tipo].push(g);
+}
         }
+
         return map;
     }, [gastos]);
 
@@ -387,11 +426,13 @@ export default function GastosIndex({
             string,
             { inversion_id: number | null; inversion_nombre: string; gastos: Gasto[] }
         > = {};
+
         for (const g of gastosByCat.flota) {
             const id = g.vehiculo?.inversion_id ?? null;
             const nombre =
                 g.vehiculo?.inversion_nombre ?? 'Sin inversión asignada';
             const key = id === null ? 'none' : String(id);
+
             if (!groups[key]) {
                 groups[key] = {
                     inversion_id: id,
@@ -399,8 +440,10 @@ export default function GastosIndex({
                     gastos: [],
                 };
             }
+
             groups[key].gastos.push(g);
         }
+
         return Object.values(groups).sort((a, b) =>
             a.inversion_nombre.localeCompare(b.inversion_nombre, 'es', {
                 numeric: true,
@@ -464,6 +507,7 @@ export default function GastosIndex({
             label: p.patente,
             sub: `${p.marca} ${p.modelo}`,
         }));
+
         return [...fijos, ...veh];
     }, [patentes]);
 
@@ -479,18 +523,32 @@ export default function GastosIndex({
 
     function handleSubmit() {
         const newErrors: Record<string, string> = {};
-        if (!fecha) newErrors.fecha = 'Requerido';
-        if (!monto || Number(monto) <= 0) newErrors.monto = 'Monto inválido';
-        if (!recibio.trim()) newErrors.recibio = 'Requerido';
-        if (!comboValue) newErrors.tipo = 'Seleccioná un tipo o patente';
+
+        if (!fecha) {
+newErrors.fecha = 'Requerido';
+}
+
+        if (!monto || Number(monto) <= 0) {
+newErrors.monto = 'Monto inválido';
+}
+
+        if (!recibio.trim()) {
+newErrors.recibio = 'Requerido';
+}
+
+        if (!comboValue) {
+newErrors.tipo = 'Seleccioná un tipo o patente';
+}
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
+
             return;
         }
 
         let tipo: Tipo;
         let vehiculoId: number | null = null;
+
         if (comboValue.startsWith('tipo:')) {
             tipo = comboValue.slice(5) as Tipo;
         } else if (comboValue.startsWith('vehiculo:')) {
@@ -498,6 +556,7 @@ export default function GastosIndex({
             vehiculoId = Number(comboValue.slice(9));
         } else {
             setErrors({ tipo: 'Selección inválida' });
+
             return;
         }
 
@@ -527,7 +586,10 @@ export default function GastosIndex({
     }
 
     function handleDelete() {
-        if (!confirmDeleteId) return;
+        if (!confirmDeleteId) {
+return;
+}
+
         router.delete(destroy.url(confirmDeleteId), {
             preserveScroll: true,
             onFinish: () => setConfirmDeleteId(null),
@@ -535,12 +597,14 @@ export default function GastosIndex({
     }
 
     function renderGastoList(list: Gasto[]) {
-        if (list.length === 0) return null;
+        if (list.length === 0) {
+return null;
+}
 
         return (
             <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-sm">
                 <table className="w-full text-left text-sm">
-                    <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                    <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                         <tr>
                             <th className="px-3 py-2 font-medium">Fecha</th>
                             <th className="px-3 py-2 font-medium">
@@ -561,6 +625,7 @@ export default function GastosIndex({
                         {list.map((g) => {
                             const descripcion =
                                 g.descripcion?.trim() || 'Sin descripción';
+
                             return (
                                 <tr
                                     key={g.id}
@@ -591,7 +656,7 @@ export default function GastosIndex({
                                                 )}
                                             </span>
                                             {isInversor && (
-                                                <span className="text-[10px] text-muted-foreground">
+                                                <span className="text-xs text-muted-foreground">
                                                     (total{' '}
                                                     {formatARS(
                                                         Number(g.monto),
@@ -629,7 +694,7 @@ export default function GastosIndex({
         <>
             <Head title="Gastos" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
+            <PageContainer>
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div>
@@ -656,7 +721,7 @@ export default function GastosIndex({
                                     className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-1.5 shadow-sm transition-colors hover:bg-muted/40"
                                 >
                                     <Wallet className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase underline decoration-dotted underline-offset-2">
+                                    <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase underline decoration-dotted underline-offset-2">
                                         Caja chica
                                     </span>
                                     <span
@@ -684,9 +749,9 @@ export default function GastosIndex({
                                 {cajaChica.periodo_abierto ? (
                                     <>
                                         <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm">
-                                            <ArrowDownLeft className="h-4 w-4 shrink-0 text-emerald-500" />
+                                            <ArrowDownLeft aria-hidden="true" className="size-4 shrink-0 text-success" />
                                             <span className="flex-1 text-left text-foreground">Cargado</span>
-                                            <span className="font-semibold text-emerald-600 tabular-nums dark:text-emerald-400">
+                                            <span className="font-semibold text-success tabular-nums">
                                                 {formatARS(Number(cajaChica.ingresos))}
                                             </span>
                                         </div>
@@ -772,6 +837,7 @@ export default function GastosIndex({
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                     {cards.map((card) => {
                         const isGeneral = card.key === 'general';
+
                         return (
                             <div
                                 key={card.key}
@@ -785,7 +851,7 @@ export default function GastosIndex({
                                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
                                         {cardIcon(card.key)}
                                     </div>
-                                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                         {card.label}
                                     </p>
                                 </div>
@@ -813,7 +879,7 @@ export default function GastosIndex({
                         <>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left text-sm">
-                                    <thead className="bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                    <thead className="bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                         <tr>
                                             <th className="px-3 py-2 font-medium">Fecha</th>
                                             <th className="px-3 py-2 font-medium">Descripción</th>
@@ -877,6 +943,7 @@ export default function GastosIndex({
                             const catGastos = gastosByCat[cat.key];
                             const catOpen = expandedCats.has(cat.key);
                             const catTotal = categoryAmount(catGastos);
+
                             return (
                                 <div
                                     key={cat.key}
@@ -920,10 +987,14 @@ export default function GastosIndex({
                                                 catGastos.length > 0 &&
                                                 (() => {
                                                     const bd = empresasBreakdown(catGastos);
-                                                    if (bd.length === 0) return null;
+
+                                                    if (bd.length === 0) {
+return null;
+}
+
                                                     return (
                                                         <div className="mb-2 rounded-lg border border-border bg-card p-3">
-                                                            <p className="mb-2 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                                                            <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                                                                 Reparto por empresa (según autos alquilados)
                                                             </p>
                                                             <div className="flex flex-wrap gap-2">
@@ -963,6 +1034,7 @@ export default function GastosIndex({
                                                                 categoryAmount(
                                                                     inv.gastos,
                                                                 );
+
                                                             return (
                                                                 <div
                                                                     key={invKey}
@@ -988,7 +1060,7 @@ export default function GastosIndex({
                                                                                     inv.inversion_nombre
                                                                                 }
                                                                             </span>
-                                                                            <span className="shrink-0 text-[10px] text-muted-foreground">
+                                                                            <span className="shrink-0 text-xs text-muted-foreground">
                                                                                 ·{' '}
                                                                                 {
                                                                                     inv
@@ -1033,14 +1105,17 @@ export default function GastosIndex({
                         })}
                     </div>
                 )}
-            </div>
+            </PageContainer>
 
             {/* ─── Modal Nuevo Gasto ─────────────────────────────────────── */}
             <Dialog
                 open={showModal}
                 onOpenChange={(open) => {
                     setShowModal(open);
-                    if (!open) resetForm();
+
+                    if (!open) {
+resetForm();
+}
                 }}
             >
                 <DialogContent
@@ -1048,8 +1123,8 @@ export default function GastosIndex({
                     onOpenAutoFocus={(e) => e.preventDefault()}
                 >
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
-                            <HandCoins className="h-5 w-5 text-amber-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft">
+                            <HandCoins aria-hidden="true" className="size-5 text-warning-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Registrar gasto</DialogTitle>
@@ -1178,7 +1253,10 @@ export default function GastosIndex({
                 open={showCajaModal}
                 onOpenChange={(open) => {
                     setShowCajaModal(open);
-                    if (!open) resetCajaForm();
+
+                    if (!open) {
+resetCajaForm();
+}
                 }}
             >
                 <DialogContent
@@ -1186,8 +1264,8 @@ export default function GastosIndex({
                     onOpenAutoFocus={(e) => e.preventDefault()}
                 >
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-                            <Wallet className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-soft">
+                            <Wallet aria-hidden="true" className="size-5 text-success-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Movimiento de caja chica</DialogTitle>
@@ -1278,8 +1356,8 @@ export default function GastosIndex({
             <Dialog open={showCajaHistorial} onOpenChange={setShowCajaHistorial}>
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-3xl">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-                            <History className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-soft">
+                            <History aria-hidden="true" className="size-5 text-success-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Historial de caja chica</DialogTitle>
@@ -1296,7 +1374,7 @@ export default function GastosIndex({
                             </p>
                         ) : (
                             <table className="w-full text-left text-sm">
-                                <thead className="sticky top-0 bg-muted/40 text-[10px] tracking-wider text-muted-foreground uppercase">
+                                <thead className="sticky top-0 bg-muted/40 text-xs tracking-wider text-muted-foreground uppercase">
                                     <tr>
                                         <th className="px-3 py-2 font-medium">Fecha</th>
                                         <th className="px-3 py-2 font-medium">Tipo</th>
@@ -1318,7 +1396,7 @@ export default function GastosIndex({
                                             <td className="px-3 py-2 text-foreground">
                                                 {m.nota ?? '—'}
                                                 {m.revertido && (
-                                                    <span className="ml-1.5 text-[10px] text-muted-foreground">
+                                                    <span className="ml-1.5 text-xs text-muted-foreground">
                                                         (revertido)
                                                     </span>
                                                 )}
@@ -1328,7 +1406,7 @@ export default function GastosIndex({
                                             </td>
                                             <td
                                                 className={`px-3 py-2 text-right font-bold whitespace-nowrap ${
-                                                    m.monto < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                                                    m.monto < 0 ? 'text-destructive' : 'text-success'
                                                 }`}
                                             >
                                                 {formatARS(Number(m.monto))}
@@ -1371,13 +1449,15 @@ export default function GastosIndex({
             <Dialog
                 open={confirmDeleteId !== null}
                 onOpenChange={(open) => {
-                    if (!open) setConfirmDeleteId(null);
+                    if (!open) {
+setConfirmDeleteId(null);
+}
                 }}
             >
                 <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-sm">
                     <div className="flex items-start gap-3 border-b border-border px-5 pt-5 pb-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500/15">
-                            <Trash2 className="h-5 w-5 text-red-500" />
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-destructive-soft">
+                            <Trash2 aria-hidden="true" className="size-5 text-destructive-soft-foreground" />
                         </div>
                         <div className="flex-1">
                             <DialogTitle className="text-base font-semibold">Eliminar gasto</DialogTitle>
