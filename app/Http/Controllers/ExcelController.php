@@ -27,14 +27,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ExcelController extends Controller
 {
-    /** Etiquetas legibles del estado de service (mismas que la pantalla). */
-    private const ESTADO_SERVICE_LABEL = [
-        'vencido' => 'Service vencido',
-        'al_dia' => 'Al día',
-        'sin_service' => 'Sin service',
-        'sin_km' => 'Sin datos',
-    ];
-
     /**
      * Excel del Resumen financiero: mismos filtros y misma Action que la
      * vista (las cifras exportadas nunca divergen de la pantalla).
@@ -547,27 +539,16 @@ class ExcelController extends Controller
         ]);
 
         $writer = SimpleExcelWriter::streamDownload('service-'.now()->format('Y-m-d').'.xlsx');
-        $writer->addHeader([
-            'Patente', 'Marca', 'Modelo', 'Año', 'Empresa', 'Conductor',
-            'Km actual', 'Último service (km)', 'Último service (fecha)', 'Realizado por',
-            'Km recorridos', 'Km restantes', 'Estado',
-        ]);
+        $writer->addHeader(['Patente', 'Empresa', 'Inversión', 'Km actual', 'Últ. service', 'Fecha']);
 
         foreach ($vehiculos as $v) {
             $writer->addRow([
                 $v['patente'],
-                $v['marca'],
-                $v['modelo'],
-                $v['anio'],
                 $v['empresa'] ?? '',
-                $v['conductor'] ?? 'Sin conductor',
+                $v['inversion'] ?? 'Sin inversión',
                 $v['km_actual'] ?? '',
                 $v['ultimo_service']['kilometraje'] ?? '',
                 isset($v['ultimo_service']) ? Carbon::parse($v['ultimo_service']['fecha'])->format('d/m/Y') : '',
-                $v['ultimo_service']['realizado_por'] ?? '',
-                $v['km_recorridos'] ?? '',
-                $v['km_restantes'] ?? '',
-                self::ESTADO_SERVICE_LABEL[$v['estado']] ?? $v['estado'],
             ]);
         }
 
