@@ -499,7 +499,7 @@ class PdfController extends Controller
         $intervaloKm = Service::INTERVALO_KM;
 
         $pdf = Pdf::loadView('pdf.services', compact('vehiculos', 'filtros', 'intervaloKm'))
-            ->setPaper('a4', 'landscape');
+            ->setPaper('a4', 'portrait');
 
         return $pdf->download('service-'.now()->format('Y-m-d').'.pdf');
     }

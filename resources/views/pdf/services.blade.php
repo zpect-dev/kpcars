@@ -31,42 +31,29 @@
     <table>
         <thead>
             <tr>
-                <th style="width:9%">Patente</th>
-                <th style="width:14%">Vehículo</th>
-                <th style="width:11%">Empresa</th>
-                <th style="width:14%">Conductor</th>
-                <th class="numeric" style="width:10%">Km actual</th>
-                <th class="numeric" style="width:10%">Últ. service</th>
-                <th class="center" style="width:9%">Fecha</th>
-                <th style="width:11%">Realizado por</th>
-                <th class="numeric" style="width:12%">Estado</th>
+                <th style="width:14%">Patente</th>
+                <th style="width:18%">Empresa</th>
+                <th style="width:20%">Inversión</th>
+                <th class="numeric" style="width:16%">Km actual</th>
+                <th class="numeric" style="width:16%">Últ. service</th>
+                <th class="center" style="width:16%">Fecha</th>
             </tr>
         </thead>
         <tbody>
             @forelse($vehiculos as $v)
                 <tr>
                     <td>{{ $v['patente'] }}</td>
-                    <td>{{ trim($v['marca'].' '.$v['modelo']) }}</td>
                     <td>{{ $v['empresa'] ?? '—' }}</td>
-                    <td>{{ $v['conductor'] ?? 'Sin conductor' }}</td>
+                    <td>{{ $v['inversion'] ?? 'Sin inversión' }}</td>
                     <td class="numeric">{{ $km($v['km_actual']) }}</td>
                     <td class="numeric">{{ $km($v['ultimo_service']['kilometraje'] ?? null) }}</td>
                     <td class="center">
                         {{ isset($v['ultimo_service']) ? \Carbon\Carbon::parse($v['ultimo_service']['fecha'])->format('d/m/Y') : '—' }}
                     </td>
-                    <td>{{ $v['ultimo_service']['realizado_por'] ?? '—' }}</td>
-                    <td class="numeric">
-                        {{ $estadoLabels[$v['estado']] ?? $v['estado'] }}
-                        @if($v['estado'] === 'vencido')
-                            (+{{ number_format(max(0, ($v['km_recorridos'] ?? 0) - $intervaloKm), 0, ',', '.') }})
-                        @elseif($v['estado'] === 'al_dia')
-                            ({{ number_format((int) $v['km_restantes'], 0, ',', '.') }} rest.)
-                        @endif
-                    </td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="9" class="center">No hay vehículos que coincidan con los filtros.</td>
+                    <td colspan="6" class="center">No hay vehículos que coincidan con los filtros.</td>
                 </tr>
             @endforelse
         </tbody>
