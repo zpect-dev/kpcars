@@ -169,7 +169,10 @@ export function Combobox({
                 </div>
             </PopoverAnchor>
             <PopoverContent
-                className="p-0 border-none shadow-none"
+                // pointer-events-auto: dentro de un Dialog modal, Radix pone
+                // pointer-events:none en <body> y el portal del Popover lo hereda,
+                // lo que mata los clicks sobre las sugerencias.
+                className="pointer-events-auto border-none p-0 shadow-none"
                 style={{ width: inputRef.current?.offsetWidth }}
                 onOpenAutoFocus={(e) => e.preventDefault()}
                 onCloseAutoFocus={(e) => e.preventDefault()}
