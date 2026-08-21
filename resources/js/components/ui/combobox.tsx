@@ -209,10 +209,13 @@ export function Combobox({
                                             : 'hover:bg-accent/60',
                                     )}
                                     onMouseEnter={() => setHighlightedIndex(idx)}
-                                    onMouseDown={(e) => {
+                                    onPointerDown={(e) => {
+                                        // Evita que el input pierda el foco al
+                                        // presionar; la seleccion ocurre en el
+                                        // click, que tambien cubre tactil.
                                         e.preventDefault();
-                                        handleSelect(option);
                                     }}
+                                    onClick={() => handleSelect(option)}
                                 >
                                     <span className="flex min-w-0 flex-1 items-center gap-2">
                                         {option.code && (
